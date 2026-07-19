@@ -25,6 +25,12 @@ class UserFactory extends Factory
     public function definition(): array
     {
         return [
+            // No university_id / role default here on purpose: role dictates
+            // whether university_id may be null (super_admin) or must be set
+            // (org_admin/technician), so state methods below own that pairing
+            // instead of the base definition guessing at it.
+            'university_id' => null,
+            'role' => 'technician',
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
@@ -40,6 +46,39 @@ class UserFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'email_verified_at' => null,
+        ]);
+    }
+
+    /**
+     * Platform-level role, never tied to a university.
+     */
+    public function superAdmin(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role' => 'super_admin',
+            'university_id' => null,
+        ]);
+    }
+
+    /**
+     * Manages one university's buildings/rooms/units/technicians.
+     */
+    public function orgAdmin(int $universityId): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role' => 'org_admin',
+            'university_id' => $universityId,
+        ]);
+    }
+
+    /**
+     * Scans QR codes and logs maintenance work for one university.
+     */
+    public function technician(int $universityId): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role' => 'technician',
+            'university_id' => $universityId,
         ]);
     }
 }
