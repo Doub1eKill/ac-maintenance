@@ -14,6 +14,7 @@ class Building extends Model
     protected $fillable = [
         'university_id',
         'name',
+        'abbreviation',
     ];
 
     public function university(): BelongsTo

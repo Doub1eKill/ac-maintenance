@@ -31,6 +31,11 @@ class UserFactory extends Factory
             // instead of the base definition guessing at it.
             'university_id' => null,
             'role' => 'technician',
+            // Factory/seeded users represent already-provisioned staff, not
+            // self-registrations, so they default to 'active' — the DB
+            // column default stays 'pending' for anything created outside
+            // the factory (e.g. the public registration form).
+            'status' => 'active',
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
@@ -79,6 +84,16 @@ class UserFactory extends Factory
         return $this->state(fn (array $attributes) => [
             'role' => 'technician',
             'university_id' => $universityId,
+        ]);
+    }
+
+    /**
+     * Mirrors a fresh self-registration awaiting org_admin approval.
+     */
+    public function pending(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'status' => 'pending',
         ]);
     }
 }

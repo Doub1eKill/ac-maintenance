@@ -16,6 +16,7 @@ class UniversityFactory extends Factory
     {
         return [
             'name' => fake()->unique()->company().' University',
+            'abbreviation' => strtoupper(fake()->unique()->lexify('????')),
             'address' => fake()->address(),
             'phone' => fake()->numerify('0#-###-####'),
         ];

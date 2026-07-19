@@ -15,9 +15,16 @@ class AirConditionerSeeder extends Seeder
         University::with('buildings.rooms')->get()->each(function (University $university) {
             $university->buildings->each(function ($building) {
                 $building->rooms->each(function ($room) {
-                    AirConditioner::factory()
-                        ->count(rand(1, 4))
-                        ->create(['room_id' => $room->id]);
+                    // One at a time (not ->count(n)->create()) so each unit's
+                    // ac_code sees the previous one already committed —
+                    // ->count(n)->create() would compute the same "next
+                    // sequence" for every row in the batch and collide.
+                    foreach (range(1, rand(1, 4)) as $i) {
+                        AirConditioner::factory()->create([
+                            'room_id' => $room->id,
+                            'ac_code' => AirConditioner::generateCodeForRoom($room),
+                        ]);
+                    }
                 });
             });
         });

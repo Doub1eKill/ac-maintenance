@@ -18,6 +18,11 @@ class AirConditionerFactory extends Factory
     {
         return [
             'room_id' => Room::factory(),
+            // Placeholder only, for ad-hoc/standalone factory use (e.g.
+            // AirConditioner::factory()->create() in a test). The seeder
+            // always overrides this with AirConditioner::generateCodeForRoom()
+            // so demo data follows the real PKRU-B1-101-01 format.
+            'ac_code' => 'TMP-'.fake()->unique()->numberBetween(100000, 999999),
             'qr_code' => Str::uuid(),
             'brand' => fake()->randomElement(['Daikin', 'Mitsubishi Electric', 'Panasonic', 'LG', 'Carrier']),
             'model' => strtoupper(fake()->bothify('??-####')),

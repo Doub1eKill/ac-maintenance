@@ -23,10 +23,41 @@ class User extends Authenticatable
     protected $fillable = [
         'university_id',
         'role',
+        'status',
         'name',
         'email',
         'password',
     ];
+
+    /**
+     * Whether this account is allowed to log in and act right now.
+     * Separate from role — an account can be a valid technician and
+     * still be pending/suspended.
+     */
+    public function isActive(): bool
+    {
+        return $this->status === 'active';
+    }
+
+    /**
+     * Small readability helpers so role checks read as intent
+     * (`$user->isSuperAdmin()`) instead of repeating the raw string
+     * comparison in every controller/view that needs one.
+     */
+    public function isSuperAdmin(): bool
+    {
+        return $this->role === 'super_admin';
+    }
+
+    public function isOrgAdmin(): bool
+    {
+        return $this->role === 'org_admin';
+    }
+
+    public function isTechnician(): bool
+    {
+        return $this->role === 'technician';
+    }
 
     public function university(): BelongsTo
     {
@@ -41,6 +72,16 @@ class User extends Authenticatable
     public function maintenanceLogs(): HasMany
     {
         return $this->hasMany(MaintenanceLog::class);
+    }
+
+    /**
+     * Work orders this technician currently holds/has held — named
+     * "claimed" (not just workOrders()) since the FK is claimed_by, a
+     * pool-claim relationship, not "assigned to" in the traditional sense.
+     */
+    public function claimedWorkOrders(): HasMany
+    {
+        return $this->hasMany(WorkOrder::class, 'claimed_by');
     }
 
     /**

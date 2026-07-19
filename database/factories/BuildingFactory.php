@@ -24,6 +24,11 @@ class BuildingFactory extends Factory
             // (university_id, name) unique index.
             'name' => fake()->randomElement(['Engineering', 'Science', 'Library', 'Administration', 'Dormitory'])
                 .' Building '.fake()->unique()->numberBetween(100, 999999),
+            // Globally unique here too (stricter than the actual
+            // (university_id, abbreviation) constraint needs) — same
+            // reasoning as `name` above: simplest way to avoid collisions
+            // across a whole seeding run without tracking per-university state.
+            'abbreviation' => 'B'.fake()->unique()->numberBetween(1, 999999),
         ];
     }
 }

@@ -12,6 +12,7 @@ class MaintenanceLog extends Model
 
     protected $fillable = [
         'air_conditioner_id',
+        'work_order_id',
         'user_id',
         'action',
         'notes',
@@ -33,5 +34,10 @@ class MaintenanceLog extends Model
     public function technician(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    public function workOrder(): BelongsTo
+    {
+        return $this->belongsTo(WorkOrder::class);
     }
 }

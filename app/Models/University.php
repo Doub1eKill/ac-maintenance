@@ -12,6 +12,7 @@ class University extends Model
 
     protected $fillable = [
         'name',
+        'abbreviation',
         'address',
         'phone',
     ];
@@ -24,5 +25,10 @@ class University extends Model
     public function users(): HasMany
     {
         return $this->hasMany(User::class);
+    }
+
+    public function workOrders(): HasMany
+    {
+        return $this->hasMany(WorkOrder::class);
     }
 }
