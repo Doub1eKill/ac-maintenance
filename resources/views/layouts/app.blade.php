@@ -12,7 +12,7 @@
         <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
 
         <!-- Scripts -->
-        @vite(['resources/css/app.css', 'resources/js/app.js'])
+        @vite(['resources/css/app.css', 'resources/js/app.tsx'])
     </head>
     <body class="font-sans antialiased">
         <div class="min-h-screen bg-gray-100">
@@ -30,6 +30,8 @@
             <!-- Page Content -->
             <main>
                 {{ $slot }}
+                {{-- React mount point: components will mount here when #react-root is present --}}
+                <div id="react-root" data-page="{{ request()->route()?->getName() }}"></div>
             </main>
         </div>
     </body>
