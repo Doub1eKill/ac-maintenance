@@ -1,7 +1,11 @@
+import { AuthLayout } from "@/components/auth/auth-layout";
 import { ResetPasswordForm } from "./reset-password-form";
 
-// Server Component: reads the token straight out of the URL server-side,
-// the form itself is the only part that needs client interactivity.
+export const metadata = {
+  title: "ตั้งรหัสผ่านใหม่ | AC Maintenance System",
+  description: "ตั้งรหัสผ่านใหม่สำหรับเข้าใช้งานระบบบริหารจัดการและแจ้งซ่อมเครื่องปรับอากาศ",
+};
+
 export default async function ResetPasswordPage({
   searchParams,
 }: {
@@ -11,16 +15,23 @@ export default async function ResetPasswordPage({
 
   if (!token) {
     return (
-      <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-4">
-        <p className="text-sm text-red-800">Missing reset token.</p>
-      </main>
+      <AuthLayout
+        title="ข้อผิดพลาด"
+        subtitle="ไม่พบโทเค็นสำหรับตั้งรหัสผ่านใหม่ กรุณาขอลิงก์ใหม่อีกครั้ง"
+      >
+        <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-400 text-center">
+          ไม่พบรหัสโทเค็น (Missing Reset Token)
+        </div>
+      </AuthLayout>
     );
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-4">
-      <h1 className="mb-6 text-2xl font-semibold text-gray-900">Set a new password</h1>
+    <AuthLayout
+      title="ตั้งรหัสผ่านใหม่"
+      subtitle="กรุณาระบุรหัสผ่านใหม่ที่คุณต้องการใช้สำหรับเข้าสู่ระบบ"
+    >
       <ResetPasswordForm token={token} />
-    </main>
+    </AuthLayout>
   );
 }

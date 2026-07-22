@@ -1,12 +1,18 @@
+import { AuthLayout } from "@/components/auth/auth-layout";
 import { LoginForm } from "@/components/login-form";
 
-// Server Component: this page itself has no interactivity, only the form
-// (which needs onSubmit/useState) is a Client Component.
+export const metadata = {
+  title: "เข้าสู่ระบบ | AC Maintenance System",
+  description: "เข้าสู่ระบบบริหารจัดการและแจ้งซ่อมเครื่องปรับอากาศระดับมหาวิทยาลัย",
+};
+
 export default function LoginPage() {
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-4">
-      <h1 className="mb-6 text-2xl font-semibold text-gray-900">Log in</h1>
+    <AuthLayout
+      title="ยินดีต้อนรับเข้าสู่ระบบ"
+      subtitle="กรุณากรอกอีเมลและรหัสผ่านเพื่อเข้าสู่บัญชีใช้งานของคุณ"
+    >
       <LoginForm />
-    </main>
+    </AuthLayout>
   );
 }

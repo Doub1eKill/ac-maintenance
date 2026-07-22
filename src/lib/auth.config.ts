@@ -38,9 +38,9 @@ export const authConfig = {
     },
     session({ session, token }) {
       session.user.id = token.sub as string;
-      session.user.role = token.role;
-      session.user.status = token.status;
-      session.user.universityId = token.universityId;
+      session.user.role = token.role as any;
+      session.user.status = token.status as any;
+      session.user.universityId = token.universityId as any;
       return session;
     },
     authorized({ auth, request }) {

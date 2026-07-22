@@ -5,7 +5,7 @@
 // password without carrying over Laravel-specific bcrypt cost/config, so
 // there's no safe way to keep them usable under the new auth system.
 import { PrismaMariaDb } from "@prisma/adapter-mariadb";
-import { PrismaClient } from "../src/generated/prisma/client.ts";
+import { PrismaClient } from "../src/generated/prisma/client";
 import "dotenv/config";
 
 async function main() {

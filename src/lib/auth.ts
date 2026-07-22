@@ -10,12 +10,6 @@ const credentialsSchema = z.object({
   password: z.string().min(1),
 });
 
-// Distinct, non-generic codes for the account states a legitimate holder of
-// this email can usefully act on (this is a closed, invite-only B2B system —
-// unlike a public consumer app, these don't leak "does this email exist"
-// information in any way that matters here). Wrong password / unknown email
-// still collapse into one generic error below, per standard anti-enumeration
-// practice.
 class AccountPendingApproval extends CredentialsSignin {
   code = "account-pending";
 }
@@ -35,48 +29,71 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "Password", type: "password" },
       },
       async authorize(rawCredentials) {
+        console.log("[AUTH LOG] rawCredentials:", rawCredentials);
         const parsed = credentialsSchema.safeParse(rawCredentials);
-        if (!parsed.success) return null;
-
-        const user = await prisma.user.findUnique({
-          where: { email: parsed.data.email },
-        });
-
-        // Same generic outcome for "no such user" and "wrong password"
-        // (checked together below) — never confirm which one it was.
-        if (!user) return null;
-
-        // NULL password is this app's "must reset password" flag (see the
-        // schema comment) — surfaced distinctly because, unlike "wrong
-        // password", the user genuinely cannot succeed here no matter what
-        // they type, so a generic "invalid credentials" would just be
-        // confusing dead-end UX.
-        if (user.password === null) {
-          throw new PasswordResetRequired();
-        }
-        if (user.status === "suspended") {
-          throw new AccountSuspended();
-        }
-        if (user.status === "pending") {
-          throw new AccountPendingApproval();
+        if (!parsed.success) {
+          console.log("[AUTH LOG] Zod validation failed:", parsed.error);
+          return null;
         }
 
-        const passwordMatches = await bcrypt.compare(parsed.data.password, user.password);
-        if (!passwordMatches) return null;
+        const email = parsed.data.email.toLowerCase().trim();
+        console.log("[AUTH LOG] Looking for user with email:", email);
 
-        return {
-          id: String(user.id),
-          email: user.email,
-          name: user.name,
-          role: user.role,
-          status: user.status,
-          universityId: user.universityId ? Number(user.universityId) : null,
-        };
+        try {
+          const user = await prisma.user.findUnique({
+            where: { email },
+          });
+
+          if (!user) {
+            console.log("[AUTH LOG] User not found for email:", email);
+            return null;
+          }
+
+          console.log("[AUTH LOG] User found:", {
+            id: String(user.id),
+            email: user.email,
+            role: user.role,
+            status: user.status,
+            hasPassword: !!user.password,
+          });
+
+          if (user.password === null) {
+            console.log("[AUTH LOG] Password is null");
+            throw new PasswordResetRequired();
+          }
+          if (user.status === "suspended") {
+            console.log("[AUTH LOG] Account is suspended");
+            throw new AccountSuspended();
+          }
+          if (user.status === "pending") {
+            console.log("[AUTH LOG] Account is pending approval");
+            throw new AccountPendingApproval();
+          }
+
+          const passwordMatches = await bcrypt.compare(parsed.data.password, user.password);
+          console.log("[AUTH LOG] Password matches:", passwordMatches);
+
+          if (!passwordMatches) {
+            console.log("[AUTH LOG] Password comparison failed!");
+            return null;
+          }
+
+          return {
+            id: String(user.id),
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            status: user.status,
+            universityId: user.universityId ? Number(user.universityId) : null,
+          };
+        } catch (error) {
+          if (error instanceof CredentialsSignin) {
+            throw error;
+          }
+          console.error("[AUTH LOG] Unexpected error in authorize:", error);
+          return null;
+        }
       },
     }),
   ],
-  // jwt/session/authorized callbacks all come from authConfig unchanged —
-  // they live there specifically so proxy.ts's separate NextAuth(authConfig)
-  // instance sees the exact same role/status/universityId logic (see the
-  // comment on those callbacks in auth.config.ts for why that matters).
 });
