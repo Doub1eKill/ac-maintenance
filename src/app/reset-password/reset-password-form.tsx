@@ -3,6 +3,8 @@
 import { useState, useActionState } from "react";
 import Link from "next/link";
 import { resetPassword, type ResetPasswordState } from "./actions";
+import { Eye, EyeOff, AlertTriangle, CheckCircle2, KeyRound } from "lucide-react";
+import { AnimatedIcon } from "@/components/ui/animated-icon";
 
 export function ResetPasswordForm({ token }: { token: string }) {
   const [state, formAction, isPending] = useActionState<ResetPasswordState, FormData>(
@@ -14,21 +16,20 @@ export function ResetPasswordForm({ token }: { token: string }) {
   if (state?.success) {
     return (
       <div className="space-y-6 text-center">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
-          <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-600 shadow-2xs">
+          <CheckCircle2 className="h-7 w-7 text-emerald-600" />
         </div>
-        <div className="space-y-2">
-          <h3 className="text-xl font-bold text-white">ตั้งรหัสผ่านใหม่เรียบร้อยแล้ว</h3>
-          <p className="text-xs text-slate-300">
+        <div className="space-y-1">
+          <h3 className="text-xl font-extrabold text-slate-950">ตั้งรหัสผ่านใหม่เรียบร้อยแล้ว</h3>
+          <p className="text-xs text-slate-600">
             คุณสามารถใช้รหัสผ่านใหม่เพื่อเข้าสู่ระบบบริหารจัดการได้ทันที
           </p>
         </div>
         <Link
           href="/login"
-          className="inline-flex w-full items-center justify-center rounded-xl bg-sky-500 py-3 font-semibold text-slate-950 hover:bg-sky-400 transition-colors shadow-lg shadow-sky-500/20"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 py-3 font-bold text-xs text-white hover:bg-slate-800 transition-all shadow-md"
         >
+          <KeyRound className="h-4 w-4" />
           เข้าสู่ระบบเลย
         </Link>
       </div>
@@ -40,14 +41,14 @@ export function ResetPasswordForm({ token }: { token: string }) {
       <input type="hidden" name="token" value={token} />
 
       {state?.error && (
-        <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3.5 text-xs text-red-400 flex items-start gap-2">
-          <span>⚠️</span>
+        <div className="rounded-xl border border-red-200 bg-red-50 p-3.5 text-xs text-red-900 flex items-start gap-2.5 shadow-2xs">
+          <AlertTriangle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
           <div>{state.error}</div>
         </div>
       )}
 
       <div>
-        <label htmlFor="password" className="mb-1.5 block text-xs font-medium text-slate-300">
+        <label htmlFor="password" className="mb-1.5 block text-xs font-bold text-slate-800">
           รหัสผ่านใหม่ (อย่างน้อย 8 ตัวอักษร)
         </label>
         <div className="relative">
@@ -59,14 +60,14 @@ export function ResetPasswordForm({ token }: { token: string }) {
             minLength={8}
             autoComplete="new-password"
             placeholder="••••••••"
-            className="w-full rounded-xl border border-slate-700 bg-slate-950/80 px-3.5 py-2.5 pr-10 text-sm text-white placeholder-slate-500 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 transition-all"
+            className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 pr-10 text-xs text-slate-900 placeholder-slate-400 focus:border-slate-950 focus:outline-none shadow-2xs"
           />
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-950"
           >
-            {showPassword ? "🙈" : "👁️"}
+            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
         </div>
       </div>
@@ -74,7 +75,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
       <button
         type="submit"
         disabled={isPending}
-        className="w-full rounded-xl bg-gradient-to-r from-sky-500 to-cyan-400 py-3 font-bold text-slate-950 hover:from-sky-400 hover:to-cyan-300 disabled:opacity-50 transition-all shadow-lg shadow-sky-500/20 mt-2"
+        className="w-full rounded-xl bg-slate-950 py-3 font-bold text-xs text-white hover:bg-slate-800 disabled:opacity-50 transition-all shadow-md mt-2"
       >
         {isPending ? "กำลังบันทึก..." : "บันทึกรหัสผ่านใหม่"}
       </button>

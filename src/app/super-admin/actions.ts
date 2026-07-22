@@ -16,70 +16,86 @@ async function verifySuperAdmin() {
 export async function getSuperAdminData() {
   await verifySuperAdmin();
 
-  const [
-    totalUniversities,
-    pendingUsersCount,
-    totalTechsCount,
-    totalWorkOrdersCount,
-    pendingUsersRaw,
-    universitiesRaw,
-  ] = await Promise.all([
-    prisma.university.count(),
-    prisma.user.count({ where: { status: "pending" } }),
-    prisma.user.count({ where: { role: "technician" } }),
-    prisma.workOrder.count(),
-    prisma.user.findMany({
-      where: { status: "pending" },
-      include: { university: true },
-      orderBy: { createdAt: "desc" },
-    }),
-    prisma.university.findMany({
-      include: {
-        _count: {
-          select: {
-            buildings: true,
-            users: true,
-            workOrders: true,
-          },
-        },
-      },
-      orderBy: { createdAt: "desc" },
-    }),
-  ]);
-
-  const pendingUsers = pendingUsersRaw.map((u) => ({
-    id: u.id.toString(),
-    name: u.name,
-    email: u.email,
-    role: u.role,
-    status: u.status,
-    createdAt: u.createdAt ? u.createdAt.toISOString() : null,
-    universityName: u.university?.name || "ไม่ระบุ",
-    universityAbbr: u.university?.abbreviation || "-",
-  }));
-
-  const universities = universitiesRaw.map((u) => ({
-    id: u.id.toString(),
-    name: u.name,
-    abbreviation: u.abbreviation,
-    address: u.address,
-    phone: u.phone,
-    buildingsCount: u._count.buildings,
-    usersCount: u._count.users,
-    workOrdersCount: u._count.workOrders,
-    createdAt: u.createdAt ? u.createdAt.toISOString() : null,
-  }));
-
-  return {
-    metrics: {
+  try {
+    const [
       totalUniversities,
       pendingUsersCount,
       totalTechsCount,
       totalWorkOrdersCount,
-    },
-    pendingUsers,
-    universities,
-  };
+      pendingUsersRaw,
+      universitiesRaw,
+    ] = await Promise.all([
+      prisma.university.count(),
+      prisma.user.count({ where: { status: "pending" } }),
+      prisma.user.count({ where: { role: "technician" } }),
+      prisma.workOrder.count(),
+      prisma.user.findMany({
+        where: { status: "pending" },
+        include: { university: true },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.university.findMany({
+        include: {
+          _count: {
+            select: {
+              buildings: true,
+              users: true,
+              workOrders: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+    ]);
+
+    const pendingUsers = pendingUsersRaw.map((u) => ({
+      id: u.id.toString(),
+      name: u.name,
+      email: u.email,
+      role: u.role,
+      status: u.status,
+      createdAt: u.createdAt ? u.createdAt.toISOString() : null,
+      universityName: u.university?.name || "ไม่ระบุ",
+      universityAbbr: u.university?.abbreviation || "-",
+    }));
+
+    const universities = universitiesRaw.map((u) => ({
+      id: u.id.toString(),
+      name: u.name,
+      abbreviation: u.abbreviation,
+      address: u.address,
+      phone: u.phone,
+      buildingsCount: u._count.buildings,
+      usersCount: u._count.users,
+      workOrdersCount: u._count.workOrders,
+      createdAt: u.createdAt ? u.createdAt.toISOString() : null,
+    }));
+
+    return {
+      dbError: null,
+      metrics: {
+        totalUniversities,
+        pendingUsersCount,
+        totalTechsCount,
+        totalWorkOrdersCount,
+      },
+      pendingUsers,
+      universities,
+    };
+  } catch (error) {
+    console.error("Super Admin Data query failed:", error);
+    return {
+      dbError: "ไม่สามารถเชื่อมต่อฐานข้อมูล MariaDB/MySQL ได้ (Connection Pool Timeout) - กรุณาตรวจสอบว่าเซิร์ฟเวอร์ MySQL บนพอร์ต 3307 เปิดใช้งานอยู่ และเรียกใช้ 'npx tsx prisma/seed.ts'",
+      metrics: {
+        totalUniversities: 0,
+        pendingUsersCount: 0,
+        totalTechsCount: 0,
+        totalWorkOrdersCount: 0,
+      },
+      pendingUsers: [],
+      universities: [],
+    };
+  }
 }
 
 export async function updateUserStatusAction(userId: string, newStatus: "active" | "suspended") {
@@ -94,7 +110,7 @@ export async function updateUserStatusAction(userId: string, newStatus: "active"
     return { success: true };
   } catch (error) {
     console.error("Failed to update user status:", error);
-    return { error: "ไม่สามารถอัปเดตสถานะผู้ใช้ได้" };
+    return { error: "ไม่สามารถอัปเดตสถานะผู้ใช้ได้ กรุณาตรวจสอบการเชื่อมต่อฐานข้อมูล" };
   }
 }
 

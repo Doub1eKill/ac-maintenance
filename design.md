@@ -1,148 +1,81 @@
-# 🎨 Design System & Architecture Specification (`design.md`)
-> **Project:** AC Maintenance System (ระบบบริหารจัดการและแจ้งซ่อมเครื่องปรับอากาศ)  
+# 🎨 Design System & Architecture Specification (`DESIGN.md`)
+> **Project:** AC Maintenance System (ระบบบริหารจัดการและแจ้งซ่อมเครื่องปรับอากาศ มหาวิทยาลัย)  
+> **Visual Reference:** Executive SaaS Dashboard (BizLink Aesthetic Specification)  
 > **Target Framework:** Next.js 16 (App Router) + Tailwind CSS v4 + Prisma 7  
-> **Design Philosophy:** Modern Enterprise Utility, Clean, High-Contrast & Mobile-First  
+> **Design Philosophy:** Warm Off-White Minimalist, Executive Kanban Grid, High Contrast & User-Friendly  
 
 ---
 
-## 1. 📌 Executive Summary & Project Vision
+## 1. 📌 Executive Summary & Visual Direction
 
-ระบบ **AC Maintenance** เป็นแพลตฟอร์มบริหารจัดการและบันทึกประวัติการบำรุงรักษาเครื่องปรับอากาศระดับมหาวิทยาลัย (Multi-tenant Architecture) ออกแบบมารองรับผู้ใช้งาน 3 กลุ่มหลัก ได้แก่ **Super Admin**, **Org Admin (มหาวิทยาลัย)** และ **Technician (ช่างเทคนิค)**
+ระบบ **AC Maintenance** ได้รับการปรับปรุงสถาปัตยกรรม UI/UX ให้ตรงตามแรงบันดาลใจจากแดชบอร์ด **BizLink Executive SaaS** (เน้นความสะอาด โปร่ง สบายตา และมี Hierarchy ระดับพรีเมียม)
 
-### Key Objectives
-1. **Visual Clarity:** แสดงสถานะเครื่องปรับอากาศและใบงานซ่อมบำรุง (Work Orders) ได้ทันทีผ่าน Dashboard ที่เข้าใจง่าย
-2. **Field-Optimized UX:** รองรับการใช้งานของช่างเทคนิคบนสมาร์ทโฟนแบบ Mobile-First (สแกน QR Code, กดรับงาน, บันทึกการซ่อม)
-3. **Data Integrity & Multi-Tenancy:** แยกขอบเขตข้อมูลของแต่ละมหาวิทยาลัยอย่างเด็ดขาด (`university_id`)
-4. **Fast & Responsive:** โหลดรวดเร็ว ใช้งานง่ายด้วยโทนสีที่สบายตา มี Hierarchy ชัดเจน
+### Key Design Pillars
+1. **Warm Off-White Canvas (`#f7f7f2` / `#f4f4ee`):** พื้นหลังโทนสว่างนุ่มนวล ตาไม่ล้า ลดความแออัดของข้อมูล
+2. **Elevated White Cards & Dark Highlight Card:** การ์ดสีขาวสะอาดสะอ้าน (`#ffffff`) พร้อมขอบบาง (`border-slate-200/80`) และการ์ดเน้นไฮไลท์โทนเข้ม (`#18181b` Dark High-Contrast Card)
+3. **Left Sidebar Navigation:** เมนูแนวตั้งด้านซ้ายจัดเรียงหมวดหมู่ชัดเจน พร้อมสถิติจำนวนย่อย
+4. **Analytic Widgets & Kanban Status Grid:** ด้านบนแสดงกราฟแท่งสถิติรายสัปดาห์ (Weekly Bar Chart) ร่วมกับมาตรวัดความสมบูรณ์ (Progress Gauge) และเรียงลำดับการ์ดแอร์/ใบงานซ่อมตาม Kanban Columns (`Pending`, `Claimed`, `Completed`)
 
 ---
 
 ## 2. 🎨 Design Aesthetics & Visual Tokens
 
-### 2.1 Color Palette (โทนสีสถาปัตยกรรม)
-เน้นโทนสีสดใสที่สะท้อนถึงความเย็น ความสะอาด และความน่าเชื่อถือทางวิศวกรรม
+### 2.1 Color Palette (โทนสีระบบ)
 
-* **Primary (Cooling Teal & Ice Blue):**
-  * `Primary 600`: `#0284C7` (Sky Blue - ปุ่มหลัก / Header Highlights)
-  * `Primary 500`: `#0EA5E9` (Cyan Accent - Active State / Interactive Elements)
-  * `Primary 50`: `#F0F9FF` (Background Highlight / Soft Badge)
-* **Neutral Surface (Dark/Light Balance):**
-  * `Surface Canvas`: `#F8FAFC` (Light Background) / `#0F172A` (Dark Background)
-  * `Card Surface`: `#FFFFFF` / `#1E293B` (Elevated Cards with subtle border)
-  * `Text Main`: `#0F172A` / `#F8FAFC` (High contrast readability)
-  * `Text Muted`: `#64748B` / `#94A3B8` (Sub-headers & Labels)
-* **Status Colors (การแสดงสถานะที่ชัดเจน):**
-  * 🟢 **Normal / Completed:** `#10B981` (Emerald Green) - แอร์ปกติ / งานเสร็จสิ้น
-  * 🟡 **Needs Cleaning / Pending:** `#F59E0B` (Amber Gold) - ครบกำหนดล้าง / รอช่างรับงาน
-  * 🔴 **Broken / Critical:** `#EF4444` (Coral Red) - เครื่องเสีย / แจ้งซ่อมด่วน
-  * 🔵 **Claimed / In-Progress:** `#6366F1` (Indigo) - ช่างรับงานแล้ว กำลังซ่อม
-
----
-
-### 2.2 Typography (แบบอักษร)
-* **Font Family:** `Noto Sans Thai` (Google Fonts), `Inter`, sans-serif (รองรับภาษาไทยและอังกฤษอย่างสมบูรณ์ อ่านง่าย สบายตา สวยงามประณีตบนทุกอุปกรณ์)
-* **Hierarchy Scale:**
-  * `Page Title (H1)`: 28px / SemiBold (Tracking Tight)
-  * `Section Header (H2)`: 20px / SemiBold
-  * `Card Title (H3)`: 16px / Medium
-  * `Body Text`: 14px / Regular (Leading Relaxed)
-  * `Caption / Badge`: 12px / Medium (Uppercase Tracking Wider)
+* **Canvas & Surface (พื้นหลังและพื้นที่ใช้งาน):**
+  * `Canvas Background`: `#f7f7f2` (Warm Off-White)
+  * `Sidebar & Top Bar`: `#ffffff` (Pure Crisp White)
+  * `Card Surface`: `#ffffff` (Elevated White with `border border-slate-200/80` & `shadow-sm`)
+  * `Highlight Surface`: `#18181b` (Dark Slate / Charcoal Card for Active/Selected Items)
+* **Typography Colors:**
+  * `Heading Text`: `#09090b` (Deep Charcoal / Black)
+  * `Body Text`: `#27272a` (Slate 800)
+  * `Sub-text / Muted`: `#71717a` (Slate 500)
+* **Status Badges & Indicators:**
+  * 🟢 **Completed / Healthy:** `#10b981` (Emerald Green)
+  * 🟡 **Pending / Cleaning Due:** `#f59e0b` (Amber Gold)
+  * 🔴 **Broken / Urgent:** `#ef4444` (Coral Red)
+  * 🔵 **Claimed / In-Progress:** `#0284c7` (Sky Blue)
 
 ---
 
-### 2.3 UI Components & Micro-Interactions
-* **Glassmorphism & Clean Borders:** การใช้ Card ที่มีเงาบางเบา (`shadow-sm`) และขอบชัดเจน (`border border-slate-200`)
-* **Status Pills:** ป้ายกำกับสถานะหัวมน (Rounded Full) พร้อมจุดไฟ LED Animated Pulse สำหรับงานด่วน
-* **Micro-Animations:** Transition Smooth (150ms - 200ms) เมื่อ Hover ปุ่มหรือสลับ Tab
+## 2.2 Typography & Hierarchy
+
+* **Font Family:** `Noto Sans Thai`, `Inter`, sans-serif
+* **Hierarchy:**
+  * `Header H1`: 24px / Bold / `tracking-tight`
+  * `Section Title H2`: 18px / SemiBold
+  * `Card Title H3`: 15px / Bold / `#09090b`
+  * `Body Text`: 13px / Regular / `#27272a`
+  * `Metadata / Pill`: 11px / SemiBold / `#71717a`
 
 ---
 
-## 3. 🏗️ UX Workflows & Role-Based Dashboards
+## 3. 🏗️ Layout Structure (BizLink Layout Pattern)
 
 ```
-                   ┌──────────────────────────────────────┐
-                   │             Authentication           │
-                   │    /login  /reset-password           │
-                   └──────────────────┬───────────────────┘
-                                      │
-           ┌──────────────────────────┼──────────────────────────┐
-           ▼                          ▼                          ▼
-┌─────────────────────┐    ┌─────────────────────┐    ┌─────────────────────┐
-│    /super-admin     │    │       /admin        │    │        /tech        │
-│  Platform Overview  │    │  Org Admin Workspace │    │ Technician Workspace│
-│ - Universities List │    │ - Dashboard Metrics │    │ - Claim Job Pool    │
-│ - Global System Log │    │ - Asset Tree        │    │ - My Claimed Jobs   │
-│                     │    │ - Work Order Dispatch│    │ - QR Code Scanner   │
-│                     │    │ - User/Tech Status  │    │ - Log Repair Form   │
-└─────────────────────┘    └─────────────────────┘    └─────────────────────┘
-```
-
-### 3.1 Org Admin Workspace (`/admin`)
-เน้นการบริหารจัดการ assets และการจ่ายงานช่างในมหาวิทยาลัย
-* **Top Metric Cards:**
-  * จำนวนแอร์ทั้งหมด (Total Units)
-  * แอร์ที่ชำรุด/ต้องล้าง (Broken / Cleaning Due)
-  * ใบงานซ่อมบำรุงที่รอช่างรับงาน (Pending Work Orders)
-  * จำนวนช่างที่ปฏิบัติงาน (Active Technicians)
-* **Asset Hierarchy Tree (โครงสร้างอาคาร):**
-  * `University` ➔ `Building` ➔ `Room` ➔ `AirConditioner (acCode)`
-* **Work Order Dispatch Center:**
-  * ตารางติดตามสถานะงานแบบ Real-time Filter ตามตึก/สถานะ/ประเภทการซ่อม
-  * ปุ่มออกใบงานซ่อมด่วน (Create Work Order)
-
----
-
-### 3.2 Technician Workspace (`/tech`) — Mobile-First Design
-ออกแบบมาให้ใช้บนมือถือได้ด้วยมือเดียว สะดวกสำหรับช่างหน้างาน
-1. **Tab 1: Job Pool (งานที่เปิดรับซ่อม):**
-   * แสดงการ์ดงานซ่อมที่ยังไม่มีผู้รับ (`status: pending`) พร้อมปุ่มกด **"รับงานนี้" (Claim Order)**
-2. **Tab 2: My Active Jobs (งานของฉัน):**
-   * แสดงงานที่รับมาแล้ว (`status: claimed`)
-   * ปุ่มสแกน QR Code หรือปุ่ม **"บันทึกประวัติซ่อม" (Log Action)**
-3. **Quick Action: Action Logger Modal / Sheet:**
-   * เลือกประเภทงาน: 🧼 ล้างแอร์ (`cleaning`), 🛠️ ซ่อมแซม (`repair`), ❄️ เติมน้ำยาแอร์ (`refill_refrigerant`)
-   * ช่องกรอกหมายเหตุ (Notes) และปุ่มยืนยันปิดงาน
-
----
-
-## 4. 📐 Route Structure & Layout Architecture
-
-```
-src/app/
-├── (auth)/
-│   ├── login/page.tsx               # หน้าล็อกอินแยกตาม Credentials
-│   ├── request-password-reset/      # ขอรีเซ็ตรหัสผ่าน
-│   └── reset-password/              # ตั้งรหัสผ่านใหม่
-├── admin/                           # Org Admin Module (/admin/*)
-│   ├── page.tsx                     # Dashboard หลักของ Org Admin
-│   ├── assets/                      # จัดการตึก/ห้อง/เครื่องปรับอากาศ
-│   ├── work-orders/                 # จัดการและติดตามใบงานซ่อม
-│   └── users/                       # จัดการผู้ใช้งานและช่างซ่อม
-├── tech/                            # Technician Module (/tech/*)
-│   ├── page.tsx                     # Mobile Pool & My Jobs
-│   ├── scan/                        # หน้าสแกน QR Code สำหรับช่าง
-│   └── history/                     # ประวัติงานที่ช่างเคยทำสำเร็จ
-└── api/                             # Route Handlers / Actions Validation
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Left Sidebar   │ Top Search Bar: Search AC/WorkOrder... [Sort] [Filters] [+New] │
+│                ├─────────────────────────────────────────────────────────────┤
+│ - Dashboard    │ Analytic Banner: [Weekly Chart] [Gauge 92%] [Key Metrics]  │
+│ - Work Orders  ├─────────────────────────────────────────────────────────────┤
+│ - Asset Tree   │ Kanban Status Columns:                                      │
+│ - Techs        │ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐          │
+│ - Settings     │ │ Pending (12) │ │ Claimed (17) │ │Completed (13)│          │
+│                │ ├──────────────┤ ├──────────────┤ ├──────────────┤          │
+│ Projects       │ │ Card 1       │ │ Card 1       │ │ Card 1       │          │
+│ Members        │ │ Card 2       │ │ [DARK CARD]  │ │ Card 2       │          │
+│ [Logout]       │ └──────────────┘ └──────────────┘ └──────────────┘          │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 5. ♿ Accessibility & Responsive Specs
+## 4. 📐 Role-Based View Architecture
 
-1. **Responsive Breakpoints:**
-   * Mobile (< 640px): Bottom Navigation Bar สำหรับช่าง, Single Column Card Stack
-   * Tablet (640px - 1024px): 2-Column Dashboard Grid
-   * Desktop (> 1024px): Collapsible Sidebar Navigation, 4-Column Metric Grid, Full Data Table
-2. **WCAG Compliance:**
-   * Contrast ratio ของตัวหนังสือบน Background เกิน 4.5:1
-   * มี `aria-label` และ Support การใช้ Keyboard Tab Navigation ในทุก Form และ Modal
-   * ไม่ใช้สีเพียงอย่างเดียวในการระบุสถานะ (มี Icon + Text ควบคู่เสมอ)
-
----
-
-## 6. 🚀 Next Steps & Implementation Roadmap
-
-1. **Phase 1: Shell & Components Setup** (ทำ App Shell, Theme, Navigation, Header, Reusable Badge/Button)
-2. **Phase 2: Org Admin Dashboard (`/admin`)** (หน้าสรุป Metrics, Table แสดง Work Orders, Asset Tree)
-3. **Phase 3: Technician Interface (`/tech`)** (Mobile Navigation, Job Pool Cards, Claim & Repair Form Sheet)
-4. **Phase 4: Verification & Polish** (สอบทานการทำงานของ Server Actions, Responsive & User Experience)
+1. **Super Admin Dashboard (`/super-admin`)**:
+   - แดชบอร์ดบริหารส่วนกลาง ควบคุมรายชื่อมหาวิทยาลัยและศูนย์อนุมัติสิทธิ์บัญชีผู้ใช้ใหม่
+2. **Org Admin Dashboard (`/admin`)**:
+   - แดชบอร์ดประจำสถาบัน แสดงกราฟแอร์รายสัปดาห์, มาตรวัดความสมบูรณ์ของแอร์ (Fleet Health Gauge), คลังจ่ายงานซ่อม (Work Order Kanban Columns) และผังอาคาร (Asset Tree)
+3. **Technician Workspace (`/tech`)**:
+   - หน้าจอช่างซ่อมบนมือถือแบบสว่าง สบายตา สแกน QR Code และกดรับงานจาก Job Pool ได้ด้วยมือเดียว

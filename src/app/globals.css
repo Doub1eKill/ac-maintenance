@@ -1,19 +1,77 @@
 @import "tailwindcss";
 
 :root {
-  --background: #020617;
-  --foreground: #f8fafc;
+  --background: #f7f7f2;
+  --foreground: #18181b;
+  --card: #ffffff;
+  --card-foreground: #18181b;
+  --border: #e4e4e0;
+  --primary: #18181b;
+  --primary-foreground: #ffffff;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-border: var(--border);
   --font-sans: var(--font-noto-sans-thai), var(--font-geist-sans), system-ui, -apple-system, sans-serif;
   --font-mono: var(--font-geist-mono);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background-color: #f7f7f2;
+  color: #18181b;
   font-family: var(--font-noto-sans-thai), var(--font-geist-sans), system-ui, sans-serif;
+  min-height: 100vh;
+}
+
+/* Custom Clean Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f7f7f2;
+}
+::-webkit-scrollbar-thumb {
+  background: #d4d4d8;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #a1a1aa;
+}
+
+/* Clean Card Surface Utilities */
+.biz-card {
+  background: #ffffff;
+  border: 1px solid #e4e4e0;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.02);
+  border-radius: 1.25rem;
+}
+
+.biz-card-dark {
+  background: #18181b;
+  color: #ffffff;
+  border: 1px solid #27272a;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
+  border-radius: 1.25rem;
+}
+
+.biz-banner {
+  background: #f4f4ee;
+  border: 1px solid #e4e4e0;
+  border-radius: 1.5rem;
+}
+
+/* Pulse Laser Line Keyframes */
+@keyframes laserSweep {
+  0% { top: 0%; opacity: 0.8; }
+  50% { top: 95%; opacity: 1; }
+  100% { top: 0%; opacity: 0.8; }
+}
+
+.animate-laser {
+  animation: laserSweep 2s ease-in-out infinite;
 }

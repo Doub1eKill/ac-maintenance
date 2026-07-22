@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { createWorkOrderAction } from "@/app/admin/actions";
+import { createWorkOrderAction, updateUserStatusByOrgAdminAction } from "@/app/admin/actions";
 import {
   Building2,
   Snowflake,
@@ -15,8 +15,17 @@ import {
   ChevronUp,
   X,
   DoorClosed,
+  Search,
+  MoreVertical,
+  Calendar,
+  MessageSquare,
+  TrendingUp,
+  UserCheck,
+  UserX,
+  Users,
 } from "lucide-react";
 import { AnimatedIcon } from "@/components/ui/animated-icon";
+import { DashboardLayout, NavItem } from "@/components/layout/dashboard-layout";
 
 interface WorkOrderItem {
   id: string;
@@ -54,36 +63,128 @@ interface BuildingItem {
   rooms: RoomItem[];
 }
 
+interface PendingUser {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  status: string;
+  createdAt: string | null;
+}
+
 interface AdminDashboardViewProps {
+  user: {
+    name?: string | null;
+    email?: string | null;
+    role?: string | null;
+  };
+  dbError?: string | null;
   universityName: string;
   metrics: {
     totalUnits: number;
     brokenOrCleaningUnits: number;
     pendingWorkOrders: number;
     activeTechsCount: number;
+    pendingUsersCount?: number;
   };
   workOrders: WorkOrderItem[];
   buildings: BuildingItem[];
   allAcUnits: Array<{ id: string; label: string }>;
+  pendingUsers?: PendingUser[];
+  allUsers?: PendingUser[];
 }
 
 export function AdminDashboardView({
+  user,
+  dbError,
   universityName,
   metrics,
   workOrders,
   buildings,
   allAcUnits,
+  pendingUsers = [],
+  allUsers = [],
 }: AdminDashboardViewProps) {
+  const [activeTab, setActiveTab] = useState<string>("overview");
   const [isPending, startTransition] = useTransition();
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [globalSearch, setGlobalSearch] = useState("");
   const [expandedBuilding, setExpandedBuilding] = useState<string | null>(buildings[0]?.id || null);
   const [toastMessage, setToastMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  const filteredOrders =
-    statusFilter === "all"
-      ? workOrders
-      : workOrders.filter((wo) => wo.status === statusFilter);
+  const pendingOrders = workOrders.filter(
+    (wo) => wo.status === "pending" && matchesSearch(wo, globalSearch)
+  );
+
+  const claimedOrders = workOrders.filter(
+    (wo) => wo.status === "claimed" && matchesSearch(wo, globalSearch)
+  );
+
+  const completedOrders = workOrders.filter(
+    (wo) => wo.status === "completed" && matchesSearch(wo, globalSearch)
+  );
+
+  const filteredPendingUsers = pendingUsers.filter(
+    (u) =>
+      u.name.toLowerCase().includes(globalSearch.toLowerCase()) ||
+      u.email.toLowerCase().includes(globalSearch.toLowerCase()) ||
+      u.role.toLowerCase().includes(globalSearch.toLowerCase())
+  );
+
+  const filteredAllUsers = allUsers.filter(
+    (u) =>
+      u.name.toLowerCase().includes(globalSearch.toLowerCase()) ||
+      u.email.toLowerCase().includes(globalSearch.toLowerCase()) ||
+      u.role.toLowerCase().includes(globalSearch.toLowerCase())
+  );
+
+  function matchesSearch(wo: WorkOrderItem, search: string) {
+    if (!search.trim()) return true;
+    const s = search.toLowerCase();
+    return (
+      wo.acCode.toLowerCase().includes(s) ||
+      wo.brand.toLowerCase().includes(s) ||
+      wo.location.toLowerCase().includes(s) ||
+      (wo.claimedByName && wo.claimedByName.toLowerCase().includes(s))
+    );
+  }
+
+  function handleUserStatus(userId: string, newStatus: "active" | "suspended") {
+    setToastMessage(null);
+    startTransition(async () => {
+      const res = await updateUserStatusByOrgAdminAction(userId, newStatus);
+      if (res.error) {
+        setToastMessage({ type: "error", text: res.error });
+      } else {
+        setToastMessage({
+          type: "success",
+          text: newStatus === "active" ? "อนุมัติสิทธิ์เข้าใช้งานสำเร็จ" : "ระงับสิทธิ์เข้าใช้งานสำเร็จ",
+        });
+      }
+    });
+  }
+
+  const filteredBuildings = buildings.map((b) => {
+    if (!globalSearch.trim()) return b;
+    const s = globalSearch.toLowerCase();
+    const matchesBuilding = b.name.toLowerCase().includes(s) || b.abbreviation.toLowerCase().includes(s);
+
+    const matchingRooms = b.rooms.filter((r) => {
+      const matchesRoom = r.name.toLowerCase().includes(s);
+      const matchesAC = r.acUnits.some(
+        (ac) => ac.acCode.toLowerCase().includes(s) || ac.brand.toLowerCase().includes(s)
+      );
+      return matchesRoom || matchesAC;
+    });
+
+    if (matchesBuilding || matchingRooms.length > 0) {
+      return {
+        ...b,
+        rooms: matchingRooms.length > 0 ? matchingRooms : b.rooms,
+      };
+    }
+    return null;
+  }).filter(Boolean) as BuildingItem[];
 
   async function handleCreateOrderSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -95,370 +196,526 @@ export function AdminDashboardView({
       if (res.error) {
         setToastMessage({ type: "error", text: res.error });
       } else {
-        setToastMessage({ type: "success", text: "ออกใบงานซ่อมบำรุงเรียบร้อยแล้ว" });
+        setToastMessage({ type: "success", text: "ออกใบงานซ่อมบำรุงด่วนเรียบร้อยแล้ว" });
         setShowCreateModal(false);
       }
     });
   }
 
+  const adminNavItems: NavItem[] = [
+    {
+      id: "overview",
+      label: "Dashboard",
+      icon: Snowflake,
+    },
+    {
+      id: "kanban",
+      label: "Work Order Kanban",
+      icon: ClipboardList,
+      badge: metrics.pendingWorkOrders,
+    },
+    {
+      id: "approvals",
+      label: "User Approvals",
+      icon: Clock,
+      badge: pendingUsers.length,
+    },
+    {
+      id: "team",
+      label: "Staff & Techs",
+      icon: Users,
+    },
+    {
+      id: "assets",
+      label: "Asset Tree",
+      icon: Building2,
+    },
+  ];
+
   return (
-    <div className="space-y-8 pb-12">
+    <DashboardLayout
+      user={{
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        universityName,
+      }}
+      activeTab={activeTab}
+      setActiveTab={setActiveTab}
+      navItems={adminNavItems}
+      searchValue={globalSearch}
+      onSearchChange={setGlobalSearch}
+      searchPlaceholder="Search AC code, user name, building, technician..."
+      onCreateAction={() => setShowCreateModal(true)}
+      createActionLabel="+ Create Work Order"
+    >
+      {/* Database Connection Alert */}
+      {dbError && (
+        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-xs font-semibold text-amber-900 flex items-start gap-3 shadow-2xs">
+          <AnimatedIcon icon={AlertTriangle} size={18} animation="wiggle" className="text-amber-600 shrink-0 mt-0.5" />
+          <div>
+            <div className="font-bold text-amber-950">Database Connection Notice</div>
+            <p className="text-amber-800 font-normal leading-relaxed mt-0.5">{dbError}</p>
+          </div>
+        </div>
+      )}
+
       {/* Toast Notification */}
       {toastMessage && (
         <div
-          className={`rounded-xl border p-4 text-xs sm:text-sm font-semibold flex items-center justify-between shadow-lg ${
+          className={`rounded-2xl border p-4 text-xs font-semibold flex items-center justify-between shadow-2xs ${
             toastMessage.type === "success"
-              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-              : "border-red-500/30 bg-red-500/10 text-red-400"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+              : "border-red-200 bg-red-50 text-red-900"
           }`}
         >
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             {toastMessage.type === "success" ? (
-              <AnimatedIcon icon={CheckCircle2} size={16} animation="bounce" className="text-emerald-400" />
+              <AnimatedIcon icon={CheckCircle2} size={18} animation="bounce" className="text-emerald-600" />
             ) : (
-              <AnimatedIcon icon={AlertTriangle} size={16} animation="wiggle" className="text-red-400" />
+              <AnimatedIcon icon={AlertTriangle} size={18} animation="wiggle" className="text-red-600" />
             )}
             <span>{toastMessage.text}</span>
           </div>
-          <button onClick={() => setToastMessage(null)} className="text-slate-400 hover:text-white">
+          <button onClick={() => setToastMessage(null)} className="text-slate-400 hover:text-slate-900">
             <X className="h-4 w-4" />
           </button>
         </div>
       )}
 
-      {/* Top Header & Quick Action */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/30 bg-sky-500/10 px-3 py-1 text-xs font-semibold text-sky-300 mb-2">
-            <AnimatedIcon icon={Building2} size={14} animation="lift" />
-            {universityName} Workspace
+      {/* BizLink Top Analytic Banner (Bar Chart & Gauge Stats Widget) */}
+      <div className="biz-banner p-6 sm:p-8 flex flex-col lg:flex-row items-center justify-between gap-6 shadow-2xs">
+        {/* Left: Bar Chart Widget */}
+        <div className="space-y-3 w-full lg:w-auto">
+          <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+            Weekly Repair Activity
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-            ระบบบริหารจัดการ & ออกใบงานซ่อมบำรุง
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            ติดตามสถานะเครื่องปรับอากาศ กระจายใบงานซ่อม และควบคุมสินทรัพย์ภายในมหาวิทยาลัย
-          </p>
+          <div className="flex items-end gap-3 h-24 pt-2">
+            <div className="flex flex-col items-center gap-1">
+              <div className="w-6 bg-slate-900 rounded-t-md h-16" />
+              <span className="text-[10px] font-bold text-slate-400">Mon</span>
+            </div>
+            <div className="flex flex-col items-center gap-1">
+              <div className="w-6 bg-slate-400 rounded-t-md h-10" />
+              <span className="text-[10px] font-bold text-slate-400">Tue</span>
+            </div>
+            <div className="flex flex-col items-center gap-1">
+              <div className="w-6 bg-slate-900 rounded-t-md h-24" />
+              <span className="text-[10px] font-bold text-slate-400">Wed</span>
+            </div>
+            <div className="flex flex-col items-center gap-1">
+              <div className="w-6 bg-slate-300 rounded-t-md h-12" />
+              <span className="text-[10px] font-bold text-slate-400">Thu</span>
+            </div>
+            <div className="flex flex-col items-center gap-1">
+              <div className="w-6 bg-slate-900 rounded-t-md h-20" />
+              <span className="text-[10px] font-bold text-slate-400">Fri</span>
+            </div>
+          </div>
         </div>
 
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 to-cyan-400 px-4 py-2.5 text-xs font-bold text-slate-950 hover:from-sky-400 hover:to-cyan-300 transition-all shadow-lg shadow-sky-500/20 group"
-        >
-          <AnimatedIcon icon={Plus} size={16} animation="spin" className="stroke-[3]" />
-          ออกใบงานซ่อมด่วน (Create Order)
-        </button>
-      </div>
-
-      {/* 4 Core Metric Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 backdrop-blur-xl space-y-2 group hover:border-sky-500/40 transition-colors">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">จำนวนแอร์ทั้งหมด</span>
-            <AnimatedIcon icon={Snowflake} size={18} animation="spin" className="text-sky-400" />
-          </div>
-          <div className="flex items-baseline justify-between">
-            <span className="text-3xl font-black text-white">{metrics.totalUnits}</span>
-            <span className="text-xs font-semibold text-sky-400 bg-sky-500/10 px-2 py-0.5 rounded-md">Units</span>
-          </div>
-          <div className="text-[11px] text-slate-500">ในระบบมหาวิทยาลัย</div>
-        </div>
-
-        <div className="rounded-2xl border border-red-500/30 bg-red-500/5 p-5 backdrop-blur-xl space-y-2 group hover:border-red-500/60 transition-colors">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-red-400 uppercase tracking-wider flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-red-400 animate-pulse" />
-              แอร์ที่ชำรุด / ต้องล้าง
+        {/* Middle: Gauge Progress Indicator */}
+        <div className="flex items-center gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
+          <div className="relative h-16 w-16 flex items-center justify-center rounded-full border-4 border-slate-950 border-t-slate-200">
+            <span className="text-base font-black text-slate-950">
+              {metrics.totalUnits > 0
+                ? `${Math.round(((metrics.totalUnits - metrics.brokenOrCleaningUnits) / metrics.totalUnits) * 100)}%`
+                : "100%"}
             </span>
-            <AnimatedIcon icon={AlertTriangle} size={18} animation="wiggle" className="text-red-400" />
           </div>
-          <div className="flex items-baseline justify-between">
-            <span className="text-3xl font-black text-red-300">{metrics.brokenOrCleaningUnits}</span>
-            <span className="text-xs font-semibold text-red-400 bg-red-500/10 px-2 py-0.5 rounded-md">Attention</span>
+          <div>
+            <div className="text-xs font-bold text-slate-950">Fleet Health Rate</div>
+            <div className="text-[11px] text-slate-500">Normal units running ok</div>
           </div>
-          <div className="text-[11px] text-slate-400">ต้องดำเนินการซ่อมบำรุง</div>
         </div>
 
-        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-5 backdrop-blur-xl space-y-2 group hover:border-amber-500/60 transition-colors">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-amber-400 uppercase tracking-wider">ใบงานที่รอช่างรับงาน</span>
-            <AnimatedIcon icon={Clock} size={18} animation="pulse" className="text-amber-400" />
+        {/* Right: Big Numeric Metrics */}
+        <div className="flex items-center gap-8 w-full lg:w-auto justify-between lg:justify-end border-t lg:border-t-0 border-slate-200 pt-4 lg:pt-0">
+          <div>
+            <div className="text-3xl font-black text-slate-950">{metrics.totalUnits}</div>
+            <div className="text-xs font-semibold text-slate-500">AC Units Installed</div>
           </div>
-          <div className="flex items-baseline justify-between">
-            <span className="text-3xl font-black text-amber-300">{metrics.pendingWorkOrders}</span>
-            <span className="text-xs font-semibold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md">Pending Pool</span>
+          <div>
+            <div className="text-3xl font-black text-slate-950">{metrics.pendingWorkOrders}</div>
+            <div className="text-xs font-semibold text-amber-600 font-bold">Pending Jobs</div>
           </div>
-          <div className="text-[11px] text-slate-400">รอช่างเทคนิคกดรับงาน</div>
-        </div>
-
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 backdrop-blur-xl space-y-2 group hover:border-emerald-500/40 transition-colors">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">ช่างเทคนิคปฏิบัติงาน</span>
-            <AnimatedIcon icon={Wrench} size={18} animation="bounce" className="text-emerald-400" />
+          <div>
+            <div className="text-3xl font-black text-slate-950">{pendingUsers.length}</div>
+            <div className="text-xs font-semibold text-indigo-600 font-bold">Pending Users</div>
           </div>
-          <div className="flex items-baseline justify-between">
-            <span className="text-3xl font-black text-emerald-400">{metrics.activeTechsCount}</span>
-            <span className="text-xs font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md">Active Techs</span>
-          </div>
-          <div className="text-[11px] text-slate-500">พร้อมรับงานซ่อมบำรุง</div>
         </div>
       </div>
 
-      {/* Work Order Dispatch Center */}
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 backdrop-blur-xl space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-4">
-          <div>
-            <h2 className="text-lg font-bold text-white flex items-center gap-2">
-              <AnimatedIcon icon={ClipboardList} size={20} animation="lift" className="text-sky-400" />
-              <span>ศูนย์จ่ายและติดตามงานซ่อม (Work Order Dispatch Center)</span>
-              <span className="rounded-full bg-sky-500/20 px-2.5 py-0.5 text-xs font-bold text-sky-300">
-                {workOrders.length}
-              </span>
-            </h2>
-            <p className="text-xs text-slate-400">ติดตามสถานะงานซ่อมแบบ Real-time และตรวจสอบช่างผู้รับงาน</p>
+      {/* Main Kanban Grid Layout (BizLink Style Columns) */}
+      {(activeTab === "overview" || activeTab === "kanban") && (
+        <div className="space-y-6 animate-in fade-in">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold text-slate-950">Work Order Kanban Columns</h2>
           </div>
 
-          {/* Filter Pills */}
-          <div className="flex items-center gap-1.5 rounded-xl bg-slate-950 p-1 border border-slate-800 text-xs">
-            <button
-              onClick={() => setStatusFilter("all")}
-              className={`rounded-lg px-2.5 py-1 font-semibold transition-all ${
-                statusFilter === "all" ? "bg-slate-800 text-white" : "text-slate-400 hover:text-white"
-              }`}
-            >
-              ทั้งหมด
-            </button>
-            <button
-              onClick={() => setStatusFilter("pending")}
-              className={`rounded-lg px-2.5 py-1 font-semibold transition-all ${
-                statusFilter === "pending" ? "bg-amber-500/20 text-amber-300" : "text-slate-400 hover:text-white"
-              }`}
-            >
-              รอช่างรับ (Pending)
-            </button>
-            <button
-              onClick={() => setStatusFilter("claimed")}
-              className={`rounded-lg px-2.5 py-1 font-semibold transition-all ${
-                statusFilter === "claimed" ? "bg-sky-500/20 text-sky-300" : "text-slate-400 hover:text-white"
-              }`}
-            >
-              กำลังซ่อม (Claimed)
-            </button>
-            <button
-              onClick={() => setStatusFilter("completed")}
-              className={`rounded-lg px-2.5 py-1 font-semibold transition-all ${
-                statusFilter === "completed" ? "bg-emerald-500/20 text-emerald-300" : "text-slate-400 hover:text-white"
-              }`}
-            >
-              เสร็จสิ้น (Completed)
-            </button>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Column 1: Pending Orders */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-sm font-bold text-slate-950">Pending Claims</span>
+                <span className="rounded-lg bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 text-xs font-bold font-mono">
+                  {pendingOrders.length}
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                {pendingOrders.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-2xl">
+                    No pending orders
+                  </div>
+                ) : (
+                  pendingOrders.map((wo) => (
+                    <div key={wo.id} className="biz-card p-4 space-y-3 hover:border-slate-400 transition-all">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono font-bold text-sm text-slate-950">{wo.acCode}</span>
+                        <MoreVertical className="h-4 w-4 text-slate-400" />
+                      </div>
+                      <div className="text-xs font-medium text-slate-600 leading-relaxed">
+                        {wo.location} ({wo.brand})
+                      </div>
+                      <div className="pt-2 flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-100">
+                        <span className="inline-flex items-center gap-1 font-semibold text-amber-700">
+                          <Clock className="h-3 w-3" /> Waiting Tech
+                        </span>
+                        <span className="font-mono">{wo.createdAt ? new Date(wo.createdAt).toLocaleDateString() : ""}</span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Column 2: In-Progress / Claimed (Contains Dark Highlight Card) */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-sm font-bold text-slate-950">In Progress</span>
+                <span className="rounded-lg bg-sky-100 text-sky-800 border border-sky-200 px-2 py-0.5 text-xs font-bold font-mono">
+                  {claimedOrders.length}
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                {claimedOrders.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-2xl">
+                    No claimed active orders
+                  </div>
+                ) : (
+                  claimedOrders.map((wo, idx) => (
+                    <div
+                      key={wo.id}
+                      className={
+                        idx === 0
+                          ? "biz-card-dark p-4 space-y-3 shadow-md"
+                          : "biz-card p-4 space-y-3 hover:border-slate-400 transition-all"
+                      }
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className={`font-mono font-bold text-sm ${idx === 0 ? "text-white" : "text-slate-950"}`}>
+                          {wo.acCode}
+                        </span>
+                        <MoreVertical className={`h-4 w-4 ${idx === 0 ? "text-slate-400" : "text-slate-400"}`} />
+                      </div>
+                      <div className={`text-xs font-medium leading-relaxed ${idx === 0 ? "text-slate-300" : "text-slate-600"}`}>
+                        {wo.location} ({wo.brand})
+                      </div>
+                      <div
+                        className={`pt-2 flex items-center justify-between text-[11px] border-t ${
+                          idx === 0 ? "text-slate-300 border-slate-800" : "text-slate-400 border-slate-100"
+                        }`}
+                      >
+                        <span className="inline-flex items-center gap-1 font-bold">
+                          <Wrench className="h-3 w-3 text-sky-400" /> {wo.claimedByName || "Tech Assigned"}
+                        </span>
+                        <span className="font-mono">{wo.claimedAt ? new Date(wo.claimedAt).toLocaleTimeString() : ""}</span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Column 3: Completed Orders */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-sm font-bold text-slate-950">Completed</span>
+                <span className="rounded-lg bg-emerald-100 text-emerald-800 border border-emerald-200 px-2 py-0.5 text-xs font-bold font-mono">
+                  {completedOrders.length}
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                {completedOrders.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-2xl">
+                    No completed orders
+                  </div>
+                ) : (
+                  completedOrders.map((wo) => (
+                    <div key={wo.id} className="biz-card p-4 space-y-3 hover:border-slate-400 transition-all opacity-90">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono font-bold text-sm text-slate-950">{wo.acCode}</span>
+                        <MoreVertical className="h-4 w-4 text-slate-400" />
+                      </div>
+                      <div className="text-xs font-medium text-slate-600 leading-relaxed">
+                        {wo.location}
+                      </div>
+                      <div className="pt-2 flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-100">
+                        <span className="inline-flex items-center gap-1 font-bold text-emerald-700">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> Finished
+                        </span>
+                        <span className="font-mono">{wo.claimedByName || "-"}</span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
           </div>
         </div>
+      )}
 
-        {filteredOrders.length === 0 ? (
-          <div className="py-8 text-center text-xs text-slate-500 border border-dashed border-slate-800 rounded-xl">
-            ไม่พบใบงานซ่อมตามเงื่อนไขที่เลือก
+      {/* User Approvals Tab */}
+      {activeTab === "approvals" && (
+        <div className="biz-card p-6 space-y-5 animate-in fade-in">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <h2 className="text-base font-bold text-slate-950 flex items-center gap-2">
+              <Clock className="h-5 w-5 text-amber-500" />
+              <span>Pending User Approvals for {universityName} ({pendingUsers.length})</span>
+            </h2>
           </div>
-        ) : (
+
+          {filteredPendingUsers.length === 0 ? (
+            <div className="py-12 text-center text-xs text-slate-500 border border-dashed border-slate-200 rounded-2xl">
+              No pending user registration requests for this university at this time.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-slate-700">
+                <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  <tr>
+                    <th className="py-3 px-4 rounded-l-xl">User Name</th>
+                    <th className="py-3 px-4">Email</th>
+                    <th className="py-3 px-4">Role</th>
+                    <th className="py-3 px-4">Requested Date</th>
+                    <th className="py-3 px-4 text-right rounded-r-xl">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredPendingUsers.map((u) => (
+                    <tr key={u.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="py-3.5 px-4 font-bold text-slate-950">{u.name}</td>
+                      <td className="py-3.5 px-4 font-mono">{u.email}</td>
+                      <td className="py-3.5 px-4 font-bold text-slate-800 uppercase">{u.role}</td>
+                      <td className="py-3.5 px-4 font-mono">{u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "-"}</td>
+                      <td className="py-3.5 px-4 text-right space-x-2">
+                        <button
+                          onClick={() => handleUserStatus(u.id, "active")}
+                          disabled={isPending}
+                          className="rounded-lg bg-emerald-600 px-3 py-1.5 font-bold text-white hover:bg-emerald-700 transition-colors disabled:opacity-50 inline-flex items-center gap-1"
+                        >
+                          <UserCheck className="h-3.5 w-3.5" />
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => handleUserStatus(u.id, "suspended")}
+                          disabled={isPending}
+                          className="rounded-lg bg-red-600 px-3 py-1.5 font-bold text-white hover:bg-red-700 transition-colors disabled:opacity-50 inline-flex items-center gap-1"
+                        >
+                          <UserX className="h-3.5 w-3.5" />
+                          Reject
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Staff & Technicians Tab */}
+      {activeTab === "team" && (
+        <div className="biz-card p-6 space-y-5 animate-in fade-in">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <h2 className="text-base font-bold text-slate-950 flex items-center gap-2">
+              <Users className="h-5 w-5 text-slate-700" />
+              <span>Campus Staff & Technician Directory ({allUsers.length})</span>
+            </h2>
+          </div>
+
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-300">
-              <thead className="border-b border-slate-800 bg-slate-950/80 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+            <table className="w-full text-left text-xs text-slate-700">
+              <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                 <tr>
-                  <th className="py-3 px-4">รหัสแอร์ (acCode)</th>
-                  <th className="py-3 px-4">ยี่ห้อ</th>
-                  <th className="py-3 px-4">สถานที่ / อาคาร / ห้อง</th>
-                  <th className="py-3 px-4">สถานะงาน</th>
-                  <th className="py-3 px-4">ช่างผู้รับงาน</th>
-                  <th className="py-3 px-4">เวลาที่เปิดงาน</th>
+                  <th className="py-3 px-4 rounded-l-xl">User Name</th>
+                  <th className="py-3 px-4">Email</th>
+                  <th className="py-3 px-4">Role</th>
+                  <th className="py-3 px-4">Status</th>
+                  <th className="py-3 px-4 text-right rounded-r-xl">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60">
-                {filteredOrders.map((wo) => (
-                  <tr key={wo.id} className="hover:bg-slate-800/30 transition-colors">
-                    <td className="py-3.5 px-4 font-mono font-bold text-sky-400">{wo.acCode}</td>
-                    <td className="py-3.5 px-4 text-slate-300">{wo.brand}</td>
-                    <td className="py-3.5 px-4 font-medium text-white">{wo.location}</td>
+              <tbody className="divide-y divide-slate-100">
+                {filteredAllUsers.map((u) => (
+                  <tr key={u.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="py-3.5 px-4 font-bold text-slate-950">{u.name}</td>
+                    <td className="py-3.5 px-4 font-mono">{u.email}</td>
+                    <td className="py-3.5 px-4 font-bold text-slate-800 uppercase">{u.role}</td>
                     <td className="py-3.5 px-4">
-                      {wo.status === "pending" && (
-                        <span className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-bold text-amber-300">
-                          <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
-                          รอช่างรับงาน (Pending)
-                        </span>
-                      )}
-                      {wo.status === "claimed" && (
-                        <span className="inline-flex items-center gap-1.5 rounded-md border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 text-[11px] font-bold text-sky-300">
-                          <span className="h-1.5 w-1.5 rounded-full bg-sky-400" />
-                          กำลังดำเนินการ (Claimed)
-                        </span>
-                      )}
-                      {wo.status === "completed" && (
-                        <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-bold text-emerald-400">
-                          <AnimatedIcon icon={CheckCircle2} size={14} animation="bounce" />
-                          เสร็จสิ้น (Completed)
-                        </span>
-                      )}
+                      <span
+                        className={`px-2 py-0.5 rounded-md font-bold text-[10px] uppercase ${
+                          u.status === "active"
+                            ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                            : u.status === "pending"
+                            ? "bg-amber-100 text-amber-800 border border-amber-200"
+                            : "bg-red-100 text-red-800 border border-red-200"
+                        }`}
+                      >
+                        {u.status}
+                      </span>
                     </td>
-                    <td className="py-3.5 px-4 text-slate-300">
-                      {wo.claimedByName ? (
-                        <span className="inline-flex items-center gap-1.5 font-semibold text-slate-200">
-                          <AnimatedIcon icon={Wrench} size={14} animation="wiggle" className="text-sky-400" />
-                          {wo.claimedByName}
-                        </span>
+                    <td className="py-3.5 px-4 text-right space-x-2">
+                      {u.status === "active" ? (
+                        <button
+                          onClick={() => handleUserStatus(u.id, "suspended")}
+                          disabled={isPending || u.role === "super_admin"}
+                          className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-700 hover:bg-red-100 transition-colors disabled:opacity-40"
+                        >
+                          Suspend
+                        </button>
                       ) : (
-                        <span className="text-slate-500 italic">ยังไม่มีผู้รับ</span>
+                        <button
+                          onClick={() => handleUserStatus(u.id, "active")}
+                          disabled={isPending || u.role === "super_admin"}
+                          className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 hover:bg-emerald-100 transition-colors disabled:opacity-40"
+                        >
+                          Activate
+                        </button>
                       )}
-                    </td>
-                    <td className="py-3.5 px-4 text-slate-500">
-                      {wo.createdAt ? new Date(wo.createdAt).toLocaleString("th-TH") : "-"}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Asset Hierarchy View */}
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 backdrop-blur-xl space-y-4">
-        <div>
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <AnimatedIcon icon={Building2} size={20} animation="lift" className="text-sky-400" />
-            <span>โครงสร้างอาคารและสินทรัพย์ (Asset Hierarchy Tree)</span>
-          </h2>
-          <p className="text-xs text-slate-400">แสดงลำดับขั้น อาคาร ➔ ห้อง ➔ เครื่องปรับอากาศ พร้อมสถานะรายเครื่อง</p>
-        </div>
+      {activeTab === "assets" && (
+        <div className="biz-card p-6 space-y-5 animate-in fade-in">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <h2 className="text-base font-bold text-slate-950 flex items-center gap-2">
+              <Building2 className="h-5 w-5 text-slate-700" />
+              <span>Asset Hierarchy Tree ({buildings.length} Buildings)</span>
+            </h2>
+          </div>
 
-        <div className="space-y-3">
-          {buildings.map((b) => (
-            <div key={b.id} className="rounded-xl border border-slate-800 bg-slate-950 overflow-hidden">
-              <button
-                onClick={() => setExpandedBuilding(expandedBuilding === b.id ? null : b.id)}
-                className="w-full flex items-center justify-between p-4 text-left hover:bg-slate-900 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-500/10 text-sky-400 font-bold text-xs border border-sky-500/20">
-                    {b.abbreviation}
-                  </span>
-                  <div>
-                    <h3 className="font-bold text-white text-sm">{b.name}</h3>
-                    <p className="text-xs text-slate-400">{b.rooms.length} ห้อง • {b.unitsCount} เครื่องปรับอากาศ</p>
-                  </div>
-                </div>
-                <span className="text-slate-400 text-sm font-bold">
-                  {expandedBuilding === b.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                </span>
-              </button>
-
-              {expandedBuilding === b.id && (
-                <div className="border-t border-slate-800/80 bg-slate-900/40 p-4 space-y-4">
-                  {b.rooms.map((r) => (
-                    <div key={r.id} className="rounded-lg border border-slate-800 bg-slate-900 p-3 space-y-2">
-                      <div className="flex items-center justify-between text-xs border-b border-slate-800 pb-2">
-                        <span className="font-bold text-slate-200 flex items-center gap-1.5">
-                          <AnimatedIcon icon={DoorClosed} size={14} animation="bounce" className="text-sky-400" />
-                          ห้อง {r.name} (ชั้น {r.floor || 1})
-                        </span>
-                        <span className="text-slate-400">{r.acUnits.length} เครื่อง</span>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                        {r.acUnits.map((ac) => (
-                          <div
-                            key={ac.id}
-                            className="rounded-md border border-slate-800 bg-slate-950 p-2.5 text-xs flex items-center justify-between"
-                          >
-                            <div>
-                              <div className="font-mono font-bold text-sky-400">{ac.acCode}</div>
-                              <div className="text-[11px] text-slate-400">{ac.brand} {ac.btu ? `(${ac.btu} BTU)` : ""}</div>
-                            </div>
-                            <div>
-                              {ac.status === "normal" && (
-                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded">
-                                  <AnimatedIcon icon={CheckCircle2} size={12} animation="bounce" /> ปกติ
-                                </span>
-                              )}
-                              {ac.status === "broken" && (
-                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-400 bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded">
-                                  <AnimatedIcon icon={AlertTriangle} size={12} animation="wiggle" /> ชำรุด
-                                </span>
-                              )}
-                              {ac.status === "needs_cleaning" && (
-                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-300 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded">
-                                  <AnimatedIcon icon={Clock} size={12} animation="pulse" /> ต้องล้าง
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+          <div className="space-y-3">
+            {filteredBuildings.map((b) => (
+              <div key={b.id} className="rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden">
+                <button
+                  onClick={() => setExpandedBuilding(expandedBuilding === b.id ? null : b.id)}
+                  className="w-full flex items-center justify-between p-4 text-left hover:bg-slate-100 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-white font-mono text-xs font-bold">
+                      {b.abbreviation}
+                    </span>
+                    <div>
+                      <h3 className="font-bold text-slate-950 text-sm">{b.name}</h3>
+                      <p className="text-xs text-slate-500">{b.rooms.length} Rooms • {b.unitsCount} AC Units</p>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
+                  </div>
+                  <span className="text-slate-400 font-bold">
+                    {expandedBuilding === b.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </span>
+                </button>
+
+                {expandedBuilding === b.id && (
+                  <div className="border-t border-slate-200 bg-white p-4 space-y-3">
+                    {b.rooms.map((r) => (
+                      <div key={r.id} className="rounded-xl border border-slate-200 p-3.5 space-y-2">
+                        <div className="flex items-center justify-between text-xs font-bold text-slate-900 border-b border-slate-100 pb-2">
+                          <span>Room {r.name} (Floor {r.floor || 1})</span>
+                          <span className="text-slate-500 font-normal">{r.acUnits.length} Units</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                          {r.acUnits.map((ac) => (
+                            <div key={ac.id} className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs flex items-center justify-between">
+                              <div>
+                                <div className="font-mono font-bold text-slate-950">{ac.acCode}</div>
+                                <div className="text-[10px] text-slate-500">{ac.brand}</div>
+                              </div>
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                {ac.status}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Modal: Create Work Order */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4">
-          <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <AnimatedIcon icon={ClipboardList} size={20} animation="lift" className="text-sky-400" />
-                <span>ออกใบงานซ่อมบำรุงด่วน (Create Order)</span>
-              </h3>
-              <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-white">
-                <X className="h-4 w-4" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-xs p-4">
+          <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xl space-y-4 animate-in fade-in">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-base font-bold text-slate-950">Create Work Order</h3>
+              <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-950">
+                <X className="h-5 w-5" />
               </button>
             </div>
 
             <form onSubmit={handleCreateOrderSubmit} className="space-y-4 text-xs">
               <div>
-                <label className="mb-1.5 block font-medium text-slate-300">เลือกเครื่องปรับอากาศที่ต้องการแจ้งซ่อม</label>
+                <label className="mb-1.5 block font-bold text-slate-700">Select Air Conditioner</label>
                 <select
                   name="airConditionerId"
                   required
                   defaultValue=""
-                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-white focus:border-sky-500 focus:outline-none"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-slate-900 focus:border-slate-950 focus:outline-none"
                 >
-                  <option value="" disabled className="bg-slate-900 text-slate-500">
-                    -- กรุณาเลือกเครื่องปรับอากาศ --
-                  </option>
+                  <option value="" disabled>-- Select AC Unit --</option>
                   {allAcUnits.map((unit) => (
-                    <option key={unit.id} value={unit.id} className="bg-slate-900 text-white">
+                    <option key={unit.id} value={unit.id}>
                       {unit.label}
                     </option>
                   ))}
                 </select>
               </div>
 
-              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-[11px] text-amber-300">
-                เมื่อออกใบงานซ่อม ใบงานจะปรากฏใน <b>Job Pool</b> ของช่างเทคนิคทันทีเพื่อให้ช่างกดรับงานต่อไป
-              </div>
-
               <div className="flex gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="w-1/2 rounded-xl border border-slate-700 py-2.5 font-semibold text-slate-300 hover:bg-slate-800"
+                  className="w-1/2 rounded-xl border border-slate-200 py-2.5 font-bold text-slate-700 hover:bg-slate-100"
                 >
-                  ยกเลิก
+                  Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="w-1/2 rounded-xl bg-sky-500 py-2.5 font-bold text-slate-950 hover:bg-sky-400 disabled:opacity-50"
+                  className="w-1/2 rounded-xl bg-slate-950 py-2.5 font-bold text-white hover:bg-slate-800 disabled:opacity-50"
                 >
-                  {isPending ? "กำลังออกใบงาน..." : "ยืนยันออกใบงาน"}
+                  {isPending ? "Creating..." : "Confirm Work Order"}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
-    </div>
+    </DashboardLayout>
   );
 }

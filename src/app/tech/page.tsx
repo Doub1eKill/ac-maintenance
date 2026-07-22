@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { NavHeader } from "@/components/layout/nav-header";
 import { getTechnicianData } from "./actions";
 import { TechMobileView } from "@/components/tech/tech-mobile-view";
 
@@ -19,25 +18,19 @@ export default async function TechHomePage() {
     redirect("/");
   }
 
-  const { universityName, jobPool, myJobs } = await getTechnicianData();
+  const { dbError, universityName, jobPool, myJobs } = await getTechnicianData();
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 selection:bg-emerald-500 selection:text-white">
-      <NavHeader
-        user={{
-          name: session.user.name,
-          email: session.user.email,
-          role: session.user.role,
-          universityName,
-        }}
-      />
-      <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
-        <TechMobileView
-          universityName={universityName}
-          jobPool={jobPool}
-          myJobs={myJobs}
-        />
-      </main>
-    </div>
+    <TechMobileView
+      user={{
+        name: session.user.name,
+        email: session.user.email,
+        role: session.user.role,
+      }}
+      dbError={dbError}
+      universityName={universityName}
+      jobPool={jobPool}
+      myJobs={myJobs}
+    />
   );
 }

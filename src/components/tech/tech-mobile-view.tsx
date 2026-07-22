@@ -12,8 +12,13 @@ import {
   Check,
   X,
   AlertTriangle,
+  Search,
+  Building2,
+  MoreVertical,
+  Calendar,
 } from "lucide-react";
 import { AnimatedIcon } from "@/components/ui/animated-icon";
+import { DashboardLayout, NavItem } from "@/components/layout/dashboard-layout";
 
 interface TechJobItem {
   id: string;
@@ -28,14 +33,29 @@ interface TechJobItem {
 }
 
 interface TechMobileViewProps {
+  user: {
+    name?: string | null;
+    email?: string | null;
+    role?: string | null;
+  };
+  dbError?: string | null;
   universityName: string;
   jobPool: TechJobItem[];
   myJobs: TechJobItem[];
 }
 
-export function TechMobileView({ universityName, jobPool, myJobs }: TechMobileViewProps) {
-  const [activeTab, setActiveTab] = useState<"pool" | "my_jobs">("pool");
+export function TechMobileView({
+  user,
+  dbError,
+  universityName,
+  jobPool,
+  myJobs,
+}: TechMobileViewProps) {
+  const [activeTab, setActiveTab] = useState<string>("pool");
   const [isPending, startTransition] = useTransition();
+
+  // Search Filter State
+  const [searchQuery, setSearchQuery] = useState("");
 
   // QR Scanner Modal State
   const [showQrModal, setShowQrModal] = useState(false);
@@ -46,6 +66,20 @@ export function TechMobileView({ universityName, jobPool, myJobs }: TechMobileVi
 
   // Notification Toast State
   const [toastMessage, setToastMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const filteredPool = jobPool.filter(
+    (job) =>
+      job.acCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      job.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      job.location.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const filteredMyJobs = myJobs.filter(
+    (job) =>
+      job.acCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      job.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      job.location.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   function handleClaim(workOrderId: string) {
     setToastMessage(null);
@@ -86,201 +120,228 @@ export function TechMobileView({ universityName, jobPool, myJobs }: TechMobileVi
     setScannedAcCode("");
   }
 
+  const techNavItems: NavItem[] = [
+    {
+      id: "pool",
+      label: "Job Pool",
+      icon: ClipboardList,
+      badge: jobPool.length,
+    },
+    {
+      id: "my_jobs",
+      label: "My Jobs",
+      icon: Wrench,
+      badge: myJobs.length,
+    },
+  ];
+
   return (
-    <div className="space-y-6 pb-20 max-w-lg mx-auto">
+    <DashboardLayout
+      user={{
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        universityName,
+      }}
+      activeTab={activeTab}
+      setActiveTab={setActiveTab}
+      navItems={techNavItems}
+      searchValue={searchQuery}
+      onSearchChange={setSearchQuery}
+      searchPlaceholder="Search AC code, location..."
+      onCreateAction={() => setShowQrModal(true)}
+      createActionLabel="QR Scanner"
+    >
+      {/* Database Connection Alert */}
+      {dbError && (
+        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-xs font-semibold text-amber-900 flex items-start gap-2.5 shadow-2xs">
+          <AnimatedIcon icon={AlertTriangle} size={18} animation="wiggle" className="text-amber-600 shrink-0 mt-0.5" />
+          <div>
+            <div className="font-bold text-amber-950">Database Connection Notice</div>
+            <p className="text-amber-800 font-normal leading-relaxed text-[11px]">{dbError}</p>
+          </div>
+        </div>
+      )}
+
       {/* Toast Notification */}
       {toastMessage && (
         <div
-          className={`rounded-2xl border p-4 text-xs font-semibold flex items-center justify-between shadow-xl ${
+          className={`rounded-2xl border p-4 text-xs font-semibold flex items-center justify-between shadow-2xs ${
             toastMessage.type === "success"
-              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-              : "border-red-500/30 bg-red-500/10 text-red-400"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+              : "border-red-200 bg-red-50 text-red-900"
           }`}
         >
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             {toastMessage.type === "success" ? (
-              <AnimatedIcon icon={CheckCircle2} size={16} animation="bounce" className="text-emerald-400" />
+              <AnimatedIcon icon={CheckCircle2} size={18} animation="bounce" className="text-emerald-600 shrink-0" />
             ) : (
-              <AnimatedIcon icon={AlertTriangle} size={16} animation="wiggle" className="text-red-400" />
+              <AnimatedIcon icon={AlertTriangle} size={18} animation="wiggle" className="text-red-600 shrink-0" />
             )}
             <span>{toastMessage.text}</span>
           </div>
-          <button onClick={() => setToastMessage(null)} className="text-slate-400 hover:text-white">
+          <button onClick={() => setToastMessage(null)} className="text-slate-400 hover:text-slate-900">
             <X className="h-4 w-4" />
           </button>
         </div>
       )}
 
-      {/* Top Mobile Bar */}
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 backdrop-blur-xl space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-full">
-              <AnimatedIcon icon={Wrench} size={14} animation="wiggle" />
-              ช่างเทคนิคซ่อมบำรุง
-            </span>
-            <h1 className="text-xl font-extrabold text-white mt-1">พื้นที่ปฏิบัติงานช่าง</h1>
-            <p className="text-xs text-slate-400">{universityName}</p>
+      {/* BizLink Top Banner */}
+      <div className="biz-banner p-6 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-2xs">
+        <div>
+          <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+            Technician Mobile Workspace
           </div>
-
-          <button
-            onClick={() => setShowQrModal(true)}
-            className="flex flex-col items-center justify-center h-14 w-14 rounded-2xl bg-gradient-to-br from-sky-500 to-cyan-400 text-slate-950 font-bold shadow-lg shadow-sky-500/20 active:scale-95 transition-all group"
-          >
-            <AnimatedIcon icon={QrCode} size={24} animation="spin" className="stroke-[2.5]" />
-            <span className="text-[9px] uppercase tracking-wider font-extrabold mt-0.5">QR SCAN</span>
-          </button>
+          <h1 className="text-xl font-bold text-slate-950 mt-1">
+            {activeTab === "pool" ? "Available Job Pool" : "My Active Claimed Jobs"}
+          </h1>
         </div>
-      </div>
-
-      {/* 2-Tab Mobile Navigation */}
-      <div className="grid grid-cols-2 gap-2 rounded-2xl bg-slate-950 p-1.5 border border-slate-800">
-        <button
-          onClick={() => setActiveTab("pool")}
-          className={`flex items-center justify-center gap-2 rounded-xl py-3 text-xs font-bold transition-all ${
-            activeTab === "pool"
-              ? "bg-gradient-to-r from-sky-500 to-cyan-400 text-slate-950 shadow-md"
-              : "text-slate-400 hover:text-white"
-          }`}
-        >
-          <AnimatedIcon icon={ClipboardList} size={16} animation="lift" />
-          <span>งานในคลัง (Job Pool)</span>
-          <span className={`rounded-full px-2 py-0.5 text-[10px] font-black ${
-            activeTab === "pool" ? "bg-slate-950 text-white" : "bg-slate-800 text-slate-300"
-          }`}>
-            {jobPool.length}
-          </span>
-        </button>
 
         <button
-          onClick={() => setActiveTab("my_jobs")}
-          className={`flex items-center justify-center gap-2 rounded-xl py-3 text-xs font-bold transition-all ${
-            activeTab === "my_jobs"
-              ? "bg-gradient-to-r from-sky-500 to-cyan-400 text-slate-950 shadow-md"
-              : "text-slate-400 hover:text-white"
-          }`}
+          onClick={() => setShowQrModal(true)}
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-xs font-bold text-white hover:bg-slate-800 transition-all shadow-md shrink-0"
         >
-          <AnimatedIcon icon={Wrench} size={16} animation="bounce" />
-          <span>งานของฉัน (My Jobs)</span>
-          <span className={`rounded-full px-2 py-0.5 text-[10px] font-black ${
-            activeTab === "my_jobs" ? "bg-slate-950 text-white" : "bg-slate-800 text-slate-300"
-          }`}>
-            {myJobs.length}
-          </span>
+          <QrCode className="h-4 w-4 text-white" />
+          <span>Scan QR Code</span>
         </button>
       </div>
 
-      {/* TAB 1: Job Pool Cards */}
+      {/* TAB 1: Job Pool */}
       {activeTab === "pool" && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between text-xs text-slate-400 px-1">
-            <span>รายการงานซ่อมบำรุงที่รอช่างกดรับ</span>
-            <span>{jobPool.length} รายการ</span>
-          </div>
-
-          {jobPool.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/40 p-8 text-center text-xs text-slate-500 space-y-2 flex flex-col items-center">
-              <AnimatedIcon icon={CheckCircle2} size={32} animation="bounce" className="text-slate-600" />
-              <p>ไม่มีงานซ่อมใหม่ในคลังในขณะนี้</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in">
+          {filteredPool.length === 0 ? (
+            <div className="col-span-full py-12 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-2xl">
+              No available repair jobs in the pool.
             </div>
           ) : (
-            jobPool.map((job) => (
-              <div
-                key={job.id}
-                className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-lg space-y-3.5 backdrop-blur-xl hover:border-sky-500/40 transition-colors"
-              >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <span className="font-mono font-black text-sky-400 text-base">{job.acCode}</span>
-                    <div className="text-xs font-bold text-white mt-0.5">{job.brand} {job.btu ? `(${job.btu} BTU)` : ""}</div>
+            filteredPool.map((job) => (
+              <div key={job.id} className="biz-card p-5 space-y-4 hover:border-slate-400 transition-all">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-base font-bold text-slate-950">{job.acCode}</span>
+                    <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700">
+                      {job.brand} {job.btu ? `(${job.btu} BTU)` : ""}
+                    </span>
                   </div>
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 text-[10px] font-bold text-amber-300">
-                    <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
-                    รอช่างรับงาน
+                  <MoreVertical className="h-4 w-4 text-slate-400" />
+                </div>
+
+                <div className="text-xs text-slate-600 font-medium leading-relaxed">
+                  {job.location}
+                </div>
+
+                <div className="pt-2 flex items-center justify-between text-xs border-t border-slate-100">
+                  <span className="text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                    Pending Claim
                   </span>
+                  <button
+                    onClick={() => handleClaim(job.id)}
+                    disabled={isPending}
+                    className="rounded-xl bg-slate-950 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800 transition-all shadow-sm active:scale-95"
+                  >
+                    Claim Job
+                  </button>
                 </div>
-
-                <div className="rounded-xl border border-slate-800 bg-slate-950 p-3 text-xs text-slate-300 space-y-1">
-                  <div className="text-[11px] text-slate-400 font-medium">สถานที่ตั้ง:</div>
-                  <div className="font-semibold text-white">{job.location}</div>
-                </div>
-
-                <button
-                  onClick={() => handleClaim(job.id)}
-                  disabled={isPending}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 to-cyan-400 py-3 text-xs font-black text-slate-950 hover:from-sky-400 hover:to-cyan-300 disabled:opacity-50 transition-all shadow-md shadow-sky-500/20 active:scale-[0.98] group"
-                >
-                  <AnimatedIcon icon={Wrench} size={16} animation="bounce" className="stroke-[2.5]" />
-                  <span>{isPending ? "กำลังบันทึก..." : "กดรับงานนี้ (Claim Order)"}</span>
-                </button>
               </div>
             ))
           )}
         </div>
       )}
 
-      {/* TAB 2: My Active Jobs Cards */}
+      {/* TAB 2: My Jobs */}
       {activeTab === "my_jobs" && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between text-xs text-slate-400 px-1">
-            <span>งานซ่อมบำรุงที่คุณรับมาแล้ว</span>
-            <span>{myJobs.length} รายการ</span>
-          </div>
-
-          {myJobs.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/40 p-8 text-center text-xs text-slate-500 space-y-2 flex flex-col items-center">
-              <AnimatedIcon icon={ClipboardList} size={32} animation="bounce" className="text-slate-600" />
-              <p>คุณยังไม่มีงานซ่อมที่รับไว้ ไปที่แท็บ &quot;งานในคลัง&quot; เพื่อกดรับงานได้เลย</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in">
+          {filteredMyJobs.length === 0 ? (
+            <div className="col-span-full py-12 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-2xl">
+              You have no active claimed jobs.
             </div>
           ) : (
-            myJobs.map((job) => (
+            filteredMyJobs.map((job, idx) => (
               <div
                 key={job.id}
-                className="rounded-2xl border border-sky-500/30 bg-slate-900 p-5 shadow-xl space-y-3.5"
+                className={idx === 0 ? "biz-card-dark p-5 space-y-4 shadow-md" : "biz-card p-5 space-y-4 hover:border-slate-400 transition-all"}
               >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <span className="font-mono font-black text-sky-400 text-base">{job.acCode}</span>
-                    <div className="text-xs font-bold text-white mt-0.5">{job.brand} {job.btu ? `(${job.btu} BTU)` : ""}</div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className={`font-mono text-base font-bold ${idx === 0 ? "text-white" : "text-slate-950"}`}>
+                      {job.acCode}
+                    </span>
+                    <span className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${idx === 0 ? "bg-slate-800 text-slate-300" : "bg-slate-100 text-slate-700"}`}>
+                      {job.brand}
+                    </span>
                   </div>
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/30 bg-sky-500/10 px-2.5 py-0.5 text-[10px] font-bold text-sky-300">
-                    <span className="h-1.5 w-1.5 rounded-full bg-sky-400 animate-pulse" />
-                    กำลังดำเนินการ
-                  </span>
+                  <MoreVertical className={`h-4 w-4 ${idx === 0 ? "text-slate-400" : "text-slate-400"}`} />
                 </div>
 
-                <div className="rounded-xl border border-slate-800 bg-slate-950 p-3 text-xs text-slate-300 space-y-1">
-                  <div className="text-[11px] text-slate-400 font-medium">สถานที่ตั้ง:</div>
-                  <div className="font-semibold text-white">{job.location}</div>
+                <div className={`text-xs font-medium leading-relaxed ${idx === 0 ? "text-slate-300" : "text-slate-600"}`}>
+                  {job.location}
                 </div>
 
-                <button
-                  onClick={() => setSelectedJobForLog(job)}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 py-3 text-xs font-black text-slate-950 hover:from-emerald-400 hover:to-teal-300 transition-all shadow-md shadow-emerald-500/20 active:scale-[0.98] group"
-                >
-                  <AnimatedIcon icon={CheckCircle2} size={16} animation="bounce" className="stroke-[2.5]" />
-                  <span>บันทึกประวัติซ่อมบำรุง & ปิดงาน</span>
-                </button>
+                <div className={`pt-2 flex items-center justify-between text-xs border-t ${idx === 0 ? "border-slate-800 text-slate-300" : "border-slate-100 text-slate-500"}`}>
+                  <span className="text-[11px] font-bold text-sky-600">In Progress</span>
+                  <button
+                    onClick={() => setSelectedJobForLog(job)}
+                    className="rounded-xl bg-slate-950 text-white border border-slate-800 px-4 py-2 text-xs font-bold hover:bg-slate-800 transition-all shadow-sm active:scale-95"
+                  >
+                    Log & Complete
+                  </button>
+                </div>
               </div>
             ))
           )}
+        </div>
+      )}
+
+      {/* Modal: QR Code Scanner Simulator */}
+      {showQrModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-xs p-4">
+          <div className="w-full max-w-sm max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xl space-y-4 animate-in fade-in">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-sm font-bold text-slate-950 flex items-center gap-2">
+                <QrCode className="h-4 w-4 text-slate-950" />
+                <span>Scan AC QR Code</span>
+              </h3>
+              <button onClick={() => setShowQrModal(false)} className="text-slate-400 hover:text-slate-950">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="relative h-40 w-full rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 flex flex-col items-center justify-center overflow-hidden">
+              <div className="absolute inset-x-0 h-0.5 bg-slate-900 animate-laser" />
+              <QrCode className="h-12 w-12 text-slate-400 animate-pulse" />
+              <span className="text-[11px] font-semibold text-slate-500 mt-2">Aim camera at QR code</span>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-[11px] font-bold text-slate-700">Simulate Scan Input:</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={scannedAcCode}
+                  onChange={(e) => setScannedAcCode(e.target.value)}
+                  placeholder="e.g. PKRU-ENG-101-AC1"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-900 font-mono focus:border-slate-950 focus:outline-none"
+                />
+                <button
+                  onClick={handleSimulateQrScan}
+                  className="rounded-xl bg-slate-950 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800 shrink-0"
+                >
+                  Confirm
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
       {/* Modal: Action Logger Sheet */}
       {selectedJobForLog && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-950/80 backdrop-blur-md p-4">
-          <div className="w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-2xl space-y-4 animate-in slide-in-from-bottom">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div>
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <AnimatedIcon icon={CheckCircle2} size={18} animation="bounce" className="text-emerald-400" />
-                  <span>บันทึกประวัติซ่อมบำรุง</span>
-                </h3>
-                <p className="text-xs text-sky-400 font-mono font-bold">{selectedJobForLog.acCode}</p>
-              </div>
-              <button onClick={() => setSelectedJobForLog(null)} className="text-slate-400 hover:text-white">
-                <X className="h-4 w-4" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-xs p-4">
+          <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xl space-y-4 animate-in fade-in">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-sm font-bold text-slate-950">Log Repair ({selectedJobForLog.acCode})</h3>
+              <button onClick={() => setSelectedJobForLog(null)} className="text-slate-400 hover:text-slate-950">
+                <X className="h-5 w-5" />
               </button>
             </div>
 
@@ -289,35 +350,35 @@ export function TechMobileView({ universityName, jobPool, myJobs }: TechMobileVi
               <input type="hidden" name="airConditionerId" value={selectedJobForLog.airConditionerId || ""} />
 
               <div>
-                <label className="mb-1.5 block font-semibold text-slate-300 uppercase tracking-wider">
-                  ประเภทการซ่อมบำรุง (Maintenance Action)
-                </label>
+                <label className="mb-2 block font-bold text-slate-700">Action Type</label>
                 <div className="grid grid-cols-3 gap-2">
-                  <label className="flex flex-col items-center justify-center rounded-xl border border-slate-700 bg-slate-950 p-3 text-center cursor-pointer hover:border-sky-500 has-[:checked]:border-sky-500 has-[:checked]:bg-sky-500/10 group">
+                  <label className="flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-slate-50 p-3 text-center cursor-pointer hover:border-slate-950 has-[:checked]:border-slate-950 has-[:checked]:bg-slate-100">
                     <input type="radio" name="action" value="cleaning" defaultChecked className="sr-only" />
-                    <AnimatedIcon icon={Sparkles} size={20} animation="sparkle" className="text-sky-400 mb-1" />
-                    <span className="font-bold text-white text-[11px]">ล้างแอร์</span>
+                    <Sparkles className="h-4 w-4 text-slate-800 mb-1" />
+                    <span className="font-bold text-slate-950">Cleaning</span>
                   </label>
-                  <label className="flex flex-col items-center justify-center rounded-xl border border-slate-700 bg-slate-950 p-3 text-center cursor-pointer hover:border-sky-500 has-[:checked]:border-sky-500 has-[:checked]:bg-sky-500/10 group">
+
+                  <label className="flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-slate-50 p-3 text-center cursor-pointer hover:border-slate-950 has-[:checked]:border-slate-950 has-[:checked]:bg-slate-100">
                     <input type="radio" name="action" value="repair" className="sr-only" />
-                    <AnimatedIcon icon={Wrench} size={20} animation="wiggle" className="text-amber-400 mb-1" />
-                    <span className="font-bold text-white text-[11px]">ซ่อมแซม</span>
+                    <Wrench className="h-4 w-4 text-slate-800 mb-1" />
+                    <span className="font-bold text-slate-950">Repair</span>
                   </label>
-                  <label className="flex flex-col items-center justify-center rounded-xl border border-slate-700 bg-slate-950 p-3 text-center cursor-pointer hover:border-sky-500 has-[:checked]:border-sky-500 has-[:checked]:bg-sky-500/10 group">
+
+                  <label className="flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-slate-50 p-3 text-center cursor-pointer hover:border-slate-950 has-[:checked]:border-slate-950 has-[:checked]:bg-slate-100">
                     <input type="radio" name="action" value="refill_refrigerant" className="sr-only" />
-                    <AnimatedIcon icon={Droplets} size={20} animation="bounce" className="text-cyan-400 mb-1" />
-                    <span className="font-bold text-white text-[11px]">เติมน้ำยา</span>
+                    <Droplets className="h-4 w-4 text-slate-800 mb-1" />
+                    <span className="font-bold text-slate-950">Gas Refill</span>
                   </label>
                 </div>
               </div>
 
               <div>
-                <label className="mb-1.5 block font-medium text-slate-300">รายละเอียดเพิ่มเติม / หมายเหตุ</label>
+                <label className="mb-1 block font-bold text-slate-700">Notes (Optional)</label>
                 <textarea
                   name="notes"
                   rows={3}
-                  placeholder="ระบุอาการ การเปลี่ยนอะไหล่ หรือหมายเหตุการล้างแอร์..."
-                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-white placeholder-slate-500 focus:border-sky-500 focus:outline-none"
+                  placeholder="Details..."
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-slate-900 focus:border-slate-950 focus:outline-none"
                 />
               </div>
 
@@ -325,67 +386,22 @@ export function TechMobileView({ universityName, jobPool, myJobs }: TechMobileVi
                 <button
                   type="button"
                   onClick={() => setSelectedJobForLog(null)}
-                  className="w-1/2 rounded-xl border border-slate-700 py-3 font-semibold text-slate-300 hover:bg-slate-800"
+                  className="w-1/2 rounded-xl border border-slate-200 py-2.5 font-bold text-slate-700 hover:bg-slate-100"
                 >
-                  ยกเลิก
+                  Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="w-1/2 flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 py-3 font-bold text-slate-950 hover:from-emerald-400 hover:to-teal-300 disabled:opacity-50"
+                  className="w-1/2 rounded-xl bg-slate-950 py-2.5 font-bold text-white hover:bg-slate-800 disabled:opacity-50"
                 >
-                  <AnimatedIcon icon={Check} size={16} animation="bounce" className="stroke-[3]" />
-                  <span>{isPending ? "กำลังบันทึก..." : "ยืนยันปิดงาน"}</span>
+                  {isPending ? "Saving..." : "Log & Finish"}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
-
-      {/* Modal: QR Code Scanner Simulator */}
-      {showQrModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4">
-          <div className="w-full max-w-sm rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-2xl space-y-4 text-center">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <AnimatedIcon icon={QrCode} size={16} animation="spin" className="text-sky-400" />
-                <span>สแกน QR Code หน้างาน</span>
-              </h3>
-              <button onClick={() => setShowQrModal(false)} className="text-slate-400 hover:text-white">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="mx-auto flex h-40 w-40 items-center justify-center rounded-2xl border-2 border-dashed border-sky-400/50 bg-slate-950 relative overflow-hidden">
-              <div className="absolute inset-x-0 h-1 bg-sky-400 shadow-lg shadow-sky-400 animate-bounce" />
-              <AnimatedIcon icon={QrCode} size={48} animation="pulse" className="text-slate-600" />
-            </div>
-
-            <p className="text-xs text-slate-400">
-              กล้องมือถือพร้อมสแกนป้าย QR Code ที่ติดอยู่กับตัวเครื่องปรับอากาศ
-            </p>
-
-            <div className="space-y-2 text-left">
-              <label className="text-[11px] font-semibold text-slate-300">ทดสอบจำลองป้อนรหัสแอร์ (acCode):</label>
-              <input
-                type="text"
-                value={scannedAcCode}
-                onChange={(e) => setScannedAcCode(e.target.value)}
-                placeholder="เช่น PKRU-B1-301-01"
-                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white uppercase focus:border-sky-500 focus:outline-none"
-              />
-            </div>
-
-            <button
-              onClick={handleSimulateQrScan}
-              className="w-full rounded-xl bg-sky-500 py-2.5 text-xs font-bold text-slate-950 hover:bg-sky-400"
-            >
-              จำลองผลสแกน QR Code
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
+    </DashboardLayout>
   );
 }

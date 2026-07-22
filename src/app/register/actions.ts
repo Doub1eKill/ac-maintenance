@@ -43,6 +43,37 @@ export async function getUniversities() {
   }
 }
 
+const PUBLIC_EMAIL_DOMAINS = [
+  "gmail.com",
+  "hotmail.com",
+  "outlook.com",
+  "yahoo.com",
+  "icloud.com",
+  "live.com",
+  "aol.com",
+];
+
+function isInstitutionalDomain(emailDomain: string, universityAbbr?: string): boolean {
+  const domain = emailDomain.toLowerCase();
+
+  // Public webmail domains require manual Org Admin verification
+  if (PUBLIC_EMAIL_DOMAINS.includes(domain)) {
+    return false;
+  }
+
+  // Official educational domains (.ac.th, .edu, .edu.th)
+  if (domain.endsWith(".ac.th") || domain.endsWith(".edu") || domain.endsWith(".edu.th")) {
+    return true;
+  }
+
+  // Matches university abbreviation in domain name
+  if (universityAbbr && domain.includes(universityAbbr.toLowerCase())) {
+    return true;
+  }
+
+  return false;
+}
+
 export async function registerUser(
   _prevState: RegisterState,
   formData: FormData
@@ -65,34 +96,56 @@ export async function registerUser(
   const { name, email, password, universityId, role } = parsed.data;
 
   try {
+    const cleanEmail = email.toLowerCase().trim();
+
     // Check if email is already registered
     const existingUser = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
+      where: { email: cleanEmail },
     });
 
     if (existingUser) {
       return { error: "อีเมลนี้ถูกลงทะเบียนในระบบเรียบร้อยแล้ว" };
     }
 
+    // Fetch university info for domain matching & auto-approval
+    const targetUni = await prisma.university.findUnique({
+      where: { id: BigInt(universityId) },
+      select: { name: true, abbreviation: true },
+    });
+
+    const emailDomain = cleanEmail.split("@")[1] || "";
+    const isVerifiedDomain = isInstitutionalDomain(emailDomain, targetUni?.abbreviation);
+    
+    // Enterprise Auto-Approval Rule:
+    // Institutional/university emails (.ac.th, .edu) auto-activate.
+    // Public webmail (gmail/hotmail) remains pending for manual Org Admin verification.
+    const initialStatus = isVerifiedDomain ? "active" : "pending";
+
     // Hash password with bcrypt
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user with status: 'pending' (Awaiting Org Admin Approval)
     await prisma.user.create({
       data: {
         name,
-        email: email.toLowerCase(),
+        email: cleanEmail,
         password: hashedPassword,
         universityId: BigInt(universityId),
         role: role as UserRole,
-        status: "pending",
+        status: initialStatus,
       },
     });
+
+    if (initialStatus === "active") {
+      return {
+        success: true,
+        message: `ลงทะเบียนสำเร็จ! บัญชีของคุณได้รับการอนุมัติและเปิดใช้งานสิทธิ์เข้าสู่ระบบทันทีเนื่องจากเป็นอีเมลสถาบัน (${cleanEmail})`,
+      };
+    }
 
     return {
       success: true,
       message:
-        "ลงทะเบียนสำเร็จ! บัญชีของคุณอยู่ระหว่างรอการอนุมัติสิทธิ์จากผู้ดูแลระบบมหาวิทยาลัย (Pending Approval)",
+        "ลงทะเบียนสำเร็จ! บัญชีของคุณอยู่ระหว่างรอการตรวจสอบและอนุมัติสิทธิ์จากผู้ดูแลระบบมหาวิทยาลัย (Pending Approval)",
     };
   } catch (error) {
     console.error("Registration error:", error);

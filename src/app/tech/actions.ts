@@ -19,66 +19,77 @@ export async function getTechnicianData() {
   const universityId = BigInt(session.user.universityId!);
   const techId = BigInt(session.user.id!);
 
-  const [university, pendingOrdersRaw, myJobsRaw] = await Promise.all([
-    prisma.university.findUnique({ where: { id: universityId } }),
-    prisma.workOrder.findMany({
-      where: { universityId, status: "pending" },
-      include: {
-        airConditioner: {
-          include: {
-            room: {
-              include: {
-                building: true,
+  try {
+    const [university, pendingOrdersRaw, myJobsRaw] = await Promise.all([
+      prisma.university.findUnique({ where: { id: universityId } }),
+      prisma.workOrder.findMany({
+        where: { universityId, status: "pending" },
+        include: {
+          airConditioner: {
+            include: {
+              room: {
+                include: {
+                  building: true,
+                },
               },
             },
           },
         },
-      },
-      orderBy: { createdAt: "desc" },
-    }),
-    prisma.workOrder.findMany({
-      where: { universityId, claimedBy: techId, status: "claimed" },
-      include: {
-        airConditioner: {
-          include: {
-            room: {
-              include: {
-                building: true,
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.workOrder.findMany({
+        where: { universityId, claimedBy: techId, status: "claimed" },
+        include: {
+          airConditioner: {
+            include: {
+              room: {
+                include: {
+                  building: true,
+                },
               },
             },
           },
         },
-      },
-      orderBy: { claimedAt: "desc" },
-    }),
-  ]);
+        orderBy: { claimedAt: "desc" },
+      }),
+    ]);
 
-  const jobPool = pendingOrdersRaw.map((wo) => ({
-    id: wo.id.toString(),
-    acCode: wo.airConditioner.acCode,
-    brand: wo.airConditioner.brand,
-    btu: wo.airConditioner.btu,
-    status: wo.airConditioner.status,
-    location: `${wo.airConditioner.room.building.name} (${wo.airConditioner.room.building.abbreviation}) - ห้อง ${wo.airConditioner.room.name} (ชั้น ${wo.airConditioner.room.floor || 1})`,
-    createdAt: wo.createdAt ? wo.createdAt.toISOString() : null,
-  }));
+    const jobPool = pendingOrdersRaw.map((wo) => ({
+      id: wo.id.toString(),
+      acCode: wo.airConditioner.acCode,
+      brand: wo.airConditioner.brand,
+      btu: wo.airConditioner.btu,
+      status: wo.airConditioner.status,
+      location: `${wo.airConditioner.room.building.name} (${wo.airConditioner.room.building.abbreviation}) - ห้อง ${wo.airConditioner.room.name} (ชั้น ${wo.airConditioner.room.floor || 1})`,
+      createdAt: wo.createdAt ? wo.createdAt.toISOString() : null,
+    }));
 
-  const myJobs = myJobsRaw.map((wo) => ({
-    id: wo.id.toString(),
-    acCode: wo.airConditioner.acCode,
-    brand: wo.airConditioner.brand,
-    btu: wo.airConditioner.btu,
-    airConditionerId: wo.airConditionerId.toString(),
-    status: wo.airConditioner.status,
-    location: `${wo.airConditioner.room.building.name} (${wo.airConditioner.room.building.abbreviation}) - ห้อง ${wo.airConditioner.room.name} (ชั้น ${wo.airConditioner.room.floor || 1})`,
-    claimedAt: wo.claimedAt ? wo.claimedAt.toISOString() : null,
-  }));
+    const myJobs = myJobsRaw.map((wo) => ({
+      id: wo.id.toString(),
+      acCode: wo.airConditioner.acCode,
+      brand: wo.airConditioner.brand,
+      btu: wo.airConditioner.btu,
+      airConditionerId: wo.airConditionerId.toString(),
+      status: wo.airConditioner.status,
+      location: `${wo.airConditioner.room.building.name} (${wo.airConditioner.room.building.abbreviation}) - ห้อง ${wo.airConditioner.room.name} (ชั้น ${wo.airConditioner.room.floor || 1})`,
+      claimedAt: wo.claimedAt ? wo.claimedAt.toISOString() : null,
+    }));
 
-  return {
-    universityName: university?.name || "มหาวิทยาลัย",
-    jobPool,
-    myJobs,
-  };
+    return {
+      dbError: null,
+      universityName: university?.name || "มหาวิทยาลัย",
+      jobPool,
+      myJobs,
+    };
+  } catch (error) {
+    console.error("Technician Data query failed:", error);
+    return {
+      dbError: "ไม่สามารถเชื่อมต่อฐานข้อมูล MariaDB/MySQL ได้ (Connection Pool Timeout) - กรุณาตรวจสอบว่าเซิร์ฟเวอร์ MySQL บนพอร์ต 3307 เปิดใช้งานอยู่ และเรียกใช้ 'npx tsx prisma/seed.ts'",
+      universityName: "มหาวิทยาลัย",
+      jobPool: [],
+      myJobs: [],
+    };
+  }
 }
 
 export async function claimWorkOrderAction(workOrderId: string) {
