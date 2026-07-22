@@ -1,0 +1,251 @@
+// This schema was introspected from the live MySQL database (via `prisma db pull`)
+// that was previously managed by Laravel migrations — every relation, index, and
+// onDelete/onUpdate behavior below was cross-checked against the actual FK
+// constraints in information_schema.REFERENTIAL_CONSTRAINTS and matches exactly.
+// Reasoning comments are carried over from the original Laravel migrations so the
+// "why" isn't lost in the framework migration.
+//
+// Laravel framework tables (cache, cache_locks, failed_jobs, job_batches, jobs,
+// migrations, password_reset_tokens, sessions) are intentionally NOT modeled here —
+// they belonged to Laravel's queue/cache/session infrastructure, which Next.js
+// replaces with its own mechanisms. The tables themselves are left untouched in
+// MySQL; Prisma just doesn't manage them.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model University {
+  id           BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  name         String   @unique(map: "universities_name_unique") @db.VarChar(255) // natural key of the institution
+  abbreviation String   @unique(map: "universities_abbreviation_unique") @db.VarChar(10) // feeds ac_code's first segment, e.g. "PKRU"
+  address      String?  @db.VarChar(255)
+  phone        String?  @db.VarChar(255)
+  createdAt    DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt    DateTime? @map("updated_at") @db.Timestamp(0)
+
+  buildings  Building[]
+  users      User[]
+  workOrders WorkOrder[]
+
+  @@map("universities")
+}
+
+model Building {
+  id            BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  universityId  BigInt   @map("university_id") @db.UnsignedBigInt
+  name          String   @db.VarChar(255)
+  abbreviation  String   @db.VarChar(10) // feeds ac_code's second segment, e.g. "B1" — unique per university only
+  createdAt     DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt     DateTime? @map("updated_at") @db.Timestamp(0)
+
+  // 1:N — one university has many buildings, a building belongs to exactly
+  // one university. Tenant boundary starts here.
+  // RESTRICT: deleting a tenant must not silently wipe its buildings/rooms/units.
+  university University @relation(fields: [universityId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "buildings_university_id_foreign")
+  rooms      Room[]
+
+  @@unique([universityId, abbreviation], map: "buildings_university_id_abbreviation_unique")
+  @@unique([universityId, name], map: "buildings_university_id_name_unique")
+  @@map("buildings")
+}
+
+model Room {
+  id          BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  buildingId  BigInt   @map("building_id") @db.UnsignedBigInt
+  name        String   @db.VarChar(255) // room number/label, e.g. "301"
+  floor       Int?     @db.UnsignedSmallInt
+  createdAt   DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt   DateTime? @map("updated_at") @db.Timestamp(0)
+
+  // 1:N — one building has many rooms. university_id is deliberately NOT
+  // duplicated here — tenant is derived via rooms -> buildings -> university.
+  // RESTRICT: force explicit room reassignment before a building can be removed.
+  building        Building         @relation(fields: [buildingId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "rooms_building_id_foreign")
+  airConditioners AirConditioner[]
+
+  @@unique([buildingId, name], map: "rooms_building_id_name_unique")
+  @@map("rooms")
+}
+
+model User {
+  id              BigInt     @id @default(autoincrement()) @db.UnsignedBigInt
+  universityId    BigInt?    @map("university_id") @db.UnsignedBigInt // nullable: super_admin is platform-level, not tied to a tenant
+  role            UserRole   @default(technician)
+  status          UserStatus @default(pending) // separate from role — an account can be a valid technician and still be pending/suspended
+  name            String     @db.VarChar(255)
+  email           String     @unique(map: "users_email_unique") @db.VarChar(255)
+  emailVerifiedAt DateTime?  @map("email_verified_at") @db.Timestamp(0)
+  // Nullable on purpose (was NOT NULL under Laravel): NULL doubles as the
+  // "must reset password" flag instead of a separate boolean column. Every
+  // legacy Laravel bcrypt hash is deliberately cleared to NULL during this
+  // migration (bcrypt hashes from Laravel's password broker cannot be
+  // verified through this app's own hashing calls without dragging the old
+  // PHP-specific bcrypt config along), so NULL means one thing consistently:
+  // this account cannot sign in via Credentials until a new password is set.
+  password        String?    @db.VarChar(255)
+  rememberToken   String?    @map("remember_token") @db.VarChar(100)
+  createdAt       DateTime?  @map("created_at") @db.Timestamp(0)
+  updatedAt       DateTime?  @map("updated_at") @db.Timestamp(0)
+
+  // 1:N — one university has many users, a user belongs to at most one
+  // university. RESTRICT (not the optional-relation default of SetNull):
+  // deleting a tenant must not silently orphan/erase its staff accounts.
+  university       University?        @relation(fields: [universityId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "users_university_id_foreign")
+  phones           UserPhone[]
+  maintenanceLogs  MaintenanceLog[]
+  claimedWorkOrders WorkOrder[]
+
+  @@index([universityId, role], map: "users_university_id_role_index")
+  @@index([universityId, status], map: "users_university_id_status_index")
+  @@map("users")
+}
+
+model UserPhone {
+  id          BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  userId      BigInt   @map("user_id") @db.UnsignedBigInt
+  phoneNumber String   @map("phone_number") @db.VarChar(255)
+  isPrimary   Boolean  @default(false) @map("is_primary")
+  createdAt   DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt   DateTime? @map("updated_at") @db.Timestamp(0)
+
+  // 1NF fix: a user can have multiple phone numbers, so they get their own
+  // table instead of phone_1/phone_2 columns.
+  // CASCADE: a phone number has no meaning without its owner.
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "user_phones_user_id_foreign")
+
+  @@unique([userId, phoneNumber], map: "user_phones_user_id_phone_number_unique")
+  @@map("user_phones")
+}
+
+model AirConditioner {
+  id          BigInt               @id @default(autoincrement()) @db.UnsignedBigInt
+  roomId      BigInt               @map("room_id") @db.UnsignedBigInt
+  acCode      String               @unique(map: "air_conditioners_ac_code_unique") @map("ac_code") @db.VarChar(255) // human-readable, globally unique: [UNI]-[BLDG]-[ROOM]-[NN]
+  qrCode      String               @unique(map: "air_conditioners_qr_code_unique") @map("qr_code") @db.Char(36) // uuid embedded in the printed QR — never exposes the sequential ac_code
+  brand       String               @db.VarChar(255)
+  model       String?              @db.VarChar(255)
+  btu         Int?                 @db.UnsignedInt
+  installedAt DateTime?            @map("installed_at") @db.Date
+  status      AirConditionerStatus @default(normal)
+  createdAt   DateTime?            @map("created_at") @db.Timestamp(0)
+  updatedAt   DateTime?            @map("updated_at") @db.Timestamp(0)
+
+  // 1:N — one room can contain several units. RESTRICT: force explicit
+  // reassignment/retirement of units before a room is removed.
+  // roomId is immutable in the app layer after registration (never exposed
+  // as editable) — this is what makes denormalizing tenant info onto
+  // work_orders safe (see WorkOrder below): there's no window where a
+  // unit's tenant chain could go stale.
+  room             Room             @relation(fields: [roomId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "air_conditioners_room_id_foreign")
+  maintenanceLogs  MaintenanceLog[]
+  workOrders       WorkOrder[]
+
+  @@index([roomId], map: "air_conditioners_room_id_index")
+  @@map("air_conditioners")
+}
+
+model MaintenanceLog {
+  id               BigInt            @id @default(autoincrement()) @db.UnsignedBigInt
+  airConditionerId BigInt            @map("air_conditioner_id") @db.UnsignedBigInt
+  workOrderId      BigInt?           @map("work_order_id") @db.UnsignedBigInt // set only when this log closes a claimed pool job
+  userId           BigInt            @map("user_id") @db.UnsignedBigInt // the technician who performed the work
+  action           MaintenanceAction
+  notes            String?           @db.Text
+  performedAt      DateTime          @map("performed_at") @db.DateTime(0)
+  createdAt        DateTime?         @map("created_at") @db.Timestamp(0)
+  updatedAt        DateTime?         @map("updated_at") @db.Timestamp(0)
+
+  // Central transaction table. Never CASCADE on either FK below: a
+  // physical asset's repair history, and a technician's accountability for
+  // work performed, must both survive independently of the referenced
+  // row's own lifecycle.
+  airConditioner AirConditioner @relation(fields: [airConditionerId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "maintenance_logs_air_conditioner_id_foreign")
+  technician     User           @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "maintenance_logs_user_id_foreign")
+  // SET NULL: the log has independent value as history — it must survive
+  // even if the work order itself is later deleted or cancelled.
+  workOrder      WorkOrder?     @relation(fields: [workOrderId], references: [id], onDelete: SetNull, onUpdate: Restrict, map: "maintenance_logs_work_order_id_foreign")
+
+  @@index([airConditionerId, performedAt], map: "maintenance_logs_air_conditioner_id_performed_at_index")
+  @@index([userId], map: "maintenance_logs_user_id_index")
+  @@index([workOrderId], map: "maintenance_logs_work_order_id_index")
+  @@map("maintenance_logs")
+}
+
+model WorkOrder {
+  id               BigInt          @id @default(autoincrement()) @db.UnsignedBigInt
+  airConditionerId BigInt          @map("air_conditioner_id") @db.UnsignedBigInt
+  // Deliberately denormalized (the rest of this schema derives tenant via
+  // join on purpose). Justified here because: 1) the technician pool page
+  // queries "pending work orders for my university" on every dashboard
+  // load — a genuinely hot path; 2) zero staleness risk, since
+  // AirConditioner.roomId is immutable after registration, so the
+  // university a unit belongs to can never change out from under this
+  // column once set.
+  universityId     BigInt          @map("university_id") @db.UnsignedBigInt
+  status           WorkOrderStatus @default(pending)
+  claimedBy        BigInt?         @map("claimed_by") @db.UnsignedBigInt
+  claimedAt        DateTime?       @map("claimed_at") @db.Timestamp(0) // separate from updatedAt, which gets overwritten again on completion
+  createdAt        DateTime?       @map("created_at") @db.Timestamp(0)
+  updatedAt        DateTime?       @map("updated_at") @db.Timestamp(0)
+
+  // RESTRICT: semi-transactional table, never cascade.
+  airConditioner  AirConditioner   @relation(fields: [airConditionerId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "work_orders_air_conditioner_id_foreign")
+  university      University       @relation(fields: [universityId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "work_orders_university_id_foreign")
+  // SET NULL: optional reference — nullable until claimed. This app never
+  // hard-deletes users (accounts are suspended via User.status instead),
+  // so this is a safety net more than an expected path.
+  claimedByUser   User?            @relation(fields: [claimedBy], references: [id], onDelete: SetNull, onUpdate: Restrict, map: "work_orders_claimed_by_foreign")
+  maintenanceLogs MaintenanceLog[]
+
+  @@index([universityId, status, createdAt], map: "work_orders_university_id_status_created_at_index")
+  @@index([airConditionerId, status], map: "work_orders_air_conditioner_id_status_index")
+  @@index([claimedBy], map: "work_orders_claimed_by_index")
+  @@map("work_orders")
+}
+
+enum UserRole {
+  super_admin
+  org_admin
+  technician
+
+  @@map("users_role")
+}
+
+enum UserStatus {
+  pending
+  active
+  suspended
+
+  @@map("users_status")
+}
+
+enum WorkOrderStatus {
+  pending
+  claimed
+  completed
+  cancelled
+
+  @@map("work_orders_status")
+}
+
+enum MaintenanceAction {
+  cleaning
+  repair
+  refill_refrigerant
+
+  @@map("maintenance_logs_action")
+}
+
+enum AirConditionerStatus {
+  normal
+  broken
+  needs_cleaning
+
+  @@map("air_conditioners_status")
+}
