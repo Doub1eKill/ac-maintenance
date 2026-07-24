@@ -1,5 +1,4 @@
-import { PrismaClient } from "../src/generated/prisma/client";
-const prisma = new PrismaClient();
+import { prisma } from "../src/lib/prisma";
 async function main() {
   const user = await prisma.user.findFirst();
   if (user && !('deletedAt' in user)) throw new Error("deletedAt missing from User");
