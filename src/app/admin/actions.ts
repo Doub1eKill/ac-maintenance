@@ -5,6 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
+import { format, subDays } from "date-fns";
 
 async function verifyOrgAdmin() {
   const session = await auth();
@@ -26,6 +27,7 @@ export async function getOrgAdminData() {
       techsRaw,
       pendingUsersRaw,
       allUsersRaw,
+      maintenanceLogsRaw,
     ] = await Promise.all([
       prisma.university.findUnique({ where: { id: universityId } }),
       prisma.building.findMany({
@@ -74,6 +76,12 @@ export async function getOrgAdminData() {
         where: { universityId },
         orderBy: { createdAt: "desc" },
       }),
+      prisma.maintenanceLog.findMany({
+        where: { 
+          airConditioner: { room: { building: { universityId } } },
+          performedAt: { gte: subDays(new Date(), 7) }
+        },
+      })
     ]);
 
     // Aggregate metrics
@@ -159,6 +167,25 @@ export async function getOrgAdminData() {
       });
     });
 
+    const weeklyActivity = Array.from({ length: 7 }).map((_, i) => {
+      const date = subDays(new Date(), 6 - i);
+      const dayStr = format(date, "EEE");
+      return {
+        day: dayStr,
+        repairs: 0,
+      };
+    });
+
+    // We already fetched maintenanceLogsRaw from the last 7 days
+
+    maintenanceLogsRaw.forEach(log => {
+      const dayStr = format(log.performedAt, "EEE");
+      const activityDay = weeklyActivity.find(d => d.day === dayStr);
+      if (activityDay) {
+        activityDay.repairs += 1;
+      }
+    });
+
     return {
       dbError: null,
       universityName: university?.name || "มหาวิทยาลัย",
@@ -169,6 +196,7 @@ export async function getOrgAdminData() {
         activeTechsCount: techsRaw.length,
         pendingUsersCount: pendingUsers.length,
       },
+      weeklyActivity,
       workOrders,
       buildings: buildingList,
       allAcUnits,
@@ -188,6 +216,7 @@ export async function getOrgAdminData() {
         activeTechsCount: 0,
         pendingUsersCount: 0,
       },
+      weeklyActivity: [],
       workOrders: [],
       buildings: [],
       allAcUnits: [],

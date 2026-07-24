@@ -27,6 +27,7 @@ import {
 import { AnimatedIcon } from "@/components/ui/animated-icon";
 import { DashboardLayout, NavItem } from "@/components/layout/dashboard-layout";
 import { AssetManager } from "@/components/admin/asset-manager";
+import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from "recharts";
 
 interface WorkOrderItem {
   id: string;
@@ -88,6 +89,7 @@ interface AdminDashboardViewProps {
     activeTechsCount: number;
     pendingUsersCount?: number;
   };
+  weeklyActivity: Array<{ day: string; repairs: number }>;
   workOrders: WorkOrderItem[];
   buildings: BuildingItem[];
   allAcUnits: Array<{ id: string; label: string }>;
@@ -101,6 +103,7 @@ export function AdminDashboardView({
   dbError,
   universityName,
   metrics,
+  weeklyActivity = [],
   workOrders,
   buildings,
   allAcUnits,
@@ -288,32 +291,34 @@ export function AdminDashboardView({
 
       {/* BizLink Top Analytic Banner (Bar Chart & Gauge Stats Widget) */}
       <div className="biz-banner p-6 sm:p-8 flex flex-col lg:flex-row items-center justify-between gap-6 shadow-2xs">
-        {/* Left: Bar Chart Widget */}
-        <div className="space-y-3 w-full lg:w-auto">
+        {/* Left: Bar Chart Widget (Recharts) */}
+        <div className="space-y-3 w-full lg:w-1/3">
           <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">
             Weekly Repair Activity
           </div>
-          <div className="flex items-end gap-3 h-24 pt-2">
-            <div className="flex flex-col items-center gap-1">
-              <div className="w-6 bg-slate-900 rounded-t-md h-16" />
-              <span className="text-[10px] font-bold text-slate-400">Mon</span>
-            </div>
-            <div className="flex flex-col items-center gap-1">
-              <div className="w-6 bg-slate-400 rounded-t-md h-10" />
-              <span className="text-[10px] font-bold text-slate-400">Tue</span>
-            </div>
-            <div className="flex flex-col items-center gap-1">
-              <div className="w-6 bg-slate-900 rounded-t-md h-24" />
-              <span className="text-[10px] font-bold text-slate-400">Wed</span>
-            </div>
-            <div className="flex flex-col items-center gap-1">
-              <div className="w-6 bg-slate-300 rounded-t-md h-12" />
-              <span className="text-[10px] font-bold text-slate-400">Thu</span>
-            </div>
-            <div className="flex flex-col items-center gap-1">
-              <div className="w-6 bg-slate-900 rounded-t-md h-20" />
-              <span className="text-[10px] font-bold text-slate-400">Fri</span>
-            </div>
+          <div className="h-28 pt-2 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={weeklyActivity} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+                <XAxis 
+                  dataKey="day" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fontSize: 10, fill: "#94a3b8", fontWeight: 700 }}
+                  dy={5}
+                />
+                <Tooltip 
+                  cursor={{ fill: '#f1f5f9' }}
+                  contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                  labelStyle={{ fontWeight: 700, color: '#0f172a' }}
+                />
+                <Bar 
+                  dataKey="repairs" 
+                  fill="#0f172a" 
+                  radius={[6, 6, 6, 6]}
+                  barSize={24}
+                />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
 
