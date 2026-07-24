@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { updateUserStatusAction, createUniversityAction } from "@/app/super-admin/actions";
+import { updateUserStatusAction } from "@/app/super-admin/actions";
 import {
   ShieldCheck,
   Building2,
@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 import { AnimatedIcon } from "@/components/ui/animated-icon";
 import { DashboardLayout, NavItem } from "@/components/layout/dashboard-layout";
+import { MasterDataClient } from "@/app/super-admin/master-data/master-data-client";
+import { Database } from "lucide-react";
 
 interface PendingUser {
   id: string;
@@ -61,6 +63,7 @@ interface SuperAdminViewProps {
   };
   pendingUsers: PendingUser[];
   universities: UniversityItem[];
+  brands: any[]; // Or add proper BrandType interface
 }
 
 export function SuperAdminView({
@@ -69,6 +72,7 @@ export function SuperAdminView({
   metrics,
   pendingUsers,
   universities,
+  brands,
 }: SuperAdminViewProps) {
   const [activeTab, setActiveTab] = useState<string>("overview");
   const [isPending, startTransition] = useTransition();
@@ -108,13 +112,34 @@ export function SuperAdminView({
     e.preventDefault();
     setActionMessage(null);
     const formData = new FormData(e.currentTarget);
+    const data = Object.fromEntries(formData.entries());
+
     startTransition(async () => {
-      const res = await createUniversityAction(formData);
-      if (res.error) {
-        setActionMessage({ type: "error", text: res.error });
-      } else {
-        setActionMessage({ type: "success", text: "เพิ่มมหาวิทยาลัยใหม่ลงระบบเรียบร้อยแล้ว" });
-        setShowAddUniModal(false);
+      try {
+        const res = await fetch("/api/super-admin/universities", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: data.name,
+            shortName: data.abbreviation,
+            contactName: data.contactName,
+            contactEmail: data.adminEmail, // using adminEmail as contact email too
+            contactPhone: data.phone,
+            adminEmail: data.adminEmail,
+            adminPassword: data.adminPassword,
+          }),
+        });
+
+        if (!res.ok) {
+          const errorText = await res.text();
+          setActionMessage({ type: "error", text: errorText || "Failed to create university" });
+        } else {
+          setActionMessage({ type: "success", text: "เพิ่มมหาวิทยาลัยใหม่ลงระบบเรียบร้อยแล้ว" });
+          setShowAddUniModal(false);
+          // In a real app, we'd router.refresh() here
+        }
+      } catch (err: any) {
+        setActionMessage({ type: "error", text: err.message });
       }
     });
   }
@@ -135,6 +160,11 @@ export function SuperAdminView({
       id: "universities",
       label: "Universities",
       icon: Building2,
+    },
+    {
+      id: "master-data",
+      label: "Master Data",
+      icon: Database,
     },
   ];
 
@@ -394,6 +424,12 @@ export function SuperAdminView({
         </div>
       )}
 
+      {activeTab === "master-data" && (
+        <div className="animate-in fade-in">
+          <MasterDataClient initialBrands={brands} />
+        </div>
+      )}
+
       {/* Modal: Add University */}
       {showAddUniModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-xs p-4">
@@ -447,6 +483,42 @@ export function SuperAdminView({
                   placeholder="076-211-959"
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-slate-900 font-mono focus:border-slate-950 focus:outline-none"
                 />
+              </div>
+
+              <div className="border-t border-slate-100 pt-3">
+                <h4 className="font-bold text-slate-950 mb-2">Default Admin Account</h4>
+                <div className="space-y-3">
+                  <div>
+                    <label className="mb-1 block font-bold text-slate-700">Admin Name</label>
+                    <input
+                      name="contactName"
+                      type="text"
+                      required
+                      placeholder="Admin Name"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-slate-900 focus:border-slate-950 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block font-bold text-slate-700">Admin Email</label>
+                    <input
+                      name="adminEmail"
+                      type="email"
+                      required
+                      placeholder="admin@uni.edu"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-slate-900 focus:border-slate-950 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block font-bold text-slate-700">Password</label>
+                    <input
+                      name="adminPassword"
+                      type="password"
+                      required
+                      placeholder="Min 8 characters"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-slate-900 focus:border-slate-950 focus:outline-none"
+                    />
+                  </div>
+                </div>
               </div>
 
               <div className="flex gap-2 pt-2">

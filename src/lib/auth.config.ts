@@ -49,9 +49,10 @@ export const authConfig = {
 
       const isAdminRoute = pathname.startsWith("/admin");
       const isTechRoute = pathname.startsWith("/tech");
+      const isSuperAdminRoute = pathname.startsWith("/super-admin") || pathname.startsWith("/api/super-admin");
 
       if (!isLoggedIn) {
-        return isAdminRoute || isTechRoute ? false : true;
+        return isAdminRoute || isTechRoute || isSuperAdminRoute ? false : true;
       }
 
       // Suspended/pending accounts never had a chance to reach this
@@ -68,6 +69,9 @@ export const authConfig = {
       // equivalent CRUD area here either (see the original Laravel
       // decision: super_admin has no university_id to scope admin
       // resources by).
+      if (isSuperAdminRoute) {
+        return auth.user.role === "super_admin";
+      }
       if (isAdminRoute) {
         return auth.user.role === "org_admin";
       }

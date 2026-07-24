@@ -13,5 +13,5 @@ import { authConfig } from "@/lib/auth.config";
 export default NextAuth(authConfig).auth;
 
 export const config = {
-  matcher: ["/admin/:path*", "/tech/:path*"],
+  matcher: ["/admin/:path*", "/tech/:path*", "/super-admin/:path*", "/api/super-admin/:path*"],
 };
