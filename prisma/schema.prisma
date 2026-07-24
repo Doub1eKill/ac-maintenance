@@ -21,11 +21,11 @@ datasource db {
 }
 
 model University {
-  id           BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
-  name         String   @unique(map: "universities_name_unique") @db.VarChar(255) // natural key of the institution
-  abbreviation String   @unique(map: "universities_abbreviation_unique") @db.VarChar(10) // feeds ac_code's first segment, e.g. "PKRU"
-  address      String?  @db.VarChar(255)
-  phone        String?  @db.VarChar(255)
+  id           BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  name         String    @unique(map: "universities_name_unique") @db.VarChar(255) // natural key of the institution
+  abbreviation String    @unique(map: "universities_abbreviation_unique") @db.VarChar(10) // feeds ac_code's first segment, e.g. "PKRU"
+  address      String?   @db.VarChar(255)
+  phone        String?   @db.VarChar(255)
   createdAt    DateTime? @map("created_at") @db.Timestamp(0)
   updatedAt    DateTime? @map("updated_at") @db.Timestamp(0)
 
@@ -37,12 +37,12 @@ model University {
 }
 
 model Building {
-  id            BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
-  universityId  BigInt   @map("university_id") @db.UnsignedBigInt
-  name          String   @db.VarChar(255)
-  abbreviation  String   @db.VarChar(10) // feeds ac_code's second segment, e.g. "B1" — unique per university only
-  createdAt     DateTime? @map("created_at") @db.Timestamp(0)
-  updatedAt     DateTime? @map("updated_at") @db.Timestamp(0)
+  id           BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  universityId BigInt    @map("university_id") @db.UnsignedBigInt
+  name         String    @db.VarChar(255)
+  abbreviation String    @db.VarChar(10) // feeds ac_code's second segment, e.g. "B1" — unique per university only
+  createdAt    DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt    DateTime? @map("updated_at") @db.Timestamp(0)
 
   // 1:N — one university has many buildings, a building belongs to exactly
   // one university. Tenant boundary starts here.
@@ -56,12 +56,12 @@ model Building {
 }
 
 model Room {
-  id          BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
-  buildingId  BigInt   @map("building_id") @db.UnsignedBigInt
-  name        String   @db.VarChar(255) // room number/label, e.g. "301"
-  floor       Int?     @db.UnsignedSmallInt
-  createdAt   DateTime? @map("created_at") @db.Timestamp(0)
-  updatedAt   DateTime? @map("updated_at") @db.Timestamp(0)
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  buildingId BigInt    @map("building_id") @db.UnsignedBigInt
+  name       String    @db.VarChar(255) // room number/label, e.g. "301"
+  floor      Int?      @db.UnsignedSmallInt
+  createdAt  DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt  DateTime? @map("updated_at") @db.Timestamp(0)
 
   // 1:N — one building has many rooms. university_id is deliberately NOT
   // duplicated here — tenant is derived via rooms -> buildings -> university.
@@ -92,13 +92,14 @@ model User {
   rememberToken   String?    @map("remember_token") @db.VarChar(100)
   createdAt       DateTime?  @map("created_at") @db.Timestamp(0)
   updatedAt       DateTime?  @map("updated_at") @db.Timestamp(0)
+  deletedAt       DateTime?  @map("deleted_at") @db.Timestamp(0)
 
   // 1:N — one university has many users, a user belongs to at most one
   // university. RESTRICT (not the optional-relation default of SetNull):
   // deleting a tenant must not silently orphan/erase its staff accounts.
-  university       University?        @relation(fields: [universityId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "users_university_id_foreign")
-  phones           UserPhone[]
-  maintenanceLogs  MaintenanceLog[]
+  university        University?      @relation(fields: [universityId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "users_university_id_foreign")
+  phones            UserPhone[]
+  maintenanceLogs   MaintenanceLog[]
   claimedWorkOrders WorkOrder[]
 
   @@index([universityId, role], map: "users_university_id_role_index")
@@ -107,10 +108,10 @@ model User {
 }
 
 model UserPhone {
-  id          BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
-  userId      BigInt   @map("user_id") @db.UnsignedBigInt
-  phoneNumber String   @map("phone_number") @db.VarChar(255)
-  isPrimary   Boolean  @default(false) @map("is_primary")
+  id          BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  userId      BigInt    @map("user_id") @db.UnsignedBigInt
+  phoneNumber String    @map("phone_number") @db.VarChar(255)
+  isPrimary   Boolean   @default(false) @map("is_primary")
   createdAt   DateTime? @map("created_at") @db.Timestamp(0)
   updatedAt   DateTime? @map("updated_at") @db.Timestamp(0)
 
@@ -123,18 +124,48 @@ model UserPhone {
   @@map("user_phones")
 }
 
+model AcBrand {
+  id        BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  name      String    @unique(map: "ac_brands_name_unique") @db.VarChar(255)
+  createdAt DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime? @map("updated_at") @db.Timestamp(0)
+
+  models          AcModel[]
+  airConditioners AirConditioner[]
+
+  @@map("ac_brands")
+}
+
+model AcModel {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  brandId    BigInt    @map("brand_id") @db.UnsignedBigInt
+  name       String    @db.VarChar(255)
+  defaultBtu Int?      @map("default_btu") @db.UnsignedInt
+  createdAt  DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt  DateTime? @map("updated_at") @db.Timestamp(0)
+
+  brand           AcBrand          @relation(fields: [brandId], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "ac_models_brand_id_foreign")
+  airConditioners AirConditioner[]
+
+  @@unique([brandId, name], map: "ac_models_brand_id_name_unique")
+  @@map("ac_models")
+}
+
 model AirConditioner {
   id          BigInt               @id @default(autoincrement()) @db.UnsignedBigInt
   roomId      BigInt               @map("room_id") @db.UnsignedBigInt
+  acBrandId   BigInt?              @map("ac_brand_id") @db.UnsignedBigInt
+  acModelId   BigInt?              @map("ac_model_id") @db.UnsignedBigInt
   acCode      String               @unique(map: "air_conditioners_ac_code_unique") @map("ac_code") @db.VarChar(255) // human-readable, globally unique: [UNI]-[BLDG]-[ROOM]-[NN]
   qrCode      String               @unique(map: "air_conditioners_qr_code_unique") @map("qr_code") @db.Char(36) // uuid embedded in the printed QR — never exposes the sequential ac_code
-  brand       String               @db.VarChar(255)
-  model       String?              @db.VarChar(255)
+  brand       String?              @db.VarChar(255) // Fallback for "Other" custom brands
+  model       String?              @db.VarChar(255) // Fallback for "Other" custom models
   btu         Int?                 @db.UnsignedInt
   installedAt DateTime?            @map("installed_at") @db.Date
   status      AirConditionerStatus @default(normal)
   createdAt   DateTime?            @map("created_at") @db.Timestamp(0)
   updatedAt   DateTime?            @map("updated_at") @db.Timestamp(0)
+  deletedAt   DateTime?            @map("deleted_at") @db.Timestamp(0)
 
   // 1:N — one room can contain several units. RESTRICT: force explicit
   // reassignment/retirement of units before a room is removed.
@@ -142,9 +173,11 @@ model AirConditioner {
   // as editable) — this is what makes denormalizing tenant info onto
   // work_orders safe (see WorkOrder below): there's no window where a
   // unit's tenant chain could go stale.
-  room             Room             @relation(fields: [roomId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "air_conditioners_room_id_foreign")
-  maintenanceLogs  MaintenanceLog[]
-  workOrders       WorkOrder[]
+  room            Room             @relation(fields: [roomId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "air_conditioners_room_id_foreign")
+  acBrand         AcBrand?         @relation(fields: [acBrandId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "airConditioners_ac_brand_id_foreign")
+  acModel         AcModel?         @relation(fields: [acModelId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "airConditioners_ac_model_id_foreign")
+  maintenanceLogs MaintenanceLog[]
+  workOrders      WorkOrder[]
 
   @@index([roomId], map: "air_conditioners_room_id_index")
   @@map("air_conditioners")
@@ -157,6 +190,9 @@ model MaintenanceLog {
   userId           BigInt            @map("user_id") @db.UnsignedBigInt // the technician who performed the work
   action           MaintenanceAction
   notes            String?           @db.Text
+  beforePhotoUrl       String?       @map("before_photo_url") @db.VarChar(255)
+  afterPhotoUrl        String?       @map("after_photo_url") @db.VarChar(255)
+  customerSignatureUrl String?       @map("customer_signature_url") @db.VarChar(255)
   performedAt      DateTime          @map("performed_at") @db.DateTime(0)
   createdAt        DateTime?         @map("created_at") @db.Timestamp(0)
   updatedAt        DateTime?         @map("updated_at") @db.Timestamp(0)
@@ -191,6 +227,8 @@ model WorkOrder {
   status           WorkOrderStatus @default(pending)
   claimedBy        BigInt?         @map("claimed_by") @db.UnsignedBigInt
   claimedAt        DateTime?       @map("claimed_at") @db.Timestamp(0) // separate from updatedAt, which gets overwritten again on completion
+  completedAt      DateTime?       @map("completed_at") @db.Timestamp(0)
+  estimatedCost    Decimal?        @map("estimated_cost") @db.Decimal(10, 2)
   createdAt        DateTime?       @map("created_at") @db.Timestamp(0)
   updatedAt        DateTime?       @map("updated_at") @db.Timestamp(0)
 
