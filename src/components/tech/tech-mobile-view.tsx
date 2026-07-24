@@ -123,13 +123,13 @@ export function TechMobileView({
   const techNavItems: NavItem[] = [
     {
       id: "pool",
-      label: "Job Pool",
+      label: "งานทั้งหมด",
       icon: ClipboardList,
       badge: jobPool.length,
     },
     {
       id: "my_jobs",
-      label: "My Jobs",
+      label: "งานของฉัน",
       icon: Wrench,
       badge: myJobs.length,
     },
@@ -148,16 +148,16 @@ export function TechMobileView({
       navItems={techNavItems}
       searchValue={searchQuery}
       onSearchChange={setSearchQuery}
-      searchPlaceholder="Search AC code, location..."
+      searchPlaceholder="ค้นหารหัสแอร์, สถานที่..."
       onCreateAction={() => setShowQrModal(true)}
-      createActionLabel="QR Scanner"
+      createActionLabel="สแกน QR Code"
     >
       {/* Database Connection Alert */}
       {dbError && (
         <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-xs font-semibold text-amber-900 flex items-start gap-2.5 shadow-2xs">
           <AnimatedIcon icon={AlertTriangle} size={18} animation="wiggle" className="text-amber-600 shrink-0 mt-0.5" />
           <div>
-            <div className="font-bold text-amber-950">Database Connection Notice</div>
+            <div className="font-bold text-amber-950">การแจ้งเตือนการเชื่อมต่อฐานข้อมูล</div>
             <p className="text-amber-800 font-normal leading-relaxed text-[11px]">{dbError}</p>
           </div>
         </div>
@@ -190,10 +190,10 @@ export function TechMobileView({
       <div className="biz-banner p-6 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-2xs">
         <div>
           <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-            Technician Mobile Workspace
+            พื้นที่ปฏิบัติงานช่างเทคนิค
           </div>
           <h1 className="text-xl font-bold text-slate-950 mt-1">
-            {activeTab === "pool" ? "Available Job Pool" : "My Active Claimed Jobs"}
+            {activeTab === "pool" ? "งานซ่อมบำรุงที่รอรับ" : "งานซ่อมบำรุงที่ฉันกำลังดำเนินการ"}
           </h1>
         </div>
 
@@ -202,7 +202,7 @@ export function TechMobileView({
           className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-xs font-bold text-white hover:bg-slate-800 transition-all shadow-md shrink-0"
         >
           <QrCode className="h-4 w-4 text-white" />
-          <span>Scan QR Code</span>
+          <span>สแกน QR Code</span>
         </button>
       </div>
 
@@ -211,7 +211,7 @@ export function TechMobileView({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in">
           {filteredPool.length === 0 ? (
             <div className="col-span-full py-12 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-2xl">
-              No available repair jobs in the pool.
+              ไม่มีงานซ่อมบำรุงที่รอรับ
             </div>
           ) : (
             filteredPool.map((job) => (
@@ -232,14 +232,14 @@ export function TechMobileView({
 
                 <div className="pt-2 flex items-center justify-between text-xs border-t border-slate-100">
                   <span className="text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                    Pending Claim
+                    รอรับงาน
                   </span>
                   <button
                     onClick={() => handleClaim(job.id)}
                     disabled={isPending}
                     className="rounded-xl bg-slate-950 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800 transition-all shadow-sm active:scale-95"
                   >
-                    Claim Job
+                    รับงาน
                   </button>
                 </div>
               </div>
@@ -253,7 +253,7 @@ export function TechMobileView({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in">
           {filteredMyJobs.length === 0 ? (
             <div className="col-span-full py-12 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-2xl">
-              You have no active claimed jobs.
+              คุณไม่มีงานที่กำลังดำเนินการ
             </div>
           ) : (
             filteredMyJobs.map((job, idx) => (
@@ -278,12 +278,12 @@ export function TechMobileView({
                 </div>
 
                 <div className={`pt-2 flex items-center justify-between text-xs border-t ${idx === 0 ? "border-slate-800 text-slate-300" : "border-slate-100 text-slate-500"}`}>
-                  <span className="text-[11px] font-bold text-sky-600">In Progress</span>
+                  <span className="text-[11px] font-bold text-sky-600">กำลังดำเนินการ</span>
                   <button
                     onClick={() => setSelectedJobForLog(job)}
                     className="rounded-xl bg-slate-950 text-white border border-slate-800 px-4 py-2 text-xs font-bold hover:bg-slate-800 transition-all shadow-sm active:scale-95"
                   >
-                    Log & Complete
+                    บันทึกและปิดงาน
                   </button>
                 </div>
               </div>
@@ -299,7 +299,7 @@ export function TechMobileView({
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="text-sm font-bold text-slate-950 flex items-center gap-2">
                 <QrCode className="h-4 w-4 text-slate-950" />
-                <span>Scan AC QR Code</span>
+                <span>สแกนรหัส QR เครื่องปรับอากาศ</span>
               </h3>
               <button onClick={() => setShowQrModal(false)} className="text-slate-400 hover:text-slate-950">
                 <X className="h-5 w-5" />
@@ -309,11 +309,11 @@ export function TechMobileView({
             <div className="relative h-40 w-full rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 flex flex-col items-center justify-center overflow-hidden">
               <div className="absolute inset-x-0 h-0.5 bg-slate-900 animate-laser" />
               <QrCode className="h-12 w-12 text-slate-400 animate-pulse" />
-              <span className="text-[11px] font-semibold text-slate-500 mt-2">Aim camera at QR code</span>
+              <span className="text-[11px] font-semibold text-slate-500 mt-2">เล็งกล้องไปที่ QR Code</span>
             </div>
 
             <div className="space-y-2">
-              <label className="block text-[11px] font-bold text-slate-700">Simulate Scan Input:</label>
+              <label className="block text-[11px] font-bold text-slate-700">จำลองการสแกน:</label>
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -326,7 +326,7 @@ export function TechMobileView({
                   onClick={handleSimulateQrScan}
                   className="rounded-xl bg-slate-950 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800 shrink-0"
                 >
-                  Confirm
+                  ยืนยัน
                 </button>
               </div>
             </div>
@@ -339,7 +339,7 @@ export function TechMobileView({
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-950/40 backdrop-blur-xs p-0 sm:p-4">
           <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-t-3xl sm:rounded-2xl border border-slate-200 bg-white p-6 pb-10 sm:pb-6 shadow-2xl space-y-4 animate-in slide-in-from-bottom-full sm:slide-in-from-bottom-0 sm:fade-in">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-sm font-bold text-slate-950">Log Repair ({selectedJobForLog.acCode})</h3>
+              <h3 className="text-sm font-bold text-slate-950">บันทึกประวัติการซ่อม ({selectedJobForLog.acCode})</h3>
               <button onClick={() => setSelectedJobForLog(null)} className="text-slate-400 hover:text-slate-950">
                 <X className="h-5 w-5" />
               </button>
@@ -350,34 +350,34 @@ export function TechMobileView({
               <input type="hidden" name="airConditionerId" value={selectedJobForLog.airConditionerId || ""} />
 
               <div>
-                <label className="mb-2 block font-bold text-slate-700">Action Type</label>
+                <label className="mb-2 block font-bold text-slate-700">ประเภทการดำเนินการ</label>
                 <div className="grid grid-cols-3 gap-2">
                   <label className="flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-slate-50 p-3 text-center cursor-pointer hover:border-slate-950 has-[:checked]:border-slate-950 has-[:checked]:bg-slate-100">
                     <input type="radio" name="action" value="cleaning" defaultChecked className="sr-only" />
                     <Sparkles className="h-4 w-4 text-slate-800 mb-1" />
-                    <span className="font-bold text-slate-950">Cleaning</span>
+                    <span className="font-bold text-slate-950">ล้างแอร์</span>
                   </label>
 
                   <label className="flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-slate-50 p-3 text-center cursor-pointer hover:border-slate-950 has-[:checked]:border-slate-950 has-[:checked]:bg-slate-100">
                     <input type="radio" name="action" value="repair" className="sr-only" />
                     <Wrench className="h-4 w-4 text-slate-800 mb-1" />
-                    <span className="font-bold text-slate-950">Repair</span>
+                    <span className="font-bold text-slate-950">ซ่อมแอร์</span>
                   </label>
 
                   <label className="flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-slate-50 p-3 text-center cursor-pointer hover:border-slate-950 has-[:checked]:border-slate-950 has-[:checked]:bg-slate-100">
                     <input type="radio" name="action" value="refill_refrigerant" className="sr-only" />
                     <Droplets className="h-4 w-4 text-slate-800 mb-1" />
-                    <span className="font-bold text-slate-950">Gas Refill</span>
+                    <span className="font-bold text-slate-950">เติมน้ำยาแอร์</span>
                   </label>
                 </div>
               </div>
 
               <div>
-                <label className="mb-1 block font-bold text-slate-700">Notes (Optional)</label>
+                <label className="mb-1 block font-bold text-slate-700">บันทึกเพิ่มเติม (ไม่บังคับ)</label>
                 <textarea
                   name="notes"
                   rows={3}
-                  placeholder="Details..."
+                  placeholder="รายละเอียด..."
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-slate-900 focus:border-slate-950 focus:outline-none"
                 />
               </div>
@@ -388,14 +388,14 @@ export function TechMobileView({
                   onClick={() => setSelectedJobForLog(null)}
                   className="w-1/2 rounded-xl border border-slate-200 py-2.5 font-bold text-slate-700 hover:bg-slate-100"
                 >
-                  Cancel
+                  ยกเลิก
                 </button>
                 <button
                   type="submit"
                   disabled={isPending}
                   className="w-1/2 rounded-xl bg-slate-950 py-2.5 font-bold text-white hover:bg-slate-800 disabled:opacity-50"
                 >
-                  {isPending ? "Saving..." : "Log & Finish"}
+                  {isPending ? "กำลังบันทึก..." : "บันทึกและเสร็จสิ้น"}
                 </button>
               </div>
             </form>

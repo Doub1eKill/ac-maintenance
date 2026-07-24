@@ -23,10 +23,12 @@ import {
   UserCheck,
   UserX,
   Users,
+  Banknote,
 } from "lucide-react";
 import { AnimatedIcon } from "@/components/ui/animated-icon";
 import { DashboardLayout, NavItem } from "@/components/layout/dashboard-layout";
 import { AssetManager } from "@/components/admin/asset-manager";
+import { FinancialDashboardView } from "@/components/admin/financial-dashboard-view";
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from "recharts";
 
 interface WorkOrderItem {
@@ -96,6 +98,7 @@ interface AdminDashboardViewProps {
   pendingUsers?: PendingUser[];
   allUsers?: PendingUser[];
   brands: any[];
+  financialMetrics?: any;
 }
 
 export function AdminDashboardView({
@@ -110,6 +113,7 @@ export function AdminDashboardView({
   pendingUsers = [],
   allUsers = [],
   brands = [],
+  financialMetrics,
 }: AdminDashboardViewProps) {
   const [activeTab, setActiveTab] = useState<string>("overview");
   const [isPending, startTransition] = useTransition();
@@ -211,30 +215,35 @@ export function AdminDashboardView({
   const adminNavItems: NavItem[] = [
     {
       id: "overview",
-      label: "Dashboard",
+      label: "ภาพรวมระบบ",
       icon: Snowflake,
     },
     {
       id: "kanban",
-      label: "Work Order Kanban",
+      label: "กระดานใบงาน",
       icon: ClipboardList,
       badge: metrics.pendingWorkOrders,
     },
     {
       id: "approvals",
-      label: "User Approvals",
+      label: "อนุมัติผู้ใช้งาน",
       icon: Clock,
       badge: pendingUsers.length,
     },
     {
       id: "team",
-      label: "Staff & Techs",
+      label: "เจ้าหน้าที่ & ช่าง",
       icon: Users,
     },
     {
       id: "assets",
-      label: "Asset Tree",
+      label: "ระบบสินทรัพย์",
       icon: Building2,
+    },
+    {
+      id: "financials",
+      label: "การเงิน & งบประมาณ",
+      icon: Banknote,
     },
   ];
 
@@ -251,16 +260,16 @@ export function AdminDashboardView({
       navItems={adminNavItems}
       searchValue={globalSearch}
       onSearchChange={setGlobalSearch}
-      searchPlaceholder="Search AC code, user name, building, technician..."
+      searchPlaceholder="ค้นหารหัสแอร์, ชื่อผู้ใช้, อาคาร, ช่าง..."
       onCreateAction={() => setShowCreateModal(true)}
-      createActionLabel="+ Create Work Order"
+      createActionLabel="+ สร้างใบงานซ่อมบำรุง"
     >
       {/* Database Connection Alert */}
       {dbError && (
         <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-xs font-semibold text-amber-900 flex items-start gap-3 shadow-2xs">
           <AnimatedIcon icon={AlertTriangle} size={18} animation="wiggle" className="text-amber-600 shrink-0 mt-0.5" />
           <div>
-            <div className="font-bold text-amber-950">Database Connection Notice</div>
+            <div className="font-bold text-amber-950">การแจ้งเตือนการเชื่อมต่อฐานข้อมูล</div>
             <p className="text-amber-800 font-normal leading-relaxed mt-0.5">{dbError}</p>
           </div>
         </div>
@@ -294,7 +303,7 @@ export function AdminDashboardView({
         {/* Left: Bar Chart Widget (Recharts) */}
         <div className="space-y-3 w-full lg:w-1/3">
           <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-            Weekly Repair Activity
+            กิจกรรมซ่อมบำรุงประจำสัปดาห์
           </div>
           <div className="h-28 pt-2 w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -332,8 +341,8 @@ export function AdminDashboardView({
             </span>
           </div>
           <div>
-            <div className="text-xs font-bold text-slate-950">Fleet Health Rate</div>
-            <div className="text-[11px] text-slate-500">Normal units running ok</div>
+            <div className="text-xs font-bold text-slate-950">อัตราเครื่องปรับอากาศปกติ</div>
+            <div className="text-[11px] text-slate-500">แอร์ทำงานปกติ</div>
           </div>
         </div>
 
@@ -341,15 +350,15 @@ export function AdminDashboardView({
         <div className="flex items-center gap-8 w-full lg:w-auto justify-between lg:justify-end border-t lg:border-t-0 border-slate-200 pt-4 lg:pt-0">
           <div>
             <div className="text-3xl font-black text-slate-950">{metrics.totalUnits}</div>
-            <div className="text-xs font-semibold text-slate-500">AC Units Installed</div>
+            <div className="text-xs font-semibold text-slate-500">จำนวนแอร์ทั้งหมด</div>
           </div>
           <div>
             <div className="text-3xl font-black text-slate-950">{metrics.pendingWorkOrders}</div>
-            <div className="text-xs font-semibold text-amber-600 font-bold">Pending Jobs</div>
+            <div className="text-xs font-semibold text-amber-600 font-bold">งานรอดำเนินการ</div>
           </div>
           <div>
             <div className="text-3xl font-black text-slate-950">{pendingUsers.length}</div>
-            <div className="text-xs font-semibold text-indigo-600 font-bold">Pending Users</div>
+            <div className="text-xs font-semibold text-indigo-600 font-bold">ผู้ใช้รออนุมัติ</div>
           </div>
         </div>
       </div>
@@ -358,14 +367,14 @@ export function AdminDashboardView({
       {(activeTab === "overview" || activeTab === "kanban") && (
         <div className="space-y-6 animate-in fade-in">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold text-slate-950">Work Order Kanban Columns</h2>
+            <h2 className="text-lg font-bold text-slate-950">กระดานสถานะใบงานซ่อมบำรุง</h2>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Column 1: Pending Orders */}
             <div className="space-y-4">
               <div className="flex items-center justify-between px-1">
-                <span className="text-sm font-bold text-slate-950">Pending Claims</span>
+                <span className="text-sm font-bold text-slate-950">รอช่างรับงาน</span>
                 <span className="rounded-lg bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 text-xs font-bold font-mono">
                   {pendingOrders.length}
                 </span>
@@ -374,7 +383,7 @@ export function AdminDashboardView({
               <div className="space-y-3">
                 {pendingOrders.length === 0 ? (
                   <div className="p-6 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-2xl">
-                    No pending orders
+                    ไม่มีงานค้าง
                   </div>
                 ) : (
                   pendingOrders.map((wo) => (
@@ -388,7 +397,7 @@ export function AdminDashboardView({
                       </div>
                       <div className="pt-2 flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-100">
                         <span className="inline-flex items-center gap-1 font-semibold text-amber-700">
-                          <Clock className="h-3 w-3" /> Waiting Tech
+                          <Clock className="h-3 w-3" /> รอช่าง
                         </span>
                         <span className="font-mono">{wo.createdAt ? new Date(wo.createdAt).toLocaleDateString() : ""}</span>
                       </div>
@@ -401,7 +410,7 @@ export function AdminDashboardView({
             {/* Column 2: In-Progress / Claimed (Contains Dark Highlight Card) */}
             <div className="space-y-4">
               <div className="flex items-center justify-between px-1">
-                <span className="text-sm font-bold text-slate-950">In Progress</span>
+                <span className="text-sm font-bold text-slate-950">กำลังดำเนินการ</span>
                 <span className="rounded-lg bg-sky-100 text-sky-800 border border-sky-200 px-2 py-0.5 text-xs font-bold font-mono">
                   {claimedOrders.length}
                 </span>
@@ -410,7 +419,7 @@ export function AdminDashboardView({
               <div className="space-y-3">
                 {claimedOrders.length === 0 ? (
                   <div className="p-6 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-2xl">
-                    No claimed active orders
+                    ไม่มีงานที่กำลังดำเนินการ
                   </div>
                 ) : (
                   claimedOrders.map((wo, idx) => (
@@ -437,7 +446,7 @@ export function AdminDashboardView({
                         }`}
                       >
                         <span className="inline-flex items-center gap-1 font-bold">
-                          <Wrench className="h-3 w-3 text-sky-400" /> {wo.claimedByName || "Tech Assigned"}
+                          <Wrench className="h-3 w-3 text-sky-400" /> {wo.claimedByName || "มอบหมายช่างแล้ว"}
                         </span>
                         <span className="font-mono">{wo.claimedAt ? new Date(wo.claimedAt).toLocaleTimeString() : ""}</span>
                       </div>
@@ -450,7 +459,7 @@ export function AdminDashboardView({
             {/* Column 3: Completed Orders */}
             <div className="space-y-4">
               <div className="flex items-center justify-between px-1">
-                <span className="text-sm font-bold text-slate-950">Completed</span>
+                <span className="text-sm font-bold text-slate-950">เสร็จสมบูรณ์</span>
                 <span className="rounded-lg bg-emerald-100 text-emerald-800 border border-emerald-200 px-2 py-0.5 text-xs font-bold font-mono">
                   {completedOrders.length}
                 </span>
@@ -459,7 +468,7 @@ export function AdminDashboardView({
               <div className="space-y-3">
                 {completedOrders.length === 0 ? (
                   <div className="p-6 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-2xl">
-                    No completed orders
+                    ไม่มีงานที่เสร็จสิ้น
                   </div>
                 ) : (
                   completedOrders.map((wo) => (
@@ -473,7 +482,7 @@ export function AdminDashboardView({
                       </div>
                       <div className="pt-2 flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-100">
                         <span className="inline-flex items-center gap-1 font-bold text-emerald-700">
-                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> Finished
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> เสร็จเรียบร้อย
                         </span>
                         <span className="font-mono">{wo.claimedByName || "-"}</span>
                       </div>
@@ -492,24 +501,24 @@ export function AdminDashboardView({
           <div className="flex items-center justify-between border-b border-slate-100 pb-4">
             <h2 className="text-base font-bold text-slate-950 flex items-center gap-2">
               <Clock className="h-5 w-5 text-amber-500" />
-              <span>Pending User Approvals for {universityName} ({pendingUsers.length})</span>
+              <span>คำขออนุมัติผู้ใช้งานใหม่สำหรับ {universityName} ({pendingUsers.length})</span>
             </h2>
           </div>
 
           {filteredPendingUsers.length === 0 ? (
             <div className="py-12 text-center text-xs text-slate-500 border border-dashed border-slate-200 rounded-2xl">
-              No pending user registration requests for this university at this time.
+              ยังไม่มีคำขอลงทะเบียนผู้ใช้งานสำหรับองค์กรนี้
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs text-slate-700">
                 <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                   <tr>
-                    <th className="py-3 px-4 rounded-l-xl">User Name</th>
-                    <th className="py-3 px-4">Email</th>
-                    <th className="py-3 px-4">Role</th>
-                    <th className="py-3 px-4">Requested Date</th>
-                    <th className="py-3 px-4 text-right rounded-r-xl">Action</th>
+                    <th className="py-3 px-4 rounded-l-xl">ชื่อผู้ใช้</th>
+                    <th className="py-3 px-4">อีเมล</th>
+                    <th className="py-3 px-4">บทบาท</th>
+                    <th className="py-3 px-4">วันที่ขอ</th>
+                    <th className="py-3 px-4 text-right rounded-r-xl">จัดการ</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -526,7 +535,7 @@ export function AdminDashboardView({
                           className="rounded-lg bg-emerald-600 px-3 py-1.5 font-bold text-white hover:bg-emerald-700 transition-colors disabled:opacity-50 inline-flex items-center gap-1"
                         >
                           <UserCheck className="h-3.5 w-3.5" />
-                          Approve
+                          อนุมัติ
                         </button>
                         <button
                           onClick={() => handleUserStatus(u.id, "suspended")}
@@ -534,7 +543,7 @@ export function AdminDashboardView({
                           className="rounded-lg bg-red-600 px-3 py-1.5 font-bold text-white hover:bg-red-700 transition-colors disabled:opacity-50 inline-flex items-center gap-1"
                         >
                           <UserX className="h-3.5 w-3.5" />
-                          Reject
+                          ปฏิเสธ
                         </button>
                       </td>
                     </tr>
@@ -552,7 +561,7 @@ export function AdminDashboardView({
           <div className="flex items-center justify-between border-b border-slate-100 pb-4">
             <h2 className="text-base font-bold text-slate-950 flex items-center gap-2">
               <Users className="h-5 w-5 text-slate-700" />
-              <span>Campus Staff & Technician Directory ({allUsers.length})</span>
+              <span>ทำเนียบเจ้าหน้าที่และช่างซ่อมบำรุง ({allUsers.length})</span>
             </h2>
           </div>
 
@@ -560,11 +569,11 @@ export function AdminDashboardView({
             <table className="w-full text-left text-xs text-slate-700">
               <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                 <tr>
-                  <th className="py-3 px-4 rounded-l-xl">User Name</th>
-                  <th className="py-3 px-4">Email</th>
-                  <th className="py-3 px-4">Role</th>
-                  <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4 text-right rounded-r-xl">Action</th>
+                  <th className="py-3 px-4 rounded-l-xl">ชื่อผู้ใช้</th>
+                  <th className="py-3 px-4">อีเมล</th>
+                  <th className="py-3 px-4">บทบาท</th>
+                  <th className="py-3 px-4">สถานะ</th>
+                  <th className="py-3 px-4 text-right rounded-r-xl">จัดการ</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -593,7 +602,7 @@ export function AdminDashboardView({
                           disabled={isPending || u.role === "super_admin"}
                           className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-700 hover:bg-red-100 transition-colors disabled:opacity-40"
                         >
-                          Suspend
+                          ระงับสิทธิ์
                         </button>
                       ) : (
                         <button
@@ -601,7 +610,7 @@ export function AdminDashboardView({
                           disabled={isPending || u.role === "super_admin"}
                           className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 hover:bg-emerald-100 transition-colors disabled:opacity-40"
                         >
-                          Activate
+                          เปิดใช้งาน
                         </button>
                       )}
                     </td>
@@ -614,8 +623,14 @@ export function AdminDashboardView({
       )}
 
       {/* Asset Hierarchy View */}
+      {/* Asset Hierarchy View */}
       {activeTab === "assets" && (
         <AssetManager buildings={buildings} brands={brands} globalSearch={globalSearch} />
+      )}
+
+      {/* Financials View */}
+      {activeTab === "financials" && (
+        <FinancialDashboardView data={{ financialMetrics }} />
       )}
 
       {/* Modal: Create Work Order */}
@@ -623,7 +638,7 @@ export function AdminDashboardView({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-xs p-4">
           <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xl space-y-4 animate-in fade-in">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-base font-bold text-slate-950">Create Work Order</h3>
+              <h3 className="text-base font-bold text-slate-950">สร้างใบงานซ่อมบำรุง</h3>
               <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-950">
                 <X className="h-5 w-5" />
               </button>
@@ -631,14 +646,14 @@ export function AdminDashboardView({
 
             <form onSubmit={handleCreateOrderSubmit} className="space-y-4 text-xs">
               <div>
-                <label className="mb-1.5 block font-bold text-slate-700">Select Air Conditioner</label>
+                <label className="mb-1.5 block font-bold text-slate-700">เลือกเครื่องปรับอากาศ</label>
                 <select
                   name="airConditionerId"
                   required
                   defaultValue=""
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-slate-900 focus:border-slate-950 focus:outline-none"
                 >
-                  <option value="" disabled>-- Select AC Unit --</option>
+                  <option value="" disabled>-- เลือกเครื่องปรับอากาศ --</option>
                   {allAcUnits.map((unit) => (
                     <option key={unit.id} value={unit.id}>
                       {unit.label}
@@ -653,14 +668,14 @@ export function AdminDashboardView({
                   onClick={() => setShowCreateModal(false)}
                   className="w-1/2 rounded-xl border border-slate-200 py-2.5 font-bold text-slate-700 hover:bg-slate-100"
                 >
-                  Cancel
+                  ยกเลิก
                 </button>
                 <button
                   type="submit"
                   disabled={isPending}
                   className="w-1/2 rounded-xl bg-slate-950 py-2.5 font-bold text-white hover:bg-slate-800 disabled:opacity-50"
                 >
-                  {isPending ? "Creating..." : "Confirm Work Order"}
+                  {isPending ? "กำลังสร้าง..." : "ยืนยันการสร้างใบงาน"}
                 </button>
               </div>
             </form>

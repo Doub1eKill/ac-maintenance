@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
+import { format, subDays } from "date-fns";
 
 async function verifySuperAdmin() {
   const session = await auth();
@@ -25,6 +26,7 @@ export async function getSuperAdminData() {
       pendingUsersRaw,
       universitiesRaw,
       brandsRaw,
+      recentUsersRaw,
     ] = await Promise.all([
       prisma.university.count(),
       prisma.user.count({ where: { status: "pending" } }),
@@ -55,6 +57,10 @@ export async function getSuperAdminData() {
           }
         },
         orderBy: { name: 'asc' }
+      }),
+      prisma.user.findMany({
+        where: { createdAt: { gte: subDays(new Date(), 7) } },
+        select: { createdAt: true },
       }),
     ]);
 
@@ -94,6 +100,25 @@ export async function getSuperAdminData() {
       }))
     }));
 
+    const registrationActivity = Array.from({ length: 7 }).map((_, i) => {
+      const date = subDays(new Date(), 6 - i);
+      const dayStr = format(date, "EEE");
+      return {
+        day: dayStr,
+        users: 0,
+      };
+    });
+
+    recentUsersRaw.forEach((u) => {
+      if (u.createdAt) {
+        const dayStr = format(u.createdAt, "EEE");
+        const activityDay = registrationActivity.find(d => d.day === dayStr);
+        if (activityDay) {
+          activityDay.users += 1;
+        }
+      }
+    });
+
     return {
       dbError: null,
       metrics: {
@@ -105,6 +130,7 @@ export async function getSuperAdminData() {
       pendingUsers,
       universities,
       brands,
+      registrationActivity,
     };
   } catch (error) {
     console.error("Super Admin Data query failed:", error);
@@ -119,6 +145,7 @@ export async function getSuperAdminData() {
       pendingUsers: [],
       universities: [],
       brands: [],
+      registrationActivity: [],
     };
   }
 }

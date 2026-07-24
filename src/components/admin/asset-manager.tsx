@@ -139,7 +139,7 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-100 pb-4 gap-4">
         <h2 className="text-base font-bold text-slate-950 flex items-center gap-2">
           <Building2 className="h-5 w-5 text-slate-700" />
-          <span>Asset Hierarchy Tree ({buildings.length} อาคาร)</span>
+          <span>โครงสร้างสินทรัพย์ ({buildings.length} อาคาร)</span>
         </h2>
         <button
           onClick={() => setShowAddBuilding(true)}

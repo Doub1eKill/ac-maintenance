@@ -24,6 +24,7 @@ import { AnimatedIcon } from "@/components/ui/animated-icon";
 import { DashboardLayout, NavItem } from "@/components/layout/dashboard-layout";
 import { MasterDataClient } from "@/app/super-admin/master-data/master-data-client";
 import { Database } from "lucide-react";
+import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from "recharts";
 
 interface PendingUser {
   id: string;
@@ -64,6 +65,7 @@ interface SuperAdminViewProps {
   pendingUsers: PendingUser[];
   universities: UniversityItem[];
   brands: any[]; // Or add proper BrandType interface
+  registrationActivity?: Array<{ day: string; users: number }>;
 }
 
 export function SuperAdminView({
@@ -73,6 +75,7 @@ export function SuperAdminView({
   pendingUsers,
   universities,
   brands,
+  registrationActivity = [],
 }: SuperAdminViewProps) {
   const [activeTab, setActiveTab] = useState<string>("overview");
   const [isPending, startTransition] = useTransition();
@@ -147,23 +150,23 @@ export function SuperAdminView({
   const superAdminNavItems: NavItem[] = [
     {
       id: "overview",
-      label: "Dashboard",
+      label: "แดชบอร์ด",
       icon: ShieldCheck,
     },
     {
       id: "approvals",
-      label: "User Approvals",
+      label: "อนุมัติผู้ใช้",
       icon: Clock,
       badge: pendingUsers.length,
     },
     {
       id: "universities",
-      label: "Universities",
+      label: "มหาวิทยาลัย",
       icon: Building2,
     },
     {
       id: "master-data",
-      label: "Master Data",
+      label: "ข้อมูลหลัก",
       icon: Database,
     },
   ];
@@ -176,16 +179,16 @@ export function SuperAdminView({
       navItems={superAdminNavItems}
       searchValue={globalSearch}
       onSearchChange={setGlobalSearch}
-      searchPlaceholder="Search university, user, email..."
+      searchPlaceholder="ค้นหามหาวิทยาลัย, ผู้ใช้, อีเมล..."
       onCreateAction={() => setShowAddUniModal(true)}
-      createActionLabel="+ Add University"
+      createActionLabel="+ เพิ่มมหาวิทยาลัย"
     >
       {/* Database Connection Alert */}
       {dbError && (
         <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-xs font-semibold text-amber-900 flex items-start gap-3 shadow-2xs">
           <AnimatedIcon icon={AlertTriangle} size={18} animation="wiggle" className="text-amber-600 shrink-0 mt-0.5" />
           <div>
-            <div className="font-bold text-amber-950">Database Connection Notice</div>
+            <div className="font-bold text-amber-950">การแจ้งเตือนการเชื่อมต่อฐานข้อมูล</div>
             <p className="text-amber-800 font-normal leading-relaxed mt-0.5">{dbError}</p>
           </div>
         </div>
@@ -216,32 +219,34 @@ export function SuperAdminView({
 
       {/* BizLink Top Analytic Banner (Bar Chart & Gauge Stats Widget) */}
       <div className="biz-banner p-6 sm:p-8 flex flex-col lg:flex-row items-center justify-between gap-6 shadow-2xs">
-        {/* Left: Bar Chart Widget */}
-        <div className="space-y-3 w-full lg:w-auto">
+        {/* Left: Bar Chart Widget (Recharts) */}
+        <div className="space-y-3 w-full lg:w-1/3">
           <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-            System Registration Activity
+            กิจกรรมการลงทะเบียนเข้าระบบ
           </div>
-          <div className="flex items-end gap-3 h-24 pt-2">
-            <div className="flex flex-col items-center gap-1">
-              <div className="w-6 bg-slate-900 rounded-t-md h-12" />
-              <span className="text-[10px] font-bold text-slate-400">Mon</span>
-            </div>
-            <div className="flex flex-col items-center gap-1">
-              <div className="w-6 bg-slate-400 rounded-t-md h-16" />
-              <span className="text-[10px] font-bold text-slate-400">Tue</span>
-            </div>
-            <div className="flex flex-col items-center gap-1">
-              <div className="w-6 bg-slate-900 rounded-t-md h-20" />
-              <span className="text-[10px] font-bold text-slate-400">Wed</span>
-            </div>
-            <div className="flex flex-col items-center gap-1">
-              <div className="w-6 bg-slate-300 rounded-t-md h-10" />
-              <span className="text-[10px] font-bold text-slate-400">Thu</span>
-            </div>
-            <div className="flex flex-col items-center gap-1">
-              <div className="w-6 bg-slate-900 rounded-t-md h-22" />
-              <span className="text-[10px] font-bold text-slate-400">Fri</span>
-            </div>
+          <div className="h-28 pt-2 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={registrationActivity} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+                <XAxis 
+                  dataKey="day" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fontSize: 10, fill: "#94a3b8", fontWeight: 700 }}
+                  dy={5}
+                />
+                <Tooltip 
+                  cursor={{ fill: '#f1f5f9' }}
+                  contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                  labelStyle={{ fontWeight: 700, color: '#0f172a' }}
+                />
+                <Bar 
+                  dataKey="users" 
+                  fill="#0f172a" 
+                  radius={[6, 6, 6, 6]}
+                  barSize={24}
+                />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
 
@@ -251,8 +256,8 @@ export function SuperAdminView({
             <span className="text-base font-black text-slate-950">92%</span>
           </div>
           <div>
-            <div className="text-xs font-bold text-slate-950">Platform Health</div>
-            <div className="text-[11px] text-slate-500">Multi-tenant uptime ok</div>
+            <div className="text-xs font-bold text-slate-950">สถานะระบบส่วนกลาง</div>
+            <div className="text-[11px] text-slate-500">ระบบทำงานปกติ</div>
           </div>
         </div>
 
@@ -260,15 +265,15 @@ export function SuperAdminView({
         <div className="flex items-center gap-8 w-full lg:w-auto justify-between lg:justify-end border-t lg:border-t-0 border-slate-200 pt-4 lg:pt-0">
           <div>
             <div className="text-3xl font-black text-slate-950">{metrics.totalUniversities}</div>
-            <div className="text-xs font-semibold text-slate-500">Campuses Active</div>
+            <div className="text-xs font-semibold text-slate-500">องค์กรที่เปิดใช้งาน</div>
           </div>
           <div>
             <div className="text-3xl font-black text-slate-950">{metrics.pendingUsersCount}</div>
-            <div className="text-xs font-semibold text-amber-600 font-bold">Pending Approvals</div>
+            <div className="text-xs font-semibold text-amber-600 font-bold">รออนุมัติ</div>
           </div>
           <div>
             <div className="text-3xl font-black text-slate-950">{metrics.totalWorkOrdersCount}</div>
-            <div className="text-xs font-semibold text-slate-500">Work Orders Total</div>
+            <div className="text-xs font-semibold text-slate-500">ใบงานทั้งหมด</div>
           </div>
         </div>
       </div>
@@ -277,7 +282,7 @@ export function SuperAdminView({
       {activeTab === "overview" && (
         <div className="space-y-6 animate-in fade-in">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold text-slate-950">System Overview & Recent Activity</h2>
+            <h2 className="text-lg font-bold text-slate-950">ภาพรวมระบบและกิจกรรมล่าสุด</h2>
           </div>
 
           {/* Kanban-style Grid Cards */}
@@ -285,20 +290,20 @@ export function SuperAdminView({
             {/* Highlighted Card (BizLink Dark Style) */}
             <div className="biz-card-dark p-5 space-y-4 relative overflow-hidden">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Platform Control</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">การจัดการระบบส่วนกลาง</span>
                 <MoreVertical className="h-4 w-4 text-slate-400" />
               </div>
               <div className="space-y-1">
-                <h3 className="text-lg font-bold text-white">Central System Status</h3>
+                <h3 className="text-lg font-bold text-white">สถานะระบบส่วนกลาง</h3>
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  Multi-tenant database active. Managing {metrics.totalUniversities} universities and {metrics.totalTechsCount} technicians.
+                  ฐานข้อมูลระบบทำงานปกติ บริหารจัดการ {metrics.totalUniversities} องค์กร และช่างเทคนิค {metrics.totalTechsCount} คน
                 </p>
               </div>
               <div className="pt-2 flex items-center justify-between text-xs text-slate-300 border-t border-slate-800">
                 <span className="inline-flex items-center gap-1">
-                  <Calendar className="h-3.5 w-3.5 text-slate-400" /> Real-time
+                  <Calendar className="h-3.5 w-3.5 text-slate-400" /> เรียลไทม์
                 </span>
-                <span className="font-bold text-emerald-400">Operational</span>
+                <span className="font-bold text-emerald-400">ใช้งานได้ปกติ</span>
               </div>
             </div>
 
@@ -314,12 +319,12 @@ export function SuperAdminView({
                 <div className="space-y-1">
                   <h3 className="text-base font-bold text-slate-950">{uni.name}</h3>
                   <p className="text-xs text-slate-500">
-                    {uni.buildingsCount} Buildings • {uni.usersCount} Accounts Registered
+                    {uni.buildingsCount} อาคาร • ลงทะเบียน {uni.usersCount} บัญชี
                   </p>
                 </div>
                 <div className="pt-2 flex items-center justify-between text-xs text-slate-500 border-t border-slate-100">
                   <span className="inline-flex items-center gap-1 font-semibold">
-                    <ClipboardList className="h-3.5 w-3.5 text-slate-400" /> {uni.workOrdersCount} Work Orders
+                    <ClipboardList className="h-3.5 w-3.5 text-slate-400" /> ใบงาน {uni.workOrdersCount} ใบ
                   </span>
                   <span className="font-mono">{uni.phone || "-"}</span>
                 </div>
@@ -334,24 +339,24 @@ export function SuperAdminView({
           <div className="flex items-center justify-between border-b border-slate-100 pb-4">
             <h2 className="text-base font-bold text-slate-950 flex items-center gap-2">
               <Clock className="h-5 w-5 text-amber-500" />
-              <span>Pending User Approvals ({pendingUsers.length})</span>
+              <span>คำขออนุมัติผู้ใช้งาน ({pendingUsers.length})</span>
             </h2>
           </div>
 
           {filteredPendingUsers.length === 0 ? (
             <div className="py-12 text-center text-xs text-slate-500 border border-dashed border-slate-200 rounded-2xl">
-              No pending approval requests at this time.
+              ไม่มีคำขออนุมัติในขณะนี้
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs text-slate-700">
                 <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                   <tr>
-                    <th className="py-3 px-4 rounded-l-xl">User Name</th>
-                    <th className="py-3 px-4">Email</th>
-                    <th className="py-3 px-4">Role</th>
-                    <th className="py-3 px-4">University</th>
-                    <th className="py-3 px-4 text-right rounded-r-xl">Action</th>
+                    <th className="py-3 px-4 rounded-l-xl">ชื่อผู้ใช้</th>
+                    <th className="py-3 px-4">อีเมล</th>
+                    <th className="py-3 px-4">บทบาท</th>
+                    <th className="py-3 px-4">มหาวิทยาลัย</th>
+                    <th className="py-3 px-4 text-right rounded-r-xl">จัดการ</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -367,14 +372,14 @@ export function SuperAdminView({
                           disabled={isPending}
                           className="rounded-lg bg-emerald-600 px-3 py-1.5 font-bold text-white hover:bg-emerald-700 transition-colors"
                         >
-                          Approve
+                          อนุมัติ
                         </button>
                         <button
                           onClick={() => handleUserStatus(u.id, "suspended")}
                           disabled={isPending}
                           className="rounded-lg bg-red-600 px-3 py-1.5 font-bold text-white hover:bg-red-700 transition-colors"
                         >
-                          Reject
+                          ปฏิเสธ
                         </button>
                       </td>
                     </tr>
@@ -391,7 +396,7 @@ export function SuperAdminView({
           <div className="flex items-center justify-between border-b border-slate-100 pb-4">
             <h2 className="text-base font-bold text-slate-950 flex items-center gap-2">
               <Building2 className="h-5 w-5 text-slate-700" />
-              <span>Universities Directory ({universities.length})</span>
+              <span>ทำเนียบองค์กร ({universities.length})</span>
             </h2>
           </div>
 
@@ -399,12 +404,12 @@ export function SuperAdminView({
             <table className="w-full text-left text-xs text-slate-700">
               <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                 <tr>
-                  <th className="py-3 px-4 rounded-l-xl">Name</th>
-                  <th className="py-3 px-4">Abbr</th>
-                  <th className="py-3 px-4">Buildings</th>
-                  <th className="py-3 px-4">Users</th>
-                  <th className="py-3 px-4">Work Orders</th>
-                  <th className="py-3 px-4 text-right rounded-r-xl">Phone</th>
+                  <th className="py-3 px-4 rounded-l-xl">ชื่อ</th>
+                  <th className="py-3 px-4">ตัวย่อ</th>
+                  <th className="py-3 px-4">อาคาร</th>
+                  <th className="py-3 px-4">ผู้ใช้</th>
+                  <th className="py-3 px-4">ใบงาน</th>
+                  <th className="py-3 px-4 text-right rounded-r-xl">เบอร์โทรศัพท์</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -435,7 +440,7 @@ export function SuperAdminView({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-xs p-4">
           <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xl space-y-4 animate-in fade-in">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-base font-bold text-slate-950">Add New University</h3>
+              <h3 className="text-base font-bold text-slate-950">เพิ่มองค์กรใหม่</h3>
               <button onClick={() => setShowAddUniModal(false)} className="text-slate-400 hover:text-slate-950">
                 <X className="h-5 w-5" />
               </button>
@@ -443,40 +448,40 @@ export function SuperAdminView({
 
             <form onSubmit={handleCreateUniSubmit} className="space-y-3.5 text-xs">
               <div>
-                <label className="mb-1 block font-bold text-slate-700">University Name</label>
+                <label className="mb-1 block font-bold text-slate-700">ชื่อองค์กร (มหาวิทยาลัย)</label>
                 <input
                   name="name"
                   type="text"
                   required
-                  placeholder="e.g. Phuket Rajabhat University"
+                  placeholder="เช่น มหาวิทยาลัยราชภัฏภูเก็ต"
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-slate-900 focus:border-slate-950 focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="mb-1 block font-bold text-slate-700">Abbreviation (Abbr)</label>
+                <label className="mb-1 block font-bold text-slate-700">ตัวย่อ</label>
                 <input
                   name="abbreviation"
                   type="text"
                   required
                   maxLength={10}
-                  placeholder="e.g. PKRU"
+                  placeholder="เช่น PKRU"
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-slate-900 uppercase font-mono font-bold focus:border-slate-950 focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="mb-1 block font-bold text-slate-700">Address</label>
+                <label className="mb-1 block font-bold text-slate-700">ที่อยู่</label>
                 <textarea
                   name="address"
                   rows={2}
-                  placeholder="Address..."
+                  placeholder="ที่อยู่..."
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-slate-900 focus:border-slate-950 focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="mb-1 block font-bold text-slate-700">Phone</label>
+                <label className="mb-1 block font-bold text-slate-700">เบอร์โทรศัพท์</label>
                 <input
                   name="phone"
                   type="text"
@@ -486,10 +491,10 @@ export function SuperAdminView({
               </div>
 
               <div className="border-t border-slate-100 pt-3">
-                <h4 className="font-bold text-slate-950 mb-2">Default Admin Account</h4>
+                <h4 className="font-bold text-slate-950 mb-2">บัญชีผู้ดูแลระบบองค์กร (เริ่มต้น)</h4>
                 <div className="space-y-3">
                   <div>
-                    <label className="mb-1 block font-bold text-slate-700">Admin Name</label>
+                    <label className="mb-1 block font-bold text-slate-700">ชื่อผู้ดูแลระบบ</label>
                     <input
                       name="contactName"
                       type="text"
@@ -499,7 +504,7 @@ export function SuperAdminView({
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block font-bold text-slate-700">Admin Email</label>
+                    <label className="mb-1 block font-bold text-slate-700">อีเมลผู้ดูแลระบบ</label>
                     <input
                       name="adminEmail"
                       type="email"
@@ -509,12 +514,12 @@ export function SuperAdminView({
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block font-bold text-slate-700">Password</label>
+                    <label className="mb-1 block font-bold text-slate-700">รหัสผ่าน</label>
                     <input
                       name="adminPassword"
                       type="password"
                       required
-                      placeholder="Min 8 characters"
+                      placeholder="อย่างน้อย 8 ตัวอักษร"
                       className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-slate-900 focus:border-slate-950 focus:outline-none"
                     />
                   </div>
@@ -527,14 +532,14 @@ export function SuperAdminView({
                   onClick={() => setShowAddUniModal(false)}
                   className="w-1/2 rounded-xl border border-slate-200 py-2.5 font-bold text-slate-700 hover:bg-slate-100"
                 >
-                  Cancel
+                  ยกเลิก
                 </button>
                 <button
                   type="submit"
                   disabled={isPending}
                   className="w-1/2 rounded-xl bg-slate-950 py-2.5 font-bold text-white hover:bg-slate-800 disabled:opacity-50"
                 >
-                  {isPending ? "Saving..." : "Save University"}
+                  {isPending ? "กำลังบันทึก..." : "บันทึกข้อมูล"}
                 </button>
               </div>
             </form>
