@@ -24,6 +24,7 @@ export async function getSuperAdminData() {
       totalWorkOrdersCount,
       pendingUsersRaw,
       universitiesRaw,
+      brandsRaw,
     ] = await Promise.all([
       prisma.university.count(),
       prisma.user.count({ where: { status: "pending" } }),
@@ -45,6 +46,15 @@ export async function getSuperAdminData() {
           },
         },
         orderBy: { createdAt: "desc" },
+      }),
+      prisma.acBrand.findMany({
+        include: {
+          models: true,
+          _count: {
+            select: { models: true, airConditioners: true }
+          }
+        },
+        orderBy: { name: 'asc' }
       }),
     ]);
 
@@ -71,6 +81,19 @@ export async function getSuperAdminData() {
       createdAt: u.createdAt ? u.createdAt.toISOString() : null,
     }));
 
+    const brands = brandsRaw.map((b) => ({
+      id: b.id.toString(),
+      name: b.name,
+      modelsCount: b._count.models,
+      acCount: b._count.airConditioners,
+      models: b.models.map((m) => ({
+        id: m.id.toString(),
+        brandId: m.brandId.toString(),
+        name: m.name,
+        defaultBtu: m.defaultBtu
+      }))
+    }));
+
     return {
       dbError: null,
       metrics: {
@@ -81,6 +104,7 @@ export async function getSuperAdminData() {
       },
       pendingUsers,
       universities,
+      brands,
     };
   } catch (error) {
     console.error("Super Admin Data query failed:", error);
@@ -94,6 +118,7 @@ export async function getSuperAdminData() {
       },
       pendingUsers: [],
       universities: [],
+      brands: [],
     };
   }
 }

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
+import { logAudit } from "@/lib/audit";
 import { MaintenanceAction } from "@/generated/prisma/client";
 
 async function verifyTechnician() {
@@ -27,6 +28,7 @@ export async function getTechnicianData() {
         include: {
           airConditioner: {
             include: {
+              acBrand: true,
               room: {
                 include: {
                   building: true,
@@ -42,6 +44,7 @@ export async function getTechnicianData() {
         include: {
           airConditioner: {
             include: {
+              acBrand: true,
               room: {
                 include: {
                   building: true,
@@ -57,7 +60,7 @@ export async function getTechnicianData() {
     const jobPool = pendingOrdersRaw.map((wo) => ({
       id: wo.id.toString(),
       acCode: wo.airConditioner.acCode,
-      brand: wo.airConditioner.brand,
+      brand: wo.airConditioner.acBrand?.name || wo.airConditioner.brand || "ไม่ระบุ",
       btu: wo.airConditioner.btu,
       status: wo.airConditioner.status,
       location: `${wo.airConditioner.room.building.name} (${wo.airConditioner.room.building.abbreviation}) - ห้อง ${wo.airConditioner.room.name} (ชั้น ${wo.airConditioner.room.floor || 1})`,
@@ -67,7 +70,7 @@ export async function getTechnicianData() {
     const myJobs = myJobsRaw.map((wo) => ({
       id: wo.id.toString(),
       acCode: wo.airConditioner.acCode,
-      brand: wo.airConditioner.brand,
+      brand: wo.airConditioner.acBrand?.name || wo.airConditioner.brand || "ไม่ระบุ",
       btu: wo.airConditioner.btu,
       airConditionerId: wo.airConditionerId.toString(),
       status: wo.airConditioner.status,
@@ -112,6 +115,16 @@ export async function claimWorkOrderAction(workOrderId: string) {
         claimedAt: new Date(),
         status: "claimed",
       },
+    });
+
+    await logAudit({
+      universityId: BigInt(session.user.universityId!),
+      userId: techId,
+      action: "CLAIM_WORKORDER",
+      entityType: "workOrder",
+      entityId: BigInt(workOrderId),
+      newValues: { status: "claimed", claimedBy: techId.toString() },
+      ipAddress: "server_action",
     });
 
     revalidatePath("/tech");
@@ -173,6 +186,16 @@ export async function logMaintenanceAction(formData: FormData) {
     await prisma.airConditioner.update({
       where: { id: acId },
       data: { status: "normal" },
+    });
+
+    await logAudit({
+      universityId: BigInt(session.user.universityId!),
+      userId: techId,
+      action: "COMPLETE_WORKORDER",
+      entityType: "workOrder",
+      entityId: wId,
+      newValues: { status: "completed", action },
+      ipAddress: "server_action",
     });
 
     revalidatePath("/tech");

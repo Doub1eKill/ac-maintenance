@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { AnimatedIcon } from "@/components/ui/animated-icon";
 import { DashboardLayout, NavItem } from "@/components/layout/dashboard-layout";
+import { AssetManager } from "@/components/admin/asset-manager";
 
 interface WorkOrderItem {
   id: string;
@@ -92,6 +93,7 @@ interface AdminDashboardViewProps {
   allAcUnits: Array<{ id: string; label: string }>;
   pendingUsers?: PendingUser[];
   allUsers?: PendingUser[];
+  brands: any[];
 }
 
 export function AdminDashboardView({
@@ -104,6 +106,7 @@ export function AdminDashboardView({
   allAcUnits,
   pendingUsers = [],
   allUsers = [],
+  brands = [],
 }: AdminDashboardViewProps) {
   const [activeTab, setActiveTab] = useState<string>("overview");
   const [isPending, startTransition] = useTransition();
@@ -607,64 +610,7 @@ export function AdminDashboardView({
 
       {/* Asset Hierarchy View */}
       {activeTab === "assets" && (
-        <div className="biz-card p-6 space-y-5 animate-in fade-in">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-            <h2 className="text-base font-bold text-slate-950 flex items-center gap-2">
-              <Building2 className="h-5 w-5 text-slate-700" />
-              <span>Asset Hierarchy Tree ({buildings.length} Buildings)</span>
-            </h2>
-          </div>
-
-          <div className="space-y-3">
-            {filteredBuildings.map((b) => (
-              <div key={b.id} className="rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden">
-                <button
-                  onClick={() => setExpandedBuilding(expandedBuilding === b.id ? null : b.id)}
-                  className="w-full flex items-center justify-between p-4 text-left hover:bg-slate-100 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-white font-mono text-xs font-bold">
-                      {b.abbreviation}
-                    </span>
-                    <div>
-                      <h3 className="font-bold text-slate-950 text-sm">{b.name}</h3>
-                      <p className="text-xs text-slate-500">{b.rooms.length} Rooms • {b.unitsCount} AC Units</p>
-                    </div>
-                  </div>
-                  <span className="text-slate-400 font-bold">
-                    {expandedBuilding === b.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                  </span>
-                </button>
-
-                {expandedBuilding === b.id && (
-                  <div className="border-t border-slate-200 bg-white p-4 space-y-3">
-                    {b.rooms.map((r) => (
-                      <div key={r.id} className="rounded-xl border border-slate-200 p-3.5 space-y-2">
-                        <div className="flex items-center justify-between text-xs font-bold text-slate-900 border-b border-slate-100 pb-2">
-                          <span>Room {r.name} (Floor {r.floor || 1})</span>
-                          <span className="text-slate-500 font-normal">{r.acUnits.length} Units</span>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                          {r.acUnits.map((ac) => (
-                            <div key={ac.id} className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs flex items-center justify-between">
-                              <div>
-                                <div className="font-mono font-bold text-slate-950">{ac.acCode}</div>
-                                <div className="text-[10px] text-slate-500">{ac.brand}</div>
-                              </div>
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-200">
-                                {ac.status}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
+        <AssetManager buildings={buildings} brands={brands} globalSearch={globalSearch} />
       )}
 
       {/* Modal: Create Work Order */}

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
+import { logAudit } from "@/lib/audit";
 
 async function verifyOrgAdmin() {
   const session = await auth();
@@ -32,8 +33,12 @@ export async function getOrgAdminData() {
         include: {
           rooms: {
             include: {
-              airConditioners: true,
+              airConditioners: {
+                include: { acBrand: true, acModel: true },
+                orderBy: { acCode: "asc" },
+              },
             },
+            orderBy: { name: "asc" },
           },
         },
         orderBy: { name: "asc" },
@@ -43,6 +48,8 @@ export async function getOrgAdminData() {
         include: {
           airConditioner: {
             include: {
+              acBrand: true,
+              acModel: true,
               room: {
                 include: {
                   building: true,
@@ -90,8 +97,8 @@ export async function getOrgAdminData() {
           acUnits: r.airConditioners.map((ac) => ({
             id: ac.id.toString(),
             acCode: ac.acCode,
-            brand: ac.brand,
-            model: ac.model,
+            brand: ac.acBrand?.name || ac.brand || "ไม่ระบุ",
+            model: ac.acModel?.name || ac.model || null,
             btu: ac.btu,
             status: ac.status,
           })),
@@ -112,7 +119,7 @@ export async function getOrgAdminData() {
     const workOrders = workOrdersRaw.map((wo) => ({
       id: wo.id.toString(),
       acCode: wo.airConditioner.acCode,
-      brand: wo.airConditioner.brand,
+      brand: wo.airConditioner.acBrand?.name || wo.airConditioner.brand || "ไม่ระบุ",
       location: `${wo.airConditioner.room.building.name} (${wo.airConditioner.room.building.abbreviation}) - ห้อง ${wo.airConditioner.room.name}`,
       status: wo.status,
       claimedByName: wo.claimedByUser?.name || null,
@@ -167,6 +174,7 @@ export async function getOrgAdminData() {
       allAcUnits,
       pendingUsers,
       allUsers,
+      brands: await prisma.acBrand.findMany({ include: { models: true }, orderBy: { name: 'asc' } }),
     };
   } catch (error) {
     console.error("Org Admin Data query failed:", error);
@@ -248,12 +256,22 @@ export async function createWorkOrderAction(formData: FormData) {
     const acId = BigInt(parsed.data.airConditionerId);
 
     // Create Work Order
-    await prisma.workOrder.create({
+    const workOrder = await prisma.workOrder.create({
       data: {
         airConditionerId: acId,
         universityId: universityId,
         status: "pending",
       },
+    });
+
+    await logAudit({
+      universityId: universityId,
+      userId: BigInt(session.user.id!),
+      action: "CREATE_WORKORDER",
+      entityType: "workOrder",
+      entityId: workOrder.id,
+      newValues: { status: "pending", airConditionerId: acId.toString() },
+      ipAddress: "server_action",
     });
 
     // Update AC status to broken/needs_cleaning if it was normal
@@ -267,5 +285,183 @@ export async function createWorkOrderAction(formData: FormData) {
   } catch (error) {
     console.error("Failed to create work order:", error);
     return { error: "ไม่สามารถออกใบงานซ่อมบำรุงได้" };
+  }
+}
+
+const buildingSchema = z.object({
+  name: z.string().min(1, "กรุณาระบุชื่ออาคาร"),
+  abbreviation: z.string().min(1, "กรุณาระบุตัวย่ออาคาร"),
+});
+
+export async function createBuildingAction(formData: FormData) {
+  const session = await verifyOrgAdmin();
+  const universityId = BigInt(session.user.universityId!);
+  
+  const parsed = buildingSchema.safeParse({
+    name: formData.get("name"),
+    abbreviation: formData.get("abbreviation"),
+  });
+  
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message || "ข้อมูลไม่ถูกต้อง" };
+  
+  try {
+    const existing = await prisma.building.findFirst({
+      where: {
+        universityId,
+        OR: [
+          { name: parsed.data.name },
+          { abbreviation: parsed.data.abbreviation }
+        ]
+      }
+    });
+    
+    if (existing) return { error: "มีชื่อหรือตัวย่ออาคารนี้ในระบบแล้ว" };
+    
+    await prisma.building.create({
+      data: {
+        universityId,
+        name: parsed.data.name,
+        abbreviation: parsed.data.abbreviation
+      }
+    });
+    
+    revalidatePath("/admin");
+    return { success: true };
+  } catch (error) {
+    console.error(error);
+    return { error: "เกิดข้อผิดพลาดในการบันทึกอาคาร" };
+  }
+}
+
+const roomSchema = z.object({
+  buildingId: z.string().min(1, "กรุณาเลือกอาคาร"),
+  name: z.string().min(1, "กรุณาระบุชื่อ/หมายเลขห้อง"),
+  floor: z.string().transform(val => val ? parseInt(val, 10) : null).nullable(),
+});
+
+export async function createRoomAction(formData: FormData) {
+  const session = await verifyOrgAdmin();
+  const universityId = BigInt(session.user.universityId!);
+  
+  const parsed = roomSchema.safeParse({
+    buildingId: formData.get("buildingId"),
+    name: formData.get("name"),
+    floor: formData.get("floor"),
+  });
+  
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message || "ข้อมูลไม่ถูกต้อง" };
+  
+  try {
+    // Verify building belongs to university
+    const building = await prisma.building.findUnique({
+      where: { id: BigInt(parsed.data.buildingId) }
+    });
+    
+    if (!building || building.universityId !== universityId) {
+      return { error: "อาคารไม่ถูกต้อง" };
+    }
+    
+    const existing = await prisma.room.findUnique({
+      where: {
+        buildingId_name: {
+          buildingId: building.id,
+          name: parsed.data.name
+        }
+      }
+    });
+    
+    if (existing) return { error: "มีห้องนี้อยู่ในอาคารแล้ว" };
+    
+    await prisma.room.create({
+      data: {
+        buildingId: building.id,
+        name: parsed.data.name,
+        floor: parsed.data.floor
+      }
+    });
+    
+    revalidatePath("/admin");
+    return { success: true };
+  } catch (error) {
+    console.error(error);
+    return { error: "เกิดข้อผิดพลาดในการบันทึกห้อง" };
+  }
+}
+
+const acSchema = z.object({
+  roomId: z.string().min(1, "กรุณาเลือกห้อง"),
+  brandType: z.enum(["master", "other"]),
+  acModelId: z.string().optional(),
+  customBrand: z.string().optional(),
+  customModel: z.string().optional(),
+  btu: z.string().transform(val => val ? parseInt(val, 10) : null).nullable()
+});
+
+export async function createAirConditionerAction(formData: FormData) {
+  const session = await verifyOrgAdmin();
+  const universityId = BigInt(session.user.universityId!);
+  
+  const parsed = acSchema.safeParse({
+    roomId: formData.get("roomId"),
+    brandType: formData.get("brandType"),
+    acModelId: formData.get("acModelId"),
+    customBrand: formData.get("customBrand"),
+    customModel: formData.get("customModel"),
+    btu: formData.get("btu"),
+  });
+  
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message || "ข้อมูลไม่ถูกต้อง" };
+  const data = parsed.data;
+  
+  if (data.brandType === "master" && !data.acModelId) {
+    return { error: "กรุณาเลือกรุ่นแอร์" };
+  }
+  if (data.brandType === "other" && !data.customBrand) {
+    return { error: "กรุณาระบุยี่ห้อแอร์" };
+  }
+
+  try {
+    // Verify room belongs to university
+    const room = await prisma.room.findUnique({
+      where: { id: BigInt(data.roomId) },
+      include: { building: { include: { university: true } }, airConditioners: true }
+    });
+    
+    if (!room || room.building.universityId !== universityId) {
+      return { error: "ห้องไม่ถูกต้อง" };
+    }
+    
+    // Generate AC Code: [UNI]-[BLDG]-[ROOM]-[NN]
+    const unitCount = room.airConditioners.length + 1;
+    const acCode = `${room.building.university.abbreviation}-${room.building.abbreviation}-${room.name}-${unitCount.toString().padStart(2, '0')}`;
+    const qrCode = crypto.randomUUID();
+    
+    let dbData: any = {
+      roomId: room.id,
+      acCode,
+      qrCode,
+      btu: data.btu,
+      installedAt: new Date()
+    };
+    
+    if (data.brandType === "master") {
+      const model = await prisma.acModel.findUnique({
+        where: { id: BigInt(data.acModelId!) }
+      });
+      if (!model) return { error: "ไม่พบรุ่นแอร์ที่เลือก" };
+      
+      dbData.acBrandId = model.brandId;
+      dbData.acModelId = model.id;
+    } else {
+      dbData.brand = data.customBrand;
+      dbData.model = data.customModel;
+    }
+    
+    await prisma.airConditioner.create({ data: dbData });
+    revalidatePath("/admin");
+    return { success: true };
+  } catch (error) {
+    console.error(error);
+    return { error: "เกิดข้อผิดพลาดในการลงทะเบียนแอร์" };
   }
 }

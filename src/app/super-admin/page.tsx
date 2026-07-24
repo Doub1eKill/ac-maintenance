@@ -18,7 +18,7 @@ export default async function SuperAdminPage() {
     redirect("/");
   }
 
-  const { dbError, metrics, pendingUsers, universities } = await getSuperAdminData();
+  const { dbError, metrics, pendingUsers, universities, brands } = await getSuperAdminData();
 
   return (
     <SuperAdminView
@@ -31,6 +31,7 @@ export default async function SuperAdminPage() {
       metrics={metrics}
       pendingUsers={pendingUsers}
       universities={universities}
+      brands={brands}
     />
   );
 }

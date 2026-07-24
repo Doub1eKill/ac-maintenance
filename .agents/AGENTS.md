@@ -26,7 +26,7 @@
 - **Hierarchy:** Superpowers process skills (`brainstorming`, `systematic-debugging`, `writing-plans`, `executing-plans`, `subagent-driven-development`, `dispatching-parallel-agents`, `test-driven-development`, `verification-before-completion`) take precedence over all domain/secondary skills. Domain-specific skills (e.g., UI styling, Prisma, Next.js) are secondary tools invoked *under* the Superpowers process guidance.
 
 ## Multi-Agent Step-by-Step Pipeline (Role Delegation)
-Never attempt to execute complex multi-step tasks in a single monolithic action. Always partition work across specialized sub-agent roles:
+Never attempt to execute complex multi-step ta  sks in a single monolithic action. Always partition work across specialized sub-agent roles:
 
 1. **🧑‍💻 Role 1: Brainstormer & Architect (`superpowers:brainstorming`)**
    - **Task:** Analyzes user prompts/requirements, expands ideas, explores context, and establishes design choices before code modification.

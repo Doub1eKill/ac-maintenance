@@ -27,6 +27,7 @@ export default async function AdminHomePage() {
     allAcUnits,
     pendingUsers,
     allUsers,
+    brands,
   } = await getOrgAdminData();
 
   return (
@@ -44,6 +45,7 @@ export default async function AdminHomePage() {
       allAcUnits={allAcUnits}
       pendingUsers={pendingUsers}
       allUsers={allUsers}
+      brands={brands || []}
     />
   );
 }
