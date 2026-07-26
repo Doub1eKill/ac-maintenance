@@ -65,7 +65,7 @@ interface ACUnit {
   model: string | null;
   btu: number | null;
   status: string;
-  qrCode?: string;
+  qrCode: string;
   maintenanceSchedule?: {
     frequencyValue: number;
     frequencyUnit: string;
