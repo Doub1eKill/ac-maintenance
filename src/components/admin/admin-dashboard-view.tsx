@@ -429,7 +429,15 @@ export function AdminDashboardView({
                   <div key={wo.id} className="p-3 rounded-xl border border-slate-100 bg-slate-50 flex flex-col gap-1">
                     <div className="flex justify-between items-center">
                       <span className="font-mono font-bold text-sm text-slate-900">{wo.acCode}</span>
-                      <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold">รอดำเนินการ</span>
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => { setSelectedOrderToAssign(wo.id); setShowAssignModal(true); }}
+                          className="text-[10px] font-bold text-sky-600 bg-sky-50 border border-sky-100 px-2 py-0.5 rounded hover:bg-sky-100 transition-colors"
+                        >
+                          จ่ายงาน
+                        </button>
+                        <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold">รอดำเนินการ</span>
+                      </div>
                     </div>
                     <span className="text-xs text-slate-500">{wo.location}</span>
                   </div>
