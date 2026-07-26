@@ -29,7 +29,6 @@ export default async function AdminHomePage() {
     allUsers,
     brands,
     weeklyActivity,
-    financialMetrics,
   } = await getOrgAdminData();
 
   return (
@@ -49,7 +48,6 @@ export default async function AdminHomePage() {
       allUsers={allUsers}
       brands={brands || []}
       weeklyActivity={weeklyActivity}
-      financialMetrics={financialMetrics}
     />
   );
 }

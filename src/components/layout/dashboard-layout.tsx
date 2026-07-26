@@ -20,8 +20,20 @@ import {
   Plus,
   User,
   Users,
+  Settings,
+  Bell,
+  ChevronsUpDown,
 } from "lucide-react";
 import { AnimatedIcon } from "@/components/ui/animated-icon";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export interface NavItem {
   id: string;
@@ -193,67 +205,65 @@ export function DashboardLayout({
           </div>
         </div>
 
-        {/* User Footer Card */}
-        <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-          <div className="flex items-center gap-2.5 overflow-hidden">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-200 font-bold text-slate-800 text-xs">
-              {user.name ? user.name.slice(0, 2).toUpperCase() : "US"}
-            </div>
-            <div className="overflow-hidden">
-              <div className="text-xs font-bold text-slate-950 truncate">{user.name || "ผู้ใช้งาน"}</div>
-              <div className="text-[10px] text-slate-500 truncate">{user.email}</div>
-            </div>
-          </div>
-
-          <button
-            onClick={() => signOut({ callbackUrl: "/login" })}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-            title="ออกจากระบบ"
-          >
-            <LogOut className="h-4 w-4" />
-          </button>
+        {/* User Footer Card - Dropdown Menu (ReUI Style) */}
+        <div className="pt-4 border-t border-slate-100">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex w-full items-center justify-between rounded-xl p-2 hover:bg-slate-50 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-slate-400">
+                <div className="flex items-center gap-2.5 overflow-hidden">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-900 font-bold text-white text-xs shadow-sm">
+                    {user.name ? user.name.slice(0, 2).toUpperCase() : "US"}
+                  </div>
+                  <div className="overflow-hidden text-left">
+                    <div className="text-xs font-bold text-slate-950 truncate">{user.name || "ผู้ใช้งาน"}</div>
+                    <div className="text-[10px] text-slate-500 truncate">{user.email}</div>
+                  </div>
+                </div>
+                <ChevronsUpDown className="h-4 w-4 text-slate-400" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent 
+              className="w-56 rounded-xl border-slate-200 bg-white p-2 shadow-lg animate-in fade-in zoom-in-95" 
+              align="end" 
+              sideOffset={8}
+            >
+              <DropdownMenuLabel className="font-normal">
+                <div className="flex flex-col space-y-1">
+                  <p className="text-sm font-medium leading-none text-slate-900">{user.name || "ผู้ใช้งาน"}</p>
+                  <p className="text-xs leading-none text-slate-500">{user.email}</p>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator className="bg-slate-100" />
+              <DropdownMenuGroup>
+                <DropdownMenuItem className="rounded-lg text-sm font-medium text-slate-700 focus:bg-slate-50 focus:text-slate-900 cursor-pointer">
+                  <User className="mr-2 h-4 w-4 text-slate-500" />
+                  <span>โปรไฟล์ส่วนตัว</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem className="rounded-lg text-sm font-medium text-slate-700 focus:bg-slate-50 focus:text-slate-900 cursor-pointer">
+                  <Settings className="mr-2 h-4 w-4 text-slate-500" />
+                  <span>ตั้งค่าระบบ</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem className="rounded-lg text-sm font-medium text-slate-700 focus:bg-slate-50 focus:text-slate-900 cursor-pointer">
+                  <Bell className="mr-2 h-4 w-4 text-slate-500" />
+                  <span>การแจ้งเตือน</span>
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator className="bg-slate-100" />
+              <DropdownMenuItem 
+                onClick={() => signOut({ callbackUrl: "/login" })}
+                className="rounded-lg text-sm font-medium text-red-600 focus:bg-red-50 focus:text-red-700 cursor-pointer"
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>ออกจากระบบ</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </aside>
 
       {/* Main Panel Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Top Search & Filter Utility Header (BizLink Top Bar) */}
-        <header className="sticky top-0 z-30 w-full border-b border-slate-200/80 bg-[#f4f4ee]/90 backdrop-blur-md px-4 sm:px-8 py-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3">
-          {/* Search Box */}
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <input
-              type="text"
-              value={searchValue}
-              onChange={(e) => onSearchChange?.(e.target.value)}
-              placeholder={searchPlaceholder}
-              className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-4 py-2 text-xs text-slate-900 placeholder-slate-400 focus:border-slate-900 focus:outline-none shadow-2xs"
-            />
-          </div>
 
-          {/* Action Tools */}
-          <div className="flex items-center justify-end gap-2.5 shrink-0">
-            <button className="hidden sm:inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs">
-              <ArrowUpDown className="h-3.5 w-3.5 text-slate-500" />
-              <span>จัดเรียงตาม</span>
-            </button>
-
-            <button className="hidden sm:inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs">
-              <SlidersHorizontal className="h-3.5 w-3.5 text-slate-500" />
-              <span>ตัวกรอง</span>
-            </button>
-
-            {onCreateAction && (
-              <button
-                onClick={onCreateAction}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-slate-950 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800 transition-all shadow-md active:scale-95"
-              >
-                <Plus className="h-4 w-4" />
-                <span>{createActionLabel}</span>
-              </button>
-            )}
-          </div>
-        </header>
 
         {/* Content Container */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-6 pb-20 lg:pb-8">

@@ -23,12 +23,18 @@ import {
   UserCheck,
   UserX,
   Users,
-  Banknote,
 } from "lucide-react";
 import { AnimatedIcon } from "@/components/ui/animated-icon";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { DashboardLayout, NavItem } from "@/components/layout/dashboard-layout";
 import { AssetManager } from "@/components/admin/asset-manager";
-import { FinancialDashboardView } from "@/components/admin/financial-dashboard-view";
+import { MaintenanceCalendar } from "@/components/admin/maintenance-calendar";
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from "recharts";
 
 interface WorkOrderItem {
@@ -98,7 +104,6 @@ interface AdminDashboardViewProps {
   pendingUsers?: PendingUser[];
   allUsers?: PendingUser[];
   brands: any[];
-  financialMetrics?: any;
 }
 
 export function AdminDashboardView({
@@ -113,11 +118,11 @@ export function AdminDashboardView({
   pendingUsers = [],
   allUsers = [],
   brands = [],
-  financialMetrics,
 }: AdminDashboardViewProps) {
   const [activeTab, setActiveTab] = useState<string>("overview");
   const [isPending, startTransition] = useTransition();
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [selectedAcForWorkOrder, setSelectedAcForWorkOrder] = useState<string | null>(null);
   const [globalSearch, setGlobalSearch] = useState("");
   const [expandedBuilding, setExpandedBuilding] = useState<string | null>(buildings[0]?.id || null);
   const [toastMessage, setToastMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -157,6 +162,11 @@ export function AdminDashboardView({
       wo.location.toLowerCase().includes(s) ||
       (wo.claimedByName && wo.claimedByName.toLowerCase().includes(s))
     );
+  }
+
+  function handleOpenCalendarWorkOrder(acId: string) {
+    setSelectedAcForWorkOrder(acId);
+    setShowCreateModal(true);
   }
 
   function handleUserStatus(userId: string, newStatus: "active" | "suspended") {
@@ -241,9 +251,9 @@ export function AdminDashboardView({
       icon: Building2,
     },
     {
-      id: "financials",
-      label: "การเงิน & งบประมาณ",
-      icon: Banknote,
+      id: "calendar",
+      label: "ปฏิทินซ่อมบำรุง",
+      icon: Calendar,
     },
   ];
 
@@ -261,7 +271,10 @@ export function AdminDashboardView({
       searchValue={globalSearch}
       onSearchChange={setGlobalSearch}
       searchPlaceholder="ค้นหารหัสแอร์, ชื่อผู้ใช้, อาคาร, ช่าง..."
-      onCreateAction={() => setShowCreateModal(true)}
+      onCreateAction={() => {
+        setSelectedAcForWorkOrder(null);
+        setShowCreateModal(true);
+      }}
       createActionLabel="+ สร้างใบงานซ่อมบำรุง"
     >
       {/* Database Connection Alert */}
@@ -298,70 +311,6 @@ export function AdminDashboardView({
         </div>
       )}
 
-      {/* BizLink Top Analytic Banner (Bar Chart & Gauge Stats Widget) */}
-      <div className="biz-banner p-6 sm:p-8 flex flex-col lg:flex-row items-center justify-between gap-6 shadow-2xs">
-        {/* Left: Bar Chart Widget (Recharts) */}
-        <div className="space-y-3 w-full lg:w-1/3">
-          <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-            กิจกรรมซ่อมบำรุงประจำสัปดาห์
-          </div>
-          <div className="h-28 pt-2 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={weeklyActivity} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-                <XAxis 
-                  dataKey="day" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fontSize: 10, fill: "#94a3b8", fontWeight: 700 }}
-                  dy={5}
-                />
-                <Tooltip 
-                  cursor={{ fill: '#f1f5f9' }}
-                  contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                  labelStyle={{ fontWeight: 700, color: '#0f172a' }}
-                />
-                <Bar 
-                  dataKey="repairs" 
-                  fill="#0f172a" 
-                  radius={[6, 6, 6, 6]}
-                  barSize={24}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Middle: Gauge Progress Indicator */}
-        <div className="flex items-center gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
-          <div className="relative h-16 w-16 flex items-center justify-center rounded-full border-4 border-slate-950 border-t-slate-200">
-            <span className="text-base font-black text-slate-950">
-              {metrics.totalUnits > 0
-                ? `${Math.round(((metrics.totalUnits - metrics.brokenOrCleaningUnits) / metrics.totalUnits) * 100)}%`
-                : "100%"}
-            </span>
-          </div>
-          <div>
-            <div className="text-xs font-bold text-slate-950">อัตราเครื่องปรับอากาศปกติ</div>
-            <div className="text-[11px] text-slate-500">แอร์ทำงานปกติ</div>
-          </div>
-        </div>
-
-        {/* Right: Big Numeric Metrics */}
-        <div className="flex items-center gap-8 w-full lg:w-auto justify-between lg:justify-end border-t lg:border-t-0 border-slate-200 pt-4 lg:pt-0">
-          <div>
-            <div className="text-3xl font-black text-slate-950">{metrics.totalUnits}</div>
-            <div className="text-xs font-semibold text-slate-500">จำนวนแอร์ทั้งหมด</div>
-          </div>
-          <div>
-            <div className="text-3xl font-black text-slate-950">{metrics.pendingWorkOrders}</div>
-            <div className="text-xs font-semibold text-amber-600 font-bold">งานรอดำเนินการ</div>
-          </div>
-          <div>
-            <div className="text-3xl font-black text-slate-950">{pendingUsers.length}</div>
-            <div className="text-xs font-semibold text-indigo-600 font-bold">ผู้ใช้รออนุมัติ</div>
-          </div>
-        </div>
-      </div>
 
       {/* Main Kanban Grid Layout (BizLink Style Columns) */}
       {(activeTab === "overview" || activeTab === "kanban") && (
@@ -628,9 +577,9 @@ export function AdminDashboardView({
         <AssetManager buildings={buildings} brands={brands} globalSearch={globalSearch} />
       )}
 
-      {/* Financials View */}
-      {activeTab === "financials" && (
-        <FinancialDashboardView data={{ financialMetrics }} />
+      {/* Maintenance Calendar View */}
+      {activeTab === "calendar" && (
+        <MaintenanceCalendar onCreateWorkOrder={handleOpenCalendarWorkOrder} />
       )}
 
       {/* Modal: Create Work Order */}
@@ -647,19 +596,18 @@ export function AdminDashboardView({
             <form onSubmit={handleCreateOrderSubmit} className="space-y-4 text-xs">
               <div>
                 <label className="mb-1.5 block font-bold text-slate-700">เลือกเครื่องปรับอากาศ</label>
-                <select
-                  name="airConditionerId"
-                  required
-                  defaultValue=""
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-slate-900 focus:border-slate-950 focus:outline-none"
-                >
-                  <option value="" disabled>-- เลือกเครื่องปรับอากาศ --</option>
-                  {allAcUnits.map((unit) => (
-                    <option key={unit.id} value={unit.id}>
-                      {unit.label}
-                    </option>
-                  ))}
-                </select>
+                <Select name="airConditionerId" required defaultValue={selectedAcForWorkOrder ?? undefined}>
+                  <SelectTrigger className="w-full rounded-xl border-slate-200 bg-slate-50 px-3.5 py-5 text-xs text-slate-900 focus:ring-slate-400">
+                    <SelectValue placeholder="-- เลือกเครื่องปรับอากาศ --" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl border-slate-200 shadow-lg animate-in fade-in zoom-in-95">
+                    {allAcUnits.map((unit) => (
+                      <SelectItem key={unit.id} value={unit.id} className="text-xs rounded-lg focus:bg-slate-50 cursor-pointer">
+                        {unit.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="flex gap-2 pt-2">

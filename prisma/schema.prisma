@@ -231,7 +231,6 @@ model WorkOrder {
   claimedBy        BigInt?         @map("claimed_by") @db.UnsignedBigInt
   claimedAt        DateTime?       @map("claimed_at") @db.Timestamp(0) // separate from updatedAt, which gets overwritten again on completion
   completedAt      DateTime?       @map("completed_at") @db.Timestamp(0)
-  estimatedCost    Decimal?        @map("estimated_cost") @db.Decimal(10, 2)
   createdAt        DateTime?       @map("created_at") @db.Timestamp(0)
   updatedAt        DateTime?       @map("updated_at") @db.Timestamp(0)
 

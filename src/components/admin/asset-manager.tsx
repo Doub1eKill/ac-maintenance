@@ -3,6 +3,13 @@
 import { useState, useTransition } from "react";
 import { Building2, Plus, ChevronDown, ChevronUp, X } from "lucide-react";
 import { createBuildingAction, createRoomAction, createAirConditionerAction } from "@/app/admin/actions";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface ACUnit {
   id: string;
@@ -291,19 +298,33 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
                 <>
                   <div>
                     <label className="mb-1.5 block font-bold text-slate-700">ยี่ห้อ (Brand)</label>
-                    <select required value={selectedBrandId} onChange={(e) => setSelectedBrandId(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-slate-900 focus:border-slate-950 focus:outline-none">
-                      <option value="" disabled>-- เลือกยี่ห้อ --</option>
-                      {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                    </select>
+                    <Select value={selectedBrandId} onValueChange={setSelectedBrandId} required>
+                      <SelectTrigger className="w-full rounded-xl border-slate-200 px-3.5 py-5 text-xs text-slate-900 focus:ring-slate-400">
+                        <SelectValue placeholder="-- เลือกยี่ห้อ --" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl border-slate-200 shadow-lg animate-in fade-in zoom-in-95">
+                        {brands.map(b => (
+                          <SelectItem key={b.id} value={b.id} className="text-xs rounded-lg focus:bg-slate-50 cursor-pointer">
+                            {b.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div>
                     <label className="mb-1.5 block font-bold text-slate-700">รุ่น (Model)</label>
-                    <select name="acModelId" required className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-slate-900 focus:border-slate-950 focus:outline-none disabled:opacity-50" disabled={!selectedBrandId}>
-                      <option value="" disabled>-- เลือกรุ่น --</option>
-                      {selectedBrand?.models.map(m => (
-                        <option key={m.id} value={m.id}>{m.name} {m.defaultBtu ? `(${m.defaultBtu} BTU)` : ""}</option>
-                      ))}
-                    </select>
+                    <Select name="acModelId" required disabled={!selectedBrandId}>
+                      <SelectTrigger className="w-full rounded-xl border-slate-200 px-3.5 py-5 text-xs text-slate-900 focus:ring-slate-400 disabled:opacity-50">
+                        <SelectValue placeholder="-- เลือกรุ่น --" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl border-slate-200 shadow-lg animate-in fade-in zoom-in-95">
+                        {selectedBrand?.models.map(m => (
+                          <SelectItem key={m.id} value={m.id} className="text-xs rounded-lg focus:bg-slate-50 cursor-pointer">
+                            {m.name} {m.defaultBtu ? `(${m.defaultBtu} BTU)` : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </>
               ) : (

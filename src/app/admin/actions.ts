@@ -28,7 +28,6 @@ export async function getOrgAdminData() {
       pendingUsersRaw,
       allUsersRaw,
       maintenanceLogsRaw,
-      completedWorkOrdersRaw,
     ] = await Promise.all([
       prisma.university.findUnique({ where: { id: universityId } }),
       prisma.building.findMany({
@@ -83,19 +82,6 @@ export async function getOrgAdminData() {
           performedAt: { gte: subDays(new Date(), 7) }
         },
       }),
-      prisma.workOrder.findMany({
-        where: { universityId, status: "completed" },
-        include: {
-          airConditioner: {
-            include: { acBrand: true, acModel: true, room: { include: { building: true } } },
-          },
-          maintenanceLogs: {
-            include: { technician: true }
-          },
-          claimedByUser: true,
-        },
-        orderBy: { completedAt: "desc" }
-      })
     ]);
 
     // Aggregate metrics
@@ -200,112 +186,6 @@ export async function getOrgAdminData() {
       }
     });
 
-    // Financial Metrics Calculation
-    let ytdSpend = 0;
-    let totalCompleted = completedWorkOrdersRaw.length;
-    const buildingCosts: Record<string, number> = {};
-    const monthlyCosts: Record<string, number> = {};
-    const actionCosts: Record<string, number> = {
-      "cleaning": 0,
-      "repair": 0,
-      "refill": 0,
-      "other": 0
-    };
-    const acCosts: Record<string, {
-      id: string;
-      acCode: string;
-      brand: string;
-      location: string;
-      cost: number;
-      repairCount: number;
-    }> = {};
-
-    const currentYear = new Date().getFullYear();
-
-    completedWorkOrdersRaw.forEach(wo => {
-      const cost = wo.estimatedCost ? Number(wo.estimatedCost) : 0;
-      
-      // Only count YTD
-      if (wo.completedAt && wo.completedAt.getFullYear() === currentYear) {
-        ytdSpend += cost;
-        
-        // Monthly trend
-        const month = format(wo.completedAt, "MMM");
-        monthlyCosts[month] = (monthlyCosts[month] || 0) + cost;
-      }
-
-      // Building cost
-      const bldg = wo.airConditioner.room.building.name;
-      buildingCosts[bldg] = (buildingCosts[bldg] || 0) + cost;
-
-      // AC cost for top 10
-      const acId = wo.airConditioner.id.toString();
-      if (!acCosts[acId]) {
-        acCosts[acId] = {
-          id: acId,
-          acCode: wo.airConditioner.acCode,
-          brand: wo.airConditioner.acBrand?.name || wo.airConditioner.brand || "ไม่ระบุ",
-          location: `${wo.airConditioner.room.building.name} ห้อง ${wo.airConditioner.room.name}`,
-          cost: 0,
-          repairCount: 0
-        };
-      }
-      acCosts[acId].cost += cost;
-      acCosts[acId].repairCount += 1;
-
-      // Breakdown by log action type (approximate)
-      if (wo.maintenanceLogs.length > 0) {
-        const action = wo.maintenanceLogs[0].action; // use primary action
-        actionCosts[action] = (actionCosts[action] || 0) + cost;
-      } else {
-        actionCosts["other"] = (actionCosts["other"] || 0) + cost;
-      }
-    });
-
-    const avgCostPerRepair = totalCompleted > 0 ? ytdSpend / totalCompleted : 0;
-    
-    let topExpensiveBuilding = { name: "ไม่มีข้อมูล", cost: 0 };
-    for (const [name, cost] of Object.entries(buildingCosts)) {
-      if (cost > topExpensiveBuilding.cost) {
-        topExpensiveBuilding = { name, cost };
-      }
-    }
-
-    const topExpensiveAcs = Object.values(acCosts)
-      .sort((a, b) => b.cost - a.cost)
-      .slice(0, 10);
-
-    const monthlyExpenses = Object.entries(monthlyCosts).map(([month, cost]) => ({ month, cost }));
-    
-    // Formatting breakdown for pie chart
-    const costBreakdown = [
-      { name: "ล้างแอร์ (Cleaning)", value: actionCosts["cleaning"] || 0 },
-      { name: "ซ่อมแซม (Repair)", value: actionCosts["repair"] || 0 },
-      { name: "เติมน้ำยา (Refill)", value: actionCosts["refill"] || 0 },
-      { name: "อื่นๆ (Other)", value: actionCosts["other"] || 0 },
-    ].filter(item => item.value > 0);
-
-    const detailedLedger = completedWorkOrdersRaw.map(wo => ({
-      id: wo.id.toString(),
-      date: wo.completedAt ? wo.completedAt.toISOString() : "",
-      workOrderId: `WO-${wo.createdAt?.getFullYear() || currentYear}-${wo.id.toString().slice(-4)}`,
-      acCode: wo.airConditioner.acCode,
-      technician: wo.claimedByUser?.name || "ไม่ระบุ",
-      cost: wo.estimatedCost ? Number(wo.estimatedCost) : 0,
-      notes: wo.maintenanceLogs[0]?.notes || "-",
-    }));
-
-    const financialMetrics = {
-      ytdSpend,
-      avgCostPerRepair,
-      topExpensiveBuilding,
-      totalCompleted,
-      monthlyExpenses,
-      costBreakdown,
-      topExpensiveAcs,
-      detailedLedger,
-    };
-
     return {
       dbError: null,
       universityName: university?.name || "มหาวิทยาลัย",
@@ -323,7 +203,6 @@ export async function getOrgAdminData() {
       pendingUsers,
       allUsers,
       brands: await prisma.acBrand.findMany({ include: { models: true }, orderBy: { name: 'asc' } }),
-      financialMetrics,
     };
   } catch (error) {
     console.error("Org Admin Data query failed:", error);
@@ -343,16 +222,6 @@ export async function getOrgAdminData() {
       allAcUnits: [],
       pendingUsers: [],
       allUsers: [],
-      financialMetrics: {
-        ytdSpend: 0,
-        avgCostPerRepair: 0,
-        topExpensiveBuilding: { name: "ไม่มีข้อมูล", cost: 0 },
-        totalCompleted: 0,
-        monthlyExpenses: [],
-        costBreakdown: [],
-        topExpensiveAcs: [],
-        detailedLedger: [],
-      },
     };
   }
 }

@@ -5,6 +5,13 @@ import Link from "next/link";
 import { registerUser, type RegisterState } from "@/app/register/actions";
 import { Wrench, Building2, Eye, EyeOff, AlertTriangle, Clock, ArrowLeft, UserPlus } from "lucide-react";
 import { AnimatedIcon } from "@/components/ui/animated-icon";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface UniversityOption {
   id: string;
@@ -106,22 +113,22 @@ export function RegisterForm({ universities }: { universities: UniversityOption[
         <label htmlFor="universityId" className="mb-1.5 block text-xs font-bold text-slate-800">
           เลือกมหาวิทยาลัย / สถาบันการศึกษาสังกัด
         </label>
-        <select
-          id="universityId"
-          name="universityId"
-          required
-          defaultValue=""
-          className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs text-slate-900 focus:border-slate-950 focus:outline-none shadow-2xs"
-        >
-          <option value="" disabled className="text-slate-400">
-            -- กรุณาเลือกสถาบันการศึกษา --
-          </option>
-          {universities.map((uni) => (
-            <option key={uni.id} value={uni.id}>
-              {uni.name} ({uni.abbreviation})
-            </option>
-          ))}
-        </select>
+        <Select name="universityId" required>
+          <SelectTrigger className="w-full rounded-xl border-slate-200 bg-white px-3.5 py-5 text-xs text-slate-900 focus:ring-slate-400 shadow-2xs">
+            <SelectValue placeholder="-- กรุณาเลือกสถาบันการศึกษา --" />
+          </SelectTrigger>
+          <SelectContent className="rounded-xl border-slate-200 shadow-lg animate-in fade-in zoom-in-95">
+            {universities.map((uni) => (
+              <SelectItem 
+                key={uni.id} 
+                value={uni.id} 
+                className="text-xs rounded-lg focus:bg-slate-50 cursor-pointer"
+              >
+                {uni.name} ({uni.abbreviation})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Name Input */}

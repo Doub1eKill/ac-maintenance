@@ -32,7 +32,6 @@ export async function POST(
       beforePhotoUrl,
       afterPhotoUrl,
       customerSignatureUrl,
-      estimatedCost,
     } = body;
 
     // Verify it belongs to tech
@@ -53,7 +52,6 @@ export async function POST(
         data: {
           status: "completed",
           completedAt: new Date(),
-          estimatedCost: estimatedCost ? Number(estimatedCost) : null,
         },
       });
 
@@ -83,7 +81,6 @@ export async function POST(
       newValues: {
         status: "completed",
         action,
-        estimatedCost,
         hasEvidence: !!(beforePhotoUrl || afterPhotoUrl || customerSignatureUrl),
       },
       ipAddress: request.headers.get("x-forwarded-for") || "unknown",

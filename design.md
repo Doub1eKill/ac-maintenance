@@ -1,7 +1,7 @@
 # 🎨 Design System & Architecture Specification (`DESIGN.md`)
 > **Project:** AC Maintenance System (ระบบบริหารจัดการและแจ้งซ่อมเครื่องปรับอากาศ มหาวิทยาลัย)  
-> **Visual Reference:** Executive SaaS Dashboard (BizLink Aesthetic Specification)  
-> **Target Framework:** Next.js 16 (App Router) + Tailwind CSS v4 + Prisma 7  
+> **Visual Reference:** ReUI Design System & Executive SaaS Dashboard (BizLink Aesthetic Specification)  
+> **Target Framework:** Next.js 16 (App Router) + Tailwind CSS v4 + Prisma 7 + ReUI / shadcn  
 > **Design Philosophy:** Warm Off-White Minimalist, Executive Kanban Grid, High Contrast & User-Friendly  
 
 ---
