@@ -331,7 +331,7 @@ export function AdminDashboardView({
       setActiveTab={setActiveTab}
       navItems={adminNavItems}
       searchValue={globalSearch}
-      onSearchChange={activeTab === "calendar" ? undefined : setGlobalSearch}
+      onSearchChange={["overview", "approvals", "calendar"].includes(activeTab) ? undefined : setGlobalSearch}
       searchPlaceholder={
         activeTab === "team" ? "ค้นหาชื่อ หรืออีเมล..." :
         activeTab === "assets" ? "ค้นหาชื่ออาคาร, เลขห้อง..." :
