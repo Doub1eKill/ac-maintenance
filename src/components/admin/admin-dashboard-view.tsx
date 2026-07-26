@@ -66,7 +66,7 @@ interface ACUnit {
   btu: number | null;
   status: string;
   qrCode: string;
-  maintenanceSchedule?: {
+  maintenanceSchedule: {
     frequencyValue: number;
     frequencyUnit: string;
     nextDueDate: string;

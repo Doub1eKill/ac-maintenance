@@ -263,9 +263,35 @@ export function DashboardLayout({
 
       {/* Main Panel Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
-
-
-        {/* Content Container */}
+        {/* Top Header */}
+        <header className="hidden lg:flex sticky top-0 z-40 w-full border-b border-slate-200/90 bg-white/90 backdrop-blur-md px-8 py-4 items-center justify-between">
+          <div className="flex items-center gap-3">
+             <h1 className="text-xl font-bold text-slate-950">{currentNav?.label}</h1>
+          </div>
+          <div className="flex items-center gap-4">
+            {onSearchChange && (
+              <div className="relative w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder={searchPlaceholder}
+                  value={searchValue}
+                  onChange={(e) => onSearchChange(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-slate-400 transition-shadow"
+                />
+              </div>
+            )}
+            {onCreateAction && (
+              <button
+                onClick={onCreateAction}
+                className="flex items-center gap-2 bg-slate-950 text-white px-4 py-2.5 rounded-xl text-xs font-bold hover:bg-slate-800 transition-colors shadow-sm"
+              >
+                <Plus className="h-4 w-4" />
+                {createActionLabel}
+              </button>
+            )}
+          </div>
+        </header>        {/* Content Container */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-6 pb-20 lg:pb-8">
           {/* Mobile Horizontal Sub-Tab Bar for quick navigation on small screens */}
           <div className="lg:hidden flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none border-b border-slate-200/80 -mx-4 px-4 sm:mx-0 sm:px-0">
