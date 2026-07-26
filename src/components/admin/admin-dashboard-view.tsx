@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { createWorkOrderAction, updateUserStatusByOrgAdminAction } from "@/app/admin/actions";
 import {
   Building2,
@@ -32,6 +32,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { DashboardLayout, NavItem } from "@/components/layout/dashboard-layout";
 import { AssetManager } from "@/components/admin/asset-manager";
 import { MaintenanceCalendar } from "@/components/admin/maintenance-calendar";
@@ -127,6 +136,15 @@ export function AdminDashboardView({
   const [expandedBuilding, setExpandedBuilding] = useState<string | null>(buildings[0]?.id || null);
   const [toastMessage, setToastMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
+  const [approvalsPage, setApprovalsPage] = useState(1);
+  const [teamPage, setTeamPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+
+  useEffect(() => {
+    setApprovalsPage(1);
+    setTeamPage(1);
+  }, [globalSearch]);
+
   const pendingOrders = workOrders.filter(
     (wo) => wo.status === "pending" && matchesSearch(wo, globalSearch)
   );
@@ -152,6 +170,12 @@ export function AdminDashboardView({
       u.email.toLowerCase().includes(globalSearch.toLowerCase()) ||
       u.role.toLowerCase().includes(globalSearch.toLowerCase())
   );
+
+  const totalApprovalsPages = Math.ceil(filteredPendingUsers.length / ITEMS_PER_PAGE);
+  const paginatedApprovals = filteredPendingUsers.slice((approvalsPage - 1) * ITEMS_PER_PAGE, approvalsPage * ITEMS_PER_PAGE);
+
+  const totalTeamPages = Math.ceil(filteredAllUsers.length / ITEMS_PER_PAGE);
+  const paginatedTeam = filteredAllUsers.slice((teamPage - 1) * ITEMS_PER_PAGE, teamPage * ITEMS_PER_PAGE);
 
   function matchesSearch(wo: WorkOrderItem, search: string) {
     if (!search.trim()) return true;
@@ -549,7 +573,7 @@ export function AdminDashboardView({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filteredPendingUsers.map((u) => (
+                  {paginatedApprovals.map((u) => (
                     <tr key={u.id} className="hover:bg-slate-50 transition-colors">
                       <td className="py-3.5 px-4 font-bold text-slate-950">{u.name}</td>
                       <td className="py-3.5 px-4 font-mono">{u.email}</td>
@@ -577,6 +601,33 @@ export function AdminDashboardView({
                   ))}
                 </tbody>
               </table>
+              {totalApprovalsPages > 1 && (
+                <div className="py-4 border-t border-slate-100">
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious 
+                          href="#" 
+                          onClick={(e) => { e.preventDefault(); setApprovalsPage(p => Math.max(1, p - 1)); }} 
+                          className={approvalsPage === 1 ? "pointer-events-none opacity-50" : ""}
+                        />
+                      </PaginationItem>
+                      <PaginationItem>
+                        <span className="text-xs font-medium text-slate-500 px-4">
+                          หน้า {approvalsPage} จาก {totalApprovalsPages}
+                        </span>
+                      </PaginationItem>
+                      <PaginationItem>
+                        <PaginationNext 
+                          href="#" 
+                          onClick={(e) => { e.preventDefault(); setApprovalsPage(p => Math.min(totalApprovalsPages, p + 1)); }}
+                          className={approvalsPage === totalApprovalsPages ? "pointer-events-none opacity-50" : ""}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -604,7 +655,7 @@ export function AdminDashboardView({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredAllUsers.map((u) => (
+                {paginatedTeam.map((u) => (
                   <tr key={u.id} className="hover:bg-slate-50 transition-colors">
                     <td className="py-3.5 px-4 font-bold text-slate-950">{u.name}</td>
                     <td className="py-3.5 px-4 font-mono">{u.email}</td>
@@ -645,6 +696,33 @@ export function AdminDashboardView({
                 ))}
               </tbody>
             </table>
+            {totalTeamPages > 1 && (
+              <div className="py-4 border-t border-slate-100">
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious 
+                        href="#" 
+                        onClick={(e) => { e.preventDefault(); setTeamPage(p => Math.max(1, p - 1)); }} 
+                        className={teamPage === 1 ? "pointer-events-none opacity-50" : ""}
+                      />
+                    </PaginationItem>
+                    <PaginationItem>
+                      <span className="text-xs font-medium text-slate-500 px-4">
+                        หน้า {teamPage} จาก {totalTeamPages}
+                      </span>
+                    </PaginationItem>
+                    <PaginationItem>
+                      <PaginationNext 
+                        href="#" 
+                        onClick={(e) => { e.preventDefault(); setTeamPage(p => Math.min(totalTeamPages, p + 1)); }}
+                        className={teamPage === totalTeamPages ? "pointer-events-none opacity-50" : ""}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            )}
           </div>
         </div>
       )}

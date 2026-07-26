@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { claimWorkOrderAction, logMaintenanceAction } from "@/app/tech/actions";
 import {
   Wrench,
@@ -17,6 +17,13 @@ import {
   MoreVertical,
   Calendar,
 } from "lucide-react";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { AnimatedIcon } from "@/components/ui/animated-icon";
 import { DashboardLayout, NavItem } from "@/components/layout/dashboard-layout";
 
@@ -67,6 +74,15 @@ export function TechMobileView({
   // Notification Toast State
   const [toastMessage, setToastMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
+  const [poolPage, setPoolPage] = useState(1);
+  const [myJobsPage, setMyJobsPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+
+  useEffect(() => {
+    setPoolPage(1);
+    setMyJobsPage(1);
+  }, [searchQuery]);
+
   const filteredPool = jobPool.filter(
     (job) =>
       job.acCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -80,6 +96,12 @@ export function TechMobileView({
       job.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
       job.location.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const totalPoolPages = Math.ceil(filteredPool.length / ITEMS_PER_PAGE);
+  const paginatedPool = filteredPool.slice((poolPage - 1) * ITEMS_PER_PAGE, poolPage * ITEMS_PER_PAGE);
+
+  const totalMyJobsPages = Math.ceil(filteredMyJobs.length / ITEMS_PER_PAGE);
+  const paginatedMyJobs = filteredMyJobs.slice((myJobsPage - 1) * ITEMS_PER_PAGE, myJobsPage * ITEMS_PER_PAGE);
 
   function handleClaim(workOrderId: string) {
     setToastMessage(null);
@@ -214,7 +236,7 @@ export function TechMobileView({
               ไม่มีงานซ่อมบำรุงที่รอรับ
             </div>
           ) : (
-            filteredPool.map((job) => (
+            paginatedPool.map((job) => (
               <div key={job.id} className="biz-card p-5 space-y-4 hover:border-slate-400 transition-all">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -248,6 +270,34 @@ export function TechMobileView({
         </div>
       )}
 
+      {activeTab === "pool" && totalPoolPages > 1 && (
+        <div className="py-4 mt-2">
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious 
+                  href="#" 
+                  onClick={(e) => { e.preventDefault(); setPoolPage(p => Math.max(1, p - 1)); }} 
+                  className={poolPage === 1 ? "pointer-events-none opacity-50" : ""}
+                />
+              </PaginationItem>
+              <PaginationItem>
+                <span className="text-xs font-medium text-slate-500 px-4">
+                  หน้า {poolPage} จาก {totalPoolPages}
+                </span>
+              </PaginationItem>
+              <PaginationItem>
+                <PaginationNext 
+                  href="#" 
+                  onClick={(e) => { e.preventDefault(); setPoolPage(p => Math.min(totalPoolPages, p + 1)); }}
+                  className={poolPage === totalPoolPages ? "pointer-events-none opacity-50" : ""}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
+
       {/* TAB 2: My Jobs */}
       {activeTab === "my_jobs" && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in">
@@ -256,7 +306,7 @@ export function TechMobileView({
               คุณไม่มีงานที่กำลังดำเนินการ
             </div>
           ) : (
-            filteredMyJobs.map((job, idx) => (
+            paginatedMyJobs.map((job, idx) => (
               <div
                 key={job.id}
                 className={idx === 0 ? "biz-card-dark p-5 space-y-4 shadow-md" : "biz-card p-5 space-y-4 hover:border-slate-400 transition-all"}
@@ -289,6 +339,34 @@ export function TechMobileView({
               </div>
             ))
           )}
+        </div>
+      )}
+
+      {activeTab === "my_jobs" && totalMyJobsPages > 1 && (
+        <div className="py-4 mt-2">
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious 
+                  href="#" 
+                  onClick={(e) => { e.preventDefault(); setMyJobsPage(p => Math.max(1, p - 1)); }} 
+                  className={myJobsPage === 1 ? "pointer-events-none opacity-50" : ""}
+                />
+              </PaginationItem>
+              <PaginationItem>
+                <span className="text-xs font-medium text-slate-500 px-4">
+                  หน้า {myJobsPage} จาก {totalMyJobsPages}
+                </span>
+              </PaginationItem>
+              <PaginationItem>
+                <PaginationNext 
+                  href="#" 
+                  onClick={(e) => { e.preventDefault(); setMyJobsPage(p => Math.min(totalMyJobsPages, p + 1)); }}
+                  className={myJobsPage === totalMyJobsPages ? "pointer-events-none opacity-50" : ""}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
         </div>
       )}
 

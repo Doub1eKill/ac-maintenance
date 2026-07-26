@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { Building2, Plus, ChevronDown, ChevronUp, X, QrCode, CalendarClock, Printer } from "lucide-react";
 import { createBuildingAction, createRoomAction, createAirConditionerAction, saveMaintenanceScheduleAction } from "@/app/admin/actions";
 import { QRCodeSVG } from "qrcode.react";
@@ -11,6 +11,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 interface ACUnit {
   id: string;
@@ -74,6 +81,13 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
   const [acBrandType, setAcBrandType] = useState<"master" | "other">("master");
   const [selectedBrandId, setSelectedBrandId] = useState<string>("");
 
+  const [buildingsPage, setBuildingsPage] = useState(1);
+  const BUILDINGS_PER_PAGE = 5;
+
+  useEffect(() => {
+    setBuildingsPage(1);
+  }, [globalSearch]);
+
   const filteredBuildings = buildings.map((b) => {
     if (!globalSearch.trim()) return b;
     const s = globalSearch.toLowerCase();
@@ -95,6 +109,9 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
     }
     return null;
   }).filter(Boolean) as BuildingItem[];
+
+  const totalBuildingsPages = Math.ceil(filteredBuildings.length / BUILDINGS_PER_PAGE);
+  const paginatedBuildings = filteredBuildings.slice((buildingsPage - 1) * BUILDINGS_PER_PAGE, buildingsPage * BUILDINGS_PER_PAGE);
 
   async function handleAddBuilding(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -182,7 +199,7 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
       </div>
 
       <div className="space-y-3">
-        {filteredBuildings.map((b) => (
+        {paginatedBuildings.map((b) => (
           <div key={b.id} className="rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden">
             <div className="w-full flex items-center justify-between p-4 text-left hover:bg-slate-100 transition-colors cursor-pointer" onClick={() => setExpandedBuilding(expandedBuilding === b.id ? null : b.id)}>
               <div className="flex items-center gap-3">
@@ -260,6 +277,34 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
           </div>
         ))}
       </div>
+
+      {totalBuildingsPages > 1 && (
+        <div className="py-4 border-t border-slate-100 mt-4">
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious 
+                  href="#" 
+                  onClick={(e) => { e.preventDefault(); setBuildingsPage(p => Math.max(1, p - 1)); }} 
+                  className={buildingsPage === 1 ? "pointer-events-none opacity-50" : ""}
+                />
+              </PaginationItem>
+              <PaginationItem>
+                <span className="text-xs font-medium text-slate-500 px-4">
+                  หน้า {buildingsPage} จาก {totalBuildingsPages}
+                </span>
+              </PaginationItem>
+              <PaginationItem>
+                <PaginationNext 
+                  href="#" 
+                  onClick={(e) => { e.preventDefault(); setBuildingsPage(p => Math.min(totalBuildingsPages, p + 1)); }}
+                  className={buildingsPage === totalBuildingsPages ? "pointer-events-none opacity-50" : ""}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
 
       {/* Add Building Modal */}
       {showAddBuilding && (
