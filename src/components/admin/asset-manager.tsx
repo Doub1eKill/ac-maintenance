@@ -94,11 +94,7 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
     const matchesBuilding = b.name.toLowerCase().includes(s) || b.abbreviation.toLowerCase().includes(s);
 
     const matchingRooms = b.rooms.filter((r) => {
-      const matchesRoom = r.name.toLowerCase().includes(s);
-      const matchesAC = r.acUnits.some(
-        (ac) => ac.acCode.toLowerCase().includes(s) || ac.brand.toLowerCase().includes(s)
-      );
-      return matchesRoom || matchesAC;
+      return r.name.toLowerCase().includes(s);
     });
 
     if (matchesBuilding || matchingRooms.length > 0) {

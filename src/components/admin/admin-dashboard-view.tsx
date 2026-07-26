@@ -168,15 +168,13 @@ export function AdminDashboardView({
   const filteredPendingUsers = pendingUsers.filter(
     (u) =>
       u.name.toLowerCase().includes(globalSearch.toLowerCase()) ||
-      u.email.toLowerCase().includes(globalSearch.toLowerCase()) ||
-      u.role.toLowerCase().includes(globalSearch.toLowerCase())
+      u.email.toLowerCase().includes(globalSearch.toLowerCase())
   );
 
   const filteredAllUsers = allUsers.filter(
     (u) =>
       u.name.toLowerCase().includes(globalSearch.toLowerCase()) ||
-      u.email.toLowerCase().includes(globalSearch.toLowerCase()) ||
-      u.role.toLowerCase().includes(globalSearch.toLowerCase())
+      u.email.toLowerCase().includes(globalSearch.toLowerCase())
   );
 
   const totalApprovalsPages = Math.ceil(filteredPendingUsers.length / ITEMS_PER_PAGE);
@@ -244,6 +242,12 @@ export function AdminDashboardView({
     e.preventDefault();
     setToastMessage(null);
     const formData = new FormData(e.currentTarget);
+    const acId = formData.get("airConditionerId") as string;
+    
+    if (!acId) {
+      setToastMessage({ type: "error", text: "กรุณาเลือกเครื่องปรับอากาศที่ต้องการแจ้งซ่อม" });
+      return;
+    }
 
     startTransition(async () => {
       const res = await createWorkOrderAction(formData);
@@ -327,8 +331,12 @@ export function AdminDashboardView({
       setActiveTab={setActiveTab}
       navItems={adminNavItems}
       searchValue={globalSearch}
-      onSearchChange={setGlobalSearch}
-      searchPlaceholder="ค้นหารหัสแอร์, ชื่อผู้ใช้, อาคาร, ช่าง..."
+      onSearchChange={activeTab === "calendar" ? undefined : setGlobalSearch}
+      searchPlaceholder={
+        activeTab === "team" ? "ค้นหาชื่อ หรืออีเมล..." :
+        activeTab === "assets" ? "ค้นหาชื่ออาคาร, เลขห้อง..." :
+        "ค้นหารหัสแอร์, สถานที่, หรือแบรนด์..."
+      }
       onCreateAction={() => {
         setSelectedAcForWorkOrder(null);
         setShowCreateModal(true);
@@ -802,7 +810,7 @@ export function AdminDashboardView({
             <form onSubmit={handleCreateOrderSubmit} className="space-y-4 text-xs">
               <div>
                 <label className="mb-1.5 block font-bold text-slate-700">เลือกเครื่องปรับอากาศ</label>
-                <Select name="airConditionerId" required defaultValue={selectedAcForWorkOrder ?? undefined}>
+                <Select name="airConditionerId" defaultValue={selectedAcForWorkOrder ?? undefined}>
                   <SelectTrigger className="w-full rounded-xl border-slate-200 bg-slate-50 px-3.5 py-5 text-xs text-slate-900 focus:ring-slate-400">
                     <SelectValue placeholder="-- เลือกเครื่องปรับอากาศ --" />
                   </SelectTrigger>
