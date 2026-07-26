@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, useEffect } from "react";
-import { createWorkOrderAction, updateUserStatusByOrgAdminAction } from "@/app/admin/actions";
+import { createWorkOrderAction, updateUserStatusByOrgAdminAction, assignWorkOrderAction } from "@/app/admin/actions";
 import {
   Building2,
   Snowflake,
@@ -131,7 +131,9 @@ export function AdminDashboardView({
   const [activeTab, setActiveTab] = useState<string>("overview");
   const [isPending, startTransition] = useTransition();
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedAcForWorkOrder, setSelectedAcForWorkOrder] = useState<string | null>(null);
+  const [selectedOrderToAssign, setSelectedOrderToAssign] = useState<string | null>(null);
   const [globalSearch, setGlobalSearch] = useState("");
   const [expandedBuilding, setExpandedBuilding] = useState<string | null>(buildings[0]?.id || null);
   const [toastMessage, setToastMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -176,6 +178,8 @@ export function AdminDashboardView({
 
   const totalTeamPages = Math.ceil(filteredAllUsers.length / ITEMS_PER_PAGE);
   const paginatedTeam = filteredAllUsers.slice((teamPage - 1) * ITEMS_PER_PAGE, teamPage * ITEMS_PER_PAGE);
+
+  const activeTechnicians = allUsers.filter(u => u.role === "technician" && u.status === "active");
 
   function matchesSearch(wo: WorkOrderItem, search: string) {
     if (!search.trim()) return true;
@@ -242,6 +246,30 @@ export function AdminDashboardView({
       } else {
         setToastMessage({ type: "success", text: "ออกใบงานซ่อมบำรุงด่วนเรียบร้อยแล้ว" });
         setShowCreateModal(false);
+      }
+    });
+  }
+
+  async function handleAssignSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!selectedOrderToAssign) return;
+    setToastMessage(null);
+    const formData = new FormData(e.currentTarget);
+    const assignToUserId = formData.get("assignToUserId") as string;
+    
+    if (!assignToUserId) {
+      setToastMessage({ type: "error", text: "กรุณาเลือกช่างเทคนิค" });
+      return;
+    }
+
+    startTransition(async () => {
+      const res = await assignWorkOrderAction(selectedOrderToAssign, assignToUserId);
+      if (res.error) {
+        setToastMessage({ type: "error", text: res.error });
+      } else {
+        setToastMessage({ type: "success", text: "มอบหมายงานเรียบร้อยแล้ว" });
+        setShowAssignModal(false);
+        setSelectedOrderToAssign(null);
       }
     });
   }
@@ -441,7 +469,15 @@ export function AdminDashboardView({
                     <div key={wo.id} className="biz-card p-4 space-y-3 hover:border-slate-400 transition-all">
                       <div className="flex items-center justify-between">
                         <span className="font-mono font-bold text-sm text-slate-950">{wo.acCode}</span>
-                        <MoreVertical className="h-4 w-4 text-slate-400" />
+                        <div className="flex items-center gap-2">
+                          <button 
+                            onClick={() => { setSelectedOrderToAssign(wo.id); setShowAssignModal(true); }}
+                            className="text-[10px] font-bold text-sky-600 bg-sky-50 border border-sky-100 px-2 py-1 rounded hover:bg-sky-100 transition-colors"
+                          >
+                            จ่ายงาน
+                          </button>
+                          <MoreVertical className="h-4 w-4 text-slate-400" />
+                        </div>
                       </div>
                       <div className="text-xs font-medium text-slate-600 leading-relaxed">
                         {wo.location} ({wo.brand})
@@ -766,6 +802,26 @@ export function AdminDashboardView({
                 </Select>
               </div>
 
+              <div>
+                <label className="mb-1.5 block font-bold text-slate-700">มอบหมายช่างเทคนิค (ไม่บังคับ)</label>
+                <Select name="assignToUserId">
+                  <SelectTrigger className="w-full rounded-xl border-slate-200 bg-slate-50 px-3.5 py-5 text-xs text-slate-900 focus:ring-slate-400">
+                    <SelectValue placeholder="-- เลือกลงคิวงาน หรือเว้นว่างให้ช่างกดรับเอง --" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl border-slate-200 shadow-lg animate-in fade-in zoom-in-95">
+                    {activeTechnicians.length === 0 ? (
+                      <SelectItem value="none" disabled className="text-xs text-slate-500">ไม่มีช่างเทคนิคที่พร้อมรับงาน</SelectItem>
+                    ) : (
+                      activeTechnicians.map((tech) => (
+                        <SelectItem key={tech.id} value={tech.id} className="text-xs rounded-lg focus:bg-slate-50 cursor-pointer">
+                          {tech.name}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div className="flex gap-2 pt-2">
                 <button
                   type="button"
@@ -780,6 +836,59 @@ export function AdminDashboardView({
                   className="w-1/2 rounded-xl bg-slate-950 py-2.5 font-bold text-white hover:bg-slate-800 disabled:opacity-50"
                 >
                   {isPending ? "กำลังสร้าง..." : "ยืนยันการสร้างใบงาน"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Assign Work Order */}
+      {showAssignModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-xs p-4">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xl space-y-4 animate-in fade-in">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-base font-bold text-slate-950">มอบหมายงานให้ช่างเทคนิค</h3>
+              <button onClick={() => setShowAssignModal(false)} className="text-slate-400 hover:text-slate-950">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAssignSubmit} className="space-y-4 text-xs">
+              <div>
+                <label className="mb-1.5 block font-bold text-slate-700">เลือกช่างเทคนิคที่ต้องการมอบหมายงาน</label>
+                <Select name="assignToUserId" required>
+                  <SelectTrigger className="w-full rounded-xl border-slate-200 bg-slate-50 px-3.5 py-5 text-xs text-slate-900 focus:ring-slate-400">
+                    <SelectValue placeholder="-- เลือกช่างเทคนิค --" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl border-slate-200 shadow-lg animate-in fade-in zoom-in-95">
+                    {activeTechnicians.length === 0 ? (
+                      <SelectItem value="none" disabled className="text-xs text-slate-500">ไม่มีช่างเทคนิคที่พร้อมรับงาน</SelectItem>
+                    ) : (
+                      activeTechnicians.map((tech) => (
+                        <SelectItem key={tech.id} value={tech.id} className="text-xs rounded-lg focus:bg-slate-50 cursor-pointer">
+                          {tech.name}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAssignModal(false)}
+                  className="w-1/2 rounded-xl border border-slate-200 py-2.5 font-bold text-slate-700 hover:bg-slate-100"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  disabled={isPending}
+                  className="w-1/2 rounded-xl bg-slate-950 py-2.5 font-bold text-white hover:bg-slate-800 disabled:opacity-50"
+                >
+                  {isPending ? "กำลังบันทึก..." : "ยืนยันการมอบหมาย"}
                 </button>
               </div>
             </form>

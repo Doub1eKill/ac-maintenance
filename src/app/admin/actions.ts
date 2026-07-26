@@ -279,6 +279,7 @@ export async function updateUserStatusByOrgAdminAction(
 
 const createWorkOrderSchema = z.object({
   airConditionerId: z.string().min(1, "กรุณาเลือกเครื่องปรับอากาศ"),
+  assignToUserId: z.string().optional(),
 });
 
 export async function createWorkOrderAction(formData: FormData) {
@@ -287,6 +288,7 @@ export async function createWorkOrderAction(formData: FormData) {
 
   const raw = {
     airConditionerId: formData.get("airConditionerId"),
+    assignToUserId: formData.get("assignToUserId") || undefined,
   };
 
   const parsed = createWorkOrderSchema.safeParse(raw);
@@ -296,13 +298,16 @@ export async function createWorkOrderAction(formData: FormData) {
 
   try {
     const acId = BigInt(parsed.data.airConditionerId);
+    const assignTo = parsed.data.assignToUserId ? BigInt(parsed.data.assignToUserId) : null;
 
     // Create Work Order
     const workOrder = await prisma.workOrder.create({
       data: {
         airConditionerId: acId,
         universityId: universityId,
-        status: "pending",
+        status: assignTo ? "claimed" : "pending",
+        claimedBy: assignTo,
+        claimedAt: assignTo ? new Date() : null,
       },
     });
 
@@ -327,6 +332,59 @@ export async function createWorkOrderAction(formData: FormData) {
   } catch (error) {
     console.error("Failed to create work order:", error);
     return { error: "ไม่สามารถออกใบงานซ่อมบำรุงได้" };
+  }
+}
+
+export async function assignWorkOrderAction(workOrderId: string, assignToUserId: string) {
+  const session = await verifyOrgAdmin();
+  const universityId = BigInt(session.user.universityId!);
+
+  try {
+    const workOrder = await prisma.workOrder.findUnique({
+      where: { id: BigInt(workOrderId) },
+      select: { universityId: true, status: true },
+    });
+
+    if (!workOrder || workOrder.universityId !== universityId) {
+      return { error: "ไม่พบใบงานซ่อมบำรุง หรือไม่มีสิทธิ์เข้าถึง" };
+    }
+    if (workOrder.status !== "pending") {
+      return { error: "ไม่สามารถมอบหมายงานได้ (งานอาจถูกรับไปแล้ว)" };
+    }
+
+    const techUser = await prisma.user.findUnique({
+      where: { id: BigInt(assignToUserId) },
+      select: { universityId: true, role: true, status: true },
+    });
+
+    if (!techUser || techUser.universityId !== universityId || techUser.role !== "technician" || techUser.status !== "active") {
+      return { error: "ไม่พบข้อมูลช่างเทคนิค หรือช่างเทคนิคไม่ได้อยู่ในสถานะที่พร้อมรับงาน" };
+    }
+
+    await prisma.workOrder.update({
+      where: { id: BigInt(workOrderId) },
+      data: {
+        status: "claimed",
+        claimedBy: BigInt(assignToUserId),
+        claimedAt: new Date(),
+      },
+    });
+
+    await logAudit({
+      universityId: universityId,
+      userId: BigInt(session.user.id!),
+      action: "ASSIGN_WORKORDER",
+      entityType: "workOrder",
+      entityId: BigInt(workOrderId),
+      newValues: { status: "claimed", claimedBy: assignToUserId },
+      ipAddress: "server_action",
+    });
+
+    revalidatePath("/admin");
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to assign work order:", error);
+    return { error: "ไม่สามารถมอบหมายงานได้ กรุณาลองใหม่อีกครั้ง" };
   }
 }
 
