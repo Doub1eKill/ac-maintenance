@@ -312,8 +312,86 @@ export function AdminDashboardView({
       )}
 
 
+      {/* Overview Analytics Dashboard */}
+      {activeTab === "overview" && (
+        <div className="space-y-6 animate-in fade-in">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="biz-card p-5 space-y-3">
+              <div className="text-slate-500 font-bold text-xs flex items-center justify-between">
+                รวมเครื่องปรับอากาศ
+                <Snowflake className="h-4 w-4 text-sky-500" />
+              </div>
+              <div className="text-3xl font-bold text-slate-950">{metrics.totalUnits} <span className="text-sm font-medium text-slate-500">เครื่อง</span></div>
+            </div>
+            <div className="biz-card p-5 space-y-3">
+              <div className="text-slate-500 font-bold text-xs flex items-center justify-between">
+                แอร์ที่เสีย / รอซ่อม
+                <AlertTriangle className="h-4 w-4 text-red-500" />
+              </div>
+              <div className="text-3xl font-bold text-slate-950">{metrics.brokenOrCleaningUnits} <span className="text-sm font-medium text-slate-500">เครื่อง</span></div>
+            </div>
+            <div className="biz-card p-5 space-y-3">
+              <div className="text-slate-500 font-bold text-xs flex items-center justify-between">
+                ใบงานรอดำเนินการ
+                <ClipboardList className="h-4 w-4 text-amber-500" />
+              </div>
+              <div className="text-3xl font-bold text-slate-950">{metrics.pendingWorkOrders} <span className="text-sm font-medium text-slate-500">ใบงาน</span></div>
+            </div>
+            <div className="biz-card p-5 space-y-3">
+              <div className="text-slate-500 font-bold text-xs flex items-center justify-between">
+                ช่างผู้รับผิดชอบ
+                <Wrench className="h-4 w-4 text-emerald-500" />
+              </div>
+              <div className="text-3xl font-bold text-slate-950">{metrics.activeTechsCount} <span className="text-sm font-medium text-slate-500">คน</span></div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 biz-card p-6 space-y-6">
+              <h3 className="text-base font-bold text-slate-950 flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-sky-600" /> สถิติการซ่อมบำรุงในรอบสัปดาห์
+              </h3>
+              <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={weeklyActivity} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
+                    <Tooltip cursor={{ fill: '#f1f5f9' }} contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                    <Bar dataKey="repairs" fill="#0ea5e9" radius={[4, 4, 0, 0]} barSize={40} name="จำนวนงานซ่อม" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+            
+            <div className="biz-card p-6 space-y-6">
+              <h3 className="text-base font-bold text-slate-950 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-amber-500" /> รอซ่อมด่วน (Pending)
+              </h3>
+              <div className="space-y-3">
+                {pendingOrders.slice(0, 4).map(wo => (
+                  <div key={wo.id} className="p-3 rounded-xl border border-slate-100 bg-slate-50 flex flex-col gap-1">
+                    <div className="flex justify-between items-center">
+                      <span className="font-mono font-bold text-sm text-slate-900">{wo.acCode}</span>
+                      <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold">รอดำเนินการ</span>
+                    </div>
+                    <span className="text-xs text-slate-500">{wo.location}</span>
+                  </div>
+                ))}
+                {pendingOrders.length === 0 && (
+                  <div className="text-center text-slate-400 text-xs py-4">ไม่มีใบงานด่วน</div>
+                )}
+                {pendingOrders.length > 4 && (
+                  <button onClick={() => setActiveTab('kanban')} className="w-full text-center text-xs font-bold text-sky-600 py-2 hover:bg-sky-50 rounded-lg transition-colors">
+                    ดูทั้งหมด ({pendingOrders.length})
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Main Kanban Grid Layout (BizLink Style Columns) */}
-      {(activeTab === "overview" || activeTab === "kanban") && (
+      {activeTab === "kanban" && (
         <div className="space-y-6 animate-in fade-in">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold text-slate-950">กระดานสถานะใบงานซ่อมบำรุง</h2>

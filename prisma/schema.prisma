@@ -271,7 +271,9 @@ model SystemAuditLog {
 model MaintenanceSchedule {
   id               BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
   airConditionerId BigInt   @map("air_conditioner_id") @db.UnsignedBigInt
-  frequencyMonths  Int      @map("frequency_months") @db.UnsignedSmallInt
+  frequencyMonths  Int?     @map("frequency_months") @db.UnsignedSmallInt // Legacy
+  frequencyValue   Int      @default(6) @map("frequency_value") @db.UnsignedInt
+  frequencyUnit    String   @default("months") @map("frequency_unit") @db.VarChar(20) // "days", "months", "years"
   lastPerformedAt  DateTime? @map("last_performed_at") @db.Date
   nextDueDate      DateTime @map("next_due_date") @db.Date
   isActive         Boolean  @default(true) @map("is_active")

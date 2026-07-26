@@ -36,7 +36,11 @@ export async function getOrgAdminData() {
           rooms: {
             include: {
               airConditioners: {
-                include: { acBrand: true, acModel: true },
+                include: { 
+                  acBrand: true, 
+                  acModel: true,
+                  maintenanceSchedules: true
+                },
                 orderBy: { acCode: "asc" },
               },
             },
@@ -102,14 +106,23 @@ export async function getOrgAdminData() {
           id: r.id.toString(),
           name: r.name,
           floor: r.floor,
-          acUnits: r.airConditioners.map((ac) => ({
-            id: ac.id.toString(),
-            acCode: ac.acCode,
-            brand: ac.acBrand?.name || ac.brand || "ไม่ระบุ",
-            model: ac.acModel?.name || ac.model || null,
-            btu: ac.btu,
-            status: ac.status,
-          })),
+          acUnits: r.airConditioners.map((ac) => {
+            const activeSchedule = ac.maintenanceSchedules?.find(s => s.isActive);
+            return {
+              id: ac.id.toString(),
+              acCode: ac.acCode,
+              brand: ac.acBrand?.name || ac.brand || "ไม่ระบุ",
+              model: ac.acModel?.name || ac.model || null,
+              btu: ac.btu,
+              status: ac.status,
+              qrCode: ac.qrCode,
+              maintenanceSchedule: activeSchedule ? {
+                frequencyValue: activeSchedule.frequencyValue,
+                frequencyUnit: activeSchedule.frequencyUnit,
+                nextDueDate: activeSchedule.nextDueDate.toISOString()
+              } : null
+            };
+          }),
         };
       });
 
@@ -492,5 +505,77 @@ export async function createAirConditionerAction(formData: FormData) {
   } catch (error) {
     console.error(error);
     return { error: "เกิดข้อผิดพลาดในการลงทะเบียนแอร์" };
+  }
+}
+
+const scheduleSchema = z.object({
+  airConditionerId: z.string().min(1, "กรุณาเลือกเครื่องปรับอากาศ"),
+  frequencyValue: z.string().transform(val => parseInt(val, 10)),
+  frequencyUnit: z.enum(["days", "months", "years"]),
+});
+
+export async function saveMaintenanceScheduleAction(formData: FormData) {
+  const session = await verifyOrgAdmin();
+  const universityId = BigInt(session.user.universityId!);
+  
+  const parsed = scheduleSchema.safeParse({
+    airConditionerId: formData.get("airConditionerId"),
+    frequencyValue: formData.get("frequencyValue"),
+    frequencyUnit: formData.get("frequencyUnit"),
+  });
+  
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message || "ข้อมูลไม่ถูกต้อง" };
+  const data = parsed.data;
+
+  try {
+    const ac = await prisma.airConditioner.findUnique({
+      where: { id: BigInt(data.airConditionerId) },
+      include: { room: { include: { building: true } } }
+    });
+
+    if (!ac || ac.room.building.universityId !== universityId) {
+      return { error: "ไม่มีสิทธิ์ในการเข้าถึง" };
+    }
+
+    // Calculate nextDueDate
+    let nextDueDate = new Date();
+    if (data.frequencyUnit === "days") {
+      nextDueDate.setDate(nextDueDate.getDate() + data.frequencyValue);
+    } else if (data.frequencyUnit === "months") {
+      nextDueDate.setMonth(nextDueDate.getMonth() + data.frequencyValue);
+    } else if (data.frequencyUnit === "years") {
+      nextDueDate.setFullYear(nextDueDate.getFullYear() + data.frequencyValue);
+    }
+
+    const existingSchedule = await prisma.maintenanceSchedule.findFirst({
+      where: { airConditionerId: BigInt(data.airConditionerId) }
+    });
+
+    if (existingSchedule) {
+      await prisma.maintenanceSchedule.update({
+        where: { id: existingSchedule.id },
+        data: {
+          frequencyValue: data.frequencyValue,
+          frequencyUnit: data.frequencyUnit,
+          nextDueDate
+        }
+      });
+    } else {
+      await prisma.maintenanceSchedule.create({
+        data: {
+          airConditionerId: BigInt(data.airConditionerId),
+          frequencyValue: data.frequencyValue,
+          frequencyUnit: data.frequencyUnit,
+          nextDueDate,
+          isActive: true
+        }
+      });
+    }
+
+    revalidatePath("/admin");
+    return { success: true };
+  } catch (error) {
+    console.error(error);
+    return { error: "เกิดข้อผิดพลาดในการบันทึกรอบการบำรุงรักษา" };
   }
 }

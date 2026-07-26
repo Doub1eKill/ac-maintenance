@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Building2, Plus, ChevronDown, ChevronUp, X } from "lucide-react";
-import { createBuildingAction, createRoomAction, createAirConditionerAction } from "@/app/admin/actions";
+import { Building2, Plus, ChevronDown, ChevronUp, X, QrCode, CalendarClock, Printer } from "lucide-react";
+import { createBuildingAction, createRoomAction, createAirConditionerAction, saveMaintenanceScheduleAction } from "@/app/admin/actions";
+import { QRCodeSVG } from "qrcode.react";
 import {
   Select,
   SelectContent,
@@ -18,6 +19,12 @@ interface ACUnit {
   model: string | null;
   btu: number | null;
   status: string;
+  qrCode: string;
+  maintenanceSchedule: {
+    frequencyValue: number;
+    frequencyUnit: string;
+    nextDueDate: string;
+  } | null;
 }
 
 interface RoomItem {
@@ -59,6 +66,8 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
   const [showAddBuilding, setShowAddBuilding] = useState(false);
   const [showAddRoom, setShowAddRoom] = useState<{ buildingId: string } | null>(null);
   const [showAddAc, setShowAddAc] = useState<{ roomId: string } | null>(null);
+  const [showPmSettings, setShowPmSettings] = useState<ACUnit | null>(null);
+  const [showQrCode, setShowQrCode] = useState<ACUnit | null>(null);
   const [toastMessage, setToastMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   // AC Form state
@@ -133,6 +142,22 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
     });
   }
 
+  async function handleSavePmSettings(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setToastMessage(null);
+    const formData = new FormData(e.currentTarget);
+    if (showPmSettings) formData.append("airConditionerId", showPmSettings.id);
+    
+    startTransition(async () => {
+      const res = await saveMaintenanceScheduleAction(formData);
+      if (res.error) setToastMessage({ type: "error", text: res.error });
+      else {
+        setShowPmSettings(null);
+        setToastMessage({ type: "success", text: "บันทึกรอบการล้างแอร์สำเร็จ" });
+      }
+    });
+  }
+
   const selectedBrand = brands.find(b => b.id === selectedBrandId);
 
   return (
@@ -200,14 +225,31 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                       {r.acUnits.map((ac) => (
-                        <div key={ac.id} className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs flex items-center justify-between">
-                          <div>
-                            <div className="font-mono font-bold text-slate-950">{ac.acCode}</div>
-                            <div className="text-[10px] text-slate-500">{ac.brand} {ac.model ? `• ${ac.model}` : ""}</div>
+                        <div key={ac.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs flex flex-col gap-3">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <div className="font-mono font-bold text-slate-950 text-sm">{ac.acCode}</div>
+                              <div className="text-[11px] text-slate-500 mt-0.5">{ac.brand} {ac.model ? `• ${ac.model}` : ""}</div>
+                            </div>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-200 whitespace-nowrap">
+                              {ac.status}
+                            </span>
                           </div>
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-200">
-                            {ac.status}
-                          </span>
+                          
+                          <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                            <button 
+                              onClick={() => setShowPmSettings(ac)}
+                              className="flex-1 rounded border border-slate-200 bg-white py-1.5 text-[10px] font-bold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors text-center"
+                            >
+                              {ac.maintenanceSchedule ? `ล้างทุก ${ac.maintenanceSchedule.frequencyValue} ${ac.maintenanceSchedule.frequencyUnit === 'days' ? 'วัน' : ac.maintenanceSchedule.frequencyUnit === 'months' ? 'เดือน' : 'ปี'}` : 'ตั้งค่าล้างแอร์'}
+                            </button>
+                            <button 
+                              onClick={() => setShowQrCode(ac)}
+                              className="flex-1 rounded border border-slate-200 bg-white py-1.5 text-[10px] font-bold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors text-center"
+                            >
+                              QR Code
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -348,6 +390,122 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
                 {isPending ? "กำลังบันทึก..." : "ลงทะเบียนเครื่องปรับอากาศ"}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* PM Settings Modal */}
+      {showPmSettings && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-xs p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xl space-y-4 animate-in fade-in">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-base font-bold text-slate-950 flex items-center gap-2">
+                <CalendarClock className="w-5 h-5 text-sky-600" />
+                รอบบำรุงรักษา ({showPmSettings.acCode})
+              </h3>
+              <button onClick={() => setShowPmSettings(null)} className="text-slate-400 hover:text-slate-950">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <form onSubmit={handleSavePmSettings} className="space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1.5 block font-bold text-slate-700">ตัวเลข</label>
+                  <input 
+                    name="frequencyValue" 
+                    type="number"
+                    required 
+                    min="1"
+                    defaultValue={showPmSettings.maintenanceSchedule?.frequencyValue || 6}
+                    className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-slate-900 focus:border-slate-950 focus:outline-none" 
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block font-bold text-slate-700">หน่วยเวลา</label>
+                  <Select name="frequencyUnit" required defaultValue={showPmSettings.maintenanceSchedule?.frequencyUnit || "months"}>
+                    <SelectTrigger className="w-full rounded-xl border-slate-200 px-3.5 py-5 text-xs text-slate-900 focus:ring-slate-400">
+                      <SelectValue placeholder="-- เลือกหน่วย --" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl border-slate-200 shadow-lg animate-in fade-in zoom-in-95">
+                      <SelectItem value="days" className="text-xs rounded-lg focus:bg-slate-50 cursor-pointer">วัน</SelectItem>
+                      <SelectItem value="months" className="text-xs rounded-lg focus:bg-slate-50 cursor-pointer">เดือน</SelectItem>
+                      <SelectItem value="years" className="text-xs rounded-lg focus:bg-slate-50 cursor-pointer">ปี</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <button type="submit" disabled={isPending} className="w-full rounded-xl bg-slate-950 py-2.5 font-bold text-white hover:bg-slate-800 disabled:opacity-50 mt-2">
+                {isPending ? "กำลังบันทึก..." : "บันทึกการตั้งค่า"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* QR Code Modal */}
+      {showQrCode && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-xs p-4">
+          <div className="w-full max-w-sm rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl space-y-6 animate-in fade-in zoom-in-95 relative">
+            <button onClick={() => setShowQrCode(null)} className="absolute right-4 top-4 text-slate-400 hover:text-slate-950 bg-slate-100 p-1.5 rounded-full transition-colors">
+              <X className="h-4 w-4" />
+            </button>
+            
+            <div className="text-center space-y-1 pt-2">
+              <h3 className="text-lg font-bold text-slate-950 tracking-tight flex items-center justify-center gap-2">
+                <QrCode className="w-5 h-5 text-slate-700" />
+                QR ประจำเครื่อง
+              </h3>
+              <p className="text-xs text-slate-500 font-medium">สแกนเพื่อดูประวัติการซ่อมบำรุง</p>
+            </div>
+
+            <div className="flex justify-center" id="qr-code-print-area">
+              <div className="bg-white p-4 rounded-2xl border-2 border-slate-100 shadow-sm flex flex-col items-center gap-3">
+                <QRCodeSVG 
+                  value={`${typeof window !== 'undefined' ? window.location.origin : ''}/qr/${showQrCode.qrCode}`}
+                  size={180}
+                  level="H"
+                  includeMargin={true}
+                  className="rounded-lg"
+                />
+                <div className="text-center">
+                  <div className="font-mono font-bold text-slate-900 text-sm tracking-widest">{showQrCode.acCode}</div>
+                  <div className="text-[10px] text-slate-500 font-medium mt-0.5">{showQrCode.brand} {showQrCode.model ? `(${showQrCode.model})` : ''}</div>
+                </div>
+              </div>
+            </div>
+
+            <button 
+              onClick={() => {
+                const printWindow = window.open('', '_blank');
+                if (!printWindow) return;
+                const qrHtml = document.getElementById('qr-code-print-area')?.innerHTML;
+                printWindow.document.write(`
+                  <html>
+                    <head>
+                      <title>Print QR Code - ${showQrCode.acCode}</title>
+                      <style>
+                        body { display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; font-family: sans-serif; }
+                        .print-container { text-align: center; padding: 20px; border: 2px dashed #ccc; border-radius: 10px; }
+                        .ac-code { font-family: monospace; font-size: 24px; font-weight: bold; margin-top: 15px; letter-spacing: 2px; }
+                        .ac-brand { font-size: 14px; color: #666; margin-top: 5px; }
+                      </style>
+                    </head>
+                    <body>
+                      <div class="print-container">
+                        ${qrHtml?.replace('class="', 'style="')}
+                      </div>
+                      <script>
+                        window.onload = () => { window.print(); window.close(); }
+                      </script>
+                    </body>
+                  </html>
+                `);
+                printWindow.document.close();
+              }}
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-900 py-3 font-bold text-white hover:bg-slate-800 transition-colors shadow-md shadow-slate-900/20"
+            >
+              <Printer className="w-4 h-4" /> พิมพ์ (Print)
+            </button>
           </div>
         </div>
       )}
