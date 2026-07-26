@@ -1,0 +1,415 @@
+"use client";
+
+import { useState } from "react";
+import { QRCodeSVG } from "qrcode.react";
+import { QrCode, Printer, X, Search, ChevronRight, CheckSquare } from "lucide-react";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+
+interface ACUnit {
+  id: string;
+  acCode: string;
+  brand: string;
+  model: string | null;
+  btu: number | null;
+  status: string;
+  qrCode: string;
+  maintenanceSchedule: {
+    frequencyValue: number;
+    frequencyUnit: string;
+    nextDueDate: string;
+  } | null;
+}
+
+interface RoomItem {
+  id: string;
+  name: string;
+  floor: number | null;
+  acUnits: ACUnit[];
+}
+
+interface BuildingItem {
+  id: string;
+  name: string;
+  abbreviation: string;
+  unitsCount: number;
+  rooms: RoomItem[];
+}
+
+interface FlatACUnit extends ACUnit {
+  location: string;
+  buildingName: string;
+  roomName: string;
+}
+
+interface QrCodeManagerProps {
+  buildings: BuildingItem[];
+  globalSearch: string;
+}
+
+export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
+  const [showQrCode, setShowQrCode] = useState<FlatACUnit | null>(null);
+  const [page, setPage] = useState(1);
+  const [selectedAcs, setSelectedAcs] = useState<string[]>([]);
+  const ITEMS_PER_PAGE = 15;
+
+  // Flatten ACs
+  const allAcs: FlatACUnit[] = buildings.flatMap((b) =>
+    b.rooms.flatMap((r) =>
+      r.acUnits.map((ac) => ({
+        ...ac,
+        location: `${b.name} - ห้อง ${r.name}`,
+        buildingName: b.name,
+        roomName: r.name,
+      }))
+    )
+  );
+
+  // Filter ACs based on globalSearch
+  const filteredAcs = allAcs.filter((ac) => {
+    if (!globalSearch.trim()) return true;
+    const s = globalSearch.toLowerCase();
+    return (
+      ac.acCode.toLowerCase().includes(s) ||
+      ac.brand.toLowerCase().includes(s) ||
+      (ac.model && ac.model.toLowerCase().includes(s)) ||
+      ac.buildingName.toLowerCase().includes(s) ||
+      ac.roomName.toLowerCase().includes(s)
+    );
+  });
+
+  const totalPages = Math.ceil(filteredAcs.length / ITEMS_PER_PAGE);
+  const paginatedAcs = filteredAcs.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+
+  const toggleSelectAll = () => {
+    const paginatedIds = paginatedAcs.map(ac => ac.id);
+    const allSelected = paginatedIds.every(id => selectedAcs.includes(id));
+    
+    if (allSelected) {
+      setSelectedAcs(prev => prev.filter(id => !paginatedIds.includes(id)));
+    } else {
+      setSelectedAcs(prev => Array.from(new Set([...prev, ...paginatedIds])));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedAcs(prev => 
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleBatchPrint = () => {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+    const html = document.getElementById("batch-print-area")?.innerHTML;
+    
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>พิมพ์ QR Code (${selectedAcs.length} เครื่อง)</title>
+          <style>
+            body { 
+              margin: 0; 
+              padding: 0;
+              font-family: sans-serif;
+            }
+            @page {
+              size: A4;
+              margin: 10mm;
+            }
+            .grid {
+              display: grid;
+              grid-template-columns: repeat(3, 1fr);
+              gap: 15px;
+            }
+            .sticker-container {
+              border: 1px dashed #cbd5e1;
+              border-radius: 12px;
+              padding: 15px;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              text-align: center;
+              page-break-inside: avoid;
+              background-color: white;
+            }
+            .ac-code {
+              font-family: monospace;
+              font-size: 18px;
+              font-weight: bold;
+              margin-top: 12px;
+              letter-spacing: 1px;
+              color: #0f172a;
+            }
+            .ac-brand {
+              font-size: 11px;
+              color: #64748b;
+              margin-top: 4px;
+            }
+            .ac-cta {
+              font-size: 11px;
+              color: #0284c7;
+              font-weight: bold;
+              margin-top: 8px;
+              padding: 4px 8px;
+              background-color: #f0f9ff;
+              border-radius: 6px;
+            }
+            svg {
+              border-radius: 8px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="grid">
+            ${html}
+          </div>
+          <script>
+            window.onload = () => { window.print(); window.close(); }
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  return (
+    <div className="space-y-4">
+      {selectedAcs.length > 0 && (
+        <div className="bg-sky-50 border border-sky-200 rounded-2xl p-4 flex items-center justify-between shadow-sm animate-in fade-in slide-in-from-top-4">
+          <div className="flex items-center gap-3">
+            <div className="bg-sky-100 p-2 rounded-xl text-sky-600">
+              <CheckSquare className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="font-bold text-sky-900 text-sm">เลือกแล้ว {selectedAcs.length} รายการ</div>
+              <div className="text-xs text-sky-700">พร้อมสำหรับพิมพ์ลงสติ๊กเกอร์ A4</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => setSelectedAcs([])}
+              className="text-xs font-bold text-sky-700 hover:text-sky-900 px-3 py-2 rounded-lg hover:bg-sky-100 transition-colors"
+            >
+              ยกเลิกทั้งหมด
+            </button>
+            <button 
+              onClick={handleBatchPrint}
+              className="flex items-center gap-2 bg-sky-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md shadow-sky-600/20 hover:bg-sky-700 transition-colors"
+            >
+              <Printer className="w-4 h-4" /> พิมพ์ QR Code ({selectedAcs.length})
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="biz-card p-6 space-y-6 animate-in fade-in">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-100 pb-4 gap-4">
+          <h2 className="text-base font-bold text-slate-950 flex items-center gap-2">
+            <QrCode className="h-5 w-5 text-slate-700" />
+            <span>จัดการ QR Code เครื่องปรับอากาศ ({filteredAcs.length} เครื่อง)</span>
+          </h2>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm whitespace-nowrap">
+            <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
+              <tr>
+                <th className="px-4 py-3 font-semibold rounded-tl-xl w-10 text-center">
+                  <input 
+                    type="checkbox" 
+                    className="w-4 h-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500 cursor-pointer"
+                    checked={paginatedAcs.length > 0 && paginatedAcs.every(ac => selectedAcs.includes(ac.id))}
+                    onChange={toggleSelectAll}
+                  />
+                </th>
+                <th className="px-4 py-3 font-semibold">รหัสเครื่อง (AC Code)</th>
+                <th className="px-4 py-3 font-semibold">ยี่ห้อ / รุ่น</th>
+                <th className="px-4 py-3 font-semibold">สถานที่ตั้ง</th>
+                <th className="px-4 py-3 font-semibold text-center rounded-tr-xl">จัดการ</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {paginatedAcs.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
+                    ไม่พบข้อมูลเครื่องปรับอากาศ
+                  </td>
+                </tr>
+              ) : (
+                paginatedAcs.map((ac) => (
+                  <tr 
+                    key={ac.id} 
+                    className={`transition-colors cursor-pointer ${selectedAcs.includes(ac.id) ? 'bg-sky-50/50' : 'hover:bg-slate-50'}`}
+                    onClick={() => toggleSelect(ac.id)}
+                  >
+                    <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                      <input 
+                        type="checkbox" 
+                        className="w-4 h-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500 cursor-pointer"
+                        checked={selectedAcs.includes(ac.id)}
+                        onChange={() => toggleSelect(ac.id)}
+                      />
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="font-mono font-bold text-slate-900">{ac.acCode}</div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-slate-800">{ac.brand}</div>
+                      <div className="text-xs text-slate-500">{ac.model || "-"}</div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="text-slate-700">{ac.location}</div>
+                    </td>
+                    <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => setShowQrCode(ac)}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-200 transition-colors"
+                      >
+                        <Printer className="h-3.5 w-3.5" /> ดูตัวอย่าง
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {totalPages > 1 && (
+          <div className="py-4 border-t border-slate-100 mt-4">
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setPage((p) => Math.max(1, p - 1));
+                    }}
+                    className={page === 1 ? "pointer-events-none opacity-50" : ""}
+                  />
+                </PaginationItem>
+                <PaginationItem>
+                  <span className="text-xs font-medium text-slate-500 px-4">
+                    หน้า {page} จาก {totalPages}
+                  </span>
+                </PaginationItem>
+                <PaginationItem>
+                  <PaginationNext
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setPage((p) => Math.min(totalPages, p + 1));
+                    }}
+                    className={page === totalPages ? "pointer-events-none opacity-50" : ""}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        )}
+
+        {/* Hidden Container for Batch Print Data */}
+        <div id="batch-print-area" className="hidden">
+          {selectedAcs.map((id) => {
+            const ac = allAcs.find(a => a.id === id);
+            if (!ac) return null;
+            return (
+              <div key={ac.id} className="sticker-container">
+                <QRCodeSVG
+                  value={`${typeof window !== "undefined" ? window.location.origin : ""}/qr/${ac.qrCode}`}
+                  size={120}
+                  level="H"
+                  includeMargin={true}
+                />
+                <div className="ac-code">{ac.acCode}</div>
+                <div className="ac-brand">{ac.brand} {ac.model ? `(${ac.model})` : ""}</div>
+                <div className="ac-cta">สแกนเพื่อแจ้งซ่อม / ดูประวัติ</div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Single QR Code Modal Preview */}
+        {showQrCode && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-xs p-4">
+            <div className="w-full max-w-sm rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl space-y-6 animate-in fade-in zoom-in-95 relative">
+              <button
+                onClick={() => setShowQrCode(null)}
+                className="absolute right-4 top-4 text-slate-400 hover:text-slate-950 bg-slate-100 p-1.5 rounded-full transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+
+              <div className="text-center space-y-1 pt-2">
+                <h3 className="text-lg font-bold text-slate-950 tracking-tight flex items-center justify-center gap-2">
+                  <QrCode className="w-5 h-5 text-slate-700" />
+                  ตัวอย่าง QR ประจำเครื่อง
+                </h3>
+                <p className="text-xs text-slate-500 font-medium">สแกนเพื่อดูประวัติการซ่อมบำรุง</p>
+              </div>
+
+              <div className="flex justify-center" id="single-qr-print-area">
+                <div className="bg-white p-4 rounded-2xl border-2 border-slate-100 shadow-sm flex flex-col items-center gap-3">
+                  <QRCodeSVG
+                    value={`${typeof window !== "undefined" ? window.location.origin : ""}/qr/${showQrCode.qrCode}`}
+                    size={160}
+                    level="H"
+                    includeMargin={true}
+                    className="rounded-lg"
+                  />
+                  <div className="text-center">
+                    <div className="font-mono font-bold text-slate-900 text-sm tracking-widest">{showQrCode.acCode}</div>
+                    <div className="text-[10px] text-slate-500 font-medium mt-0.5">
+                      {showQrCode.brand} {showQrCode.model ? `(${showQrCode.model})` : ""}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  const printWindow = window.open("", "_blank");
+                  if (!printWindow) return;
+                  const qrHtml = document.getElementById("single-qr-print-area")?.innerHTML;
+                  printWindow.document.write(`
+                    <html>
+                      <head>
+                        <title>Print QR Code - ${showQrCode.acCode}</title>
+                        <style>
+                          body { display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; font-family: sans-serif; }
+                          .print-container { text-align: center; padding: 20px; border: 2px dashed #ccc; border-radius: 12px; }
+                          .ac-code { font-family: monospace; font-size: 24px; font-weight: bold; margin-top: 15px; letter-spacing: 2px; }
+                          .ac-brand { font-size: 14px; color: #666; margin-top: 5px; }
+                        </style>
+                      </head>
+                      <body>
+                        <div class="print-container">
+                          ${qrHtml?.replace('class="', 'style="')}
+                        </div>
+                        <script>
+                          window.onload = () => { window.print(); window.close(); }
+                        </script>
+                      </body>
+                    </html>
+                  `);
+                  printWindow.document.close();
+                }}
+                className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-900 py-3 font-bold text-white hover:bg-slate-800 transition-colors shadow-md shadow-slate-900/20"
+              >
+                <Printer className="w-4 h-4" /> พิมพ์ (Print)
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

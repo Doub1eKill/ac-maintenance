@@ -101,7 +101,9 @@ model User {
   university        University?      @relation(fields: [universityId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "users_university_id_foreign")
   phones            UserPhone[]
   maintenanceLogs   MaintenanceLog[]
-  claimedWorkOrders WorkOrder[]
+  claimedWorkOrders WorkOrder[]      @relation("work_orders_claimed_by")
+  reportedWorkOrders WorkOrder[]     @relation("work_orders_reported_by")
+  assignedWorkOrders WorkOrder[]     @relation("work_orders_assigned_to")
   systemAuditLogs   SystemAuditLog[]
 
   @@index([universityId, role], map: "users_university_id_role_index")
@@ -228,6 +230,13 @@ model WorkOrder {
   // column once set.
   universityId     BigInt          @map("university_id") @db.UnsignedBigInt
   status           WorkOrderStatus @default(pending)
+  priority         String?         @default("low") @db.VarChar(20)
+  issueDescription String?         @map("issue_description") @db.Text
+  resolutionNotes  String?         @map("resolution_notes") @db.Text
+  images           Json?           @default("[]")
+  reportedById     BigInt?         @map("reported_by_id") @db.UnsignedBigInt
+  assignedToId     BigInt?         @map("assigned_to_id") @db.UnsignedBigInt
+  assignedAt       DateTime?       @map("assigned_at") @db.Timestamp(0)
   claimedBy        BigInt?         @map("claimed_by") @db.UnsignedBigInt
   claimedAt        DateTime?       @map("claimed_at") @db.Timestamp(0) // separate from updatedAt, which gets overwritten again on completion
   completedAt      DateTime?       @map("completed_at") @db.Timestamp(0)
@@ -240,7 +249,9 @@ model WorkOrder {
   // SET NULL: optional reference — nullable until claimed. This app never
   // hard-deletes users (accounts are suspended via User.status instead),
   // so this is a safety net more than an expected path.
-  claimedByUser   User?            @relation(fields: [claimedBy], references: [id], onDelete: SetNull, onUpdate: Restrict, map: "work_orders_claimed_by_foreign")
+  reportedByUser  User?            @relation("work_orders_reported_by", fields: [reportedById], references: [id], onDelete: SetNull, onUpdate: Restrict, map: "work_orders_reported_by_foreign")
+  assignedToUser  User?            @relation("work_orders_assigned_to", fields: [assignedToId], references: [id], onDelete: SetNull, onUpdate: Restrict, map: "work_orders_assigned_to_foreign")
+  claimedByUser   User?            @relation("work_orders_claimed_by", fields: [claimedBy], references: [id], onDelete: SetNull, onUpdate: Restrict, map: "work_orders_claimed_by_foreign")
   maintenanceLogs MaintenanceLog[]
 
   @@index([universityId, status, createdAt], map: "work_orders_university_id_status_created_at_index")

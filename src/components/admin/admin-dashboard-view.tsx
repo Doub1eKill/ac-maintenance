@@ -23,6 +23,7 @@ import {
   UserCheck,
   UserX,
   Users,
+  QrCode,
 } from "lucide-react";
 import { AnimatedIcon } from "@/components/ui/animated-icon";
 import {
@@ -41,9 +42,17 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { DashboardLayout, NavItem } from "@/components/layout/dashboard-layout";
 import { AssetManager } from "@/components/admin/asset-manager";
 import { MaintenanceCalendar } from "@/components/admin/maintenance-calendar";
+import { QrCodeManager } from "@/components/admin/qr-code-manager";
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from "recharts";
 
 interface WorkOrderItem {
@@ -52,8 +61,16 @@ interface WorkOrderItem {
   brand: string;
   location: string;
   status: string;
+  priority: string | null;
+  issueDescription: string | null;
+  resolutionNotes: string | null;
+  images: any | null;
+  reportedByName: string | null;
+  assignedToName: string | null;
+  assignedAt: string | null;
   claimedByName: string | null;
   claimedAt: string | null;
+  completedAt: string | null;
   createdAt: string | null;
   airConditionerId: string;
 }
@@ -146,11 +163,14 @@ export function AdminDashboardView({
 
   const [approvalsPage, setApprovalsPage] = useState(1);
   const [teamPage, setTeamPage] = useState(1);
+  const [workOrdersPage, setWorkOrdersPage] = useState(1);
+  const [selectedWorkOrderDetails, setSelectedWorkOrderDetails] = useState<WorkOrderItem | null>(null);
   const ITEMS_PER_PAGE = 10;
 
   useEffect(() => {
     setApprovalsPage(1);
     setTeamPage(1);
+    setWorkOrdersPage(1);
   }, [globalSearch]);
 
   const pendingOrders = workOrders.filter(
@@ -164,6 +184,10 @@ export function AdminDashboardView({
   const completedOrders = workOrders.filter(
     (wo) => wo.status === "completed" && matchesSearch(wo, globalSearch)
   );
+
+  const filteredWorkOrders = workOrders.filter((wo) => matchesSearch(wo, globalSearch));
+  const totalWorkOrdersPages = Math.ceil(filteredWorkOrders.length / ITEMS_PER_PAGE);
+  const paginatedWorkOrders = filteredWorkOrders.slice((workOrdersPage - 1) * ITEMS_PER_PAGE, workOrdersPage * ITEMS_PER_PAGE);
 
   const filteredPendingUsers = pendingUsers.filter(
     (u) =>
@@ -317,6 +341,11 @@ export function AdminDashboardView({
       label: "ปฏิทินซ่อมบำรุง",
       icon: Calendar,
     },
+    {
+      id: "qr_codes",
+      label: "จัดการ QR Code",
+      icon: QrCode,
+    },
   ];
 
   return (
@@ -335,6 +364,7 @@ export function AdminDashboardView({
       searchPlaceholder={
         activeTab === "team" ? "ค้นหาชื่อ หรืออีเมล..." :
         activeTab === "assets" ? "ค้นหาชื่ออาคาร, เลขห้อง..." :
+        activeTab === "qr_codes" ? "ค้นหารหัสแอร์, ยี่ห้อ, สถานที่..." :
         "ค้นหารหัสแอร์, สถานที่, หรือแบรนด์..."
       }
       onCreateAction={() => {
@@ -464,142 +494,149 @@ export function AdminDashboardView({
         </div>
       )}
 
-      {/* Main Kanban Grid Layout (BizLink Style Columns) */}
+      {/* Formal Data Table for Work Orders */}
       {activeTab === "kanban" && (
         <div className="space-y-6 animate-in fade-in">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold text-slate-950">กระดานสถานะใบงานซ่อมบำรุง</h2>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <h2 className="text-lg font-bold text-slate-950 flex items-center gap-2">
+              <ClipboardList className="h-5 w-5 text-indigo-600" /> ระบบจัดการงานซ่อมบำรุง
+            </h2>
+            <div className="text-sm text-slate-500 font-medium">
+              พบใบงานทั้งหมด <span className="font-bold text-slate-900">{filteredWorkOrders.length}</span> รายการ
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Column 1: Pending Orders */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between px-1">
-                <span className="text-sm font-bold text-slate-950">รอช่างรับงาน</span>
-                <span className="rounded-lg bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 text-xs font-bold font-mono">
-                  {pendingOrders.length}
-                </span>
-              </div>
-
-              <div className="space-y-3">
-                {pendingOrders.length === 0 ? (
-                  <div className="p-6 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-2xl">
-                    ไม่มีงานค้าง
-                  </div>
-                ) : (
-                  pendingOrders.map((wo) => (
-                    <div key={wo.id} className="biz-card p-4 space-y-3 hover:border-slate-400 transition-all">
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono font-bold text-sm text-slate-950">{wo.acCode}</span>
-                        <div className="flex items-center gap-2">
-                          <button 
-                            onClick={() => { setSelectedOrderToAssign(wo.id); setShowAssignModal(true); }}
-                            className="text-[10px] font-bold text-sky-600 bg-sky-50 border border-sky-100 px-2 py-1 rounded hover:bg-sky-100 transition-colors"
-                          >
-                            จ่ายงาน
-                          </button>
-                          <MoreVertical className="h-4 w-4 text-slate-400" />
-                        </div>
-                      </div>
-                      <div className="text-xs font-medium text-slate-600 leading-relaxed">
-                        {wo.location} ({wo.brand})
-                      </div>
-                      <div className="pt-2 flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-100">
-                        <span className="inline-flex items-center gap-1 font-semibold text-amber-700">
-                          <Clock className="h-3 w-3" /> รอช่าง
-                        </span>
-                        <span className="font-mono">{wo.createdAt ? new Date(wo.createdAt).toLocaleDateString() : ""}</span>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            {/* Column 2: In-Progress / Claimed (Contains Dark Highlight Card) */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between px-1">
-                <span className="text-sm font-bold text-slate-950">กำลังดำเนินการ</span>
-                <span className="rounded-lg bg-sky-100 text-sky-800 border border-sky-200 px-2 py-0.5 text-xs font-bold font-mono">
-                  {claimedOrders.length}
-                </span>
-              </div>
-
-              <div className="space-y-3">
-                {claimedOrders.length === 0 ? (
-                  <div className="p-6 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-2xl">
-                    ไม่มีงานที่กำลังดำเนินการ
-                  </div>
-                ) : (
-                  claimedOrders.map((wo, idx) => (
-                    <div
-                      key={wo.id}
-                      className={
-                        idx === 0
-                          ? "biz-card-dark p-4 space-y-3 shadow-md"
-                          : "biz-card p-4 space-y-3 hover:border-slate-400 transition-all"
-                      }
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className={`font-mono font-bold text-sm ${idx === 0 ? "text-white" : "text-slate-950"}`}>
-                          {wo.acCode}
-                        </span>
-                        <MoreVertical className={`h-4 w-4 ${idx === 0 ? "text-slate-400" : "text-slate-400"}`} />
-                      </div>
-                      <div className={`text-xs font-medium leading-relaxed ${idx === 0 ? "text-slate-300" : "text-slate-600"}`}>
-                        {wo.location} ({wo.brand})
-                      </div>
-                      <div
-                        className={`pt-2 flex items-center justify-between text-[11px] border-t ${
-                          idx === 0 ? "text-slate-300 border-slate-800" : "text-slate-400 border-slate-100"
-                        }`}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
+                  <tr>
+                    <th className="px-6 py-4 whitespace-nowrap">รหัสแอร์</th>
+                    <th className="px-6 py-4 whitespace-nowrap">สถานที่ตั้ง / ยี่ห้อ</th>
+                    <th className="px-6 py-4 whitespace-nowrap">วันที่แจ้ง</th>
+                    <th className="px-6 py-4 whitespace-nowrap">ผู้รับผิดชอบ</th>
+                    <th className="px-6 py-4 whitespace-nowrap text-center">สถานะ</th>
+                    <th className="px-6 py-4 whitespace-nowrap text-right">จัดการ</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {paginatedWorkOrders.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-6 py-8 text-center text-slate-400">
+                        ไม่พบข้อมูลใบงาน
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedWorkOrders.map((wo) => (
+                      <tr 
+                        key={wo.id} 
+                        className="hover:bg-slate-50 transition-colors cursor-pointer"
+                        onClick={() => setSelectedWorkOrderDetails(wo)}
                       >
-                        <span className="inline-flex items-center gap-1 font-bold">
-                          <Wrench className="h-3 w-3 text-sky-400" /> {wo.claimedByName || "มอบหมายช่างแล้ว"}
-                        </span>
-                        <span className="font-mono">{wo.claimedAt ? new Date(wo.claimedAt).toLocaleTimeString() : ""}</span>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
+                        <td className="px-6 py-4 whitespace-nowrap font-mono font-bold text-slate-900">
+                          {wo.acCode}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="font-medium text-slate-800">{wo.location}</div>
+                          <div className="text-xs text-slate-500">{wo.brand}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-slate-600">
+                          {wo.createdAt ? new Date(wo.createdAt).toLocaleDateString("th-TH") : "-"}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {wo.claimedByName ? (
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600">
+                                {wo.claimedByName.charAt(0)}
+                              </div>
+                              <span className="font-medium text-slate-700">{wo.claimedByName}</span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 italic">-</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                          {wo.status === "pending" && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                              รอดำเนินการ
+                            </span>
+                          )}
+                          {wo.status === "claimed" && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-sky-100 text-sky-800 border border-sky-200">
+                              กำลังดำเนินการ
+                            </span>
+                          )}
+                          {wo.status === "completed" && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                              เสร็จสิ้น
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          {wo.status === "pending" ? (
+                            <button
+                              onClick={(e) => { 
+                                e.stopPropagation(); 
+                                setSelectedOrderToAssign(wo.id); 
+                                setShowAssignModal(true); 
+                              }}
+                              className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-bold text-sky-700 bg-sky-50 border border-sky-200 rounded-lg hover:bg-sky-100 transition-colors"
+                            >
+                              จ่ายงาน
+                            </button>
+                          ) : (
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); setSelectedWorkOrderDetails(wo); }}
+                              className="inline-flex items-center justify-center p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+                            >
+                              <MoreVertical className="w-4 h-4" />
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
+            
+            {/* Pagination Controls */}
+            {totalWorkOrdersPages > 1 && (
+              <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
+                <div className="text-sm text-slate-500">
+                  หน้า {workOrdersPage} จาก {totalWorkOrdersPages}
+                </div>
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious 
+                        onClick={() => setWorkOrdersPage(p => Math.max(1, p - 1))}
+                        className={workOrdersPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                      />
+                    </PaginationItem>
+                    
+                    {[...Array(totalWorkOrdersPages)].map((_, i) => (
+                      <PaginationItem key={i}>
+                        <PaginationLink 
+                          onClick={() => setWorkOrdersPage(i + 1)}
+                          isActive={workOrdersPage === i + 1}
+                          className="cursor-pointer"
+                        >
+                          {i + 1}
+                        </PaginationLink>
+                      </PaginationItem>
+                    ))}
 
-            {/* Column 3: Completed Orders */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between px-1">
-                <span className="text-sm font-bold text-slate-950">เสร็จสมบูรณ์</span>
-                <span className="rounded-lg bg-emerald-100 text-emerald-800 border border-emerald-200 px-2 py-0.5 text-xs font-bold font-mono">
-                  {completedOrders.length}
-                </span>
+                    <PaginationItem>
+                      <PaginationNext 
+                        onClick={() => setWorkOrdersPage(p => Math.min(totalWorkOrdersPages, p + 1))}
+                        className={workOrdersPage === totalWorkOrdersPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
               </div>
-
-              <div className="space-y-3">
-                {completedOrders.length === 0 ? (
-                  <div className="p-6 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-2xl">
-                    ไม่มีงานที่เสร็จสิ้น
-                  </div>
-                ) : (
-                  completedOrders.map((wo) => (
-                    <div key={wo.id} className="biz-card p-4 space-y-3 hover:border-slate-400 transition-all opacity-90">
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono font-bold text-sm text-slate-950">{wo.acCode}</span>
-                        <MoreVertical className="h-4 w-4 text-slate-400" />
-                      </div>
-                      <div className="text-xs font-medium text-slate-600 leading-relaxed">
-                        {wo.location}
-                      </div>
-                      <div className="pt-2 flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-100">
-                        <span className="inline-flex items-center gap-1 font-bold text-emerald-700">
-                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> เสร็จเรียบร้อย
-                        </span>
-                        <span className="font-mono">{wo.claimedByName || "-"}</span>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
+            )}
           </div>
         </div>
       )}
@@ -865,6 +902,11 @@ export function AdminDashboardView({
         </div>
       )}
 
+      {/* QR Code Manager */}
+      {activeTab === "qr_codes" && (
+        <QrCodeManager buildings={buildings} globalSearch={globalSearch} />
+      )}
+
       {/* Modal: Assign Work Order */}
       {showAssignModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-xs p-4">
@@ -917,6 +959,216 @@ export function AdminDashboardView({
           </div>
         </div>
       )}
+      {/* Enterprise Detail Dialog (Audit Trail) */}
+      <Dialog open={!!selectedWorkOrderDetails} onOpenChange={(open) => { if (!open) setSelectedWorkOrderDetails(null) }}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto p-0 border-0 rounded-2xl overflow-hidden">
+          {selectedWorkOrderDetails && (
+            <div className="flex flex-col h-full bg-slate-50">
+              {/* Header */}
+              <div className="bg-white px-6 py-5 border-b border-slate-200 sticky top-0 z-10">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-950 flex items-center gap-2">
+                      <ClipboardList className="h-6 w-6 text-indigo-600" />
+                      ใบงานซ่อมบำรุง {selectedWorkOrderDetails.acCode}
+                    </h2>
+                    <p className="text-sm text-slate-500 mt-1 font-medium">
+                      รายละเอียดการแจ้งซ่อมและประวัติการทำงาน (Audit Trail)
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {selectedWorkOrderDetails.priority === 'critical' && (
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-800 border border-red-200">
+                        ด่วนที่สุด (Critical)
+                      </span>
+                    )}
+                    {selectedWorkOrderDetails.priority === 'high' && (
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-800 border border-orange-200">
+                        ด่วน (High)
+                      </span>
+                    )}
+                    {selectedWorkOrderDetails.status === "pending" && (
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                        รอดำเนินการ
+                      </span>
+                    )}
+                    {selectedWorkOrderDetails.status === "claimed" && (
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-sky-100 text-sky-800 border border-sky-200">
+                        กำลังดำเนินการ
+                      </span>
+                    )}
+                    {selectedWorkOrderDetails.status === "completed" && (
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                        เสร็จสิ้น
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Body */}
+              <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+                
+                {/* Left Column: Asset & Issue Details */}
+                <div className="md:col-span-2 space-y-6">
+                  {/* Issue Section */}
+                  <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+                    <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2 mb-4">
+                      <AlertTriangle className="h-4 w-4 text-amber-500" />
+                      รายละเอียดปัญหา (Issue Description)
+                    </h3>
+                    <div className="bg-slate-50 p-4 rounded-lg border border-slate-100 text-sm text-slate-700 leading-relaxed min-h-[80px]">
+                      {selectedWorkOrderDetails.issueDescription || "ไม่มีการระบุรายละเอียด"}
+                    </div>
+                  </div>
+
+                  {/* Resolution Section (If completed) */}
+                  {selectedWorkOrderDetails.status === "completed" && (
+                    <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+                      <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2 mb-4">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                        บันทึกการซ่อม (Resolution Notes)
+                      </h3>
+                      <div className="bg-emerald-50/50 p-4 rounded-lg border border-emerald-100 text-sm text-emerald-800 leading-relaxed min-h-[80px]">
+                        {selectedWorkOrderDetails.resolutionNotes || "ไม่มีการระบุบันทึกการซ่อม"}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Media / Images Section */}
+                  <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+                    <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2 mb-4">
+                      <MessageSquare className="h-4 w-4 text-slate-500" />
+                      รูปภาพประกอบ (Media/Evidence)
+                    </h3>
+                    {selectedWorkOrderDetails.images ? (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                        {Array.isArray(selectedWorkOrderDetails.images) 
+                          ? selectedWorkOrderDetails.images.map((img: string, idx: number) => (
+                              <div key={idx} className="aspect-square rounded-lg border border-slate-200 overflow-hidden bg-slate-100 relative group cursor-pointer">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={img} alt="Work Order Evidence" className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                              </div>
+                            ))
+                          : (
+                            <div className="col-span-full py-8 text-center text-sm text-slate-400 bg-slate-50 rounded-lg border border-dashed border-slate-200">
+                              รูปแบบรูปภาพไม่ถูกต้อง
+                            </div>
+                          )
+                        }
+                      </div>
+                    ) : (
+                      <div className="py-8 text-center text-sm text-slate-400 bg-slate-50 rounded-lg border border-dashed border-slate-200">
+                        ไม่มีรูปภาพประกอบ
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Right Column: Audit Trail */}
+                <div className="space-y-6">
+                  
+                  {/* Asset Info */}
+                  <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+                    <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2 mb-4 pb-3 border-b border-slate-100">
+                      <Snowflake className="h-4 w-4 text-sky-500" />
+                      ข้อมูลเครื่องปรับอากาศ
+                    </h3>
+                    <div className="space-y-3 text-sm">
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500">รหัสครุภัณฑ์:</span>
+                        <span className="font-mono font-bold text-slate-900">{selectedWorkOrderDetails.acCode}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500">ยี่ห้อ:</span>
+                        <span className="font-medium text-slate-900">{selectedWorkOrderDetails.brand}</span>
+                      </div>
+                      <div className="flex justify-between items-start">
+                        <span className="text-slate-500">สถานที่:</span>
+                        <span className="font-medium text-slate-900 text-right max-w-[150px]">{selectedWorkOrderDetails.location}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Audit Trail Timeline */}
+                  <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+                    <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2 mb-5 pb-3 border-b border-slate-100">
+                      <Clock className="h-4 w-4 text-indigo-500" />
+                      ประวัติการดำเนินการ (Audit Trail)
+                    </h3>
+                    
+                    <div className="relative pl-6 space-y-6 before:absolute before:inset-y-2 before:left-[11px] before:w-[2px] before:bg-slate-100">
+                      
+                      {/* Created */}
+                      <div className="relative">
+                        <div className="absolute -left-[30px] p-1 bg-white rounded-full">
+                          <div className="w-2.5 h-2.5 bg-slate-400 rounded-full ring-4 ring-slate-50" />
+                        </div>
+                        <div className="text-xs font-bold text-slate-900">แจ้งเรื่อง</div>
+                        <div className="text-xs text-slate-500 mt-1">
+                          {selectedWorkOrderDetails.createdAt ? new Date(selectedWorkOrderDetails.createdAt).toLocaleString("th-TH") : "-"}
+                        </div>
+                        {selectedWorkOrderDetails.reportedByName && (
+                          <div className="text-xs text-slate-600 mt-1 flex items-center gap-1.5">
+                            <UserCheck className="w-3 h-3 text-slate-400" /> {selectedWorkOrderDetails.reportedByName}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Assigned */}
+                      {selectedWorkOrderDetails.assignedToName && (
+                        <div className="relative">
+                          <div className="absolute -left-[30px] p-1 bg-white rounded-full">
+                            <div className="w-2.5 h-2.5 bg-indigo-500 rounded-full ring-4 ring-indigo-50" />
+                          </div>
+                          <div className="text-xs font-bold text-slate-900">มอบหมายงาน</div>
+                          <div className="text-xs text-slate-500 mt-1">
+                            {selectedWorkOrderDetails.assignedAt ? new Date(selectedWorkOrderDetails.assignedAt).toLocaleString("th-TH") : "-"}
+                          </div>
+                          <div className="text-xs text-indigo-700 bg-indigo-50 px-2 py-1 rounded inline-flex items-center gap-1.5 mt-1.5">
+                            <Wrench className="w-3 h-3" /> ให้ช่าง {selectedWorkOrderDetails.assignedToName}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Claimed/Started */}
+                      {selectedWorkOrderDetails.claimedAt && (
+                        <div className="relative">
+                          <div className="absolute -left-[30px] p-1 bg-white rounded-full">
+                            <div className="w-2.5 h-2.5 bg-sky-500 rounded-full ring-4 ring-sky-50" />
+                          </div>
+                          <div className="text-xs font-bold text-slate-900">เริ่มดำเนินการซ่อม</div>
+                          <div className="text-xs text-slate-500 mt-1">
+                            {new Date(selectedWorkOrderDetails.claimedAt).toLocaleString("th-TH")}
+                          </div>
+                          <div className="text-xs text-sky-700 bg-sky-50 px-2 py-1 rounded inline-flex items-center gap-1.5 mt-1.5">
+                            <Wrench className="w-3 h-3" /> ดำเนินการโดย {selectedWorkOrderDetails.claimedByName || selectedWorkOrderDetails.assignedToName}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Completed */}
+                      {selectedWorkOrderDetails.completedAt && (
+                        <div className="relative">
+                          <div className="absolute -left-[30px] p-1 bg-white rounded-full">
+                            <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full ring-4 ring-emerald-50" />
+                          </div>
+                          <div className="text-xs font-bold text-emerald-700">เสร็จสิ้นสมบูรณ์</div>
+                          <div className="text-xs text-slate-500 mt-1">
+                            {new Date(selectedWorkOrderDetails.completedAt).toLocaleString("th-TH")}
+                          </div>
+                        </div>
+                      )}
+
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }
