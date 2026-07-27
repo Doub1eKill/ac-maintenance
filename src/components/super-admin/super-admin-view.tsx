@@ -19,12 +19,14 @@ import {
   Calendar,
   MessageSquare,
   TrendingUp,
+  User,
+  Settings,
 } from "lucide-react";
 import { AnimatedIcon } from "@/components/ui/animated-icon";
 import { DashboardLayout, NavItem } from "@/components/layout/dashboard-layout";
 import { MasterDataClient } from "@/app/super-admin/master-data/master-data-client";
 import { Database } from "lucide-react";
-import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { ChartAreaInteractive } from "@/components/admin/chart-area-interactive";
 
 interface PendingUser {
   id: string;
@@ -152,22 +154,38 @@ export function SuperAdminView({
       id: "overview",
       label: "แดชบอร์ด",
       icon: ShieldCheck,
+      group: "หน้าหลัก",
     },
     {
       id: "approvals",
       label: "อนุมัติผู้ใช้",
       icon: Clock,
       badge: pendingUsers.length,
+      group: "ผู้ใช้งานและคำขอ",
     },
     {
       id: "universities",
       label: "มหาวิทยาลัย",
       icon: Building2,
+      group: "ข้อมูลองค์กร",
     },
     {
       id: "master-data",
       label: "ข้อมูลหลัก",
       icon: Database,
+      group: "ข้อมูลองค์กร",
+    },
+    {
+      id: "profile",
+      label: "จัดการโปรไฟล์",
+      icon: User,
+      group: "บัญชีและการตั้งค่า",
+    },
+    {
+      id: "settings",
+      label: "ตั้งค่าระบบ",
+      icon: Settings,
+      group: "บัญชีและการตั้งค่า",
     },
   ];
 
@@ -219,35 +237,12 @@ export function SuperAdminView({
 
       {/* BizLink Top Analytic Banner (Bar Chart & Gauge Stats Widget) */}
       <div className="biz-banner p-6 sm:p-8 flex flex-col lg:flex-row items-center justify-between gap-6 shadow-2xs">
-        {/* Left: Bar Chart Widget (Recharts) */}
-        <div className="space-y-3 w-full lg:w-1/3">
-          <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-            กิจกรรมการลงทะเบียนเข้าระบบ
-          </div>
-          <div className="h-28 pt-2 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={registrationActivity} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-                <XAxis 
-                  dataKey="day" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fontSize: 10, fill: "#94a3b8", fontWeight: 700 }}
-                  dy={5}
-                />
-                <Tooltip 
-                  cursor={{ fill: '#f1f5f9' }}
-                  contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                  labelStyle={{ fontWeight: 700, color: '#0f172a' }}
-                />
-                <Bar 
-                  dataKey="users" 
-                  fill="#0f172a" 
-                  radius={[6, 6, 6, 6]}
-                  barSize={24}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+        {/* Left: Interactive Area Chart Widget */}
+        <div className="w-full lg:w-1/2">
+          <ChartAreaInteractive 
+            title="กิจกรรมและการลงทะเบียนเข้าระบบ" 
+            description="แสดงสถิติการใช้งานและการลงทะเบียนเปรียบเทียบย้อนหลัง" 
+          />
         </div>
 
         {/* Middle: Gauge Progress Indicator */}

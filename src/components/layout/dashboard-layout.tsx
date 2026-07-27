@@ -10,21 +10,37 @@ import {
   ShieldCheck,
   Wrench,
   UserCheck,
-  Menu,
-  X,
   LucideIcon,
-  ChevronRight,
   Search,
-  SlidersHorizontal,
-  ArrowUpDown,
   Plus,
   User,
-  Users,
   Settings,
   Bell,
   ChevronsUpDown,
 } from "lucide-react";
-import { AnimatedIcon } from "@/components/ui/animated-icon";
+import {
+  SidebarProvider,
+  Sidebar,
+  SidebarHeader,
+  SidebarContent,
+  SidebarFooter,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarTrigger,
+  SidebarInset,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarGroupContent,
+} from "@/components/ui/sidebar";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
+import { Separator } from "@/components/ui/separator";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,6 +57,7 @@ export interface NavItem {
   icon: LucideIcon;
   badge?: number;
   description?: string;
+  group?: string;
 }
 
 interface DashboardLayoutProps {
@@ -73,15 +90,6 @@ export function DashboardLayout({
   searchValue = "",
   children,
 }: DashboardLayoutProps) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  const roleBadgeColor =
-    user.role === "super_admin"
-      ? "bg-purple-100 text-purple-800 border-purple-200"
-      : user.role === "org_admin"
-      ? "bg-sky-100 text-sky-800 border-sky-200"
-      : "bg-emerald-100 text-emerald-800 border-emerald-200";
-
   const roleLabel =
     user.role === "super_admin"
       ? "ผู้ดูแลระบบสูงสุด"
@@ -89,244 +97,185 @@ export function DashboardLayout({
       ? "ผู้บริหารองค์กร"
       : "ช่างซ่อมบำรุง";
 
-  const RoleIcon =
-    user.role === "super_admin"
-      ? ShieldCheck
-      : user.role === "org_admin"
-      ? UserCheck
-      : Wrench;
-
   const currentNav = navItems.find((item) => item.id === activeTab) || navItems[0];
 
+  const groupOrder = Array.from(new Set(navItems.map(item => item.group || "เมนูทั่วไป")));
+  const groupedNavItems = groupOrder.map(groupName => ({
+    groupName,
+    items: navItems.filter(item => (item.group || "เมนูทั่วไป") === groupName)
+  }));
+
   return (
-    <div className="min-h-screen bg-[#f7f7f2] text-slate-900 flex flex-col lg:flex-row selection:bg-slate-900 selection:text-white">
-      {/* Mobile Header Bar */}
-      <header className="lg:hidden sticky top-0 z-40 w-full border-b border-slate-200/90 bg-white/90 backdrop-blur-md px-4 py-3 flex items-center justify-between shadow-xs">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-100 text-slate-700 hover:text-slate-950 focus:outline-none"
-            aria-label="Toggle menu"
-          >
-            {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </button>
-          <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-950 text-white font-black">
-              <Zap className="h-4 w-4 fill-white" />
-            </div>
-            <span className="font-extrabold text-sm text-slate-950 tracking-tight">AC Maintenance</span>
-          </div>
-        </div>
-
-        <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${roleBadgeColor}`}>
-          <RoleIcon className="h-3 w-3" />
-          {roleLabel}
-        </span>
-      </header>
-
-      {/* Sidebar Overlay for Mobile */}
-      {sidebarOpen && (
-        <div
-          onClick={() => setSidebarOpen(false)}
-          className="fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-xs lg:hidden animate-in fade-in"
-        />
-      )}
-
-      {/* Left Sidebar (BizLink Style) */}
-      <aside
-        className={`fixed lg:sticky top-0 left-0 z-50 h-screen w-64 shrink-0 border-r border-slate-200/90 bg-white p-5 flex flex-col justify-between transition-transform duration-300 ease-in-out shadow-xs ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-        }`}
-      >
-        <div className="space-y-6 overflow-y-auto pr-1">
-          {/* Brand Logo */}
-          <div className="flex items-center justify-between pb-2">
-            <Link href="/" className="flex items-center gap-3 group">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-950 text-white font-black shadow-md group-hover:scale-105 transition-transform">
-                <Zap className="h-5 w-5 fill-white" />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-base font-extrabold tracking-tight text-slate-950 group-hover:text-slate-700 transition-colors">
-                  ระบบซ่อมบำรุงแอร์
-                </span>
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  ระบบองค์กร
-                </span>
-              </div>
-            </Link>
-          </div>
-
-          {/* Main Navigation List */}
-          <div className="space-y-1">
-            {navItems.map((item) => {
-              const isActive = activeTab === item.id;
-              const Icon = item.icon;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => {
-                    setActiveTab(item.id);
-                    setSidebarOpen(false);
-                  }}
-                  className={`w-full flex items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-semibold transition-all ${
-                    isActive
-                      ? "bg-slate-100 text-slate-950 font-bold shadow-2xs"
-                      : "text-slate-600 hover:text-slate-950 hover:bg-slate-50"
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Icon className={`h-4 w-4 ${isActive ? "text-slate-950" : "text-slate-400"}`} />
-                    <span>{item.label}</span>
+    <SidebarProvider>
+      <Sidebar collapsible="icon" className="border-r border-border bg-sidebar text-sidebar-foreground">
+        <SidebarHeader className="border-b border-border/50">
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton size="lg" asChild>
+                <Link href="/" className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary text-primary-foreground font-black shadow-xs shrink-0">
+                    <Zap className="h-5 w-5 fill-current" />
                   </div>
-                  {item.badge !== undefined && item.badge > 0 && (
-                    <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-700">
-                      {item.badge}
+                  <div className="grid flex-1 text-left overflow-hidden">
+                    <span className="text-sm font-extrabold tracking-tight truncate">
+                      ระบบซ่อมบำรุงแอร์
                     </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Secondary Group: Tenant Info */}
-          <div className="pt-4 border-t border-slate-100 space-y-2">
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1">
-              สังกัดสถาบัน (Institution)
-            </div>
-            <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 flex items-center gap-2.5">
-              <Building2 className="h-4 w-4 text-slate-500 shrink-0" />
-              <div className="overflow-hidden">
-                <div className="text-xs font-bold text-slate-900 truncate">
-                  {user.universityName || "ระบบส่วนกลาง"}
-                </div>
-                <div className="text-[10px] text-slate-500 truncate">{roleLabel}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* User Footer Card - Dropdown Menu (ReUI Style) */}
-        <div className="pt-4 border-t border-slate-100">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="flex w-full items-center justify-between rounded-xl p-2 hover:bg-slate-50 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-slate-400">
-                <div className="flex items-center gap-2.5 overflow-hidden">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-900 font-bold text-white text-xs shadow-sm">
-                    {user.name ? user.name.slice(0, 2).toUpperCase() : "US"}
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">
+                      {user.universityName || "ระบบองค์กร"}
+                    </span>
                   </div>
-                  <div className="overflow-hidden text-left">
-                    <div className="text-xs font-bold text-slate-950 truncate">{user.name || "ผู้ใช้งาน"}</div>
-                    <div className="text-[10px] text-slate-500 truncate">{user.email}</div>
-                  </div>
-                </div>
-                <ChevronsUpDown className="h-4 w-4 text-slate-400" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent 
-              className="w-56 rounded-xl border-slate-200 bg-white p-2 shadow-lg animate-in fade-in zoom-in-95" 
-              align="end" 
-              sideOffset={8}
-            >
-              <DropdownMenuLabel className="font-normal">
-                <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none text-slate-900">{user.name || "ผู้ใช้งาน"}</p>
-                  <p className="text-xs leading-none text-slate-500">{user.email}</p>
-                </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator className="bg-slate-100" />
-              <DropdownMenuGroup>
-                <DropdownMenuItem className="rounded-lg text-sm font-medium text-slate-700 focus:bg-slate-50 focus:text-slate-900 cursor-pointer">
-                  <User className="mr-2 h-4 w-4 text-slate-500" />
-                  <span>โปรไฟล์ส่วนตัว</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem className="rounded-lg text-sm font-medium text-slate-700 focus:bg-slate-50 focus:text-slate-900 cursor-pointer">
-                  <Settings className="mr-2 h-4 w-4 text-slate-500" />
-                  <span>ตั้งค่าระบบ</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem className="rounded-lg text-sm font-medium text-slate-700 focus:bg-slate-50 focus:text-slate-900 cursor-pointer">
-                  <Bell className="mr-2 h-4 w-4 text-slate-500" />
-                  <span>การแจ้งเตือน</span>
-                </DropdownMenuItem>
-              </DropdownMenuGroup>
-              <DropdownMenuSeparator className="bg-slate-100" />
-              <DropdownMenuItem 
-                onClick={() => signOut({ callbackUrl: "/login" })}
-                className="rounded-lg text-sm font-medium text-red-600 focus:bg-red-50 focus:text-red-700 cursor-pointer"
-              >
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>ออกจากระบบ</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </aside>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarHeader>
 
-      {/* Main Panel Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Top Header */}
-        <header className="hidden lg:flex sticky top-0 z-40 w-full border-b border-slate-200/90 bg-white/90 backdrop-blur-md px-8 py-4 items-center justify-between">
-          <div className="flex items-center gap-3">
-             <h1 className="text-xl font-bold text-slate-950">{currentNav?.label}</h1>
+        <SidebarContent>
+          {groupedNavItems.map(({ groupName, items }) => (
+            <SidebarGroup key={groupName}>
+              <SidebarGroupLabel className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                {groupName}
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {items.map((item) => {
+                    const isActive = activeTab === item.id;
+                    const Icon = item.icon;
+                    return (
+                      <SidebarMenuItem key={item.id}>
+                        <SidebarMenuButton
+                          isActive={isActive}
+                          onClick={() => setActiveTab(item.id)}
+                          tooltip={item.label}
+                          className="w-full justify-between"
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <Icon className="h-4 w-4" />
+                            <span className="font-semibold text-xs">{item.label}</span>
+                          </div>
+                          {item.badge !== undefined && item.badge > 0 && (
+                            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
+                              {item.badge}
+                            </span>
+                          )}
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  })}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          ))}
+        </SidebarContent>
+
+        <SidebarFooter className="border-t border-border/50">
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <SidebarMenuButton
+                    size="lg"
+                    className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                  >
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground font-bold text-xs shadow-xs">
+                      {user.name ? user.name.slice(0, 2).toUpperCase() : "US"}
+                    </div>
+                    <div className="grid flex-1 text-left text-xs leading-tight">
+                      <span className="truncate font-bold">{user.name || "ผู้ใช้งาน"}</span>
+                      <span className="truncate text-[10px] text-muted-foreground">{roleLabel}</span>
+                    </div>
+                    <ChevronsUpDown className="ml-auto size-4 text-muted-foreground" />
+                  </SidebarMenuButton>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  className="w-56 rounded-xl border-border bg-popover p-2 shadow-lg"
+                  side="right"
+                  align="end"
+                  sideOffset={4}
+                >
+                  <DropdownMenuLabel className="font-normal">
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-xs font-bold leading-none">{user.name || "ผู้ใช้งาน"}</p>
+                      <p className="text-[11px] leading-none text-muted-foreground">{user.email}</p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuGroup>
+                    <DropdownMenuItem className="rounded-lg text-xs font-medium cursor-pointer">
+                      <User className="mr-2 h-4 w-4" />
+                      <span>โปรไฟล์ส่วนตัว</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="rounded-lg text-xs font-medium cursor-pointer">
+                      <Settings className="mr-2 h-4 w-4" />
+                      <span>ตั้งค่าระบบ</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => signOut({ callbackUrl: "/login" })}
+                    className="rounded-lg text-xs font-medium text-destructive focus:text-destructive cursor-pointer"
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>ออกจากระบบ</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarFooter>
+      </Sidebar>
+
+      <SidebarInset className="min-w-0 bg-background">
+        <header className="flex h-16 shrink-0 items-center gap-2 border-b border-border px-4 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
+          <div className="flex items-center gap-2 px-2">
+            <SidebarTrigger className="-ml-1" />
+            <Separator orientation="vertical" className="mr-1 h-4" />
+            <Breadcrumb>
+              <BreadcrumbList>
+                <BreadcrumbItem className="hidden md:block">
+                  <BreadcrumbPage className="text-xs font-medium text-muted-foreground">
+                    {user.universityName || "ระบบส่วนกลาง"}
+                  </BreadcrumbPage>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator className="hidden md:block" />
+                <BreadcrumbItem>
+                  <BreadcrumbPage className="text-xs font-bold text-foreground">
+                    {currentNav?.label}
+                  </BreadcrumbPage>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
           </div>
-          <div className="flex items-center gap-4">
+
+          <div className="ml-auto flex items-center gap-3">
             {onSearchChange && (
-              <div className="relative w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <div className="relative w-48 sm:w-64">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                 <input
                   type="text"
                   placeholder={searchPlaceholder}
                   value={searchValue}
                   onChange={(e) => onSearchChange(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-slate-400 transition-shadow"
+                  className="w-full pl-8 pr-3 py-1.5 bg-muted/50 border border-border rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
                 />
               </div>
             )}
             {onCreateAction && (
               <button
                 onClick={onCreateAction}
-                className="flex items-center gap-2 bg-slate-950 text-white px-4 py-2.5 rounded-xl text-xs font-bold hover:bg-slate-800 transition-colors shadow-sm"
+                className="flex items-center gap-1.5 bg-primary text-primary-foreground px-3.5 py-1.5 rounded-xl text-xs font-bold hover:opacity-90 transition-opacity shadow-xs shrink-0"
               >
-                <Plus className="h-4 w-4" />
-                {createActionLabel}
+                <Plus className="h-3.5 w-3.5" />
+                <span>{createActionLabel}</span>
               </button>
             )}
           </div>
-        </header>        {/* Content Container */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-6 pb-20 lg:pb-8">
-          {/* Mobile Horizontal Sub-Tab Bar for quick navigation on small screens */}
-          <div className="lg:hidden flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none border-b border-slate-200/80 -mx-4 px-4 sm:mx-0 sm:px-0">
-            {navItems.map((item) => {
-              const isActive = activeTab === item.id;
-              const Icon = item.icon;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => setActiveTab(item.id)}
-                  className={`flex items-center gap-2 shrink-0 rounded-xl px-3 py-2 text-xs font-bold transition-all ${
-                    isActive
-                      ? "bg-slate-950 text-white shadow-xs"
-                      : "bg-white text-slate-700 border border-slate-200"
-                  }`}
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                  <span>{item.label}</span>
-                  {item.badge !== undefined && item.badge > 0 && (
-                    <span
-                      className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
-                        isActive ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-700"
-                      }`}
-                    >
-                      {item.badge}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+        </header>
 
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-6">
           {children}
         </main>
-      </div>
-    </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }

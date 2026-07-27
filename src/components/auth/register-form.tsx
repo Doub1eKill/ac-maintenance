@@ -6,12 +6,9 @@ import { registerUser, type RegisterState } from "@/app/register/actions";
 import { Wrench, Building2, Eye, EyeOff, AlertTriangle, Clock, ArrowLeft, UserPlus } from "lucide-react";
 import { AnimatedIcon } from "@/components/ui/animated-icon";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/ui/native-select";
 
 interface UniversityOption {
   id: string;
@@ -113,22 +110,17 @@ export function RegisterForm({ universities }: { universities: UniversityOption[
         <label htmlFor="universityId" className="mb-1.5 block text-xs font-bold text-slate-800">
           เลือกมหาวิทยาลัย / สถาบันการศึกษาสังกัด
         </label>
-        <Select name="universityId" required>
-          <SelectTrigger className="w-full rounded-xl border-slate-200 bg-white px-3.5 py-5 text-xs text-slate-900 focus:ring-slate-400 shadow-2xs">
-            <SelectValue placeholder="-- กรุณาเลือกสถาบันการศึกษา --" />
-          </SelectTrigger>
-          <SelectContent className="rounded-xl border-slate-200 shadow-lg animate-in fade-in zoom-in-95">
-            {universities.map((uni) => (
-              <SelectItem 
-                key={uni.id} 
-                value={uni.id} 
-                className="text-xs rounded-lg focus:bg-slate-50 cursor-pointer"
-              >
-                {uni.name} ({uni.abbreviation})
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <NativeSelect name="universityId" required className="w-full h-auto py-3 px-3.5 rounded-xl border-slate-200 bg-white text-xs text-slate-900 shadow-2xs" defaultValue="">
+          <NativeSelectOption value="" disabled>-- กรุณาเลือกสถาบันการศึกษา --</NativeSelectOption>
+          {universities.map((uni) => (
+            <NativeSelectOption 
+              key={uni.id} 
+              value={uni.id} 
+            >
+              {uni.name} ({uni.abbreviation})
+            </NativeSelectOption>
+          ))}
+        </NativeSelect>
       </div>
 
       {/* Name Input */}

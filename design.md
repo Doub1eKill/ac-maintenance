@@ -11,7 +11,7 @@
 ระบบ **AC Maintenance** ได้รับการปรับปรุงสถาปัตยกรรม UI/UX ให้ตรงตามแรงบันดาลใจจากแดชบอร์ด **BizLink Executive SaaS** (เน้นความสะอาด โปร่ง สบายตา และมี Hierarchy ระดับพรีเมียม)
 
 ### Key Design Pillars
-1. **Warm Off-White Canvas (`#f7f7f2` / `#f4f4ee`):** พื้นหลังโทนสว่างนุ่มนวล ตาไม่ล้า ลดความแออัดของข้อมูล
+1. **Clean White Canvas (`#ffffff`):** พื้นหลังโทนสว่างสะอาดตา เน้นความคลีนแบบ Modern
 2. **Elevated White Cards & Dark Highlight Card:** การ์ดสีขาวสะอาดสะอ้าน (`#ffffff`) พร้อมขอบบาง (`border-slate-200/80`) และการ์ดเน้นไฮไลท์โทนเข้ม (`#18181b` Dark High-Contrast Card)
 3. **Left Sidebar Navigation:** เมนูแนวตั้งด้านซ้ายจัดเรียงหมวดหมู่ชัดเจน พร้อมสถิติจำนวนย่อย
 4. **Analytic Widgets & Kanban Status Grid:** ด้านบนแสดงกราฟแท่งสถิติรายสัปดาห์ (Weekly Bar Chart) ร่วมกับมาตรวัดความสมบูรณ์ (Progress Gauge) และเรียงลำดับการ์ดแอร์/ใบงานซ่อมตาม Kanban Columns (`Pending`, `Claimed`, `Completed`)
@@ -23,7 +23,7 @@
 ### 2.1 Color Palette (โทนสีระบบ)
 
 * **Canvas & Surface (พื้นหลังและพื้นที่ใช้งาน):**
-  * `Canvas Background`: `#f7f7f2` (Warm Off-White)
+  * `Canvas Background`: `#ffffff` (Pure White)
   * `Sidebar & Top Bar`: `#ffffff` (Pure Crisp White)
   * `Card Surface`: `#ffffff` (Elevated White with `border border-slate-200/80` & `shadow-sm`)
   * `Highlight Surface`: `#18181b` (Dark Slate / Charcoal Card for Active/Selected Items)

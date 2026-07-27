@@ -81,34 +81,34 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
 
   const renderHeader = () => {
     return (
-      <div className="flex items-center justify-between py-4 px-6 border-b border-slate-100 bg-white rounded-t-2xl">
+      <div className="flex items-center justify-between py-4 px-6 border-b border-border bg-white rounded-t-2xl">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg border border-indigo-100">
+          <div className="p-2 bg-primary/10 text-primary rounded-lg border border-primary/20">
             <CalendarIcon className="h-5 w-5" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-slate-900">
+            <h2 className="text-lg font-bold text-foreground">
               {format(currentMonth, "MMMM yyyy", { locale: th })}
             </h2>
-            <p className="text-xs text-slate-500 font-medium">ปฏิทินรอบล้างแอร์ประจำเดือน</p>
+            <p className="text-xs text-muted-foreground font-medium">ปฏิทินรอบล้างแอร์ประจำเดือน</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-xl border border-slate-200">
+        <div className="flex items-center gap-2 bg-muted p-1 rounded-xl border border-border">
           <button 
             onClick={prevMonth}
-            className="p-1.5 hover:bg-white rounded-lg text-slate-500 hover:text-slate-900 transition-colors hover:shadow-sm"
+            className="p-1.5 hover:bg-white rounded-lg text-muted-foreground hover:text-foreground transition-colors hover:shadow-sm"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
           <button 
             onClick={() => setCurrentMonth(new Date())}
-            className="px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-white rounded-lg transition-colors hover:shadow-sm"
+            className="px-3 py-1.5 text-xs font-bold text-foreground hover:bg-white rounded-lg transition-colors hover:shadow-sm"
           >
             วันนี้
           </button>
           <button 
             onClick={nextMonth}
-            className="p-1.5 hover:bg-white rounded-lg text-slate-500 hover:text-slate-900 transition-colors hover:shadow-sm"
+            className="p-1.5 hover:bg-white rounded-lg text-muted-foreground hover:text-foreground transition-colors hover:shadow-sm"
           >
             <ChevronRight className="h-4 w-4" />
           </button>
@@ -123,7 +123,7 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
 
     for (let i = 0; i < 7; i++) {
       days.push(
-        <div key={i} className="text-center py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50 border-b border-slate-100">
+        <div key={i} className="text-center py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-wider bg-muted border-b border-border">
           {format(addDays(startDate, i), "EEEE", { locale: th })}
         </div>
       );
@@ -156,18 +156,18 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
         days.push(
           <div 
             key={day.toString()} 
-            className={`min-h-[100px] border-b border-r border-slate-100 p-2 transition-all ${
-              !isCurrentMonth ? "bg-slate-50/50 text-slate-300" : "bg-white hover:bg-slate-50"
+            className={`min-h-[100px] border-b border-r border-border p-2 transition-all ${
+              !isCurrentMonth ? "bg-muted/50 text-muted-foreground" : "bg-white hover:bg-muted"
             }`}
           >
             <div className="flex justify-between items-start">
               <span className={`text-xs font-bold flex h-6 w-6 items-center justify-center rounded-full ${
-                isTodayDate ? "bg-indigo-600 text-white shadow-md" : "text-slate-700"
+                isTodayDate ? "bg-primary text-white shadow-md" : "text-foreground"
               }`}>
                 {formattedDate}
               </span>
               {dayEvents.length > 0 && (
-                <span className="text-[10px] font-bold text-slate-400">
+                <span className="text-[10px] font-bold text-muted-foreground">
                   {dayEvents.length} รายการ
                 </span>
               )}
@@ -176,9 +176,9 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
             <div className="mt-2 flex flex-col gap-1 overflow-y-auto max-h-[80px] no-scrollbar">
               {dayEvents.map((event) => {
                 const status = getEventStatus(new Date(event.nextDueDate));
-                let badgeClass = "bg-sky-50 text-sky-700 border-sky-100 hover:bg-sky-100";
+                let badgeClass = "bg-primary/10 text-primary border-primary/20 hover:bg-primary/20";
                 if (status === "overdue") badgeClass = "bg-red-50 text-red-700 border-red-100 hover:bg-red-100";
-                if (status === "warning") badgeClass = "bg-amber-50 text-amber-700 border-amber-100 hover:bg-amber-100";
+                if (status === "warning") badgeClass = "bg-warning/10 text-warning-foreground border-warning/20 hover:bg-warning/20";
 
                 return (
                   <div
@@ -203,7 +203,7 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
       );
       days = [];
     }
-    return <div className="border-l border-slate-100">{rows}</div>;
+    return <div className="border-l border-border">{rows}</div>;
   };
 
   const renderEventModal = () => {
@@ -211,39 +211,39 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
     const status = getEventStatus(new Date(selectedEvent.nextDueDate));
 
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-xs p-4">
-        <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white shadow-xl animate-in fade-in zoom-in-95">
-          <div className="p-5 border-b border-slate-100 flex items-start justify-between">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-xs p-4">
+        <div className="w-full max-w-sm rounded-2xl border border-border bg-white shadow-xl animate-in fade-in zoom-in-95">
+          <div className="p-5 border-b border-border flex items-start justify-between">
             <div className="space-y-1">
-              <h3 className="text-base font-bold text-slate-950 flex items-center gap-2">
-                <Wrench className="h-5 w-5 text-indigo-500" />
+              <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+                <Wrench className="h-5 w-5 text-primary" />
                 ข้อมูลรอบบำรุงรักษา
               </h3>
-              <p className="text-xs text-slate-500 font-medium">รหัสเครื่อง: {selectedEvent.acCode}</p>
+              <p className="text-xs text-muted-foreground font-medium">รหัสเครื่อง: {selectedEvent.acCode}</p>
             </div>
-            <button onClick={() => setSelectedEvent(null)} className="p-1 text-slate-400 hover:text-slate-900 rounded-lg hover:bg-slate-100 transition-colors">
+            <button onClick={() => setSelectedEvent(null)} className="p-1 text-muted-foreground hover:text-foreground rounded-lg hover:bg-secondary transition-colors">
               <X className="h-4 w-4" />
             </button>
           </div>
           
           <div className="p-5 space-y-4">
-            <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-2 text-sm">
+            <div className="bg-muted p-3 rounded-xl border border-border space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-slate-500 text-xs">สถานที่</span>
-                <span className="font-bold text-slate-900 text-xs">{selectedEvent.location}</span>
+                <span className="text-muted-foreground text-xs">สถานที่</span>
+                <span className="font-bold text-foreground text-xs">{selectedEvent.location}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500 text-xs">ยี่ห้อ</span>
-                <span className="font-bold text-slate-900 text-xs">{selectedEvent.brand}</span>
+                <span className="text-muted-foreground text-xs">ยี่ห้อ</span>
+                <span className="font-bold text-foreground text-xs">{selectedEvent.brand}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500 text-xs">ความถี่การล้าง</span>
-                <span className="font-bold text-slate-900 text-xs">ทุก {selectedEvent.frequencyMonths} เดือน</span>
+                <span className="text-muted-foreground text-xs">ความถี่การล้าง</span>
+                <span className="font-bold text-foreground text-xs">ทุก {selectedEvent.frequencyMonths} เดือน</span>
               </div>
-              <div className="flex justify-between pt-2 border-t border-slate-200 mt-2">
-                <span className="text-slate-500 text-xs font-bold">กำหนดรอบถัดไป</span>
+              <div className="flex justify-between pt-2 border-t border-border mt-2">
+                <span className="text-muted-foreground text-xs font-bold">กำหนดรอบถัดไป</span>
                 <span className={`font-bold text-xs ${
-                  status === "overdue" ? "text-red-600" : status === "warning" ? "text-amber-600" : "text-sky-600"
+                  status === "overdue" ? "text-red-600" : status === "warning" ? "text-warning" : "text-primary"
                 }`}>
                   {format(new Date(selectedEvent.nextDueDate), "dd MMM yyyy", { locale: th })}
                 </span>
@@ -255,7 +255,7 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
                 onCreateWorkOrder(selectedEvent.airConditionerId);
                 setSelectedEvent(null);
               }}
-              className="w-full flex items-center justify-center gap-2 bg-slate-950 text-white font-bold text-xs py-2.5 rounded-xl hover:bg-slate-800 transition-colors"
+              className="w-full flex items-center justify-center gap-2 bg-foreground text-white font-bold text-xs py-2.5 rounded-xl hover:bg-primary/90 transition-colors"
             >
               <Wrench className="h-3.5 w-3.5" />
               สร้างใบงานซ่อมบำรุงตอนนี้
@@ -267,10 +267,10 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
   };
 
   return (
-    <div className="biz-card relative animate-in fade-in shadow-sm rounded-2xl overflow-hidden bg-white border border-slate-200">
+    <div className="biz-card relative animate-in fade-in shadow-sm rounded-2xl overflow-hidden bg-white border border-border">
       {isLoading && (
         <div className="absolute inset-0 z-10 bg-white/50 backdrop-blur-sm flex items-center justify-center">
-          <AnimatedIcon icon={Clock} size={24} animation="spin" className="text-indigo-500" />
+          <AnimatedIcon icon={Clock} size={24} animation="spin" className="text-primary" />
         </div>
       )}
       {renderHeader()}

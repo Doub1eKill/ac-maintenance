@@ -10,9 +10,9 @@ interface AuthLayoutProps {
 
 export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
   return (
-    <div className="flex min-h-screen w-full flex-col lg:flex-row bg-[#f7f7f2] text-slate-900 font-sans antialiased selection:bg-slate-900 selection:text-white">
+    <div className="flex min-h-screen w-full flex-col lg:flex-row bg-background text-foreground font-sans antialiased selection:bg-slate-900 selection:text-white">
       {/* Left Showcase Panel (BizLink Executive Warm Minimalist Style) */}
-      <div className="relative hidden lg:flex lg:w-5/12 flex-col justify-between overflow-hidden bg-[#f4f4ee] p-12 border-r border-slate-200/90">
+      <div className="relative hidden lg:flex lg:w-5/12 flex-col justify-between overflow-hidden bg-muted p-12 border-r border-border">
         {/* Brand Header */}
         <div className="relative z-10">
           <Link href="/" className="inline-flex items-center gap-3 group">
@@ -69,7 +69,7 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
       </div>
 
       {/* Right Form Container Area */}
-      <div className="flex flex-1 flex-col justify-between p-6 sm:p-12 lg:w-7/12 bg-[#f7f7f2]">
+      <div className="flex flex-1 flex-col justify-between p-6 sm:p-12 lg:w-7/12 bg-background">
         {/* Mobile Header Logo */}
         <div className="flex items-center justify-between lg:hidden mb-8">
           <Link href="/" className="flex items-center gap-2.5">

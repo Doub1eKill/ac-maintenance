@@ -182,26 +182,26 @@ export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
   return (
     <div className="space-y-4">
       {selectedAcs.length > 0 && (
-        <div className="bg-sky-50 border border-sky-200 rounded-2xl p-4 flex items-center justify-between shadow-sm animate-in fade-in slide-in-from-top-4">
+        <div className="bg-primary/10 border border-primary/30 rounded-2xl p-4 flex items-center justify-between shadow-sm animate-in fade-in slide-in-from-top-4">
           <div className="flex items-center gap-3">
-            <div className="bg-sky-100 p-2 rounded-xl text-sky-600">
+            <div className="bg-primary/20 p-2 rounded-xl text-primary">
               <CheckSquare className="w-5 h-5" />
             </div>
             <div>
-              <div className="font-bold text-sky-900 text-sm">เลือกแล้ว {selectedAcs.length} รายการ</div>
-              <div className="text-xs text-sky-700">พร้อมสำหรับพิมพ์ลงสติ๊กเกอร์ A4</div>
+              <div className="font-bold text-primary text-sm">เลือกแล้ว {selectedAcs.length} รายการ</div>
+              <div className="text-xs text-primary">พร้อมสำหรับพิมพ์ลงสติ๊กเกอร์ A4</div>
             </div>
           </div>
           <div className="flex items-center gap-3">
             <button 
               onClick={() => setSelectedAcs([])}
-              className="text-xs font-bold text-sky-700 hover:text-sky-900 px-3 py-2 rounded-lg hover:bg-sky-100 transition-colors"
+              className="text-xs font-bold text-primary hover:text-primary px-3 py-2 rounded-lg hover:bg-primary/20 transition-colors"
             >
               ยกเลิกทั้งหมด
             </button>
             <button 
               onClick={handleBatchPrint}
-              className="flex items-center gap-2 bg-sky-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md shadow-sky-600/20 hover:bg-sky-700 transition-colors"
+              className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md shadow-primary/20 hover:bg-primary/90 transition-colors"
             >
               <Printer className="w-4 h-4" /> พิมพ์ QR Code ({selectedAcs.length})
             </button>
@@ -210,21 +210,21 @@ export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
       )}
 
       <div className="biz-card p-6 space-y-6 animate-in fade-in">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-100 pb-4 gap-4">
-          <h2 className="text-base font-bold text-slate-950 flex items-center gap-2">
-            <QrCode className="h-5 w-5 text-slate-700" />
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-border pb-4 gap-4">
+          <h2 className="text-base font-bold text-foreground flex items-center gap-2">
+            <QrCode className="h-5 w-5 text-foreground" />
             <span>จัดการ QR Code เครื่องปรับอากาศ ({filteredAcs.length} เครื่อง)</span>
           </h2>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm whitespace-nowrap">
-            <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
+            <thead className="bg-muted text-muted-foreground font-bold border-b border-border">
               <tr>
                 <th className="px-4 py-3 font-semibold rounded-tl-xl w-10 text-center">
                   <input 
                     type="checkbox" 
-                    className="w-4 h-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500 cursor-pointer"
+                    className="w-4 h-4 rounded border-border text-primary focus:ring-ring cursor-pointer"
                     checked={paginatedAcs.length > 0 && paginatedAcs.every(ac => selectedAcs.includes(ac.id))}
                     onChange={toggleSelectAll}
                   />
@@ -238,7 +238,7 @@ export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
             <tbody className="divide-y divide-slate-100">
               {paginatedAcs.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
+                  <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
                     ไม่พบข้อมูลเครื่องปรับอากาศ
                   </td>
                 </tr>
@@ -246,31 +246,31 @@ export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
                 paginatedAcs.map((ac) => (
                   <tr 
                     key={ac.id} 
-                    className={`transition-colors cursor-pointer ${selectedAcs.includes(ac.id) ? 'bg-sky-50/50' : 'hover:bg-slate-50'}`}
+                    className={`transition-colors cursor-pointer ${selectedAcs.includes(ac.id) ? 'bg-primary/10' : 'hover:bg-muted'}`}
                     onClick={() => toggleSelect(ac.id)}
                   >
                     <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                       <input 
                         type="checkbox" 
-                        className="w-4 h-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500 cursor-pointer"
+                        className="w-4 h-4 rounded border-border text-primary focus:ring-ring cursor-pointer"
                         checked={selectedAcs.includes(ac.id)}
                         onChange={() => toggleSelect(ac.id)}
                       />
                     </td>
                     <td className="px-4 py-3">
-                      <div className="font-mono font-bold text-slate-900">{ac.acCode}</div>
+                      <div className="font-mono font-bold text-foreground">{ac.acCode}</div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="font-medium text-slate-800">{ac.brand}</div>
-                      <div className="text-xs text-slate-500">{ac.model || "-"}</div>
+                      <div className="font-medium text-foreground">{ac.brand}</div>
+                      <div className="text-xs text-muted-foreground">{ac.model || "-"}</div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="text-slate-700">{ac.location}</div>
+                      <div className="text-foreground">{ac.location}</div>
                     </td>
                     <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={() => setShowQrCode(ac)}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-200 transition-colors"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-secondary px-3 py-1.5 text-xs font-bold text-foreground hover:bg-accent transition-colors"
                       >
                         <Printer className="h-3.5 w-3.5" /> ดูตัวอย่าง
                       </button>
@@ -283,7 +283,7 @@ export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
         </div>
 
         {totalPages > 1 && (
-          <div className="py-4 border-t border-slate-100 mt-4">
+          <div className="py-4 border-t border-border mt-4">
             <Pagination>
               <PaginationContent>
                 <PaginationItem>
@@ -297,7 +297,7 @@ export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
                   />
                 </PaginationItem>
                 <PaginationItem>
-                  <span className="text-xs font-medium text-slate-500 px-4">
+                  <span className="text-xs font-medium text-muted-foreground px-4">
                     หน้า {page} จาก {totalPages}
                   </span>
                 </PaginationItem>
@@ -339,25 +339,25 @@ export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
 
         {/* Single QR Code Modal Preview */}
         {showQrCode && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-xs p-4">
-            <div className="w-full max-w-sm rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl space-y-6 animate-in fade-in zoom-in-95 relative">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-xs p-4">
+            <div className="w-full max-w-sm rounded-3xl border border-border bg-white p-6 shadow-2xl space-y-6 animate-in fade-in zoom-in-95 relative">
               <button
                 onClick={() => setShowQrCode(null)}
-                className="absolute right-4 top-4 text-slate-400 hover:text-slate-950 bg-slate-100 p-1.5 rounded-full transition-colors"
+                className="absolute right-4 top-4 text-muted-foreground hover:text-foreground bg-secondary p-1.5 rounded-full transition-colors"
               >
                 <X className="h-4 w-4" />
               </button>
 
               <div className="text-center space-y-1 pt-2">
-                <h3 className="text-lg font-bold text-slate-950 tracking-tight flex items-center justify-center gap-2">
-                  <QrCode className="w-5 h-5 text-slate-700" />
+                <h3 className="text-lg font-bold text-foreground tracking-tight flex items-center justify-center gap-2">
+                  <QrCode className="w-5 h-5 text-foreground" />
                   ตัวอย่าง QR ประจำเครื่อง
                 </h3>
-                <p className="text-xs text-slate-500 font-medium">สแกนเพื่อดูประวัติการซ่อมบำรุง</p>
+                <p className="text-xs text-muted-foreground font-medium">สแกนเพื่อดูประวัติการซ่อมบำรุง</p>
               </div>
 
               <div className="flex justify-center" id="single-qr-print-area">
-                <div className="bg-white p-4 rounded-2xl border-2 border-slate-100 shadow-sm flex flex-col items-center gap-3">
+                <div className="bg-white p-4 rounded-2xl border-2 border-border shadow-sm flex flex-col items-center gap-3">
                   <QRCodeSVG
                     value={`${typeof window !== "undefined" ? window.location.origin : ""}/qr/${showQrCode.qrCode}`}
                     size={160}
@@ -366,8 +366,8 @@ export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
                     className="rounded-lg"
                   />
                   <div className="text-center">
-                    <div className="font-mono font-bold text-slate-900 text-sm tracking-widest">{showQrCode.acCode}</div>
-                    <div className="text-[10px] text-slate-500 font-medium mt-0.5">
+                    <div className="font-mono font-bold text-foreground text-sm tracking-widest">{showQrCode.acCode}</div>
+                    <div className="text-[10px] text-muted-foreground font-medium mt-0.5">
                       {showQrCode.brand} {showQrCode.model ? `(${showQrCode.model})` : ""}
                     </div>
                   </div>
@@ -402,7 +402,7 @@ export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
                   `);
                   printWindow.document.close();
                 }}
-                className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-900 py-3 font-bold text-white hover:bg-slate-800 transition-colors shadow-md shadow-slate-900/20"
+                className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary py-3 font-bold text-white hover:bg-primary/90 transition-colors shadow-md shadow-slate-900/20"
               >
                 <Printer className="w-4 h-4" /> พิมพ์ (Print)
               </button>

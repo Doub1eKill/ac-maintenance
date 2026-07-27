@@ -24,15 +24,14 @@ import {
   UserX,
   Users,
   QrCode,
+  User,
+  Settings,
 } from "lucide-react";
 import { AnimatedIcon } from "@/components/ui/animated-icon";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/ui/native-select";
 import {
   Pagination,
   PaginationContent,
@@ -53,7 +52,7 @@ import { DashboardLayout, NavItem } from "@/components/layout/dashboard-layout";
 import { AssetManager } from "@/components/admin/asset-manager";
 import { MaintenanceCalendar } from "@/components/admin/maintenance-calendar";
 import { QrCodeManager } from "@/components/admin/qr-code-manager";
-import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { ChartAreaInteractive } from "@/components/admin/chart-area-interactive";
 
 interface WorkOrderItem {
   id: string;
@@ -313,38 +312,57 @@ export function AdminDashboardView({
       id: "overview",
       label: "ภาพรวมระบบ",
       icon: Snowflake,
+      group: "หน้าหลัก",
     },
     {
       id: "kanban",
       label: "กระดานใบงาน",
       icon: ClipboardList,
       badge: metrics.pendingWorkOrders,
+      group: "การซ่อมบำรุง",
+    },
+    {
+      id: "calendar",
+      label: "ปฏิทินซ่อมบำรุง",
+      icon: Calendar,
+      group: "การซ่อมบำรุง",
     },
     {
       id: "approvals",
       label: "อนุมัติผู้ใช้งาน",
       icon: Clock,
       badge: pendingUsers.length,
+      group: "ผู้ใช้งานและบุคลากร",
     },
     {
       id: "team",
       label: "เจ้าหน้าที่ & ช่าง",
       icon: Users,
+      group: "ผู้ใช้งานและบุคลากร",
     },
     {
       id: "assets",
       label: "ระบบสินทรัพย์",
       icon: Building2,
-    },
-    {
-      id: "calendar",
-      label: "ปฏิทินซ่อมบำรุง",
-      icon: Calendar,
+      group: "ระบบทรัพย์สิน",
     },
     {
       id: "qr_codes",
       label: "จัดการ QR Code",
       icon: QrCode,
+      group: "ระบบทรัพย์สิน",
+    },
+    {
+      id: "profile",
+      label: "จัดการโปรไฟล์",
+      icon: User,
+      group: "บัญชีและการตั้งค่า",
+    },
+    {
+      id: "settings",
+      label: "ตั้งค่าระบบ",
+      icon: Settings,
+      group: "บัญชีและการตั้งค่า",
     },
   ];
 
@@ -375,11 +393,11 @@ export function AdminDashboardView({
     >
       {/* Database Connection Alert */}
       {dbError && (
-        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-xs font-semibold text-amber-900 flex items-start gap-3 shadow-2xs">
-          <AnimatedIcon icon={AlertTriangle} size={18} animation="wiggle" className="text-amber-600 shrink-0 mt-0.5" />
+        <div className="rounded-2xl border border-warning/40 bg-warning/10 p-4 text-xs font-semibold text-warning-foreground flex items-start gap-3 shadow-2xs">
+          <AnimatedIcon icon={AlertTriangle} size={18} animation="wiggle" className="text-warning shrink-0 mt-0.5" />
           <div>
-            <div className="font-bold text-amber-950">การแจ้งเตือนการเชื่อมต่อฐานข้อมูล</div>
-            <p className="text-amber-800 font-normal leading-relaxed mt-0.5">{dbError}</p>
+            <div className="font-bold text-warning-foreground">การแจ้งเตือนการเชื่อมต่อฐานข้อมูล</div>
+            <p className="text-warning-foreground font-normal leading-relaxed mt-0.5">{dbError}</p>
           </div>
         </div>
       )}
@@ -389,19 +407,19 @@ export function AdminDashboardView({
         <div
           className={`rounded-2xl border p-4 text-xs font-semibold flex items-center justify-between shadow-2xs ${
             toastMessage.type === "success"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+              ? "border-success/30 bg-success/10 text-success-foreground"
               : "border-red-200 bg-red-50 text-red-900"
           }`}
         >
           <div className="flex items-center gap-2.5">
             {toastMessage.type === "success" ? (
-              <AnimatedIcon icon={CheckCircle2} size={18} animation="bounce" className="text-emerald-600" />
+              <AnimatedIcon icon={CheckCircle2} size={18} animation="bounce" className="text-success" />
             ) : (
               <AnimatedIcon icon={AlertTriangle} size={18} animation="wiggle" className="text-red-600" />
             )}
             <span>{toastMessage.text}</span>
           </div>
-          <button onClick={() => setToastMessage(null)} className="text-slate-400 hover:text-slate-900">
+          <button onClick={() => setToastMessage(null)} className="text-muted-foreground hover:text-foreground">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -413,78 +431,70 @@ export function AdminDashboardView({
         <div className="space-y-6 animate-in fade-in">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="biz-card p-5 space-y-3">
-              <div className="text-slate-500 font-bold text-xs flex items-center justify-between">
+              <div className="text-muted-foreground font-bold text-xs flex items-center justify-between">
                 รวมเครื่องปรับอากาศ
-                <Snowflake className="h-4 w-4 text-sky-500" />
+                <Snowflake className="h-4 w-4 text-primary" />
               </div>
-              <div className="text-3xl font-bold text-slate-950">{metrics.totalUnits} <span className="text-sm font-medium text-slate-500">เครื่อง</span></div>
+              <div className="text-3xl font-bold text-foreground">{metrics.totalUnits} <span className="text-sm font-medium text-muted-foreground">เครื่อง</span></div>
             </div>
             <div className="biz-card p-5 space-y-3">
-              <div className="text-slate-500 font-bold text-xs flex items-center justify-between">
+              <div className="text-muted-foreground font-bold text-xs flex items-center justify-between">
                 แอร์ที่เสีย / รอซ่อม
                 <AlertTriangle className="h-4 w-4 text-red-500" />
               </div>
-              <div className="text-3xl font-bold text-slate-950">{metrics.brokenOrCleaningUnits} <span className="text-sm font-medium text-slate-500">เครื่อง</span></div>
+              <div className="text-3xl font-bold text-foreground">{metrics.brokenOrCleaningUnits} <span className="text-sm font-medium text-muted-foreground">เครื่อง</span></div>
             </div>
             <div className="biz-card p-5 space-y-3">
-              <div className="text-slate-500 font-bold text-xs flex items-center justify-between">
+              <div className="text-muted-foreground font-bold text-xs flex items-center justify-between">
                 ใบงานรอดำเนินการ
-                <ClipboardList className="h-4 w-4 text-amber-500" />
+                <ClipboardList className="h-4 w-4 text-warning" />
               </div>
-              <div className="text-3xl font-bold text-slate-950">{metrics.pendingWorkOrders} <span className="text-sm font-medium text-slate-500">ใบงาน</span></div>
+              <div className="text-3xl font-bold text-foreground">{metrics.pendingWorkOrders} <span className="text-sm font-medium text-muted-foreground">ใบงาน</span></div>
             </div>
             <div className="biz-card p-5 space-y-3">
-              <div className="text-slate-500 font-bold text-xs flex items-center justify-between">
+              <div className="text-muted-foreground font-bold text-xs flex items-center justify-between">
                 ช่างผู้รับผิดชอบ
-                <Wrench className="h-4 w-4 text-emerald-500" />
+                <Wrench className="h-4 w-4 text-success" />
               </div>
-              <div className="text-3xl font-bold text-slate-950">{metrics.activeTechsCount} <span className="text-sm font-medium text-slate-500">คน</span></div>
+              <div className="text-3xl font-bold text-foreground">{metrics.activeTechsCount} <span className="text-sm font-medium text-muted-foreground">คน</span></div>
             </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 biz-card p-6 space-y-6">
-              <h3 className="text-base font-bold text-slate-950 flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-sky-600" /> สถิติการซ่อมบำรุงในรอบสัปดาห์
-              </h3>
-              <div className="h-64 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={weeklyActivity} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
-                    <Tooltip cursor={{ fill: '#f1f5f9' }} contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                    <Bar dataKey="repairs" fill="#0ea5e9" radius={[4, 4, 0, 0]} barSize={40} name="จำนวนงานซ่อม" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+            <div className="lg:col-span-2">
+              <ChartAreaInteractive 
+                title="ภาพรวมสถิติการซ่อมบำรุง (Maintenance Analytics)" 
+                description="สถิติการแจ้งซ่อมและงานที่เสร็จสิ้น เปรียบเทียบย้อนหลัง" 
+              />
             </div>
             
             <div className="biz-card p-6 space-y-6">
-              <h3 className="text-base font-bold text-slate-950 flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-amber-500" /> รอซ่อมด่วน (Pending)
+              <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-warning" /> รอซ่อมด่วน (Pending)
               </h3>
               <div className="space-y-3">
                 {pendingOrders.slice(0, 4).map(wo => (
-                  <div key={wo.id} className="p-3 rounded-xl border border-slate-100 bg-slate-50 flex flex-col gap-1">
+                  <div key={wo.id} className="p-3 rounded-xl border border-border bg-muted flex flex-col gap-1">
                     <div className="flex justify-between items-center">
-                      <span className="font-mono font-bold text-sm text-slate-900">{wo.acCode}</span>
+                      <span className="font-mono font-bold text-sm text-foreground">{wo.acCode}</span>
                       <div className="flex items-center gap-2">
                         <button 
                           onClick={() => { setSelectedOrderToAssign(wo.id); setShowAssignModal(true); }}
-                          className="text-[10px] font-bold text-sky-600 bg-sky-50 border border-sky-100 px-2 py-0.5 rounded hover:bg-sky-100 transition-colors"
+                          className="text-[10px] font-bold text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded hover:bg-primary/20 transition-colors"
                         >
                           จ่ายงาน
                         </button>
-                        <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold">รอดำเนินการ</span>
+                        <span className="text-[10px] bg-warning/20 text-warning-foreground px-2 py-0.5 rounded-full font-bold">รอดำเนินการ</span>
                       </div>
                     </div>
-                    <span className="text-xs text-slate-500">{wo.location}</span>
+                    <span className="text-xs text-muted-foreground">{wo.location}</span>
                   </div>
                 ))}
                 {pendingOrders.length === 0 && (
-                  <div className="text-center text-slate-400 text-xs py-4">ไม่มีใบงานด่วน</div>
+                  <div className="text-center text-muted-foreground text-xs py-4">ไม่มีใบงานด่วน</div>
                 )}
                 {pendingOrders.length > 4 && (
-                  <button onClick={() => setActiveTab('kanban')} className="w-full text-center text-xs font-bold text-sky-600 py-2 hover:bg-sky-50 rounded-lg transition-colors">
+                  <button onClick={() => setActiveTab('kanban')} className="w-full text-center text-xs font-bold text-primary py-2 hover:bg-primary/10 rounded-lg transition-colors">
                     ดูทั้งหมด ({pendingOrders.length})
                   </button>
                 )}
@@ -498,18 +508,18 @@ export function AdminDashboardView({
       {activeTab === "kanban" && (
         <div className="space-y-6 animate-in fade-in">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <h2 className="text-lg font-bold text-slate-950 flex items-center gap-2">
-              <ClipboardList className="h-5 w-5 text-indigo-600" /> ระบบจัดการงานซ่อมบำรุง
+            <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+              <ClipboardList className="h-5 w-5 text-primary" /> ระบบจัดการงานซ่อมบำรุง
             </h2>
-            <div className="text-sm text-slate-500 font-medium">
-              พบใบงานทั้งหมด <span className="font-bold text-slate-900">{filteredWorkOrders.length}</span> รายการ
+            <div className="text-sm text-muted-foreground font-medium">
+              พบใบงานทั้งหมด <span className="font-bold text-foreground">{filteredWorkOrders.length}</span> รายการ
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
-                <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
+                <thead className="bg-muted border-b border-border text-muted-foreground font-semibold">
                   <tr>
                     <th className="px-6 py-4 whitespace-nowrap">รหัสแอร์</th>
                     <th className="px-6 py-4 whitespace-nowrap">สถานที่ตั้ง / ยี่ห้อ</th>
@@ -522,7 +532,7 @@ export function AdminDashboardView({
                 <tbody className="divide-y divide-slate-100">
                   {paginatedWorkOrders.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-8 text-center text-slate-400">
+                      <td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">
                         ไม่พบข้อมูลใบงาน
                       </td>
                     </tr>
@@ -530,44 +540,44 @@ export function AdminDashboardView({
                     paginatedWorkOrders.map((wo) => (
                       <tr 
                         key={wo.id} 
-                        className="hover:bg-slate-50 transition-colors cursor-pointer"
+                        className="hover:bg-muted transition-colors cursor-pointer"
                         onClick={() => setSelectedWorkOrderDetails(wo)}
                       >
-                        <td className="px-6 py-4 whitespace-nowrap font-mono font-bold text-slate-900">
+                        <td className="px-6 py-4 whitespace-nowrap font-mono font-bold text-foreground">
                           {wo.acCode}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="font-medium text-slate-800">{wo.location}</div>
-                          <div className="text-xs text-slate-500">{wo.brand}</div>
+                          <div className="font-medium text-foreground">{wo.location}</div>
+                          <div className="text-xs text-muted-foreground">{wo.brand}</div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-slate-600">
+                        <td className="px-6 py-4 whitespace-nowrap text-muted-foreground">
                           {wo.createdAt ? new Date(wo.createdAt).toLocaleDateString("th-TH") : "-"}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           {wo.claimedByName ? (
                             <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600">
+                              <div className="w-6 h-6 rounded-full bg-accent flex items-center justify-center text-[10px] font-bold text-muted-foreground">
                                 {wo.claimedByName.charAt(0)}
                               </div>
-                              <span className="font-medium text-slate-700">{wo.claimedByName}</span>
+                              <span className="font-medium text-foreground">{wo.claimedByName}</span>
                             </div>
                           ) : (
-                            <span className="text-slate-400 italic">-</span>
+                            <span className="text-muted-foreground italic">-</span>
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-center">
                           {wo.status === "pending" && (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-warning/20 text-warning-foreground border border-warning/30">
                               รอดำเนินการ
                             </span>
                           )}
                           {wo.status === "claimed" && (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-sky-100 text-sky-800 border border-sky-200">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary/20 text-primary border border-primary/30">
                               กำลังดำเนินการ
                             </span>
                           )}
                           {wo.status === "completed" && (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-success/20 text-success-foreground border border-success/30">
                               เสร็จสิ้น
                             </span>
                           )}
@@ -580,14 +590,14 @@ export function AdminDashboardView({
                                 setSelectedOrderToAssign(wo.id); 
                                 setShowAssignModal(true); 
                               }}
-                              className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-bold text-sky-700 bg-sky-50 border border-sky-200 rounded-lg hover:bg-sky-100 transition-colors"
+                              className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-bold text-primary bg-primary/10 border border-primary/30 rounded-lg hover:bg-primary/20 transition-colors"
                             >
                               จ่ายงาน
                             </button>
                           ) : (
                             <button 
                               onClick={(e) => { e.stopPropagation(); setSelectedWorkOrderDetails(wo); }}
-                              className="inline-flex items-center justify-center p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+                              className="inline-flex items-center justify-center p-1.5 text-muted-foreground hover:text-muted-foreground rounded-lg hover:bg-secondary transition-colors"
                             >
                               <MoreVertical className="w-4 h-4" />
                             </button>
@@ -602,8 +612,8 @@ export function AdminDashboardView({
             
             {/* Pagination Controls */}
             {totalWorkOrdersPages > 1 && (
-              <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
-                <div className="text-sm text-slate-500">
+              <div className="px-6 py-4 border-t border-border bg-muted flex items-center justify-between">
+                <div className="text-sm text-muted-foreground">
                   หน้า {workOrdersPage} จาก {totalWorkOrdersPages}
                 </div>
                 <Pagination>
@@ -644,21 +654,21 @@ export function AdminDashboardView({
       {/* User Approvals Tab */}
       {activeTab === "approvals" && (
         <div className="biz-card p-6 space-y-5 animate-in fade-in">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-            <h2 className="text-base font-bold text-slate-950 flex items-center gap-2">
-              <Clock className="h-5 w-5 text-amber-500" />
+          <div className="flex items-center justify-between border-b border-border pb-4">
+            <h2 className="text-base font-bold text-foreground flex items-center gap-2">
+              <Clock className="h-5 w-5 text-warning" />
               <span>คำขออนุมัติผู้ใช้งานใหม่สำหรับ {universityName} ({pendingUsers.length})</span>
             </h2>
           </div>
 
           {filteredPendingUsers.length === 0 ? (
-            <div className="py-12 text-center text-xs text-slate-500 border border-dashed border-slate-200 rounded-2xl">
+            <div className="py-12 text-center text-xs text-muted-foreground border border-dashed border-border rounded-2xl">
               ยังไม่มีคำขอลงทะเบียนผู้ใช้งานสำหรับองค์กรนี้
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs text-slate-700">
-                <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+              <table className="w-full text-left text-xs text-foreground">
+                <thead className="border-b border-border bg-muted text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
                   <tr>
                     <th className="py-3 px-4 rounded-l-xl">ชื่อผู้ใช้</th>
                     <th className="py-3 px-4">อีเมล</th>
@@ -669,16 +679,16 @@ export function AdminDashboardView({
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {paginatedApprovals.map((u) => (
-                    <tr key={u.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="py-3.5 px-4 font-bold text-slate-950">{u.name}</td>
+                    <tr key={u.id} className="hover:bg-muted transition-colors">
+                      <td className="py-3.5 px-4 font-bold text-foreground">{u.name}</td>
                       <td className="py-3.5 px-4 font-mono">{u.email}</td>
-                      <td className="py-3.5 px-4 font-bold text-slate-800 uppercase">{u.role}</td>
+                      <td className="py-3.5 px-4 font-bold text-foreground uppercase">{u.role}</td>
                       <td className="py-3.5 px-4 font-mono">{u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "-"}</td>
                       <td className="py-3.5 px-4 text-right space-x-2">
                         <button
                           onClick={() => handleUserStatus(u.id, "active")}
                           disabled={isPending}
-                          className="rounded-lg bg-emerald-600 px-3 py-1.5 font-bold text-white hover:bg-emerald-700 transition-colors disabled:opacity-50 inline-flex items-center gap-1"
+                          className="rounded-lg bg-success px-3 py-1.5 font-bold text-white hover:bg-success/90 transition-colors disabled:opacity-50 inline-flex items-center gap-1"
                         >
                           <UserCheck className="h-3.5 w-3.5" />
                           อนุมัติ
@@ -697,7 +707,7 @@ export function AdminDashboardView({
                 </tbody>
               </table>
               {totalApprovalsPages > 1 && (
-                <div className="py-4 border-t border-slate-100">
+                <div className="py-4 border-t border-border">
                   <Pagination>
                     <PaginationContent>
                       <PaginationItem>
@@ -708,7 +718,7 @@ export function AdminDashboardView({
                         />
                       </PaginationItem>
                       <PaginationItem>
-                        <span className="text-xs font-medium text-slate-500 px-4">
+                        <span className="text-xs font-medium text-muted-foreground px-4">
                           หน้า {approvalsPage} จาก {totalApprovalsPages}
                         </span>
                       </PaginationItem>
@@ -731,16 +741,16 @@ export function AdminDashboardView({
       {/* Staff & Technicians Tab */}
       {activeTab === "team" && (
         <div className="biz-card p-6 space-y-5 animate-in fade-in">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-            <h2 className="text-base font-bold text-slate-950 flex items-center gap-2">
-              <Users className="h-5 w-5 text-slate-700" />
+          <div className="flex items-center justify-between border-b border-border pb-4">
+            <h2 className="text-base font-bold text-foreground flex items-center gap-2">
+              <Users className="h-5 w-5 text-foreground" />
               <span>ทำเนียบเจ้าหน้าที่และช่างซ่อมบำรุง ({allUsers.length})</span>
             </h2>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-700">
-              <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+            <table className="w-full text-left text-xs text-foreground">
+              <thead className="border-b border-border bg-muted text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
                 <tr>
                   <th className="py-3 px-4 rounded-l-xl">ชื่อผู้ใช้</th>
                   <th className="py-3 px-4">อีเมล</th>
@@ -751,17 +761,17 @@ export function AdminDashboardView({
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {paginatedTeam.map((u) => (
-                  <tr key={u.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="py-3.5 px-4 font-bold text-slate-950">{u.name}</td>
+                  <tr key={u.id} className="hover:bg-muted transition-colors">
+                    <td className="py-3.5 px-4 font-bold text-foreground">{u.name}</td>
                     <td className="py-3.5 px-4 font-mono">{u.email}</td>
-                    <td className="py-3.5 px-4 font-bold text-slate-800 uppercase">{u.role}</td>
+                    <td className="py-3.5 px-4 font-bold text-foreground uppercase">{u.role}</td>
                     <td className="py-3.5 px-4">
                       <span
                         className={`px-2 py-0.5 rounded-md font-bold text-[10px] uppercase ${
                           u.status === "active"
-                            ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                            ? "bg-success/20 text-success-foreground border border-success/30"
                             : u.status === "pending"
-                            ? "bg-amber-100 text-amber-800 border border-amber-200"
+                            ? "bg-warning/20 text-warning-foreground border border-warning/30"
                             : "bg-red-100 text-red-800 border border-red-200"
                         }`}
                       >
@@ -781,7 +791,7 @@ export function AdminDashboardView({
                         <button
                           onClick={() => handleUserStatus(u.id, "active")}
                           disabled={isPending || u.role === "super_admin"}
-                          className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 hover:bg-emerald-100 transition-colors disabled:opacity-40"
+                          className="rounded-lg border border-success/30 bg-success/10 px-2.5 py-1 text-[11px] font-bold text-success-foreground hover:bg-success/20 transition-colors disabled:opacity-40"
                         >
                           เปิดใช้งาน
                         </button>
@@ -792,7 +802,7 @@ export function AdminDashboardView({
               </tbody>
             </table>
             {totalTeamPages > 1 && (
-              <div className="py-4 border-t border-slate-100">
+              <div className="py-4 border-t border-border">
                 <Pagination>
                   <PaginationContent>
                     <PaginationItem>
@@ -803,7 +813,7 @@ export function AdminDashboardView({
                       />
                     </PaginationItem>
                     <PaginationItem>
-                      <span className="text-xs font-medium text-slate-500 px-4">
+                      <span className="text-xs font-medium text-muted-foreground px-4">
                         หน้า {teamPage} จาก {totalTeamPages}
                       </span>
                     </PaginationItem>
@@ -835,64 +845,56 @@ export function AdminDashboardView({
 
       {/* Modal: Create Work Order */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-xs p-4">
-          <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xl space-y-4 animate-in fade-in">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-base font-bold text-slate-950">สร้างใบงานซ่อมบำรุง</h3>
-              <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-950">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-xs p-4">
+          <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-border bg-white p-5 sm:p-6 shadow-xl space-y-4 animate-in fade-in">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <h3 className="text-base font-bold text-foreground">สร้างใบงานซ่อมบำรุง</h3>
+              <button onClick={() => setShowCreateModal(false)} className="text-muted-foreground hover:text-foreground">
                 <X className="h-5 w-5" />
               </button>
             </div>
 
             <form onSubmit={handleCreateOrderSubmit} className="space-y-4 text-xs">
               <div>
-                <label className="mb-1.5 block font-bold text-slate-700">เลือกเครื่องปรับอากาศ</label>
-                <Select name="airConditionerId" defaultValue={selectedAcForWorkOrder ?? undefined}>
-                  <SelectTrigger className="w-full rounded-xl border-slate-200 bg-slate-50 px-3.5 py-5 text-xs text-slate-900 focus:ring-slate-400">
-                    <SelectValue placeholder="-- เลือกเครื่องปรับอากาศ --" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl border-slate-200 shadow-lg animate-in fade-in zoom-in-95">
-                    {allAcUnits.map((unit) => (
-                      <SelectItem key={unit.id} value={unit.id} className="text-xs rounded-lg focus:bg-slate-50 cursor-pointer">
-                        {unit.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <label className="mb-1.5 block font-bold text-foreground">เลือกเครื่องปรับอากาศ</label>
+                <NativeSelect name="airConditionerId" defaultValue={selectedAcForWorkOrder ?? ""} className="w-full h-auto py-3 px-3.5 rounded-xl border-border bg-muted text-xs text-foreground">
+                  <NativeSelectOption value="" disabled>-- เลือกเครื่องปรับอากาศ --</NativeSelectOption>
+                  {allAcUnits.map((unit) => (
+                    <NativeSelectOption key={unit.id} value={unit.id}>
+                      {unit.label}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
               </div>
 
               <div>
-                <label className="mb-1.5 block font-bold text-slate-700">มอบหมายช่างเทคนิค (ไม่บังคับ)</label>
-                <Select name="assignToUserId">
-                  <SelectTrigger className="w-full rounded-xl border-slate-200 bg-slate-50 px-3.5 py-5 text-xs text-slate-900 focus:ring-slate-400">
-                    <SelectValue placeholder="-- เลือกลงคิวงาน หรือเว้นว่างให้ช่างกดรับเอง --" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl border-slate-200 shadow-lg animate-in fade-in zoom-in-95">
-                    {activeTechnicians.length === 0 ? (
-                      <SelectItem value="none" disabled className="text-xs text-slate-500">ไม่มีช่างเทคนิคที่พร้อมรับงาน</SelectItem>
-                    ) : (
-                      activeTechnicians.map((tech) => (
-                        <SelectItem key={tech.id} value={tech.id} className="text-xs rounded-lg focus:bg-slate-50 cursor-pointer">
-                          {tech.name}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
+                <label className="mb-1.5 block font-bold text-foreground">มอบหมายช่างเทคนิค (ไม่บังคับ)</label>
+                <NativeSelect name="assignToUserId" required defaultValue="" className="w-full h-auto py-3 px-3.5 rounded-xl border-border bg-muted text-xs text-foreground">
+                  <NativeSelectOption value="" disabled>-- เลือกช่างเทคนิค --</NativeSelectOption>
+                  {activeTechnicians.length === 0 ? (
+                    <NativeSelectOption value="none" disabled>ไม่มีช่างเทคนิคที่พร้อมรับงาน</NativeSelectOption>
+                  ) : (
+                    activeTechnicians.map((tech) => (
+                      <NativeSelectOption key={tech.id} value={tech.id}>
+                        {tech.name} (ช่างซ่อมบำรุง)
+                      </NativeSelectOption>
+                    ))
+                  )}
+                </NativeSelect>
               </div>
 
               <div className="flex gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="w-1/2 rounded-xl border border-slate-200 py-2.5 font-bold text-slate-700 hover:bg-slate-100"
+                  className="w-1/2 rounded-xl border border-border py-2.5 font-bold text-foreground hover:bg-secondary"
                 >
                   ยกเลิก
                 </button>
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="w-1/2 rounded-xl bg-slate-950 py-2.5 font-bold text-white hover:bg-slate-800 disabled:opacity-50"
+                  className="w-1/2 rounded-xl bg-foreground py-2.5 font-bold text-white hover:bg-primary/90 disabled:opacity-50"
                 >
                   {isPending ? "กำลังสร้าง..." : "ยืนยันการสร้างใบงาน"}
                 </button>
@@ -909,48 +911,44 @@ export function AdminDashboardView({
 
       {/* Modal: Assign Work Order */}
       {showAssignModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-xs p-4">
-          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xl space-y-4 animate-in fade-in">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-base font-bold text-slate-950">มอบหมายงานให้ช่างเทคนิค</h3>
-              <button onClick={() => setShowAssignModal(false)} className="text-slate-400 hover:text-slate-950">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-xs p-4">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-white p-5 sm:p-6 shadow-xl space-y-4 animate-in fade-in">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <h3 className="text-base font-bold text-foreground">มอบหมายงานให้ช่างเทคนิค</h3>
+              <button onClick={() => setShowAssignModal(false)} className="text-muted-foreground hover:text-foreground">
                 <X className="h-5 w-5" />
               </button>
             </div>
 
             <form onSubmit={handleAssignSubmit} className="space-y-4 text-xs">
               <div>
-                <label className="mb-1.5 block font-bold text-slate-700">เลือกช่างเทคนิคที่ต้องการมอบหมายงาน</label>
-                <Select name="assignToUserId" required>
-                  <SelectTrigger className="w-full rounded-xl border-slate-200 bg-slate-50 px-3.5 py-5 text-xs text-slate-900 focus:ring-slate-400">
-                    <SelectValue placeholder="-- เลือกช่างเทคนิค --" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl border-slate-200 shadow-lg animate-in fade-in zoom-in-95">
-                    {activeTechnicians.length === 0 ? (
-                      <SelectItem value="none" disabled className="text-xs text-slate-500">ไม่มีช่างเทคนิคที่พร้อมรับงาน</SelectItem>
-                    ) : (
-                      activeTechnicians.map((tech) => (
-                        <SelectItem key={tech.id} value={tech.id} className="text-xs rounded-lg focus:bg-slate-50 cursor-pointer">
-                          {tech.name}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
+                <label className="mb-1.5 block font-bold text-foreground">เลือกช่างเทคนิคที่ต้องการมอบหมายงาน</label>
+                <NativeSelect name="assignToUserId" required defaultValue="" className="w-full h-auto py-3 px-3.5 rounded-xl border-border bg-muted text-xs text-foreground">
+                  <NativeSelectOption value="" disabled>-- เลือกช่างเทคนิค --</NativeSelectOption>
+                  {activeTechnicians.length === 0 ? (
+                    <NativeSelectOption value="none" disabled>ไม่มีช่างเทคนิคที่พร้อมรับงาน</NativeSelectOption>
+                  ) : (
+                    activeTechnicians.map((tech) => (
+                      <NativeSelectOption key={tech.id} value={tech.id}>
+                        {tech.name}
+                      </NativeSelectOption>
+                    ))
+                  )}
+                </NativeSelect>
               </div>
 
               <div className="flex gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowAssignModal(false)}
-                  className="w-1/2 rounded-xl border border-slate-200 py-2.5 font-bold text-slate-700 hover:bg-slate-100"
+                  className="w-1/2 rounded-xl border border-border py-2.5 font-bold text-foreground hover:bg-secondary"
                 >
                   ยกเลิก
                 </button>
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="w-1/2 rounded-xl bg-slate-950 py-2.5 font-bold text-white hover:bg-slate-800 disabled:opacity-50"
+                  className="w-1/2 rounded-xl bg-foreground py-2.5 font-bold text-white hover:bg-primary/90 disabled:opacity-50"
                 >
                   {isPending ? "กำลังบันทึก..." : "ยืนยันการมอบหมาย"}
                 </button>
@@ -963,16 +961,16 @@ export function AdminDashboardView({
       <Dialog open={!!selectedWorkOrderDetails} onOpenChange={(open) => { if (!open) setSelectedWorkOrderDetails(null) }}>
         <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto p-0 border-0 rounded-2xl overflow-hidden">
           {selectedWorkOrderDetails && (
-            <div className="flex flex-col h-full bg-slate-50">
+            <div className="flex flex-col h-full bg-muted">
               {/* Header */}
-              <div className="bg-white px-6 py-5 border-b border-slate-200 sticky top-0 z-10">
+              <div className="bg-white px-6 py-5 border-b border-border sticky top-0 z-10">
                 <div className="flex items-start justify-between">
                   <div>
-                    <h2 className="text-xl font-bold text-slate-950 flex items-center gap-2">
-                      <ClipboardList className="h-6 w-6 text-indigo-600" />
+                    <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
+                      <ClipboardList className="h-6 w-6 text-primary" />
                       ใบงานซ่อมบำรุง {selectedWorkOrderDetails.acCode}
                     </h2>
-                    <p className="text-sm text-slate-500 mt-1 font-medium">
+                    <p className="text-sm text-muted-foreground mt-1 font-medium">
                       รายละเอียดการแจ้งซ่อมและประวัติการทำงาน (Audit Trail)
                     </p>
                   </div>
@@ -988,17 +986,17 @@ export function AdminDashboardView({
                       </span>
                     )}
                     {selectedWorkOrderDetails.status === "pending" && (
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-warning/20 text-warning-foreground border border-warning/30">
                         รอดำเนินการ
                       </span>
                     )}
                     {selectedWorkOrderDetails.status === "claimed" && (
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-sky-100 text-sky-800 border border-sky-200">
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-primary/20 text-primary border border-primary/30">
                         กำลังดำเนินการ
                       </span>
                     )}
                     {selectedWorkOrderDetails.status === "completed" && (
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-success/20 text-success-foreground border border-success/30">
                         เสร็จสิ้น
                       </span>
                     )}
@@ -1012,53 +1010,53 @@ export function AdminDashboardView({
                 {/* Left Column: Asset & Issue Details */}
                 <div className="md:col-span-2 space-y-6">
                   {/* Issue Section */}
-                  <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-                    <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2 mb-4">
-                      <AlertTriangle className="h-4 w-4 text-amber-500" />
+                  <div className="bg-white rounded-xl border border-border p-5 shadow-sm">
+                    <h3 className="text-sm font-bold text-foreground flex items-center gap-2 mb-4">
+                      <AlertTriangle className="h-4 w-4 text-warning" />
                       รายละเอียดปัญหา (Issue Description)
                     </h3>
-                    <div className="bg-slate-50 p-4 rounded-lg border border-slate-100 text-sm text-slate-700 leading-relaxed min-h-[80px]">
+                    <div className="bg-muted p-4 rounded-lg border border-border text-sm text-foreground leading-relaxed min-h-[80px]">
                       {selectedWorkOrderDetails.issueDescription || "ไม่มีการระบุรายละเอียด"}
                     </div>
                   </div>
 
                   {/* Resolution Section (If completed) */}
                   {selectedWorkOrderDetails.status === "completed" && (
-                    <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-                      <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2 mb-4">
-                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                    <div className="bg-white rounded-xl border border-border p-5 shadow-sm">
+                      <h3 className="text-sm font-bold text-foreground flex items-center gap-2 mb-4">
+                        <CheckCircle2 className="h-4 w-4 text-success" />
                         บันทึกการซ่อม (Resolution Notes)
                       </h3>
-                      <div className="bg-emerald-50/50 p-4 rounded-lg border border-emerald-100 text-sm text-emerald-800 leading-relaxed min-h-[80px]">
+                      <div className="bg-success/10 p-4 rounded-lg border border-success/20 text-sm text-success-foreground leading-relaxed min-h-[80px]">
                         {selectedWorkOrderDetails.resolutionNotes || "ไม่มีการระบุบันทึกการซ่อม"}
                       </div>
                     </div>
                   )}
 
                   {/* Media / Images Section */}
-                  <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-                    <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2 mb-4">
-                      <MessageSquare className="h-4 w-4 text-slate-500" />
+                  <div className="bg-white rounded-xl border border-border p-5 shadow-sm">
+                    <h3 className="text-sm font-bold text-foreground flex items-center gap-2 mb-4">
+                      <MessageSquare className="h-4 w-4 text-muted-foreground" />
                       รูปภาพประกอบ (Media/Evidence)
                     </h3>
                     {selectedWorkOrderDetails.images ? (
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                         {Array.isArray(selectedWorkOrderDetails.images) 
                           ? selectedWorkOrderDetails.images.map((img: string, idx: number) => (
-                              <div key={idx} className="aspect-square rounded-lg border border-slate-200 overflow-hidden bg-slate-100 relative group cursor-pointer">
+                              <div key={idx} className="aspect-square rounded-lg border border-border overflow-hidden bg-secondary relative group cursor-pointer">
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img src={img} alt="Work Order Evidence" className="w-full h-full object-cover transition-transform group-hover:scale-105" />
                               </div>
                             ))
                           : (
-                            <div className="col-span-full py-8 text-center text-sm text-slate-400 bg-slate-50 rounded-lg border border-dashed border-slate-200">
+                            <div className="col-span-full py-8 text-center text-sm text-muted-foreground bg-muted rounded-lg border border-dashed border-border">
                               รูปแบบรูปภาพไม่ถูกต้อง
                             </div>
                           )
                         }
                       </div>
                     ) : (
-                      <div className="py-8 text-center text-sm text-slate-400 bg-slate-50 rounded-lg border border-dashed border-slate-200">
+                      <div className="py-8 text-center text-sm text-muted-foreground bg-muted rounded-lg border border-dashed border-border">
                         ไม่มีรูปภาพประกอบ
                       </div>
                     )}
@@ -1069,48 +1067,48 @@ export function AdminDashboardView({
                 <div className="space-y-6">
                   
                   {/* Asset Info */}
-                  <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-                    <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2 mb-4 pb-3 border-b border-slate-100">
-                      <Snowflake className="h-4 w-4 text-sky-500" />
+                  <div className="bg-white rounded-xl border border-border p-5 shadow-sm">
+                    <h3 className="text-sm font-bold text-foreground flex items-center gap-2 mb-4 pb-3 border-b border-border">
+                      <Snowflake className="h-4 w-4 text-primary" />
                       ข้อมูลเครื่องปรับอากาศ
                     </h3>
                     <div className="space-y-3 text-sm">
                       <div className="flex justify-between items-center">
-                        <span className="text-slate-500">รหัสครุภัณฑ์:</span>
-                        <span className="font-mono font-bold text-slate-900">{selectedWorkOrderDetails.acCode}</span>
+                        <span className="text-muted-foreground">รหัสครุภัณฑ์:</span>
+                        <span className="font-mono font-bold text-foreground">{selectedWorkOrderDetails.acCode}</span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-slate-500">ยี่ห้อ:</span>
-                        <span className="font-medium text-slate-900">{selectedWorkOrderDetails.brand}</span>
+                        <span className="text-muted-foreground">ยี่ห้อ:</span>
+                        <span className="font-medium text-foreground">{selectedWorkOrderDetails.brand}</span>
                       </div>
                       <div className="flex justify-between items-start">
-                        <span className="text-slate-500">สถานที่:</span>
-                        <span className="font-medium text-slate-900 text-right max-w-[150px]">{selectedWorkOrderDetails.location}</span>
+                        <span className="text-muted-foreground">สถานที่:</span>
+                        <span className="font-medium text-foreground text-right max-w-[150px]">{selectedWorkOrderDetails.location}</span>
                       </div>
                     </div>
                   </div>
 
                   {/* Audit Trail Timeline */}
-                  <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-                    <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2 mb-5 pb-3 border-b border-slate-100">
-                      <Clock className="h-4 w-4 text-indigo-500" />
+                  <div className="bg-white rounded-xl border border-border p-5 shadow-sm">
+                    <h3 className="text-sm font-bold text-foreground flex items-center gap-2 mb-5 pb-3 border-b border-border">
+                      <Clock className="h-4 w-4 text-primary" />
                       ประวัติการดำเนินการ (Audit Trail)
                     </h3>
                     
-                    <div className="relative pl-6 space-y-6 before:absolute before:inset-y-2 before:left-[11px] before:w-[2px] before:bg-slate-100">
+                    <div className="relative pl-6 space-y-6 before:absolute before:inset-y-2 before:left-[11px] before:w-[2px] before:bg-border">
                       
                       {/* Created */}
                       <div className="relative">
                         <div className="absolute -left-[30px] p-1 bg-white rounded-full">
-                          <div className="w-2.5 h-2.5 bg-slate-400 rounded-full ring-4 ring-slate-50" />
+                          <div className="w-2.5 h-2.5 bg-muted-foreground rounded-full ring-4 ring-slate-50" />
                         </div>
-                        <div className="text-xs font-bold text-slate-900">แจ้งเรื่อง</div>
-                        <div className="text-xs text-slate-500 mt-1">
+                        <div className="text-xs font-bold text-foreground">แจ้งเรื่อง</div>
+                        <div className="text-xs text-muted-foreground mt-1">
                           {selectedWorkOrderDetails.createdAt ? new Date(selectedWorkOrderDetails.createdAt).toLocaleString("th-TH") : "-"}
                         </div>
                         {selectedWorkOrderDetails.reportedByName && (
-                          <div className="text-xs text-slate-600 mt-1 flex items-center gap-1.5">
-                            <UserCheck className="w-3 h-3 text-slate-400" /> {selectedWorkOrderDetails.reportedByName}
+                          <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5">
+                            <UserCheck className="w-3 h-3 text-muted-foreground" /> {selectedWorkOrderDetails.reportedByName}
                           </div>
                         )}
                       </div>
@@ -1119,13 +1117,13 @@ export function AdminDashboardView({
                       {selectedWorkOrderDetails.assignedToName && (
                         <div className="relative">
                           <div className="absolute -left-[30px] p-1 bg-white rounded-full">
-                            <div className="w-2.5 h-2.5 bg-indigo-500 rounded-full ring-4 ring-indigo-50" />
+                            <div className="w-2.5 h-2.5 bg-primary rounded-full ring-4 ring-primary/10" />
                           </div>
-                          <div className="text-xs font-bold text-slate-900">มอบหมายงาน</div>
-                          <div className="text-xs text-slate-500 mt-1">
+                          <div className="text-xs font-bold text-foreground">มอบหมายงาน</div>
+                          <div className="text-xs text-muted-foreground mt-1">
                             {selectedWorkOrderDetails.assignedAt ? new Date(selectedWorkOrderDetails.assignedAt).toLocaleString("th-TH") : "-"}
                           </div>
-                          <div className="text-xs text-indigo-700 bg-indigo-50 px-2 py-1 rounded inline-flex items-center gap-1.5 mt-1.5">
+                          <div className="text-xs text-primary bg-primary/10 px-2 py-1 rounded inline-flex items-center gap-1.5 mt-1.5">
                             <Wrench className="w-3 h-3" /> ให้ช่าง {selectedWorkOrderDetails.assignedToName}
                           </div>
                         </div>
@@ -1135,13 +1133,13 @@ export function AdminDashboardView({
                       {selectedWorkOrderDetails.claimedAt && (
                         <div className="relative">
                           <div className="absolute -left-[30px] p-1 bg-white rounded-full">
-                            <div className="w-2.5 h-2.5 bg-sky-500 rounded-full ring-4 ring-sky-50" />
+                            <div className="w-2.5 h-2.5 bg-primary rounded-full ring-4 ring-sky-50" />
                           </div>
-                          <div className="text-xs font-bold text-slate-900">เริ่มดำเนินการซ่อม</div>
-                          <div className="text-xs text-slate-500 mt-1">
+                          <div className="text-xs font-bold text-foreground">เริ่มดำเนินการซ่อม</div>
+                          <div className="text-xs text-muted-foreground mt-1">
                             {new Date(selectedWorkOrderDetails.claimedAt).toLocaleString("th-TH")}
                           </div>
-                          <div className="text-xs text-sky-700 bg-sky-50 px-2 py-1 rounded inline-flex items-center gap-1.5 mt-1.5">
+                          <div className="text-xs text-primary bg-primary/10 px-2 py-1 rounded inline-flex items-center gap-1.5 mt-1.5">
                             <Wrench className="w-3 h-3" /> ดำเนินการโดย {selectedWorkOrderDetails.claimedByName || selectedWorkOrderDetails.assignedToName}
                           </div>
                         </div>
@@ -1151,10 +1149,10 @@ export function AdminDashboardView({
                       {selectedWorkOrderDetails.completedAt && (
                         <div className="relative">
                           <div className="absolute -left-[30px] p-1 bg-white rounded-full">
-                            <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full ring-4 ring-emerald-50" />
+                            <div className="w-2.5 h-2.5 bg-success rounded-full ring-4 ring-success/10" />
                           </div>
-                          <div className="text-xs font-bold text-emerald-700">เสร็จสิ้นสมบูรณ์</div>
-                          <div className="text-xs text-slate-500 mt-1">
+                          <div className="text-xs font-bold text-success-foreground">เสร็จสิ้นสมบูรณ์</div>
+                          <div className="text-xs text-muted-foreground mt-1">
                             {new Date(selectedWorkOrderDetails.completedAt).toLocaleString("th-TH")}
                           </div>
                         </div>

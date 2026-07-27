@@ -25,6 +25,11 @@
 - Enhanced `asset-manager.tsx`, `admin-dashboard-view.tsx`, and `super-admin-view.tsx` with responsive filtering, clean metric cards, and maintenance status tracking.
 - Optimized mobile experience in `tech-mobile-view.tsx` for field technicians.
 
+### 4. UI/UX Refinements & Theming (July 2026)
+- **Form Controls:** Migrated all old `<Select>` and raw `<select>` elements to shadcn's `NativeSelect` component across the application (`admin-dashboard-view`, `asset-manager`, `tech-mobile-view`, `chart-area-interactive`, etc.). Improved `native-select.tsx` to properly propagate custom classNames to the internal `<select>` tag for consistent padding and height alignment with text inputs.
+- **Semantic Theming:** Audited and replaced hardcoded Tailwind color utility classes (e.g., `slate`, `sky`, `indigo`, `emerald`, `amber`) with semantic theme variables (e.g., `bg-background`, `bg-muted`, `bg-primary`, `bg-success`, `text-warning-foreground`, `border-border`) to fully support the dynamic HSL theme preset (`b7WjPrGOe`).
+- **Layout Alignment:** Fixed visual asymmetries, such as the vertical separator spacing in the sidebar trigger (`dashboard-layout.tsx`) and text overlapping in chart dropdowns.
+
 ---
 
 ## 📁 Key File Structure & Architecture
@@ -80,4 +85,4 @@ npm run build
 
 ---
 
-*Handoff document generated on July 24, 2026.*
+*Handoff document generated on July 27, 2026.*

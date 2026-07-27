@@ -30,6 +30,10 @@ import { AnimatedIcon } from "@/components/ui/animated-icon";
 import { DashboardLayout, NavItem } from "@/components/layout/dashboard-layout";
 import { Pattern as FileUpload } from "@/components/examples/c-file-upload-4";
 import { format } from "date-fns";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/ui/native-select";
 
 interface TechJobItem {
   id: string;
@@ -267,11 +271,11 @@ export function TechMobileView({
     >
       {/* Database Connection Alert */}
       {dbError && (
-        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-xs font-semibold text-amber-900 flex items-start gap-2.5 shadow-2xs">
-          <AnimatedIcon icon={AlertTriangle} size={18} animation="wiggle" className="text-amber-600 shrink-0 mt-0.5" />
+        <div className="rounded-2xl border border-warning/40 bg-warning/10 p-4 text-xs font-semibold text-warning-foreground flex items-start gap-2.5 shadow-2xs">
+          <AnimatedIcon icon={AlertTriangle} size={18} animation="wiggle" className="text-warning shrink-0 mt-0.5" />
           <div>
-            <div className="font-bold text-amber-950">การแจ้งเตือนการเชื่อมต่อฐานข้อมูล</div>
-            <p className="text-amber-800 font-normal leading-relaxed text-[11px]">{dbError}</p>
+            <div className="font-bold text-warning-foreground">การแจ้งเตือนการเชื่อมต่อฐานข้อมูล</div>
+            <p className="text-warning-foreground font-normal leading-relaxed text-[11px]">{dbError}</p>
           </div>
         </div>
       )}
@@ -281,19 +285,19 @@ export function TechMobileView({
         <div
           className={`rounded-2xl border p-4 text-xs font-semibold flex items-center justify-between shadow-2xs ${
             toastMessage.type === "success"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+              ? "border-success/30 bg-success/10 text-success-foreground"
               : "border-red-200 bg-red-50 text-red-900"
           }`}
         >
           <div className="flex items-center gap-2.5">
             {toastMessage.type === "success" ? (
-              <AnimatedIcon icon={CheckCircle2} size={18} animation="bounce" className="text-emerald-600 shrink-0" />
+              <AnimatedIcon icon={CheckCircle2} size={18} animation="bounce" className="text-success shrink-0" />
             ) : (
               <AnimatedIcon icon={AlertTriangle} size={18} animation="wiggle" className="text-red-600 shrink-0" />
             )}
             <span>{toastMessage.text}</span>
           </div>
-          <button onClick={() => setToastMessage(null)} className="text-slate-400 hover:text-slate-900">
+          <button onClick={() => setToastMessage(null)} className="text-muted-foreground hover:text-foreground">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -302,10 +306,10 @@ export function TechMobileView({
       {/* Filter Row */}
       <div className="biz-banner p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-2xs">
         <div>
-          <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+          <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
             พื้นที่ปฏิบัติงานช่างเทคนิค
           </div>
-          <h1 className="text-xl font-bold text-slate-950 mt-1">
+          <h1 className="text-xl font-bold text-foreground mt-1">
             {activeTab === "pool" ? "งานซ่อมบำรุงที่รอรับ" : 
              activeTab === "my_jobs" ? "งานที่ฉันกำลังดำเนินการ" : 
              "ประวัติการทำงานของฉัน"}
@@ -313,20 +317,20 @@ export function TechMobileView({
         </div>
 
         <div className="flex gap-2 w-full sm:w-auto">
-          <select 
+          <NativeSelect 
             value={selectedBuilding}
             onChange={(e) => setSelectedBuilding(e.target.value)}
-            className="w-full sm:w-auto rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm focus:border-slate-950 focus:outline-none"
+            className="w-full h-auto py-2 px-3 sm:w-auto rounded-xl border-border bg-white text-xs font-bold text-foreground shadow-sm"
           >
-            <option value="all">ทุกอาคาร</option>
+            <NativeSelectOption value="all">ทุกอาคาร</NativeSelectOption>
             {buildings.map(b => (
-              <option key={b.id} value={b.name}>{b.name}</option>
+              <NativeSelectOption key={b.id} value={b.name}>{b.name}</NativeSelectOption>
             ))}
-          </select>
+          </NativeSelect>
 
           <button
             onClick={() => setShowQrModal(true)}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-xs font-bold text-white hover:bg-slate-800 transition-all shadow-md shrink-0"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-foreground px-4 py-2.5 text-xs font-bold text-white hover:bg-primary/90 transition-all shadow-md shrink-0"
           >
             <QrCode className="h-4 w-4 text-white" />
             <span className="hidden sm:inline">สแกน QR Code</span>
@@ -338,7 +342,7 @@ export function TechMobileView({
       {activeTab === "pool" && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in">
           {filteredPool.length === 0 ? (
-            <div className="col-span-full py-12 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-2xl">
+            <div className="col-span-full py-12 text-center text-xs text-muted-foreground border border-dashed border-border rounded-2xl">
               ไม่มีงานซ่อมบำรุงที่รอรับ
             </div>
           ) : (
@@ -351,28 +355,28 @@ export function TechMobileView({
                 )}
                 <div className="flex items-center justify-between pr-8">
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-base font-bold text-slate-950">{job.acCode}</span>
-                    <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700">
+                    <span className="font-mono text-base font-bold text-foreground">{job.acCode}</span>
+                    <span className="rounded-md bg-secondary px-2 py-0.5 text-[10px] font-bold text-foreground">
                       {job.brand} {job.btu ? `(${job.btu} BTU)` : ""}
                     </span>
                   </div>
                 </div>
 
-                <div className="text-xs text-slate-600 font-medium leading-relaxed">
+                <div className="text-xs text-muted-foreground font-medium leading-relaxed">
                   {job.location}
                 </div>
 
-                <div className="pt-2 flex items-center justify-between text-xs border-t border-slate-100">
+                <div className="pt-2 flex items-center justify-between text-xs border-t border-border">
                   <div className="flex flex-col">
-                    <span className="text-[11px] font-bold text-amber-700">รอรับงาน</span>
-                    <span className="text-[10px] text-slate-400 mt-1">
+                    <span className="text-[11px] font-bold text-warning-foreground">รอรับงาน</span>
+                    <span className="text-[10px] text-muted-foreground mt-1">
                       {job.createdAt ? `แจ้งเมื่อ: ${format(new Date(job.createdAt), "dd/MM/yyyy")}` : ""}
                     </span>
                   </div>
                   <button
                     onClick={() => handleClaim(job.id)}
                     disabled={isPending}
-                    className="rounded-xl bg-slate-950 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800 transition-all shadow-sm active:scale-95"
+                    className="rounded-xl bg-foreground px-4 py-2 text-xs font-bold text-white hover:bg-primary/90 transition-all shadow-sm active:scale-95"
                   >
                     รับงาน
                   </button>
@@ -395,7 +399,7 @@ export function TechMobileView({
                 />
               </PaginationItem>
               <PaginationItem>
-                <span className="text-xs font-medium text-slate-500 px-4">
+                <span className="text-xs font-medium text-muted-foreground px-4">
                   หน้า {poolPage} จาก {totalPoolPages}
                 </span>
               </PaginationItem>
@@ -415,7 +419,7 @@ export function TechMobileView({
       {activeTab === "my_jobs" && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in">
           {filteredMyJobs.length === 0 ? (
-            <div className="col-span-full py-12 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-2xl">
+            <div className="col-span-full py-12 text-center text-xs text-muted-foreground border border-dashed border-border rounded-2xl">
               คุณไม่มีงานที่กำลังดำเนินการ
             </div>
           ) : (
@@ -426,24 +430,24 @@ export function TechMobileView({
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className={`font-mono text-base font-bold ${idx === 0 ? "text-white" : "text-slate-950"}`}>
+                    <span className={`font-mono text-base font-bold ${idx === 0 ? "text-white" : "text-foreground"}`}>
                       {job.acCode}
                     </span>
-                    <span className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${idx === 0 ? "bg-slate-800 text-slate-300" : "bg-slate-100 text-slate-700"}`}>
+                    <span className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${idx === 0 ? "bg-slate-800 text-muted-foreground" : "bg-secondary text-foreground"}`}>
                       {job.brand}
                     </span>
                   </div>
-                  <MoreVertical className={`h-4 w-4 ${idx === 0 ? "text-slate-400" : "text-slate-400"}`} />
+                  <MoreVertical className={`h-4 w-4 ${idx === 0 ? "text-muted-foreground" : "text-muted-foreground"}`} />
                 </div>
 
-                <div className={`text-xs font-medium leading-relaxed ${idx === 0 ? "text-slate-300" : "text-slate-600"}`}>
+                <div className={`text-xs font-medium leading-relaxed ${idx === 0 ? "text-muted-foreground" : "text-muted-foreground"}`}>
                   {job.location}
                 </div>
 
-                <div className={`pt-2 flex items-center justify-between text-xs border-t ${idx === 0 ? "border-slate-800 text-slate-300" : "border-slate-100 text-slate-500"}`}>
+                <div className={`pt-2 flex items-center justify-between text-xs border-t ${idx === 0 ? "border-slate-800 text-muted-foreground" : "border-border text-muted-foreground"}`}>
                   <div className="flex flex-col">
                     <span className="text-[11px] font-bold text-sky-400">กำลังดำเนินการ</span>
-                    <span className={`text-[10px] mt-1 ${idx === 0 ? "text-slate-400" : "text-slate-400"}`}>
+                    <span className={`text-[10px] mt-1 ${idx === 0 ? "text-muted-foreground" : "text-muted-foreground"}`}>
                       {job.claimedAt ? `รับงานเมื่อ: ${format(new Date(job.claimedAt), "dd/MM HH:mm")}` : ""}
                     </span>
                   </div>
@@ -452,7 +456,7 @@ export function TechMobileView({
                       setSelectedJobForLog(job);
                       setSelectedActions([]);
                     }}
-                    className={`rounded-xl px-4 py-2 text-xs font-bold transition-all shadow-sm active:scale-95 ${idx === 0 ? "bg-white text-slate-950 hover:bg-slate-100" : "bg-slate-950 text-white hover:bg-slate-800"}`}
+                    className={`rounded-xl px-4 py-2 text-xs font-bold transition-all shadow-sm active:scale-95 ${idx === 0 ? "bg-white text-foreground hover:bg-secondary" : "bg-foreground text-white hover:bg-primary/90"}`}
                   >
                     บันทึกและปิดงาน
                   </button>
@@ -475,7 +479,7 @@ export function TechMobileView({
                 />
               </PaginationItem>
               <PaginationItem>
-                <span className="text-xs font-medium text-slate-500 px-4">
+                <span className="text-xs font-medium text-muted-foreground px-4">
                   หน้า {myJobsPage} จาก {totalMyJobsPages}
                 </span>
               </PaginationItem>
@@ -495,28 +499,28 @@ export function TechMobileView({
       {activeTab === "completed" && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in">
           {filteredCompletedJobs.length === 0 ? (
-            <div className="col-span-full py-12 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-2xl">
+            <div className="col-span-full py-12 text-center text-xs text-muted-foreground border border-dashed border-border rounded-2xl">
               ไม่มีประวัติการทำงาน
             </div>
           ) : (
             paginatedCompletedJobs.map((job) => (
-              <div key={job.id} className="biz-card p-5 space-y-4 hover:border-slate-400 transition-all bg-slate-50">
+              <div key={job.id} className="biz-card p-5 space-y-4 hover:border-slate-400 transition-all bg-muted">
                 <div className="flex items-center justify-between opacity-80">
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-base font-bold text-slate-600">{job.acCode}</span>
-                    <span className="rounded-md bg-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+                    <span className="font-mono text-base font-bold text-muted-foreground">{job.acCode}</span>
+                    <span className="rounded-md bg-accent px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
                       {job.brand}
                     </span>
                   </div>
-                  <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                  <CheckCircle2 className="h-5 w-5 text-success" />
                 </div>
 
-                <div className="text-xs text-slate-500 font-medium leading-relaxed">
+                <div className="text-xs text-muted-foreground font-medium leading-relaxed">
                   {job.location}
                 </div>
 
-                <div className="pt-2 flex items-center justify-between text-xs border-t border-slate-200 text-slate-500">
-                  <span className="text-[11px] font-bold text-emerald-600">เสร็จสิ้นแล้ว</span>
+                <div className="pt-2 flex items-center justify-between text-xs border-t border-border text-muted-foreground">
+                  <span className="text-[11px] font-bold text-success">เสร็จสิ้นแล้ว</span>
                   <span className="text-[10px] font-semibold">
                     {job.completedAt ? `เมื่อ: ${format(new Date(job.completedAt), "dd/MM/yyyy HH:mm")}` : ""}
                   </span>
@@ -539,7 +543,7 @@ export function TechMobileView({
                 />
               </PaginationItem>
               <PaginationItem>
-                <span className="text-xs font-medium text-slate-500 px-4">
+                <span className="text-xs font-medium text-muted-foreground px-4">
                   หน้า {completedJobsPage} จาก {totalCompletedJobsPages}
                 </span>
               </PaginationItem>
@@ -557,40 +561,40 @@ export function TechMobileView({
 
       {/* Modal: QR Code Scanner Simulator */}
       {showQrModal && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-950/40 backdrop-blur-xs p-0 sm:p-4">
-          <div className="w-full max-w-sm max-h-[90vh] overflow-y-auto rounded-t-3xl sm:rounded-2xl border border-slate-200 bg-white p-6 pb-10 sm:pb-6 shadow-2xl space-y-4 animate-in slide-in-from-bottom-full sm:slide-in-from-bottom-0 sm:fade-in">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-sm font-bold text-slate-950 flex items-center gap-2">
-                <QrCode className="h-4 w-4 text-slate-950" />
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-foreground/40 backdrop-blur-xs p-0 sm:p-4">
+          <div className="w-full max-w-sm max-h-[90vh] overflow-y-auto rounded-t-3xl sm:rounded-2xl border border-border bg-white p-6 pb-10 sm:pb-6 shadow-2xl space-y-4 animate-in slide-in-from-bottom-full sm:slide-in-from-bottom-0 sm:fade-in">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                <QrCode className="h-4 w-4 text-foreground" />
                 <span>สแกนรหัส QR เครื่องปรับอากาศ</span>
               </h3>
-              <button onClick={() => setShowQrModal(false)} className="text-slate-400 hover:text-slate-950">
+              <button onClick={() => setShowQrModal(false)} className="text-muted-foreground hover:text-foreground">
                 <X className="h-5 w-5" />
               </button>
             </div>
 
             {!qrResult ? (
               <>
-                <div className="relative h-40 w-full rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 flex flex-col items-center justify-center overflow-hidden">
-                  <div className="absolute inset-x-0 h-0.5 bg-slate-900 animate-laser" />
-                  <QrCode className="h-12 w-12 text-slate-400 animate-pulse" />
-                  <span className="text-[11px] font-semibold text-slate-500 mt-2">เล็งกล้องไปที่ QR Code</span>
+                <div className="relative h-40 w-full rounded-xl border-2 border-dashed border-border bg-muted flex flex-col items-center justify-center overflow-hidden">
+                  <div className="absolute inset-x-0 h-0.5 bg-primary animate-laser" />
+                  <QrCode className="h-12 w-12 text-muted-foreground animate-pulse" />
+                  <span className="text-[11px] font-semibold text-muted-foreground mt-2">เล็งกล้องไปที่ QR Code</span>
                 </div>
     
                 <div className="space-y-2">
-                  <label className="block text-[11px] font-bold text-slate-700">จำลองการสแกน:</label>
+                  <label className="block text-[11px] font-bold text-foreground">จำลองการสแกน:</label>
                   <div className="flex gap-2">
                     <input
                       type="text"
                       value={scannedAcCode}
                       onChange={(e) => setScannedAcCode(e.target.value)}
                       placeholder="e.g. PKRU-ENG-101-AC1"
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-900 font-mono focus:border-slate-950 focus:outline-none"
+                      className="w-full rounded-xl border border-border bg-muted px-3 py-2 text-xs text-foreground font-mono focus:border-primary focus:outline-none"
                     />
                     <button
                       onClick={handleSimulateQrScan}
                       disabled={isPending}
-                      className="rounded-xl bg-slate-950 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800 shrink-0"
+                      className="rounded-xl bg-foreground px-4 py-2 text-xs font-bold text-white hover:bg-primary/90 shrink-0"
                     >
                       ยืนยัน
                     </button>
@@ -599,34 +603,34 @@ export function TechMobileView({
               </>
             ) : (
               <div className="space-y-4 animate-in zoom-in-95">
-                <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl space-y-3">
+                <div className="bg-muted border border-border p-4 rounded-xl space-y-3">
                   <div className="flex justify-between items-start">
                     <div>
-                      <div className="font-mono text-lg font-bold text-slate-900">{qrResult.acDetails.acCode}</div>
-                      <div className="text-xs text-slate-500 font-medium">{qrResult.acDetails.location}</div>
+                      <div className="font-mono text-lg font-bold text-foreground">{qrResult.acDetails.acCode}</div>
+                      <div className="text-xs text-muted-foreground font-medium">{qrResult.acDetails.location}</div>
                     </div>
-                    <span className="bg-slate-200 text-slate-800 text-[10px] font-bold px-2 py-1 rounded-md">
+                    <span className="bg-accent text-foreground text-[10px] font-bold px-2 py-1 rounded-md">
                       {qrResult.acDetails.brand}
                     </span>
                   </div>
                   
-                  <div className="border-t border-slate-200 pt-3 flex flex-col gap-1 text-xs">
+                  <div className="border-t border-border pt-3 flex flex-col gap-1 text-xs">
                     <div className="flex justify-between">
-                      <span className="text-slate-500">สถานะล่าสุด:</span>
+                      <span className="text-muted-foreground">สถานะล่าสุด:</span>
                       <span className="font-bold">{qrResult.acDetails.status === 'normal' ? '✅ ปกติ' : '⚠️ มีปัญหา'}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-slate-500">ซ่อมบำรุงล่าสุด:</span>
+                      <span className="text-muted-foreground">ซ่อมบำรุงล่าสุด:</span>
                       <span className="font-semibold">{qrResult.acDetails.lastMaintenance ? format(new Date(qrResult.acDetails.lastMaintenance), "dd/MM/yyyy") : 'ไม่เคยซ่อมบำรุง'}</span>
                     </div>
                   </div>
                 </div>
                 
                 {qrResult.pendingJobId ? (
-                  <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl flex items-center justify-between">
+                  <div className="bg-warning/10 border border-warning/30 p-3 rounded-xl flex items-center justify-between">
                     <div>
-                      <div className="text-xs font-bold text-amber-800">มีใบงานค้างอยู่!</div>
-                      <div className="text-[10px] text-amber-700">ต้องการรับงานนี้หรือไม่?</div>
+                      <div className="text-xs font-bold text-warning-foreground">มีใบงานค้างอยู่!</div>
+                      <div className="text-[10px] text-warning-foreground">ต้องการรับงานนี้หรือไม่?</div>
                     </div>
                     <button 
                       onClick={handleClaimFromQr}
@@ -637,14 +641,14 @@ export function TechMobileView({
                     </button>
                   </div>
                 ) : (
-                  <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-xl">
-                    <div className="text-xs font-bold text-emerald-800 mb-2">ไม่พบใบงานแจ้งซ่อมค้างอยู่</div>
+                  <div className="bg-success/10 border border-success/30 p-3 rounded-xl">
+                    <div className="text-xs font-bold text-success-foreground mb-2">ไม่พบใบงานแจ้งซ่อมค้างอยู่</div>
                     <button 
                       onClick={() => {
                         setToastMessage({type: 'success', text: 'สร้างใบงานบำรุงรักษาเรียบร้อย (จำลอง)'});
                         setShowQrModal(false);
                       }}
-                      className="w-full bg-emerald-600 text-white text-xs font-bold px-3 py-2 rounded-lg hover:bg-emerald-700 shadow-sm"
+                      className="w-full bg-success text-white text-xs font-bold px-3 py-2 rounded-lg hover:bg-success/90 shadow-sm"
                     >
                       สร้างใบงาน PM ใหม่
                     </button>
@@ -653,7 +657,7 @@ export function TechMobileView({
                 
                 <button 
                   onClick={() => setQrResult(null)}
-                  className="w-full border border-slate-200 bg-white text-slate-700 text-xs font-bold px-3 py-2 rounded-lg hover:bg-slate-50"
+                  className="w-full border border-border bg-white text-foreground text-xs font-bold px-3 py-2 rounded-lg hover:bg-muted"
                 >
                   สแกนเครื่องใหม่
                 </button>
@@ -665,11 +669,11 @@ export function TechMobileView({
 
       {/* Modal: Action Logger Sheet */}
       {selectedJobForLog && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-950/40 backdrop-blur-xs p-0 sm:p-4">
-          <div className="w-full max-w-md max-h-[95vh] overflow-y-auto rounded-t-3xl sm:rounded-2xl border border-slate-200 bg-white p-6 pb-10 sm:pb-6 shadow-2xl space-y-4 animate-in slide-in-from-bottom-full sm:slide-in-from-bottom-0 sm:fade-in">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-sm font-bold text-slate-950">บันทึกประวัติการซ่อม ({selectedJobForLog.acCode})</h3>
-              <button onClick={() => setSelectedJobForLog(null)} className="text-slate-400 hover:text-slate-950">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-foreground/40 backdrop-blur-xs p-0 sm:p-4">
+          <div className="w-full max-w-md max-h-[95vh] overflow-y-auto rounded-t-3xl sm:rounded-2xl border border-border bg-white p-6 pb-10 sm:pb-6 shadow-2xl space-y-4 animate-in slide-in-from-bottom-full sm:slide-in-from-bottom-0 sm:fade-in">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <h3 className="text-sm font-bold text-foreground">บันทึกประวัติการซ่อม ({selectedJobForLog.acCode})</h3>
+              <button onClick={() => setSelectedJobForLog(null)} className="text-muted-foreground hover:text-foreground">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -679,47 +683,47 @@ export function TechMobileView({
               <input type="hidden" name="airConditionerId" value={selectedJobForLog.airConditionerId || ""} />
 
               <div>
-                <label className="mb-2 block font-bold text-slate-700">ประเภทการดำเนินการ <span className="text-red-500">*</span></label>
+                <label className="mb-2 block font-bold text-foreground">ประเภทการดำเนินการ <span className="text-red-500">*</span></label>
                 <div className="grid grid-cols-3 gap-2">
                   <div 
                     onClick={() => toggleAction("cleaning")}
-                    className={`flex flex-col items-center justify-center rounded-xl border p-3 text-center cursor-pointer transition-colors ${selectedActions.includes("cleaning") ? "border-slate-950 bg-slate-100 ring-1 ring-slate-950" : "border-slate-200 bg-slate-50 hover:border-slate-400"}`}
+                    className={`flex flex-col items-center justify-center rounded-xl border p-3 text-center cursor-pointer transition-colors ${selectedActions.includes("cleaning") ? "border-slate-950 bg-secondary ring-1 ring-slate-950" : "border-border bg-muted hover:border-slate-400"}`}
                   >
-                    <Sparkles className="h-4 w-4 text-slate-800 mb-1" />
-                    <span className="font-bold text-slate-950">ล้างแอร์</span>
+                    <Sparkles className="h-4 w-4 text-foreground mb-1" />
+                    <span className="font-bold text-foreground">ล้างแอร์</span>
                   </div>
 
                   <div 
                     onClick={() => toggleAction("repair")}
-                    className={`flex flex-col items-center justify-center rounded-xl border p-3 text-center cursor-pointer transition-colors ${selectedActions.includes("repair") ? "border-slate-950 bg-slate-100 ring-1 ring-slate-950" : "border-slate-200 bg-slate-50 hover:border-slate-400"}`}
+                    className={`flex flex-col items-center justify-center rounded-xl border p-3 text-center cursor-pointer transition-colors ${selectedActions.includes("repair") ? "border-slate-950 bg-secondary ring-1 ring-slate-950" : "border-border bg-muted hover:border-slate-400"}`}
                   >
-                    <Wrench className="h-4 w-4 text-slate-800 mb-1" />
-                    <span className="font-bold text-slate-950">ซ่อมแอร์</span>
+                    <Wrench className="h-4 w-4 text-foreground mb-1" />
+                    <span className="font-bold text-foreground">ซ่อมแอร์</span>
                   </div>
 
                   <div 
                     onClick={() => toggleAction("refill_refrigerant")}
-                    className={`flex flex-col items-center justify-center rounded-xl border p-3 text-center cursor-pointer transition-colors ${selectedActions.includes("refill_refrigerant") ? "border-slate-950 bg-slate-100 ring-1 ring-slate-950" : "border-slate-200 bg-slate-50 hover:border-slate-400"}`}
+                    className={`flex flex-col items-center justify-center rounded-xl border p-3 text-center cursor-pointer transition-colors ${selectedActions.includes("refill_refrigerant") ? "border-slate-950 bg-secondary ring-1 ring-slate-950" : "border-border bg-muted hover:border-slate-400"}`}
                   >
-                    <Droplets className="h-4 w-4 text-slate-800 mb-1" />
-                    <span className="font-bold text-slate-950">เติมน้ำยาแอร์</span>
+                    <Droplets className="h-4 w-4 text-foreground mb-1" />
+                    <span className="font-bold text-foreground">เติมน้ำยาแอร์</span>
                   </div>
                 </div>
               </div>
 
               <div>
-                <label className="mb-2 block font-bold text-slate-700">รูปภาพหลักฐาน (ก่อนทำ/หลังทำ)</label>
+                <label className="mb-2 block font-bold text-foreground">รูปภาพหลักฐาน (ก่อนทำ/หลังทำ)</label>
                 <div className="flex flex-col gap-3">
-                  <div className="border border-slate-200 p-2 rounded-xl bg-slate-50">
-                    <div className="text-[10px] font-bold text-slate-500 mb-1">ภาพก่อนซ่อมบำรุง:</div>
+                  <div className="border border-border p-2 rounded-xl bg-muted">
+                    <div className="text-[10px] font-bold text-muted-foreground mb-1">ภาพก่อนซ่อมบำรุง:</div>
                     <FileUpload 
                       maxFiles={1} 
                       className="w-full"
                       onFilesChange={(files) => setBeforePhotos(files)} 
                     />
                   </div>
-                  <div className="border border-slate-200 p-2 rounded-xl bg-slate-50">
-                    <div className="text-[10px] font-bold text-slate-500 mb-1">ภาพหลังซ่อมบำรุง:</div>
+                  <div className="border border-border p-2 rounded-xl bg-muted">
+                    <div className="text-[10px] font-bold text-muted-foreground mb-1">ภาพหลังซ่อมบำรุง:</div>
                     <FileUpload 
                       maxFiles={1} 
                       className="w-full"
@@ -731,31 +735,31 @@ export function TechMobileView({
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="mb-1 block font-bold text-slate-700">สถานะแอร์หลังซ่อม <span className="text-red-500">*</span></label>
-                  <select name="acStatus" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-bold text-slate-700 focus:border-slate-950 focus:outline-none" required defaultValue="normal">
-                    <option value="normal">✅ ใช้งานได้ปกติ</option>
-                    <option value="broken">⚠️ รออะไหล่/ใช้งานไม่ได้</option>
-                    <option value="needs_cleaning">❄️ แอร์ไม่เย็น/รอตรวจสอบ</option>
-                  </select>
+                  <label className="mb-1 block font-bold text-foreground">สถานะแอร์หลังซ่อม <span className="text-red-500">*</span></label>
+                  <NativeSelect name="acStatus" className="w-full h-auto py-2.5 px-3 rounded-xl border-border bg-muted text-xs font-bold text-foreground" required defaultValue="normal">
+                    <NativeSelectOption value="normal">✅ ใช้งานได้ปกติ</NativeSelectOption>
+                    <NativeSelectOption value="broken">⚠️ รออะไหล่/ใช้งานไม่ได้</NativeSelectOption>
+                    <NativeSelectOption value="needs_cleaning">❄️ แอร์ไม่เย็น/รอตรวจสอบ</NativeSelectOption>
+                  </NativeSelect>
                 </div>
                 <div>
-                  <label className="mb-1 block font-bold text-slate-700">รายละเอียดอะไหล่/น้ำยาแอร์</label>
+                  <label className="mb-1 block font-bold text-foreground">รายละเอียดอะไหล่/น้ำยาแอร์</label>
                   <input
                     type="text"
                     name="parts"
                     placeholder="เช่น R32 10 ปอนด์"
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs text-slate-900 focus:border-slate-950 focus:outline-none"
+                    className="w-full rounded-xl border border-border bg-muted px-3 py-2.5 text-xs text-foreground focus:border-primary focus:outline-none"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="mb-1 block font-bold text-slate-700">บันทึกเพิ่มเติม (ไม่บังคับ)</label>
+                <label className="mb-1 block font-bold text-foreground">บันทึกเพิ่มเติม (ไม่บังคับ)</label>
                 <textarea
                   name="notes"
                   rows={2}
                   placeholder="รายละเอียดอาการ หรือปัญหาที่พบ..."
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-slate-900 focus:border-slate-950 focus:outline-none"
+                  className="w-full rounded-xl border border-border bg-muted px-3.5 py-2 text-foreground focus:border-primary focus:outline-none"
                 />
               </div>
 
@@ -763,14 +767,14 @@ export function TechMobileView({
                 <button
                   type="button"
                   onClick={() => setSelectedJobForLog(null)}
-                  className="w-1/2 rounded-xl border border-slate-200 py-2.5 font-bold text-slate-700 hover:bg-slate-100"
+                  className="w-1/2 rounded-xl border border-border py-2.5 font-bold text-foreground hover:bg-secondary"
                 >
                   ยกเลิก
                 </button>
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="w-1/2 rounded-xl bg-slate-950 py-2.5 font-bold text-white hover:bg-slate-800 disabled:opacity-50"
+                  className="w-1/2 rounded-xl bg-foreground py-2.5 font-bold text-white hover:bg-primary/90 disabled:opacity-50"
                 >
                   {isPending ? "กำลังบันทึก..." : "บันทึกและเสร็จสิ้น"}
                 </button>

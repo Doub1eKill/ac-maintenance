@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
-import { Noto_Sans_Thai, Geist, Geist_Mono } from "next/font/google";
+import { Noto_Sans_Thai, Geist, Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
+import { cn } from "@/lib/utils";
+
+const inter = Inter({subsets:['latin'],variable:'--font-sans'});
 
 const notoSansThai = Noto_Sans_Thai({
   variable: "--font-noto-sans-thai",
@@ -24,6 +27,8 @@ export const metadata: Metadata = {
   description: "ระบบบริหารจัดการเครื่องปรับอากาศ และการแจ้งซ่อมบำรุงระดับมหาวิทยาลัย",
 };
 
+import { TooltipProvider } from "@/components/ui/tooltip";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -32,9 +37,11 @@ export default function RootLayout({
   return (
     <html
       lang="th"
-      className={`${notoSansThai.variable} ${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={cn("h-full", "antialiased", notoSansThai.variable, geistSans.variable, geistMono.variable, "font-sans", inter.variable)}
     >
-      <body className="min-h-full flex flex-col font-sans bg-slate-950 text-slate-100">{children}</body>
+      <body className="min-h-full flex flex-col font-sans bg-background text-foreground">
+        <TooltipProvider delayDuration={0}>{children}</TooltipProvider>
+      </body>
     </html>
   );
 }
