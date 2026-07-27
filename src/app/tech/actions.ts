@@ -2,9 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { addDays, addMonths, addYears } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
+import { syncOverdueMaintenanceWorkOrders } from "@/lib/maintenance";
 import { MaintenanceAction } from "@/generated/prisma/client";
 
 async function verifyTechnician() {
@@ -35,12 +37,18 @@ async function saveUpload(file: File | null): Promise<string | null> {
   }
 }
 
+function formatAcLocation(room: { name: string; floor: number | null; building: { name: string; abbreviation: string } }) {
+  return `${room.building.name} (${room.building.abbreviation}) - ห้อง ${room.name} (ชั้น ${room.floor || 1})`;
+}
+
 export async function getTechnicianData() {
   const session = await verifyTechnician();
   const universityId = BigInt(session.user.universityId!);
   const techId = BigInt(session.user.id!);
 
   try {
+    await syncOverdueMaintenanceWorkOrders(universityId);
+
     const [university, pendingOrdersRaw, myJobsRaw, completedJobsRaw] = await Promise.all([
       prisma.university.findUnique({ where: { id: universityId } }),
       prisma.workOrder.findMany({
@@ -100,7 +108,7 @@ export async function getTechnicianData() {
       brand: wo.airConditioner.acBrand?.name || wo.airConditioner.brand || "ไม่ระบุ",
       btu: wo.airConditioner.btu,
       status: wo.airConditioner.status,
-      location: `${wo.airConditioner.room.building.name} (${wo.airConditioner.room.building.abbreviation}) - ห้อง ${wo.airConditioner.room.name} (ชั้น ${wo.airConditioner.room.floor || 1})`,
+      location: formatAcLocation(wo.airConditioner.room),
       createdAt: wo.createdAt ? wo.createdAt.toISOString() : null,
     }));
 
@@ -111,7 +119,7 @@ export async function getTechnicianData() {
       btu: wo.airConditioner.btu,
       airConditionerId: wo.airConditionerId.toString(),
       status: wo.airConditioner.status,
-      location: `${wo.airConditioner.room.building.name} (${wo.airConditioner.room.building.abbreviation}) - ห้อง ${wo.airConditioner.room.name} (ชั้น ${wo.airConditioner.room.floor || 1})`,
+      location: formatAcLocation(wo.airConditioner.room),
       claimedAt: wo.claimedAt ? wo.claimedAt.toISOString() : null,
     }));
 
@@ -122,7 +130,7 @@ export async function getTechnicianData() {
       btu: wo.airConditioner.btu,
       airConditionerId: wo.airConditionerId.toString(),
       status: wo.airConditioner.status,
-      location: `${wo.airConditioner.room.building.name} (${wo.airConditioner.room.building.abbreviation}) - ห้อง ${wo.airConditioner.room.name} (ชั้น ${wo.airConditioner.room.floor || 1})`,
+      location: formatAcLocation(wo.airConditioner.room),
       completedAt: wo.completedAt ? wo.completedAt.toISOString() : null,
     }));
 
@@ -156,42 +164,71 @@ export async function getTechnicianData() {
 }
 
 export async function claimWorkOrderAction(workOrderId: string) {
+  // Delegates to the atomic bulk-claim path (status=pending guarded update)
+  // instead of its own find-then-update, which had a TOCTOU race: two techs
+  // hitting "claim" on the same job at once could both pass the check before
+  // either write landed.
+  const result = await bulkClaimWorkOrdersAction([workOrderId]);
+
+  if ("error" in result) return { error: result.error };
+  if (result.claimedCount === 0) {
+    return { error: "ใบงานนี้ถูกรับไปแล้วหรือไม่มีในระบบ" };
+  }
+  return { success: true as const };
+}
+
+export async function bulkClaimWorkOrdersAction(workOrderIds: string[]) {
   const session = await verifyTechnician();
   const techId = BigInt(session.user.id!);
+  const universityId = BigInt(session.user.universityId!);
+
+  if (!Array.isArray(workOrderIds) || workOrderIds.length === 0) {
+    return { error: "กรุณาเลือกงานอย่างน้อย 1 รายการ" };
+  }
+
+  const ids = workOrderIds.map((id) => BigInt(id));
+  const claimedAt = new Date();
 
   try {
-    const order = await prisma.workOrder.findUnique({
-      where: { id: BigInt(workOrderId) },
+    // Claim each selected id under a status=pending guard so a job someone
+    // else grabbed a moment ago is silently skipped instead of failing (or
+    // double-claiming) the whole batch.
+    const claimedIds = await prisma.$transaction(async (tx) => {
+      const successes: bigint[] = [];
+      for (const id of ids) {
+        const { count } = await tx.workOrder.updateMany({
+          where: { id, status: "pending", universityId },
+          data: { status: "claimed", claimedBy: techId, claimedAt },
+        });
+        if (count > 0) successes.push(id);
+      }
+      return successes;
     });
 
-    if (!order || order.status !== "pending") {
-      return { error: "ใบงานนี้ถูกรับไปแล้วหรือไม่มีในระบบ" };
-    }
-
-    await prisma.workOrder.update({
-      where: { id: BigInt(workOrderId) },
-      data: {
-        claimedBy: techId,
-        claimedAt: new Date(),
-        status: "claimed",
-      },
-    });
-
-    await logAudit({
-      universityId: BigInt(session.user.universityId!),
-      userId: techId,
-      action: "CLAIM_WORKORDER",
-      entityType: "workOrder",
-      entityId: BigInt(workOrderId),
-      newValues: { status: "claimed", claimedBy: techId.toString() },
-      ipAddress: "server_action",
-    });
+    await Promise.all(
+      claimedIds.map((id) =>
+        logAudit({
+          universityId,
+          userId: techId,
+          action: "CLAIM_WORKORDER",
+          entityType: "workOrder",
+          entityId: id,
+          newValues: { status: "claimed", claimedBy: techId.toString(), bulk: true },
+          ipAddress: "server_action",
+        })
+      )
+    );
 
     revalidatePath("/tech");
-    return { success: true };
+
+    return {
+      success: true,
+      claimedCount: claimedIds.length,
+      skippedCount: ids.length - claimedIds.length,
+    };
   } catch (error) {
-    console.error("Failed to claim work order:", error);
-    return { error: "เกิดข้อผิดพลาดในการกดรับงาน" };
+    console.error("Failed to bulk claim work orders:", error);
+    return { error: "เกิดข้อผิดพลาดในการรับงานหลายรายการ" };
   }
 }
 
@@ -245,6 +282,7 @@ export async function logMaintenanceAction(formData: FormData) {
     const afterPhotoUrl = await saveUpload(afterPhotoFile);
 
     // 1. Create Multiple Maintenance Logs (one for each action checked)
+    const performedAt = new Date();
     const logsData = actionsArray.map(action => ({
       airConditionerId: acId,
       workOrderId: wId,
@@ -253,23 +291,45 @@ export async function logMaintenanceAction(formData: FormData) {
       notes,
       beforePhotoUrl,
       afterPhotoUrl,
-      performedAt: new Date(),
+      performedAt,
     }));
 
-    await prisma.maintenanceLog.createMany({
-      data: logsData,
-    });
+    await prisma.$transaction(async (tx) => {
+      // 1. Create Multiple Maintenance Logs (one for each action checked)
+      await tx.maintenanceLog.createMany({ data: logsData });
 
-    // 2. Mark Work Order as completed
-    await prisma.workOrder.update({
-      where: { id: wId },
-      data: { status: "completed", completedAt: new Date() },
-    });
+      // 2. Mark Work Order as completed
+      await tx.workOrder.update({
+        where: { id: wId },
+        data: { status: "completed", completedAt: performedAt },
+      });
 
-    // 3. Update Air Conditioner status
-    await prisma.airConditioner.update({
-      where: { id: acId },
-      data: { status: acStatus as any },
+      // 3. Update Air Conditioner status
+      await tx.airConditioner.update({
+        where: { id: acId },
+        data: { status: acStatus as any },
+      });
+
+      // 4. Roll the maintenance schedule forward so the calendar reflects
+      // the work that was just done, instead of staying stuck on the old
+      // due date until an admin edits it by hand.
+      const schedule = await tx.maintenanceSchedule.findFirst({
+        where: { airConditionerId: acId, isActive: true },
+      });
+
+      if (schedule) {
+        const nextDueDate =
+          schedule.frequencyUnit === "days"
+            ? addDays(performedAt, schedule.frequencyValue)
+            : schedule.frequencyUnit === "years"
+            ? addYears(performedAt, schedule.frequencyValue)
+            : addMonths(performedAt, schedule.frequencyValue);
+
+        await tx.maintenanceSchedule.update({
+          where: { id: schedule.id },
+          data: { lastPerformedAt: performedAt, nextDueDate },
+        });
+      }
     });
 
     await logAudit({
@@ -283,6 +343,7 @@ export async function logMaintenanceAction(formData: FormData) {
     });
 
     revalidatePath("/tech");
+    revalidatePath("/admin");
     return { success: true };
   } catch (error) {
     console.error("Failed to log maintenance action:", error);

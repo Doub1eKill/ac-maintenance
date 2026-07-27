@@ -119,6 +119,59 @@ export async function getSuperAdminData() {
       }
     });
 
+    // Per-university breakdown for the colored multi-tenant chart. Raw SQL
+    // because MaintenanceLog only reaches its university through a 3-hop
+    // join (ac -> room -> building -> university) with no denormalized key
+    // to group by, so a single grouped query is far cheaper than assembling
+    // this by hand from separate Prisma calls.
+    const universityBreakdownRaw = await prisma.$queryRaw<
+      Array<{
+        university_id: bigint;
+        university_name: string;
+        abbreviation: string;
+        total_ac_count: bigint;
+        broken_count: bigint;
+        tech_count: bigint;
+        cleaned_count: bigint;
+        repaired_count: bigint;
+      }>
+    >`
+      SELECT
+        u.id AS university_id,
+        u.name AS university_name,
+        u.abbreviation AS abbreviation,
+        COUNT(DISTINCT ac.id) AS total_ac_count,
+        COUNT(DISTINCT CASE WHEN ac.status = 'broken' THEN ac.id END) AS broken_count,
+        (SELECT COUNT(*) FROM users us WHERE us.university_id = u.id AND us.role = 'technician') AS tech_count,
+        (SELECT COUNT(*) FROM maintenance_logs ml
+           JOIN air_conditioners ac2 ON ac2.id = ml.air_conditioner_id
+           JOIN rooms r2 ON r2.id = ac2.room_id
+           JOIN buildings b2 ON b2.id = r2.building_id
+           WHERE b2.university_id = u.id AND ml.action = 'cleaning') AS cleaned_count,
+        (SELECT COUNT(*) FROM maintenance_logs ml
+           JOIN air_conditioners ac2 ON ac2.id = ml.air_conditioner_id
+           JOIN rooms r2 ON r2.id = ac2.room_id
+           JOIN buildings b2 ON b2.id = r2.building_id
+           WHERE b2.university_id = u.id AND ml.action = 'repair') AS repaired_count
+      FROM universities u
+      LEFT JOIN buildings b ON b.university_id = u.id
+      LEFT JOIN rooms r ON r.building_id = b.id
+      LEFT JOIN air_conditioners ac ON ac.room_id = r.id AND ac.deleted_at IS NULL
+      GROUP BY u.id, u.name, u.abbreviation
+      ORDER BY u.name ASC
+    `;
+
+    const universityBreakdown = universityBreakdownRaw.map((row) => ({
+      universityId: row.university_id.toString(),
+      universityName: row.university_name,
+      abbreviation: row.abbreviation,
+      totalAcCount: Number(row.total_ac_count),
+      brokenCount: Number(row.broken_count),
+      techCount: Number(row.tech_count),
+      cleanedCount: Number(row.cleaned_count),
+      repairedCount: Number(row.repaired_count),
+    }));
+
     return {
       dbError: null,
       metrics: {
@@ -131,6 +184,7 @@ export async function getSuperAdminData() {
       universities,
       brands,
       registrationActivity,
+      universityBreakdown,
     };
   } catch (error) {
     console.error("Super Admin Data query failed:", error);
@@ -146,6 +200,7 @@ export async function getSuperAdminData() {
       universities: [],
       brands: [],
       registrationActivity: [],
+      universityBreakdown: [],
     };
   }
 }

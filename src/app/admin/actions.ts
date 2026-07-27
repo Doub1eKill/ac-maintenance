@@ -5,6 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
+import { syncOverdueMaintenanceWorkOrders } from "@/lib/maintenance";
 import { format, subDays } from "date-fns";
 
 async function verifyOrgAdmin() {
@@ -20,6 +21,8 @@ export async function getOrgAdminData() {
   const universityId = BigInt(session.user.universityId!);
 
   try {
+    await syncOverdueMaintenanceWorkOrders(universityId);
+
     const [
       university,
       buildings,
@@ -93,6 +96,31 @@ export async function getOrgAdminData() {
     // Aggregate metrics
     let totalUnits = 0;
     let brokenOrCleaningUnits = 0;
+    let repairUnits = 0;
+    let cleaningUnits = 0;
+
+    // Pending work orders keyed by unit, so the urgent list below can show
+    // priority/issue text alongside each broken or overdue-for-cleaning unit.
+    const pendingWorkOrderByAcId = new Map(
+      workOrdersRaw
+        .filter((wo) => wo.status === "pending")
+        .map((wo) => [wo.airConditionerId.toString(), wo])
+    );
+
+    // Urgent list (backlog #6): broken + overdue-for-cleaning units, shaped
+    // location-first to match the Technician card layout (backlog #2).
+    const urgentUnits: Array<{
+      id: string;
+      acCode: string;
+      location: string;
+      brand: string;
+      model: string | null;
+      btu: number | null;
+      status: string;
+      priority: string | null;
+      issueDescription: string | null;
+      reportedAt: string | null;
+    }> = [];
 
     const buildingList = buildings.map((b) => {
       let bldgUnits = 0;
@@ -102,6 +130,22 @@ export async function getOrgAdminData() {
         r.airConditioners.forEach((ac) => {
           if (ac.status === "broken" || ac.status === "needs_cleaning") {
             brokenOrCleaningUnits += 1;
+            if (ac.status === "broken") repairUnits += 1;
+            else cleaningUnits += 1;
+
+            const pendingWo = pendingWorkOrderByAcId.get(ac.id.toString());
+            urgentUnits.push({
+              id: ac.id.toString(),
+              acCode: ac.acCode,
+              location: `${b.name} - ห้อง ${r.name}`,
+              brand: ac.acBrand?.name || ac.brand || "ไม่ระบุ",
+              model: ac.acModel?.name || ac.model || null,
+              btu: ac.btu,
+              status: ac.status,
+              priority: pendingWo?.priority ?? null,
+              issueDescription: pendingWo?.issueDescription ?? null,
+              reportedAt: pendingWo?.createdAt ? pendingWo.createdAt.toISOString() : null,
+            });
           }
         });
         return {
@@ -215,12 +259,15 @@ export async function getOrgAdminData() {
       metrics: {
         totalUnits,
         brokenOrCleaningUnits,
+        repairUnits,
+        cleaningUnits,
         pendingWorkOrders,
         activeTechsCount: techsRaw.length,
         pendingUsersCount: pendingUsers.length,
       },
       weeklyActivity,
       workOrders,
+      urgentUnits,
       buildings: buildingList,
       allAcUnits,
       pendingUsers,
@@ -235,12 +282,15 @@ export async function getOrgAdminData() {
       metrics: {
         totalUnits: 0,
         brokenOrCleaningUnits: 0,
+        repairUnits: 0,
+        cleaningUnits: 0,
         pendingWorkOrders: 0,
         activeTechsCount: 0,
         pendingUsersCount: 0,
       },
       weeklyActivity: [],
       workOrders: [],
+      urgentUnits: [],
       buildings: [],
       allAcUnits: [],
       pendingUsers: [],

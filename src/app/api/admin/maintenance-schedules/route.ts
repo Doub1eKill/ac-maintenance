@@ -5,7 +5,8 @@ import { auth } from "@/lib/auth";
 export async function GET(request: NextRequest) {
   try {
     const session = await auth();
-    if (!session || session.user.role !== "org_admin" || !session.user.universityId) {
+    const allowedRoles = ["org_admin", "technician"];
+    if (!session || !allowedRoles.includes(session.user.role) || !session.user.universityId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -35,7 +36,15 @@ export async function GET(request: NextRequest) {
               include: {
                 building: true
               }
-            }
+            },
+            maintenanceLogs: {
+              orderBy: { performedAt: 'desc' },
+              take: 1,
+              select: {
+                performedAt: true,
+                technician: { select: { name: true } },
+              },
+            },
           }
         }
       },
@@ -45,17 +54,21 @@ export async function GET(request: NextRequest) {
     });
 
     // Transform bigints for JSON serialization
-    const serialized = schedules.map(s => ({
-      id: s.id.toString(),
-      airConditionerId: s.airConditionerId.toString(),
-      frequencyMonths: s.frequencyMonths,
-      lastPerformedAt: s.lastPerformedAt,
-      nextDueDate: s.nextDueDate,
-      isActive: s.isActive,
-      acCode: s.airConditioner.acCode,
-      brand: s.airConditioner.brand,
-      location: `${s.airConditioner.room.building.name} - ${s.airConditioner.room.name}`,
-    }));
+    const serialized = schedules.map(s => {
+      const lastLog = s.airConditioner.maintenanceLogs[0];
+      return {
+        id: s.id.toString(),
+        airConditionerId: s.airConditionerId.toString(),
+        frequencyMonths: s.frequencyMonths,
+        lastPerformedAt: s.lastPerformedAt,
+        nextDueDate: s.nextDueDate,
+        isActive: s.isActive,
+        acCode: s.airConditioner.acCode,
+        brand: s.airConditioner.brand,
+        location: `${s.airConditioner.room.building.name} - ${s.airConditioner.room.name}`,
+        lastPerformedByName: lastLog?.technician.name ?? null,
+      };
+    });
 
     return NextResponse.json(serialized);
   } catch (error: any) {
