@@ -60,6 +60,30 @@
 - **บั๊กที่แก้ระหว่างทาง:** race condition ใน `claimWorkOrderAction` (2 ช่างกดรับงานเดียวกันพร้อมกันได้), ช่องโหว่ multi-tenant ที่ `claimWorkOrderAction` เดิมไม่เช็ค `universityId`
 - **ลบ dead code:** `/api/tech/work-orders/**`, `/api/admin/work-orders/route.ts`, `scripts/test_workflow_api.ts` — ไม่มี UI ไหนเรียกใช้จริง (ระบบใช้ Server Actions ใน `tech/actions.ts`/`admin/actions.ts` แทนหมดแล้ว)
 
+### 6. Alert Component Standardization (July 27, 2026)
+- **Installed** `Alert` component from shadcn/ui (`src/components/ui/alert.tsx`) exposing `Alert`, `AlertTitle`, `AlertDescription`, and `AlertAction` sub-components.
+- **Replaced all custom `<div>`-based alert patterns** with the standardized `<Alert>` component across **5 files** covering **8 alert locations**:
+
+| File | Alert Type | Variant |
+|------|-----------|---------|
+| `admin-dashboard-view.tsx` | DB connection error | warning (custom) |
+| `admin-dashboard-view.tsx` | Action toast (success / error) | success/destructive |
+| `tech-mobile-view.tsx` | DB connection error | warning (custom) |
+| `tech-mobile-view.tsx` | Action toast (success / error) | success/destructive |
+| `asset-manager.tsx` | Action toast (success / error) + added icon & dismiss | success/destructive |
+| `login-form.tsx` | Login error | `variant="destructive"` |
+| `register-form.tsx` | Form error | `variant="destructive"` |
+| `register-form.tsx` | Pending approval success state | amber (custom) |
+| `super-admin-view.tsx` | DB connection error | warning (custom) |
+| `super-admin-view.tsx` | Action toast (success / error) | success/destructive |
+
+- **Pattern applied consistently:**
+  - **DB Error** → `<Alert>` warning colors + `<AlertTitle>` + `<AlertDescription>`
+  - **Toast (success)** → `<Alert>` green + `AnimatedIcon` bounce + `<AlertAction>` dismiss button
+  - **Toast (error)** → `<Alert>` red + `AnimatedIcon` wiggle + `<AlertAction>` dismiss button
+  - **Form Error** → `<Alert variant="destructive">` + `<AlertDescription>`
+- Verified with `npx tsc --noEmit` → **0 TypeScript errors**.
+
 ---
 
 ## 📁 Key File Structure & Architecture
@@ -77,7 +101,7 @@ ac-maintenance/
 │   │   ├── admin/                # Admin & Financial Dashboard Components
 │   │   ├── super-admin/          # Super Admin Dashboard Components
 │   │   ├── tech/                 # Technician Mobile Components
-│   │   └── ui/                   # Shared UI Primitives
+│   │   └── ui/                   # Shared UI Primitives (incl. alert.tsx)
 │   └── lib/
 │       ├── auth.config.ts        # RBAC & Auth Session Helpers
 │       └── prisma.ts             # Prisma 7 Database Instance with MariaDB Driver Adapter
@@ -140,4 +164,4 @@ npm run build
 
 ---
 
-*Handoff document generated on July 27, 2026.*
+*Handoff document last updated: July 27, 2026.*

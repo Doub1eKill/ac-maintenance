@@ -1,9 +1,17 @@
 "use client";
 
 import { useState, useTransition, useEffect } from "react";
-import { Building2, Plus, ChevronDown, ChevronUp, X, QrCode, CalendarClock, Printer } from "lucide-react";
+import {
+  Building2, Plus, ChevronDown, ChevronUp, X, QrCode, CalendarClock, Printer, CheckCircle2, AlertTriangle
+} from "lucide-react";
 import { createBuildingAction, createRoomAction, createAirConditionerAction, saveMaintenanceScheduleAction } from "@/app/admin/actions";
 import { QRCodeSVG } from "qrcode.react";
+import {
+  Alert,
+  AlertDescription,
+  AlertAction,
+} from "@/components/ui/alert";
+import { AnimatedIcon } from "@/components/ui/animated-icon";
 import {
   NativeSelect,
   NativeSelectOption,
@@ -173,9 +181,34 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
   return (
     <div className="biz-card p-6 space-y-5 animate-in fade-in">
       {toastMessage && (
-        <div className={`p-4 rounded-xl text-sm font-bold border ${toastMessage.type === "success" ? "bg-success/10 text-success-foreground border-success/30" : "bg-red-50 text-red-800 border-red-200"}`}>
-          {toastMessage.text}
-        </div>
+        <Alert
+          className={toastMessage.type === "success"
+            ? "border-success/30 bg-success/10 text-success-foreground"
+            : "border-red-200 bg-red-50 text-destructive"
+          }
+        >
+          {toastMessage.type === "success" ? (
+            <AnimatedIcon icon={CheckCircle2} size={16} animation="bounce" className="text-success" />
+          ) : (
+            <AnimatedIcon icon={AlertTriangle} size={16} animation="wiggle" className="text-destructive" />
+          )}
+          <AlertDescription
+            className={toastMessage.type === "success"
+              ? "text-success-foreground font-semibold"
+              : "text-destructive font-semibold"
+            }
+          >
+            {toastMessage.text}
+          </AlertDescription>
+          <AlertAction>
+            <button
+              onClick={() => setToastMessage(null)}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </AlertAction>
+        </Alert>
       )}
 
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-border pb-4 gap-4">

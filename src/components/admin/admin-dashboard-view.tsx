@@ -30,6 +30,12 @@ import {
 } from "lucide-react";
 import { AnimatedIcon } from "@/components/ui/animated-icon";
 import {
+  Alert,
+  AlertTitle,
+  AlertDescription,
+  AlertAction,
+} from "@/components/ui/alert";
+import {
   NativeSelect,
   NativeSelectOption,
 } from "@/components/ui/native-select";
@@ -417,36 +423,43 @@ export function AdminDashboardView({
     >
       {/* Database Connection Alert */}
       {dbError && (
-        <div className="rounded-2xl border border-warning/40 bg-warning/10 p-4 text-xs font-semibold text-warning-foreground flex items-start gap-3 shadow-2xs">
-          <AnimatedIcon icon={AlertTriangle} size={18} animation="wiggle" className="text-warning shrink-0 mt-0.5" />
-          <div>
-            <div className="font-bold text-warning-foreground">การแจ้งเตือนการเชื่อมต่อฐานข้อมูล</div>
-            <p className="text-warning-foreground font-normal leading-relaxed mt-0.5">{dbError}</p>
-          </div>
-        </div>
+        <Alert className="border-warning/40 bg-warning/10 text-warning-foreground">
+          <AnimatedIcon icon={AlertTriangle} size={16} animation="wiggle" className="text-warning" />
+          <AlertTitle className="font-bold text-warning-foreground">การแจ้งเตือนการเชื่อมต่อฐานข้อมูล</AlertTitle>
+          <AlertDescription className="text-warning-foreground/90 font-normal">{dbError}</AlertDescription>
+        </Alert>
       )}
 
       {/* Toast Notification */}
       {toastMessage && (
-        <div
-          className={`rounded-2xl border p-4 text-xs font-semibold flex items-center justify-between shadow-2xs ${
-            toastMessage.type === "success"
-              ? "border-success/30 bg-success/10 text-success-foreground"
-              : "border-red-200 bg-red-50 text-red-900"
-          }`}
+        <Alert
+          className={toastMessage.type === "success"
+            ? "border-success/30 bg-success/10 text-success-foreground"
+            : "border-red-200 bg-red-50 text-destructive"
+          }
         >
-          <div className="flex items-center gap-2.5">
-            {toastMessage.type === "success" ? (
-              <AnimatedIcon icon={CheckCircle2} size={18} animation="bounce" className="text-success" />
-            ) : (
-              <AnimatedIcon icon={AlertTriangle} size={18} animation="wiggle" className="text-red-600" />
-            )}
-            <span>{toastMessage.text}</span>
-          </div>
-          <button onClick={() => setToastMessage(null)} className="text-muted-foreground hover:text-foreground">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+          {toastMessage.type === "success" ? (
+            <AnimatedIcon icon={CheckCircle2} size={16} animation="bounce" className="text-success" />
+          ) : (
+            <AnimatedIcon icon={AlertTriangle} size={16} animation="wiggle" className="text-destructive" />
+          )}
+          <AlertDescription
+            className={toastMessage.type === "success"
+              ? "text-success-foreground font-semibold"
+              : "text-destructive font-semibold"
+            }
+          >
+            {toastMessage.text}
+          </AlertDescription>
+          <AlertAction>
+            <button
+              onClick={() => setToastMessage(null)}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </AlertAction>
+        </Alert>
       )}
 
 
