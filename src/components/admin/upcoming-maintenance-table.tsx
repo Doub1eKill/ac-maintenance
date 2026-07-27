@@ -1,0 +1,315 @@
+"use client";
+
+import * as React from "react";
+import {
+  ColumnDef,
+  ColumnFiltersState,
+  VisibilityState,
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  SortingState,
+  useReactTable,
+} from "@tanstack/react-table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ArrowUpDown, CalendarRange, ChevronDown, MoreHorizontal } from "lucide-react";
+
+export interface UpcomingMaintenanceAC {
+  id: string;
+  acCode: string;
+  brand: string;
+  location: string;
+  nextDueDate: string;
+}
+
+export const columns: ColumnDef<UpcomingMaintenanceAC>[] = [
+  {
+    id: "select",
+    header: ({ table }) => (
+      <Checkbox
+        checked={
+          table.getIsAllPageRowsSelected() ||
+          (table.getIsSomePageRowsSelected() && "indeterminate")
+        }
+        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+        aria-label="Select all"
+      />
+    ),
+    cell: ({ row }) => (
+      <Checkbox
+        checked={row.getIsSelected()}
+        onCheckedChange={(value) => row.toggleSelected(!!value)}
+        aria-label="Select row"
+      />
+    ),
+    enableSorting: false,
+    enableHiding: false,
+  },
+  {
+    accessorKey: "acCode",
+    header: ({ column }) => {
+      return (
+        <Button
+          variant="ghost"
+          className="p-0 hover:bg-transparent font-bold text-xs"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+        >
+          รหัสแอร์
+          <ArrowUpDown className="ml-2 h-3 w-3" />
+        </Button>
+      );
+    },
+    cell: ({ row }) => <div className="font-mono font-bold text-xs">{row.getValue("acCode")}</div>,
+  },
+  {
+    accessorKey: "location",
+    header: () => <div className="text-xs font-bold">สถานที่ / ยี่ห้อ</div>,
+    cell: ({ row }) => (
+      <div>
+        <div className="font-medium text-xs">{row.getValue("location")}</div>
+        <div className="text-[10px] text-muted-foreground">{row.original.brand}</div>
+      </div>
+    ),
+  },
+  {
+    accessorKey: "nextDueDate",
+    header: ({ column }) => {
+      return (
+        <Button
+          variant="ghost"
+          className="p-0 hover:bg-transparent font-bold text-xs text-right w-full justify-end"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+        >
+          วันครบกำหนด
+          <ArrowUpDown className="ml-2 h-3 w-3" />
+        </Button>
+      );
+    },
+    cell: ({ row }) => {
+      const dateStr = row.getValue("nextDueDate") as string;
+      const date = new Date(dateStr);
+      const isOverdue = date.getTime() < new Date().getTime();
+      return (
+        <div className={`text-right text-xs font-medium ${isOverdue ? 'text-red-500' : 'text-foreground'}`}>
+          {date.toLocaleDateString("th-TH")}
+        </div>
+      );
+    },
+  },
+  {
+    id: "actions",
+    enableHiding: false,
+    cell: ({ row, table }) => {
+      const ac = row.original;
+      const meta = table.options.meta as any;
+
+      return (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="h-8 w-8 p-0">
+              <span className="sr-only">Open menu</span>
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuLabel>จัดการ</DropdownMenuLabel>
+            <DropdownMenuItem
+              onClick={() => navigator.clipboard.writeText(ac.acCode)}
+            >
+              คัดลอกรหัสแอร์
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => meta?.onViewDetails?.(ac.acCode)}>ดูรายละเอียดเครื่อง</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => meta?.onCreateWorkOrder?.(ac.id)}>สร้างใบงานล้างแอร์</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      );
+    },
+  },
+];
+
+interface UpcomingMaintenanceTableProps {
+  data: UpcomingMaintenanceAC[];
+  onViewDetails?: (acCode: string) => void;
+  onCreateWorkOrder?: (acId: string) => void;
+}
+
+export function UpcomingMaintenanceTable({ data, onViewDetails, onCreateWorkOrder }: UpcomingMaintenanceTableProps) {
+  const [sorting, setSorting] = React.useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
+  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
+  const [rowSelection, setRowSelection] = React.useState({});
+
+  const table = useReactTable({
+    data,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    onSortingChange: setSorting,
+    getSortedRowModel: getSortedRowModel(),
+    onColumnFiltersChange: setColumnFilters,
+    getFilteredRowModel: getFilteredRowModel(),
+    onColumnVisibilityChange: setColumnVisibility,
+    onRowSelectionChange: setRowSelection,
+    meta: {
+      onViewDetails,
+      onCreateWorkOrder,
+    },
+    state: {
+      sorting,
+      columnFilters,
+      columnVisibility,
+      rowSelection,
+    },
+    initialState: {
+      pagination: {
+        pageSize: 5,
+      },
+    }
+  });
+
+  return (
+    <div className="biz-card p-6 space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+          <CalendarRange className="w-5 h-5 text-primary" /> กำหนดล้างแอร์
+        </h3>
+        
+        <div className="flex items-center gap-2">
+          <Input
+            placeholder="ค้นหารหัสแอร์..."
+            value={(table.getColumn("acCode")?.getFilterValue() as string) ?? ""}
+            onChange={(event) =>
+              table.getColumn("acCode")?.setFilterValue(event.target.value)
+            }
+            className="max-w-[200px] h-8 text-xs"
+          />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="ml-auto h-8 text-xs">
+                คอลัมน์ <ChevronDown className="ml-2 h-3 w-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {table
+                .getAllColumns()
+                .filter((column) => column.getCanHide())
+                .map((column) => {
+                  return (
+                    <DropdownMenuCheckboxItem
+                      key={column.id}
+                      className="capitalize text-xs"
+                      checked={column.getIsVisible()}
+                      onCheckedChange={(value) =>
+                        column.toggleVisibility(!!value)
+                      }
+                    >
+                      {column.id === "acCode" ? "รหัสแอร์" : 
+                       column.id === "location" ? "สถานที่" : 
+                       column.id === "nextDueDate" ? "วันครบกำหนด" : column.id}
+                    </DropdownMenuCheckboxItem>
+                  );
+                })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+      
+      <div className="rounded-xl border border-border overflow-hidden">
+        <Table>
+          <TableHeader className="bg-muted/50">
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => {
+                  return (
+                    <TableHead key={header.id} className="h-10 px-4 whitespace-normal text-xs">
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                    </TableHead>
+                  );
+                })}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows?.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow
+                  key={row.id}
+                  data-state={row.getIsSelected() && "selected"}
+                  className="h-12"
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id} className="px-4 py-2 whitespace-normal">
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-24 text-center text-xs text-muted-foreground">
+                  ไม่มีแอร์ที่ถึงกำหนดล้างเร็วๆ นี้
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+      
+      <div className="flex items-center justify-between pt-2">
+        <div className="text-xs text-muted-foreground">
+          เลือกแล้ว {table.getFilteredSelectedRowModel().rows.length} จาก{" "}
+          {table.getFilteredRowModel().rows.length} รายการ
+        </div>
+        {table.getPageCount() > 1 && (
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs px-2"
+              onClick={() => table.previousPage()}
+              disabled={!table.getCanPreviousPage()}
+            >
+              ก่อนหน้า
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs px-2"
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage()}
+            >
+              ถัดไป
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition, useEffect, useMemo } from "react";
 import { createWorkOrderAction, updateUserStatusByOrgAdminAction, assignWorkOrderAction } from "@/app/admin/actions";
 import {
   Building2,
@@ -26,6 +26,7 @@ import {
   QrCode,
   User,
   Settings,
+  Activity,
 } from "lucide-react";
 import { AnimatedIcon } from "@/components/ui/animated-icon";
 import {
@@ -41,6 +42,8 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Slider } from "@/components/ui/slider";
 import {
   Dialog,
   DialogContent,
@@ -53,6 +56,7 @@ import { AssetManager } from "@/components/admin/asset-manager";
 import { MaintenanceCalendar } from "@/components/admin/maintenance-calendar";
 import { QrCodeManager } from "@/components/admin/qr-code-manager";
 import { ChartAreaInteractive } from "@/components/admin/chart-area-interactive";
+import { UpcomingMaintenanceTable } from "@/components/admin/upcoming-maintenance-table";
 
 interface WorkOrderItem {
   id: string;
@@ -171,6 +175,26 @@ export function AdminDashboardView({
     setTeamPage(1);
     setWorkOrdersPage(1);
   }, [globalSearch]);
+
+  const upcomingMaintenanceAcs = useMemo(() => {
+    const acs: any[] = [];
+    buildings.forEach(b => {
+      b.rooms.forEach(r => {
+        r.acUnits.forEach(ac => {
+          if (ac.maintenanceSchedule?.nextDueDate) {
+            acs.push({
+              id: ac.id,
+              acCode: ac.acCode,
+              brand: ac.brand || "ไม่ระบุยี่ห้อ",
+              location: `${b.abbreviation} - ${r.name}`,
+              nextDueDate: ac.maintenanceSchedule.nextDueDate
+            });
+          }
+        });
+      });
+    });
+    return acs.sort((a, b) => new Date(a.nextDueDate).getTime() - new Date(b.nextDueDate).getTime());
+  }, [buildings]);
 
   const pendingOrders = workOrders.filter(
     (wo) => wo.status === "pending" && matchesSearch(wo, globalSearch)
@@ -429,75 +453,93 @@ export function AdminDashboardView({
       {/* Overview Analytics Dashboard */}
       {activeTab === "overview" && (
         <div className="space-y-6 animate-in fade-in">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="biz-card p-5 space-y-3">
-              <div className="text-muted-foreground font-bold text-xs flex items-center justify-between">
-                รวมเครื่องปรับอากาศ
-                <Snowflake className="h-4 w-4 text-primary" />
-              </div>
-              <div className="text-3xl font-bold text-foreground">{metrics.totalUnits} <span className="text-sm font-medium text-muted-foreground">เครื่อง</span></div>
-            </div>
-            <div className="biz-card p-5 space-y-3">
-              <div className="text-muted-foreground font-bold text-xs flex items-center justify-between">
-                แอร์ที่เสีย / รอซ่อม
-                <AlertTriangle className="h-4 w-4 text-red-500" />
-              </div>
-              <div className="text-3xl font-bold text-foreground">{metrics.brokenOrCleaningUnits} <span className="text-sm font-medium text-muted-foreground">เครื่อง</span></div>
-            </div>
-            <div className="biz-card p-5 space-y-3">
-              <div className="text-muted-foreground font-bold text-xs flex items-center justify-between">
-                ใบงานรอดำเนินการ
-                <ClipboardList className="h-4 w-4 text-warning" />
-              </div>
-              <div className="text-3xl font-bold text-foreground">{metrics.pendingWorkOrders} <span className="text-sm font-medium text-muted-foreground">ใบงาน</span></div>
-            </div>
-            <div className="biz-card p-5 space-y-3">
-              <div className="text-muted-foreground font-bold text-xs flex items-center justify-between">
-                ช่างผู้รับผิดชอบ
-                <Wrench className="h-4 w-4 text-success" />
-              </div>
-              <div className="text-3xl font-bold text-foreground">{metrics.activeTechsCount} <span className="text-sm font-medium text-muted-foreground">คน</span></div>
-            </div>
+          <div className="w-full">
+            <ChartAreaInteractive 
+              title="ภาพรวมสถิติการซ่อมบำรุง (Maintenance Analytics)" 
+              description="สถิติการแจ้งซ่อมและงานที่เสร็จสิ้น เปรียบเทียบย้อนหลัง" 
+            />
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
-              <ChartAreaInteractive 
-                title="ภาพรวมสถิติการซ่อมบำรุง (Maintenance Analytics)" 
-                description="สถิติการแจ้งซ่อมและงานที่เสร็จสิ้น เปรียบเทียบย้อนหลัง" 
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <div className="xl:col-span-2 w-full">
+              <UpcomingMaintenanceTable 
+                data={upcomingMaintenanceAcs} 
+                onViewDetails={(acCode) => {
+                  setActiveTab("assets");
+                  setGlobalSearch(acCode);
+                }}
+                onCreateWorkOrder={handleOpenCalendarWorkOrder}
               />
             </div>
-            
-            <div className="biz-card p-6 space-y-6">
-              <h3 className="text-base font-bold text-foreground flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-warning" /> รอซ่อมด่วน (Pending)
+
+            <div className="biz-card p-6 h-fit w-full">
+              <h3 className="text-base font-bold mb-6 flex items-center gap-2 text-foreground">
+                <Activity className="h-5 w-5 text-primary" />
+                สรุปสถานะระบบ
               </h3>
-              <div className="space-y-3">
-                {pendingOrders.slice(0, 4).map(wo => (
-                  <div key={wo.id} className="p-3 rounded-xl border border-border bg-muted flex flex-col gap-1">
-                    <div className="flex justify-between items-center">
-                      <span className="font-mono font-bold text-sm text-foreground">{wo.acCode}</span>
-                      <div className="flex items-center gap-2">
-                        <button 
-                          onClick={() => { setSelectedOrderToAssign(wo.id); setShowAssignModal(true); }}
-                          className="text-[10px] font-bold text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded hover:bg-primary/20 transition-colors"
-                        >
-                          จ่ายงาน
-                        </button>
-                        <span className="text-[10px] bg-warning/20 text-warning-foreground px-2 py-0.5 rounded-full font-bold">รอดำเนินการ</span>
-                      </div>
+              
+              <div className="grid grid-cols-2 gap-y-8 gap-x-4">
+                {/* Item 1 */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground">
+                    <div className="p-2 bg-primary/10 rounded-lg">
+                      <Snowflake className="h-4 w-4 text-primary" />
                     </div>
-                    <span className="text-xs text-muted-foreground">{wo.location}</span>
+                    ทั้งหมด
                   </div>
-                ))}
-                {pendingOrders.length === 0 && (
-                  <div className="text-center text-muted-foreground text-xs py-4">ไม่มีใบงานด่วน</div>
-                )}
-                {pendingOrders.length > 4 && (
-                  <button onClick={() => setActiveTab('kanban')} className="w-full text-center text-xs font-bold text-primary py-2 hover:bg-primary/10 rounded-lg transition-colors">
-                    ดูทั้งหมด ({pendingOrders.length})
-                  </button>
-                )}
+                  <div className="text-3xl font-bold">{metrics.totalUnits} <span className="text-sm font-medium text-muted-foreground">เครื่อง</span></div>
+                </div>
+                
+                {/* Item 2 */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground">
+                    <div className="p-2 bg-red-500/10 rounded-lg">
+                      <AlertTriangle className="h-4 w-4 text-red-500" />
+                    </div>
+                    เสีย/รอซ่อม
+                  </div>
+                  <div className="text-3xl font-bold">{metrics.brokenOrCleaningUnits} <span className="text-sm font-medium text-muted-foreground">เครื่อง</span></div>
+                </div>
+
+                {/* Item 3 */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground">
+                    <div className="p-2 bg-orange-500/10 rounded-lg">
+                      <ClipboardList className="h-4 w-4 text-warning" />
+                    </div>
+                    รอดำเนินการ
+                  </div>
+                  <div className="text-3xl font-bold">{metrics.pendingWorkOrders} <span className="text-sm font-medium text-muted-foreground">ใบงาน</span></div>
+                </div>
+
+                {/* Item 4 */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground">
+                    <div className="p-2 bg-green-500/10 rounded-lg">
+                      <Wrench className="h-4 w-4 text-success" />
+                    </div>
+                    ช่างดูแล
+                  </div>
+                  <div className="text-3xl font-bold">{metrics.activeTechsCount} <span className="text-sm font-medium text-muted-foreground">คน</span></div>
+                </div>
+              </div>
+              
+              <div className="mt-8 pt-6 border-t border-border">
+                <div className="flex justify-between text-xs mb-2">
+                  <span className="font-bold text-muted-foreground">สถานะความพร้อมของเครื่อง</span>
+                  <span className="font-bold text-success">
+                    {metrics.totalUnits > 0 ? Math.round(((metrics.totalUnits - metrics.brokenOrCleaningUnits) / metrics.totalUnits) * 100) : 100}%
+                  </span>
+                </div>
+                <div className="pt-2 pb-1">
+                  <Slider
+                    defaultValue={[metrics.totalUnits > 0 ? Math.round(((metrics.totalUnits - metrics.brokenOrCleaningUnits) / metrics.totalUnits) * 100) : 100]}
+                    max={100}
+                    step={1}
+                    disabled
+                    className="[&_[data-slot=slider-track]]:bg-red-500 [&_[data-slot=slider-range]]:bg-success [&_[data-slot=slider-thumb]]:hidden opacity-100"
+                  />
+                </div>
               </div>
             </div>
           </div>
