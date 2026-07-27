@@ -105,16 +105,18 @@ export function ChartAreaInteractive({
             {chartDesc}
           </CardDescription>
         </div>
-        <NativeSelect
-          value={timeRange}
-          onChange={(e) => setTimeRange(e.target.value)}
-          className="w-auto sm:ml-auto flex"
-          aria-label="Select a value"
-        >
-          <NativeSelectOption value="90d">3 เดือนล่าสุด (90 วัน)</NativeSelectOption>
-          <NativeSelectOption value="30d">30 วันล่าสุด</NativeSelectOption>
-          <NativeSelectOption value="7d">7 วันล่าสุด</NativeSelectOption>
-        </NativeSelect>
+        <div className="w-[180px] shrink-0 sm:w-[200px] sm:ml-auto">
+          <NativeSelect
+            value={timeRange}
+            onChange={(e) => setTimeRange(e.target.value)}
+            className="w-full"
+            aria-label="Select a value"
+          >
+            <NativeSelectOption value="90d">3 เดือนล่าสุด (90 วัน)</NativeSelectOption>
+            <NativeSelectOption value="30d">30 วันล่าสุด</NativeSelectOption>
+            <NativeSelectOption value="7d">7 วันล่าสุด</NativeSelectOption>
+          </NativeSelect>
+        </div>
       </CardHeader>
       <CardContent className="px-2 pt-4 sm:px-6 sm:pt-6">
         <ChartContainer
