@@ -6,6 +6,10 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff, AlertTriangle, ShieldCheck, Building2, Wrench, ArrowRight } from "lucide-react";
 import { AnimatedIcon } from "@/components/ui/animated-icon";
+import {
+  Alert,
+  AlertDescription,
+} from "@/components/ui/alert";
 
 const ERROR_MESSAGES: Record<string, string> = {
   "account-pending": "บัญชีผู้ใช้ของคุณอยู่ระหว่างรอการอนุมัติสิทธิ์จากผู้ดูแลระบบมหาวิทยาลัย (Pending)",
@@ -97,10 +101,10 @@ export function LoginForm() {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-3.5 text-xs text-red-900 flex items-start gap-2.5 shadow-2xs">
-            <AlertTriangle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
-            <div>{error}</div>
-          </div>
+          <Alert variant="destructive" className="border-red-200 bg-red-50">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription className="text-red-900">{error}</AlertDescription>
+          </Alert>
         )}
 
         {/* Email Input */}

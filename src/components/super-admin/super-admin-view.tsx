@@ -27,6 +27,12 @@ import { DashboardLayout, NavItem } from "@/components/layout/dashboard-layout";
 import { MasterDataClient } from "@/app/super-admin/master-data/master-data-client";
 import { Database } from "lucide-react";
 import { ChartAreaInteractive } from "@/components/admin/chart-area-interactive";
+import {
+  Alert,
+  AlertTitle,
+  AlertDescription,
+  AlertAction,
+} from "@/components/ui/alert";
 
 interface PendingUser {
   id: string;
@@ -203,36 +209,43 @@ export function SuperAdminView({
     >
       {/* Database Connection Alert */}
       {dbError && (
-        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-xs font-semibold text-amber-900 flex items-start gap-3 shadow-2xs">
-          <AnimatedIcon icon={AlertTriangle} size={18} animation="wiggle" className="text-amber-600 shrink-0 mt-0.5" />
-          <div>
-            <div className="font-bold text-amber-950">การแจ้งเตือนการเชื่อมต่อฐานข้อมูล</div>
-            <p className="text-amber-800 font-normal leading-relaxed mt-0.5">{dbError}</p>
-          </div>
-        </div>
+        <Alert className="border-warning/40 bg-warning/10 text-warning-foreground">
+          <AnimatedIcon icon={AlertTriangle} size={16} animation="wiggle" className="text-warning" />
+          <AlertTitle className="font-bold text-warning-foreground">การแจ้งเตือนการเชื่อมต่อฐานข้อมูล</AlertTitle>
+          <AlertDescription className="text-warning-foreground/90 font-normal">{dbError}</AlertDescription>
+        </Alert>
       )}
 
       {/* Toast Notification */}
       {actionMessage && (
-        <div
-          className={`rounded-2xl border p-4 text-xs font-semibold flex items-center justify-between shadow-2xs ${
-            actionMessage.type === "success"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-900"
-              : "border-red-200 bg-red-50 text-red-900"
-          }`}
+        <Alert
+          className={actionMessage.type === "success"
+            ? "border-success/30 bg-success/10 text-success-foreground"
+            : "border-red-200 bg-red-50 text-destructive"
+          }
         >
-          <div className="flex items-center gap-2.5">
-            {actionMessage.type === "success" ? (
-              <AnimatedIcon icon={CheckCircle2} size={18} animation="bounce" className="text-emerald-600" />
-            ) : (
-              <AnimatedIcon icon={AlertTriangle} size={18} animation="wiggle" className="text-red-600" />
-            )}
-            <span>{actionMessage.text}</span>
-          </div>
-          <button onClick={() => setActionMessage(null)} className="text-slate-400 hover:text-slate-900">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+          {actionMessage.type === "success" ? (
+            <AnimatedIcon icon={CheckCircle2} size={16} animation="bounce" className="text-success" />
+          ) : (
+            <AnimatedIcon icon={AlertTriangle} size={16} animation="wiggle" className="text-destructive" />
+          )}
+          <AlertDescription
+            className={actionMessage.type === "success"
+              ? "text-success-foreground font-semibold"
+              : "text-destructive font-semibold"
+            }
+          >
+            {actionMessage.text}
+          </AlertDescription>
+          <AlertAction>
+            <button
+              onClick={() => setActionMessage(null)}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </AlertAction>
+        </Alert>
       )}
 
       {/* BizLink Top Analytic Banner (Bar Chart & Gauge Stats Widget) */}

@@ -6,6 +6,11 @@ import { registerUser, type RegisterState } from "@/app/register/actions";
 import { Wrench, Building2, Eye, EyeOff, AlertTriangle, Clock, ArrowLeft, UserPlus } from "lucide-react";
 import { AnimatedIcon } from "@/components/ui/animated-icon";
 import {
+  Alert,
+  AlertTitle,
+  AlertDescription,
+} from "@/components/ui/alert";
+import {
   NativeSelect,
   NativeSelectOption,
 } from "@/components/ui/native-select";
@@ -39,15 +44,15 @@ export function RegisterForm({ universities }: { universities: UniversityOption[
           </p>
         </div>
 
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900 text-left space-y-1 shadow-2xs">
-          <div className="font-bold text-amber-950 flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-amber-500" />
+        <Alert className="border-amber-200 bg-amber-50">
+          <Clock className="h-4 w-4 text-amber-600" />
+          <AlertTitle className="font-bold text-amber-950">
             สถานะบัญชี: รอการอนุมัติสิทธิ์ (Pending Approval)
-          </div>
-          <p className="text-slate-700 text-[11px] leading-relaxed">
+          </AlertTitle>
+          <AlertDescription className="text-slate-700 text-[11px] leading-relaxed">
             ผู้ดูแลระบบสถาบัน (Org Admin) จะทำการตรวจสอบและอนุมัติสิทธิ์เข้าใช้งานของคุณก่อนเริ่มใช้งานระบบ
-          </p>
-        </div>
+          </AlertDescription>
+        </Alert>
 
         <div className="pt-2">
           <Link
@@ -65,10 +70,10 @@ export function RegisterForm({ universities }: { universities: UniversityOption[
   return (
     <form action={formAction} className="space-y-4">
       {state?.error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-3.5 text-xs text-red-900 flex items-start gap-2.5 shadow-2xs">
-          <AlertTriangle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
-          <div>{state.error}</div>
-        </div>
+        <Alert variant="destructive" className="border-red-200 bg-red-50">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription className="text-red-900">{state.error}</AlertDescription>
+        </Alert>
       )}
 
       {/* Role Selector Tabs */}

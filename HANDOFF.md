@@ -32,6 +32,30 @@
 - **Semantic Theming:** Audited and replaced hardcoded Tailwind color utility classes (e.g., `slate`, `sky`, `indigo`, `emerald`, `amber`) with semantic theme variables (e.g., `bg-background`, `bg-muted`, `bg-primary`, `bg-success`, `text-warning-foreground`, `border-border`) to fully support the dynamic HSL theme preset (`b7WjPrGOe`).
 - **Layout Alignment:** Fixed visual asymmetries, such as the vertical separator spacing in the sidebar trigger (`dashboard-layout.tsx`) and text overlapping in chart dropdowns.
 
+### 5. Alert Component Standardization (July 27, 2026)
+- **Installed** `Alert` component from shadcn/ui (`src/components/ui/alert.tsx`) exposing `Alert`, `AlertTitle`, `AlertDescription`, and `AlertAction` sub-components.
+- **Replaced all custom `<div>`-based alert patterns** with the standardized `<Alert>` component across **5 files** covering **8 alert locations**:
+
+| File | Alert Type | Variant |
+|------|-----------|---------|
+| `admin-dashboard-view.tsx` | DB connection error | warning (custom) |
+| `admin-dashboard-view.tsx` | Action toast (success / error) | success/destructive |
+| `tech-mobile-view.tsx` | DB connection error | warning (custom) |
+| `tech-mobile-view.tsx` | Action toast (success / error) | success/destructive |
+| `asset-manager.tsx` | Action toast (success / error) + added icon & dismiss | success/destructive |
+| `login-form.tsx` | Login error | `variant="destructive"` |
+| `register-form.tsx` | Form error | `variant="destructive"` |
+| `register-form.tsx` | Pending approval success state | amber (custom) |
+| `super-admin-view.tsx` | DB connection error | warning (custom) |
+| `super-admin-view.tsx` | Action toast (success / error) | success/destructive |
+
+- **Pattern applied consistently:**
+  - **DB Error** → `<Alert>` warning colors + `<AlertTitle>` + `<AlertDescription>`
+  - **Toast (success)** → `<Alert>` green + `AnimatedIcon` bounce + `<AlertAction>` dismiss button
+  - **Toast (error)** → `<Alert>` red + `AnimatedIcon` wiggle + `<AlertAction>` dismiss button
+  - **Form Error** → `<Alert variant="destructive">` + `<AlertDescription>`
+- Verified with `npx tsc --noEmit` → **0 TypeScript errors**.
+
 ---
 
 ## 📁 Key File Structure & Architecture
@@ -49,7 +73,7 @@ ac-maintenance/
 │   │   ├── admin/                # Admin & Financial Dashboard Components
 │   │   ├── super-admin/          # Super Admin Dashboard Components
 │   │   ├── tech/                 # Technician Mobile Components
-│   │   └── ui/                   # Shared UI Primitives
+│   │   └── ui/                   # Shared UI Primitives (incl. alert.tsx)
 │   └── lib/
 │       ├── auth.config.ts        # RBAC & Auth Session Helpers
 │       └── prisma.ts             # Prisma 7 Database Instance with MariaDB Driver Adapter
@@ -109,4 +133,4 @@ npm run build
 
 ---
 
-*Handoff document generated on July 27, 2026.*
+*Handoff document last updated: July 27, 2026.*
