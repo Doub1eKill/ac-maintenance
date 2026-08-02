@@ -24,6 +24,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -43,7 +44,22 @@ export interface UpcomingMaintenanceAC {
   nextDueDate: string;
 }
 
-export const columns: ColumnDef<UpcomingMaintenanceAC>[] = [
+export interface UrgentMaintenanceAC {
+  id: string;
+  acCode: string;
+  brand: string;
+  location: string;
+  status: string;
+  priority: string | null;
+  issueDescription: string | null;
+  reportedAt: string | null;
+}
+
+export type MaintenanceRow =
+  | ({ kind: "upcoming" } & UpcomingMaintenanceAC)
+  | ({ kind: "urgent" } & UrgentMaintenanceAC);
+
+export const columns: ColumnDef<MaintenanceRow>[] = [
   {
     id: "select",
     header: ({ table }) => (
@@ -93,35 +109,53 @@ export const columns: ColumnDef<UpcomingMaintenanceAC>[] = [
     ),
   },
   {
-    accessorKey: "nextDueDate",
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          className="p-0 hover:bg-transparent font-bold text-xs text-right w-full justify-end"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          วันครบกำหนด
-          <ArrowUpDown className="ml-2 h-3 w-3" />
-        </Button>
-      );
-    },
+    id: "type",
+    header: () => <div className="text-xs font-bold">ประเภท</div>,
     cell: ({ row }) => {
-      const dateStr = row.getValue("nextDueDate") as string;
-      const date = new Date(dateStr);
+      const item = row.original;
+      if (item.kind === "urgent" && item.status === "broken") {
+        return <Badge variant="destructive" className="text-[10px]">ซ่อมด่วน</Badge>;
+      }
+      if (item.kind === "urgent" && item.status === "needs_cleaning") {
+        return (
+          <Badge variant="outline" className="text-[10px] border-amber-500/40 text-amber-600 bg-amber-500/10">
+            ค้างล้าง
+          </Badge>
+        );
+      }
+      return <Badge variant="outline" className="text-[10px]">กำหนดล้าง</Badge>;
+    },
+    enableSorting: false,
+  },
+  {
+    id: "dateInfo",
+    header: () => <div className="text-xs font-bold text-right">วันที่</div>,
+    cell: ({ row }) => {
+      const item = row.original;
+      if (item.kind === "urgent") {
+        const label = item.reportedAt ? new Date(item.reportedAt).toLocaleDateString("th-TH") : "-";
+        return (
+          <div className="text-right text-xs">
+            <div className="text-[10px] text-muted-foreground">แจ้งเมื่อ</div>
+            <div className="font-medium text-red-500">{label}</div>
+          </div>
+        );
+      }
+      const date = new Date(item.nextDueDate);
       const isOverdue = date.getTime() < new Date().getTime();
       return (
-        <div className={`text-right text-xs font-medium ${isOverdue ? 'text-red-500' : 'text-foreground'}`}>
+        <div className={`text-right text-xs font-medium ${isOverdue ? "text-red-500" : "text-foreground"}`}>
           {date.toLocaleDateString("th-TH")}
         </div>
       );
     },
+    enableSorting: false,
   },
   {
     id: "actions",
     enableHiding: false,
     cell: ({ row, table }) => {
-      const ac = row.original;
+      const item = row.original;
       const meta = table.options.meta as any;
 
       return (
@@ -135,13 +169,17 @@ export const columns: ColumnDef<UpcomingMaintenanceAC>[] = [
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>จัดการ</DropdownMenuLabel>
             <DropdownMenuItem
-              onClick={() => navigator.clipboard.writeText(ac.acCode)}
+              onClick={() => navigator.clipboard.writeText(item.acCode)}
             >
               คัดลอกรหัสแอร์
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => meta?.onViewDetails?.(ac.acCode)}>ดูรายละเอียดเครื่อง</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => meta?.onCreateWorkOrder?.(ac.id)}>สร้างใบงานล้างแอร์</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => meta?.onViewDetails?.(item.acCode)}>ดูรายละเอียดเครื่อง</DropdownMenuItem>
+            {item.kind === "urgent" ? (
+              <DropdownMenuItem onClick={() => meta?.onAssignWorkOrder?.(item.id)}>มอบหมายช่าง</DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem onClick={() => meta?.onCreateWorkOrder?.(item.id)}>สร้างใบงานล้างแอร์</DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       );
@@ -150,12 +188,13 @@ export const columns: ColumnDef<UpcomingMaintenanceAC>[] = [
 ];
 
 interface UpcomingMaintenanceTableProps {
-  data: UpcomingMaintenanceAC[];
+  data: MaintenanceRow[];
   onViewDetails?: (acCode: string) => void;
   onCreateWorkOrder?: (acId: string) => void;
+  onAssignWorkOrder?: (acId: string) => void;
 }
 
-export function UpcomingMaintenanceTable({ data, onViewDetails, onCreateWorkOrder }: UpcomingMaintenanceTableProps) {
+export function UpcomingMaintenanceTable({ data, onViewDetails, onCreateWorkOrder, onAssignWorkOrder }: UpcomingMaintenanceTableProps) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
@@ -175,6 +214,7 @@ export function UpcomingMaintenanceTable({ data, onViewDetails, onCreateWorkOrde
     meta: {
       onViewDetails,
       onCreateWorkOrder,
+      onAssignWorkOrder,
     },
     state: {
       sorting,
@@ -193,9 +233,9 @@ export function UpcomingMaintenanceTable({ data, onViewDetails, onCreateWorkOrde
     <div className="biz-card p-6 space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h3 className="text-base font-bold text-foreground flex items-center gap-2">
-          <CalendarRange className="w-5 h-5 text-primary" /> กำหนดล้างแอร์
+          <CalendarRange className="w-5 h-5 text-primary" /> รอซ่อมด่วน
         </h3>
-        
+
         <div className="flex items-center gap-2">
           <Input
             placeholder="ค้นหารหัสแอร์..."
@@ -225,9 +265,10 @@ export function UpcomingMaintenanceTable({ data, onViewDetails, onCreateWorkOrde
                         column.toggleVisibility(!!value)
                       }
                     >
-                      {column.id === "acCode" ? "รหัสแอร์" : 
-                       column.id === "location" ? "สถานที่" : 
-                       column.id === "nextDueDate" ? "วันครบกำหนด" : column.id}
+                      {column.id === "acCode" ? "รหัสแอร์" :
+                       column.id === "location" ? "สถานที่" :
+                       column.id === "type" ? "ประเภท" :
+                       column.id === "dateInfo" ? "วันที่" : column.id}
                     </DropdownMenuCheckboxItem>
                   );
                 })}
@@ -235,7 +276,7 @@ export function UpcomingMaintenanceTable({ data, onViewDetails, onCreateWorkOrde
           </DropdownMenu>
         </div>
       </div>
-      
+
       <div className="rounded-xl border border-border overflow-hidden">
         <Table>
           <TableHeader className="bg-muted/50">
@@ -274,14 +315,14 @@ export function UpcomingMaintenanceTable({ data, onViewDetails, onCreateWorkOrde
             ) : (
               <TableRow>
                 <TableCell colSpan={columns.length} className="h-24 text-center text-xs text-muted-foreground">
-                  ไม่มีแอร์ที่ถึงกำหนดล้างเร็วๆ นี้
+                  ไม่มีงานซ่อมด่วนหรือกำหนดล้างในขณะนี้
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
       </div>
-      
+
       <div className="flex items-center justify-between pt-2">
         <div className="text-xs text-muted-foreground">
           เลือกแล้ว {table.getFilteredSelectedRowModel().rows.length} จาก{" "}
