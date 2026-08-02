@@ -62,7 +62,7 @@ import { AssetManager } from "@/components/admin/asset-manager";
 import { MaintenanceCalendar } from "@/components/admin/maintenance-calendar";
 import { QrCodeManager } from "@/components/admin/qr-code-manager";
 import { ChartAreaInteractive } from "@/components/admin/chart-area-interactive";
-import { UpcomingMaintenanceTable } from "@/components/admin/upcoming-maintenance-table";
+import { UpcomingMaintenanceTable, type MaintenanceRow, type UrgentMaintenanceAC } from "@/components/admin/upcoming-maintenance-table";
 
 interface WorkOrderItem {
   id: string;
@@ -141,6 +141,7 @@ interface AdminDashboardViewProps {
     pendingUsersCount?: number;
   };
   weeklyActivity: Array<{ day: string; repairs: number }>;
+  urgentUnits: UrgentMaintenanceAC[];
   workOrders: WorkOrderItem[];
   buildings: BuildingItem[];
   allAcUnits: Array<{ id: string; label: string }>;
@@ -161,6 +162,7 @@ export function AdminDashboardView({
   pendingUsers = [],
   allUsers = [],
   brands = [],
+  urgentUnits = [],
 }: AdminDashboardViewProps) {
   const [activeTab, setActiveTab] = useState<string>("overview");
   const [isPending, startTransition] = useTransition();
@@ -184,25 +186,42 @@ export function AdminDashboardView({
     setWorkOrdersPage(1);
   }, [globalSearch]);
 
-  const upcomingMaintenanceAcs = useMemo(() => {
-    const acs: any[] = [];
-    buildings.forEach(b => {
-      b.rooms.forEach(r => {
-        r.acUnits.forEach(ac => {
-          if (ac.maintenanceSchedule?.nextDueDate) {
-            acs.push({
+  const priorityRank = (p: string | null) => (p === "critical" ? 0 : p === "high" ? 1 : 2);
+
+  const combinedMaintenanceRows = useMemo((): MaintenanceRow[] => {
+    const urgentIds = new Set(urgentUnits.map((u) => u.id));
+
+    const urgentRows: MaintenanceRow[] = [...urgentUnits]
+      .sort((a, b) => {
+        const rankDiff = priorityRank(a.priority) - priorityRank(b.priority);
+        if (rankDiff !== 0) return rankDiff;
+        const aTime = a.reportedAt ? new Date(a.reportedAt).getTime() : 0;
+        const bTime = b.reportedAt ? new Date(b.reportedAt).getTime() : 0;
+        return aTime - bTime;
+      })
+      .map((u) => ({ kind: "urgent" as const, ...u }));
+
+    const upcomingRows: Array<{ kind: "upcoming"; id: string; acCode: string; brand: string; location: string; nextDueDate: string }> = [];
+    buildings.forEach((b) => {
+      b.rooms.forEach((r) => {
+        r.acUnits.forEach((ac) => {
+          if (ac.maintenanceSchedule?.nextDueDate && !urgentIds.has(ac.id)) {
+            upcomingRows.push({
+              kind: "upcoming",
               id: ac.id,
               acCode: ac.acCode,
               brand: ac.brand || "ไม่ระบุยี่ห้อ",
-              location: `${b.abbreviation} - ${r.name}`,
-              nextDueDate: ac.maintenanceSchedule.nextDueDate
+              location: `${b.name} - ห้อง ${r.name}`,
+              nextDueDate: ac.maintenanceSchedule.nextDueDate,
             });
           }
         });
       });
     });
-    return acs.sort((a, b) => new Date(a.nextDueDate).getTime() - new Date(b.nextDueDate).getTime());
-  }, [buildings]);
+    upcomingRows.sort((a, b) => new Date(a.nextDueDate).getTime() - new Date(b.nextDueDate).getTime());
+
+    return [...urgentRows, ...upcomingRows];
+  }, [urgentUnits, buildings]);
 
   const pendingOrders = workOrders.filter(
     (wo) => wo.status === "pending" && matchesSearch(wo, globalSearch)
@@ -477,13 +496,22 @@ export function AdminDashboardView({
 
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
             <div className="xl:col-span-2 w-full">
-              <UpcomingMaintenanceTable 
-                data={upcomingMaintenanceAcs} 
+              <UpcomingMaintenanceTable
+                data={combinedMaintenanceRows}
                 onViewDetails={(acCode) => {
                   setActiveTab("assets");
                   setGlobalSearch(acCode);
                 }}
                 onCreateWorkOrder={handleOpenCalendarWorkOrder}
+                onAssignWorkOrder={(acId) => {
+                  const pendingWo = workOrders.find((wo) => wo.airConditionerId === acId && wo.status === "pending");
+                  if (!pendingWo) {
+                    setToastMessage({ type: "error", text: "ไม่พบใบงานที่รอดำเนินการสำหรับเครื่องนี้" });
+                    return;
+                  }
+                  setSelectedOrderToAssign(pendingWo.id);
+                  setShowAssignModal(true);
+                }}
               />
             </div>
 
