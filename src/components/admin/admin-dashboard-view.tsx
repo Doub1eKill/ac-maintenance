@@ -134,6 +134,8 @@ interface AdminDashboardViewProps {
   metrics: {
     totalUnits: number;
     brokenOrCleaningUnits: number;
+    repairUnits: number;
+    cleaningUnits: number;
     pendingWorkOrders: number;
     activeTechsCount: number;
     pendingUsersCount?: number;
@@ -491,7 +493,7 @@ export function AdminDashboardView({
                 สรุปสถานะระบบ
               </h3>
               
-              <div className="grid grid-cols-2 gap-y-8 gap-x-4">
+              <div className="grid grid-cols-3 gap-y-8 gap-x-4">
                 {/* Item 1 */}
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground">
@@ -502,19 +504,30 @@ export function AdminDashboardView({
                   </div>
                   <div className="text-3xl font-bold">{metrics.totalUnits} <span className="text-sm font-medium text-muted-foreground">เครื่อง</span></div>
                 </div>
-                
+
                 {/* Item 2 */}
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground">
                     <div className="p-2 bg-red-500/10 rounded-lg">
-                      <AlertTriangle className="h-4 w-4 text-red-500" />
+                      <Wrench className="h-4 w-4 text-red-500" />
                     </div>
-                    เสีย/รอซ่อม
+                    รอซ่อม
                   </div>
-                  <div className="text-3xl font-bold">{metrics.brokenOrCleaningUnits} <span className="text-sm font-medium text-muted-foreground">เครื่อง</span></div>
+                  <div className="text-3xl font-bold">{metrics.repairUnits} <span className="text-sm font-medium text-muted-foreground">เครื่อง</span></div>
                 </div>
 
                 {/* Item 3 */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground">
+                    <div className="p-2 bg-amber-500/10 rounded-lg">
+                      <Snowflake className="h-4 w-4 text-amber-500" />
+                    </div>
+                    รอล้าง
+                  </div>
+                  <div className="text-3xl font-bold">{metrics.cleaningUnits} <span className="text-sm font-medium text-muted-foreground">เครื่อง</span></div>
+                </div>
+
+                {/* Item 4 */}
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground">
                     <div className="p-2 bg-orange-500/10 rounded-lg">
@@ -525,7 +538,7 @@ export function AdminDashboardView({
                   <div className="text-3xl font-bold">{metrics.pendingWorkOrders} <span className="text-sm font-medium text-muted-foreground">ใบงาน</span></div>
                 </div>
 
-                {/* Item 4 */}
+                {/* Item 5 */}
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground">
                     <div className="p-2 bg-green-500/10 rounded-lg">
@@ -534,6 +547,17 @@ export function AdminDashboardView({
                     ช่างดูแล
                   </div>
                   <div className="text-3xl font-bold">{metrics.activeTechsCount} <span className="text-sm font-medium text-muted-foreground">คน</span></div>
+                </div>
+
+                {/* Item 6 */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground">
+                    <div className="p-2 bg-emerald-500/10 rounded-lg">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                    </div>
+                    เสร็จสิ้นสัปดาห์นี้
+                  </div>
+                  <div className="text-3xl font-bold">{weeklyActivity.reduce((sum, d) => sum + d.repairs, 0)} <span className="text-sm font-medium text-muted-foreground">งาน</span></div>
                 </div>
               </div>
               
