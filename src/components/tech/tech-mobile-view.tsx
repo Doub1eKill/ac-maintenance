@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useTransition, useEffect } from "react";
-import { claimWorkOrderAction, logMaintenanceAction, scanQrCodeAction } from "@/app/tech/actions";
+import { claimWorkOrderAction, bulkClaimWorkOrdersAction, logMaintenanceAction, scanQrCodeAction } from "@/app/tech/actions";
 import type { TechnicianAssetUnit, TechnicianAssetSummary } from "@/lib/maintenance";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Wrench,
   QrCode,
@@ -114,6 +115,9 @@ export function TechMobileView({
   // Notification Toast State
   const [toastMessage, setToastMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
+  // Bulk-claim selection state (job pool only)
+  const [selectedPoolIds, setSelectedPoolIds] = useState<string[]>([]);
+
   const [poolPage, setPoolPage] = useState(1);
   const [myJobsPage, setMyJobsPage] = useState(1);
   const [completedJobsPage, setCompletedJobsPage] = useState(1);
@@ -125,7 +129,14 @@ export function TechMobileView({
     setMyJobsPage(1);
     setCompletedJobsPage(1);
     setAssetsPage(1);
+    setSelectedPoolIds([]);
   }, [searchQuery, selectedBuilding]);
+
+  // Drop stale selections once a job leaves the pool (claimed by this tech or
+  // someone else), so the "เลือกแล้ว N งาน" count never lags reality.
+  useEffect(() => {
+    setSelectedPoolIds((prev) => prev.filter((id) => jobPool.some((job) => job.id === id)));
+  }, [jobPool]);
 
   function filterJobs<T extends { acCode: string; brand: string; location: string }>(jobs: T[]): T[] {
     return jobs.filter((job) => {
@@ -167,6 +178,32 @@ export function TechMobileView({
         setToastMessage({ type: "success", text: "รับงานเรียบร้อยแล้ว! งานถูกย้ายไปที่แท็บ 'งานของฉัน'" });
         setActiveTab("my_jobs");
       }
+    });
+  }
+
+  function togglePoolSelection(jobId: string) {
+    setSelectedPoolIds((prev) =>
+      prev.includes(jobId) ? prev.filter((id) => id !== jobId) : [...prev, jobId]
+    );
+  }
+
+  function handleBulkClaim() {
+    if (selectedPoolIds.length === 0) return;
+    setToastMessage(null);
+    startTransition(async () => {
+      const res = await bulkClaimWorkOrdersAction(selectedPoolIds);
+      if ("error" in res) {
+        setToastMessage({ type: "error", text: res.error ?? "เกิดข้อผิดพลาดในการรับงานหลายรายการ" });
+        return;
+      }
+      setToastMessage({
+        type: "success",
+        text: `รับงานสำเร็จ ${res.claimedCount} งาน${
+          res.skippedCount > 0 ? ` (ข้าม ${res.skippedCount} งานที่ถูกรับไปแล้ว)` : ""
+        } งานถูกย้ายไปที่แท็บ 'งานของฉัน'`,
+      });
+      setSelectedPoolIds([]);
+      setActiveTab("my_jobs");
     });
   }
 
@@ -466,47 +503,77 @@ export function TechMobileView({
 
       {/* TAB 1: Job Pool */}
       {activeTab === "pool" && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in">
-          {filteredPool.length === 0 ? (
-            <div className="col-span-full py-12 text-center text-xs text-muted-foreground border border-dashed border-border rounded-2xl">
-              ไม่มีงานซ่อมบำรุงที่รอรับ
-            </div>
-          ) : (
-            paginatedPool.map((job) => (
-              <div key={job.id} className="biz-card p-5 space-y-4 hover:border-slate-400 transition-all relative overflow-hidden">
-                {isUrgent(job.createdAt) && (
-                  <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1 shadow-sm">
-                    <Clock className="w-3 h-3" /> ด่วน
-                  </div>
-                )}
-                <div className="pr-8 space-y-1">
-                  <div className="text-sm font-bold text-foreground leading-snug">{job.location}</div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs font-bold text-muted-foreground">{job.acCode}</span>
-                    <span className="rounded-md bg-secondary px-2 py-0.5 text-[10px] font-bold text-foreground">
-                      {job.brand} {job.btu ? `(${job.btu} BTU)` : ""}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="pt-2 flex items-center justify-between text-xs border-t border-border">
-                  <div className="flex flex-col">
-                    <span className="text-[11px] font-bold text-warning-foreground">รอรับงาน</span>
-                    <span className="text-[10px] text-muted-foreground mt-1">
-                      {job.createdAt ? `แจ้งเมื่อ: ${format(new Date(job.createdAt), "dd/MM/yyyy")}` : ""}
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => handleClaim(job.id)}
-                    disabled={isPending}
-                    className="rounded-xl bg-foreground px-4 py-2 text-xs font-bold text-white hover:bg-primary/90 transition-all shadow-sm active:scale-95"
-                  >
-                    รับงาน
-                  </button>
-                </div>
+        <div className="space-y-4 animate-in fade-in">
+          {selectedPoolIds.length > 0 && (
+            <div className="biz-card p-4 flex items-center justify-between gap-3 bg-secondary/40 border-dashed">
+              <span className="text-xs font-bold text-foreground">เลือกแล้ว {selectedPoolIds.length} งาน</span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setSelectedPoolIds([])}
+                  className="rounded-xl border border-border px-3 py-1.5 text-xs font-bold text-foreground hover:bg-muted transition-all"
+                >
+                  ยกเลิกการเลือก
+                </button>
+                <button
+                  onClick={handleBulkClaim}
+                  disabled={isPending}
+                  className="rounded-xl bg-foreground px-4 py-1.5 text-xs font-bold text-white hover:bg-primary/90 transition-all shadow-sm active:scale-95 disabled:opacity-50"
+                >
+                  รับงานที่เลือก ({selectedPoolIds.length})
+                </button>
               </div>
-            ))
+            </div>
           )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {filteredPool.length === 0 ? (
+              <div className="col-span-full py-12 text-center text-xs text-muted-foreground border border-dashed border-border rounded-2xl">
+                ไม่มีงานซ่อมบำรุงที่รอรับ
+              </div>
+            ) : (
+              paginatedPool.map((job) => (
+                <div key={job.id} className="biz-card p-5 space-y-4 hover:border-slate-400 transition-all relative overflow-hidden">
+                  {isUrgent(job.createdAt) && (
+                    <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1 shadow-sm">
+                      <Clock className="w-3 h-3" /> ด่วน
+                    </div>
+                  )}
+                  <div className="pr-8 space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        checked={selectedPoolIds.includes(job.id)}
+                        onCheckedChange={() => togglePoolSelection(job.id)}
+                        aria-label={`เลือก ${job.acCode}`}
+                      />
+                      <div className="text-sm font-bold text-foreground leading-snug">{job.location}</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs font-bold text-muted-foreground">{job.acCode}</span>
+                      <span className="rounded-md bg-secondary px-2 py-0.5 text-[10px] font-bold text-foreground">
+                        {job.brand} {job.btu ? `(${job.btu} BTU)` : ""}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex items-center justify-between text-xs border-t border-border">
+                    <div className="flex flex-col">
+                      <span className="text-[11px] font-bold text-warning-foreground">รอรับงาน</span>
+                      <span className="text-[10px] text-muted-foreground mt-1">
+                        {job.createdAt ? `แจ้งเมื่อ: ${format(new Date(job.createdAt), "dd/MM/yyyy")}` : ""}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => handleClaim(job.id)}
+                      disabled={isPending}
+                      className="rounded-xl bg-foreground px-4 py-2 text-xs font-bold text-white hover:bg-primary/90 transition-all shadow-sm active:scale-95"
+                    >
+                      รับงาน
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       )}
 
