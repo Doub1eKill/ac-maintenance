@@ -53,6 +53,8 @@ export interface UrgentMaintenanceAC {
   priority: string | null;
   issueDescription: string | null;
   reportedAt: string | null;
+  pendingWorkOrderId?: string | null;
+  nextDueDate?: string | null;
 }
 
 export type MaintenanceRow =
@@ -135,9 +137,16 @@ export const columns: ColumnDef<MaintenanceRow>[] = [
       if (item.kind === "urgent") {
         const label = item.reportedAt ? new Date(item.reportedAt).toLocaleDateString("th-TH") : "-";
         return (
-          <div className="text-right text-xs">
-            <div className="text-[10px] text-muted-foreground">แจ้งเมื่อ</div>
-            <div className="font-medium text-red-500">{label}</div>
+          <div className="text-right text-xs space-y-0.5">
+            <div>
+              <div className="text-[10px] text-muted-foreground">แจ้งเมื่อ</div>
+              <div className="font-medium text-red-500">{label}</div>
+            </div>
+            {item.nextDueDate && (
+              <div className="text-[10px] text-muted-foreground">
+                กำหนดล้าง: {new Date(item.nextDueDate).toLocaleDateString("th-TH")}
+              </div>
+            )}
           </div>
         );
       }
@@ -175,11 +184,12 @@ export const columns: ColumnDef<MaintenanceRow>[] = [
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => meta?.onViewDetails?.(item.acCode)}>ดูรายละเอียดเครื่อง</DropdownMenuItem>
-            {item.kind === "urgent" ? (
-              <DropdownMenuItem onClick={() => meta?.onAssignWorkOrder?.(item.id)}>มอบหมายช่าง</DropdownMenuItem>
-            ) : (
+            {item.kind === "urgent" && item.pendingWorkOrderId ? (
+              <DropdownMenuItem onClick={() => meta?.onAssignWorkOrder?.(item.pendingWorkOrderId!)}>มอบหมายช่าง</DropdownMenuItem>
+            ) : null}
+            {item.kind === "upcoming" ? (
               <DropdownMenuItem onClick={() => meta?.onCreateWorkOrder?.(item.id)}>สร้างใบงานล้างแอร์</DropdownMenuItem>
-            )}
+            ) : null}
           </DropdownMenuContent>
         </DropdownMenu>
       );
@@ -191,7 +201,7 @@ interface UpcomingMaintenanceTableProps {
   data: MaintenanceRow[];
   onViewDetails?: (acCode: string) => void;
   onCreateWorkOrder?: (acId: string) => void;
-  onAssignWorkOrder?: (acId: string) => void;
+  onAssignWorkOrder?: (workOrderId: string) => void;
 }
 
 export function UpcomingMaintenanceTable({ data, onViewDetails, onCreateWorkOrder, onAssignWorkOrder }: UpcomingMaintenanceTableProps) {

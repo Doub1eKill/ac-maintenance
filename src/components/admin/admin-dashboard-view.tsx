@@ -191,6 +191,17 @@ export function AdminDashboardView({
   const combinedMaintenanceRows = useMemo((): MaintenanceRow[] => {
     const urgentIds = new Set(urgentUnits.map((u) => u.id));
 
+    const nextDueDateByAcId = new Map<string, string>();
+    buildings.forEach((b) => {
+      b.rooms.forEach((r) => {
+        r.acUnits.forEach((ac) => {
+          if (ac.maintenanceSchedule?.nextDueDate) {
+            nextDueDateByAcId.set(ac.id, ac.maintenanceSchedule.nextDueDate);
+          }
+        });
+      });
+    });
+
     const urgentRows: MaintenanceRow[] = [...urgentUnits]
       .sort((a, b) => {
         const rankDiff = priorityRank(a.priority) - priorityRank(b.priority);
@@ -199,7 +210,15 @@ export function AdminDashboardView({
         const bTime = b.reportedAt ? new Date(b.reportedAt).getTime() : 0;
         return aTime - bTime;
       })
-      .map((u) => ({ kind: "urgent" as const, ...u }));
+      .map((u) => {
+        const pendingWo = workOrders.find((wo) => wo.airConditionerId === u.id && wo.status === "pending");
+        return {
+          kind: "urgent" as const,
+          ...u,
+          pendingWorkOrderId: pendingWo ? pendingWo.id : null,
+          nextDueDate: nextDueDateByAcId.get(u.id) ?? null,
+        };
+      });
 
     const upcomingRows: Array<{ kind: "upcoming"; id: string; acCode: string; brand: string; location: string; nextDueDate: string }> = [];
     buildings.forEach((b) => {
@@ -221,7 +240,7 @@ export function AdminDashboardView({
     upcomingRows.sort((a, b) => new Date(a.nextDueDate).getTime() - new Date(b.nextDueDate).getTime());
 
     return [...urgentRows, ...upcomingRows];
-  }, [urgentUnits, buildings]);
+  }, [urgentUnits, buildings, workOrders]);
 
   const pendingOrders = workOrders.filter(
     (wo) => wo.status === "pending" && matchesSearch(wo, globalSearch)
@@ -503,13 +522,8 @@ export function AdminDashboardView({
                   setGlobalSearch(acCode);
                 }}
                 onCreateWorkOrder={handleOpenCalendarWorkOrder}
-                onAssignWorkOrder={(acId) => {
-                  const pendingWo = workOrders.find((wo) => wo.airConditionerId === acId && wo.status === "pending");
-                  if (!pendingWo) {
-                    setToastMessage({ type: "error", text: "ไม่พบใบงานที่รอดำเนินการสำหรับเครื่องนี้" });
-                    return;
-                  }
-                  setSelectedOrderToAssign(pendingWo.id);
+                onAssignWorkOrder={(workOrderId) => {
+                  setSelectedOrderToAssign(workOrderId);
                   setShowAssignModal(true);
                 }}
               />
@@ -521,7 +535,7 @@ export function AdminDashboardView({
                 สรุปสถานะระบบ
               </h3>
               
-              <div className="grid grid-cols-3 gap-y-8 gap-x-4">
+              <div className="grid grid-cols-2 xl:grid-cols-3 gap-y-8 gap-x-4">
                 {/* Item 1 */}
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground">
