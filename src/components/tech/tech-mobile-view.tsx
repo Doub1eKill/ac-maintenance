@@ -4,6 +4,7 @@ import { useState, useTransition, useEffect } from "react";
 import { claimWorkOrderAction, bulkClaimWorkOrdersAction, logMaintenanceAction, scanQrCodeAction } from "@/app/tech/actions";
 import type { TechnicianAssetUnit, TechnicianAssetSummary } from "@/lib/maintenance";
 import { Checkbox } from "@/components/ui/checkbox";
+import { MaintenanceCalendar } from "@/components/shared/maintenance-calendar";
 import {
   Wrench,
   QrCode,
@@ -302,6 +303,11 @@ export function TechMobileView({
       label: "ประวัติ",
       icon: CheckCircle2,
     },
+    {
+      id: "calendar",
+      label: "ปฏิทิน",
+      icon: Calendar,
+    },
   ];
 
   const isUrgent = (dateString?: string | null) => {
@@ -381,6 +387,7 @@ export function TechMobileView({
             {activeTab === "assets" ? "เครื่องปรับอากาศทั้งหมด" :
              activeTab === "pool" ? "งานซ่อมบำรุงที่รอรับ" :
              activeTab === "my_jobs" ? "งานที่ฉันกำลังดำเนินการ" :
+             activeTab === "calendar" ? "ปฏิทินซ่อมบำรุง" :
              "ประวัติการทำงานของฉัน"}
           </h1>
         </div>
@@ -746,6 +753,13 @@ export function TechMobileView({
               </PaginationItem>
             </PaginationContent>
           </Pagination>
+        </div>
+      )}
+
+      {/* TAB 4: Maintenance Calendar */}
+      {activeTab === "calendar" && (
+        <div className="animate-in fade-in">
+          <MaintenanceCalendar />
         </div>
       )}
 

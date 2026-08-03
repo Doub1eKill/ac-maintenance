@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
                 building: true
               }
             },
+            acBrand: { select: { name: true } },
             maintenanceLogs: {
               orderBy: { performedAt: 'desc' },
               take: 1,
@@ -59,12 +60,13 @@ export async function GET(request: NextRequest) {
       return {
         id: s.id.toString(),
         airConditionerId: s.airConditionerId.toString(),
-        frequencyMonths: s.frequencyMonths,
+        frequencyValue: s.frequencyValue,
+        frequencyUnit: s.frequencyUnit,
         lastPerformedAt: s.lastPerformedAt,
         nextDueDate: s.nextDueDate,
         isActive: s.isActive,
         acCode: s.airConditioner.acCode,
-        brand: s.airConditioner.brand,
+        brand: s.airConditioner.acBrand?.name ?? s.airConditioner.brand ?? "ไม่ระบุ",
         location: `${s.airConditioner.room.building.name} - ${s.airConditioner.room.name}`,
         lastPerformedByName: lastLog?.technician.name ?? null,
       };

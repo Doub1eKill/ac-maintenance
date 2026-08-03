@@ -34,14 +34,23 @@ interface Schedule {
   acCode: string;
   brand: string;
   location: string;
-  frequencyMonths: number;
+  frequencyValue: number;
+  frequencyUnit: string;
   lastPerformedAt: string | null;
+  lastPerformedByName: string | null;
   nextDueDate: string;
   isActive: boolean;
 }
 
+function formatFrequencyLabel(value: number, unit: string) {
+  const unitLabel = unit === "days" ? "วัน" : unit === "years" ? "ปี" : "เดือน";
+  return `ทุก ${value} ${unitLabel}`;
+}
+
 interface MaintenanceCalendarProps {
-  onCreateWorkOrder: (acId: string) => void;
+  // Omit to render a read-only calendar (e.g. the technician view, which has
+  // no work-order-creation action of its own).
+  onCreateWorkOrder?: (acId: string) => void;
 }
 
 export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarProps) {
@@ -238,7 +247,11 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground text-xs">ความถี่การล้าง</span>
-                <span className="font-bold text-foreground text-xs">ทุก {selectedEvent.frequencyMonths} เดือน</span>
+                <span className="font-bold text-foreground text-xs">{formatFrequencyLabel(selectedEvent.frequencyValue, selectedEvent.frequencyUnit)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground text-xs">ทำล่าสุดโดย</span>
+                <span className="font-bold text-foreground text-xs">{selectedEvent.lastPerformedByName ?? "ยังไม่เคยดำเนินการ"}</span>
               </div>
               <div className="flex justify-between pt-2 border-t border-border mt-2">
                 <span className="text-muted-foreground text-xs font-bold">กำหนดรอบถัดไป</span>
@@ -250,16 +263,18 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
               </div>
             </div>
 
-            <button
-              onClick={() => {
-                onCreateWorkOrder(selectedEvent.airConditionerId);
-                setSelectedEvent(null);
-              }}
-              className="w-full flex items-center justify-center gap-2 bg-foreground text-white font-bold text-xs py-2.5 rounded-xl hover:bg-primary/90 transition-colors"
-            >
-              <Wrench className="h-3.5 w-3.5" />
-              สร้างใบงานซ่อมบำรุงตอนนี้
-            </button>
+            {onCreateWorkOrder && (
+              <button
+                onClick={() => {
+                  onCreateWorkOrder(selectedEvent.airConditionerId);
+                  setSelectedEvent(null);
+                }}
+                className="w-full flex items-center justify-center gap-2 bg-foreground text-white font-bold text-xs py-2.5 rounded-xl hover:bg-primary/90 transition-colors"
+              >
+                <Wrench className="h-3.5 w-3.5" />
+                สร้างใบงานซ่อมบำรุงตอนนี้
+              </button>
+            )}
           </div>
         </div>
       </div>

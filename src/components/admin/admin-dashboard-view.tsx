@@ -59,7 +59,7 @@ import {
 } from "@/components/ui/dialog";
 import { DashboardLayout, NavItem } from "@/components/layout/dashboard-layout";
 import { AssetManager } from "@/components/admin/asset-manager";
-import { MaintenanceCalendar } from "@/components/admin/maintenance-calendar";
+import { MaintenanceCalendar } from "@/components/shared/maintenance-calendar";
 import { QrCodeManager } from "@/components/admin/qr-code-manager";
 import { ChartAreaInteractive } from "@/components/admin/chart-area-interactive";
 import { UpcomingMaintenanceTable, type MaintenanceRow, type UrgentMaintenanceAC } from "@/components/admin/upcoming-maintenance-table";
