@@ -220,7 +220,7 @@ export function AdminDashboardView({
         };
       });
 
-    const upcomingRows: Array<{ kind: "upcoming"; id: string; acCode: string; brand: string; location: string; nextDueDate: string }> = [];
+    const upcomingRows: Array<{ kind: "upcoming"; id: string; acCode: string; brand: string; btu: number | null; location: string; nextDueDate: string }> = [];
     buildings.forEach((b) => {
       b.rooms.forEach((r) => {
         r.acUnits.forEach((ac) => {
@@ -230,6 +230,7 @@ export function AdminDashboardView({
               id: ac.id,
               acCode: ac.acCode,
               brand: ac.brand || "ไม่ระบุยี่ห้อ",
+              btu: ac.btu,
               location: `${b.name} - ห้อง ${r.name}`,
               nextDueDate: ac.maintenanceSchedule.nextDueDate,
             });

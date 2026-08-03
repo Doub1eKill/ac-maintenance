@@ -40,6 +40,7 @@ export interface UpcomingMaintenanceAC {
   id: string;
   acCode: string;
   brand: string;
+  btu: number | null;
   location: string;
   nextDueDate: string;
 }
@@ -48,6 +49,7 @@ export interface UrgentMaintenanceAC {
   id: string;
   acCode: string;
   brand: string;
+  btu: number | null;
   location: string;
   status: string;
   priority: string | null;
@@ -102,11 +104,13 @@ export const columns: ColumnDef<MaintenanceRow>[] = [
   },
   {
     accessorKey: "location",
-    header: () => <div className="text-xs font-bold">สถานที่ / ยี่ห้อ</div>,
+    header: () => <div className="text-xs font-bold">สถานที่ / รุ่นแอร์</div>,
     cell: ({ row }) => (
       <div>
         <div className="font-medium text-xs">{row.getValue("location")}</div>
-        <div className="text-[10px] text-muted-foreground">{row.original.brand}</div>
+        <div className="text-[10px] text-muted-foreground">
+          {row.original.brand} {row.original.btu ? `(${row.original.btu} BTU)` : ""}
+        </div>
       </div>
     ),
   },
