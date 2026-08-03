@@ -2,6 +2,7 @@
 
 import { useState, useTransition, useEffect } from "react";
 import { claimWorkOrderAction, logMaintenanceAction, scanQrCodeAction } from "@/app/tech/actions";
+import type { TechnicianAssetUnit, TechnicianAssetSummary } from "@/lib/maintenance";
 import {
   Wrench,
   QrCode,
@@ -17,7 +18,8 @@ import {
   MoreVertical,
   Calendar,
   History,
-  Clock
+  Clock,
+  Snowflake
 } from "lucide-react";
 import {
   Pagination,
@@ -72,6 +74,8 @@ interface TechMobileViewProps {
   myJobs: TechJobItem[];
   completedJobs?: TechJobItem[];
   buildings?: Building[];
+  assetList?: TechnicianAssetUnit[];
+  assetSummary?: TechnicianAssetSummary;
 }
 
 export function TechMobileView({
@@ -82,6 +86,8 @@ export function TechMobileView({
   myJobs,
   completedJobs = [],
   buildings = [],
+  assetList = [],
+  assetSummary = { total: 0, cleaningJobs: 0, repairJobs: 0 },
 }: TechMobileViewProps) {
   const [activeTab, setActiveTab] = useState<string>("pool");
   const [isPending, startTransition] = useTransition();
@@ -111,30 +117,33 @@ export function TechMobileView({
   const [poolPage, setPoolPage] = useState(1);
   const [myJobsPage, setMyJobsPage] = useState(1);
   const [completedJobsPage, setCompletedJobsPage] = useState(1);
+  const [assetsPage, setAssetsPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
 
   useEffect(() => {
     setPoolPage(1);
     setMyJobsPage(1);
     setCompletedJobsPage(1);
+    setAssetsPage(1);
   }, [searchQuery, selectedBuilding]);
 
-  const filterJobs = (jobs: TechJobItem[]) => {
+  function filterJobs<T extends { acCode: string; brand: string; location: string }>(jobs: T[]): T[] {
     return jobs.filter((job) => {
-      const matchesSearch = 
+      const matchesSearch =
         job.acCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
         job.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
         job.location.toLowerCase().includes(searchQuery.toLowerCase());
-      
+
       const matchesBuilding = selectedBuilding === "all" || job.location.includes(selectedBuilding);
-      
+
       return matchesSearch && matchesBuilding;
     });
-  };
+  }
 
   const filteredPool = filterJobs(jobPool);
   const filteredMyJobs = filterJobs(myJobs);
   const filteredCompletedJobs = filterJobs(completedJobs);
+  const filteredAssets = filterJobs(assetList);
 
   const totalPoolPages = Math.ceil(filteredPool.length / ITEMS_PER_PAGE);
   const paginatedPool = filteredPool.slice((poolPage - 1) * ITEMS_PER_PAGE, poolPage * ITEMS_PER_PAGE);
@@ -144,6 +153,9 @@ export function TechMobileView({
 
   const totalCompletedJobsPages = Math.ceil(filteredCompletedJobs.length / ITEMS_PER_PAGE);
   const paginatedCompletedJobs = filteredCompletedJobs.slice((completedJobsPage - 1) * ITEMS_PER_PAGE, completedJobsPage * ITEMS_PER_PAGE);
+
+  const totalAssetsPages = Math.ceil(filteredAssets.length / ITEMS_PER_PAGE);
+  const paginatedAssets = filteredAssets.slice((assetsPage - 1) * ITEMS_PER_PAGE, assetsPage * ITEMS_PER_PAGE);
 
   function handleClaim(workOrderId: string) {
     setToastMessage(null);
@@ -230,6 +242,12 @@ export function TechMobileView({
   }
 
   const techNavItems: NavItem[] = [
+    {
+      id: "assets",
+      label: "แอร์ทั้งหมด",
+      icon: Snowflake,
+      badge: assetSummary.repairJobs + assetSummary.cleaningJobs,
+    },
     {
       id: "pool",
       label: "งานทั้งหมด",
@@ -323,8 +341,9 @@ export function TechMobileView({
             พื้นที่ปฏิบัติงานช่างเทคนิค
           </div>
           <h1 className="text-xl font-bold text-foreground mt-1">
-            {activeTab === "pool" ? "งานซ่อมบำรุงที่รอรับ" : 
-             activeTab === "my_jobs" ? "งานที่ฉันกำลังดำเนินการ" : 
+            {activeTab === "assets" ? "เครื่องปรับอากาศทั้งหมด" :
+             activeTab === "pool" ? "งานซ่อมบำรุงที่รอรับ" :
+             activeTab === "my_jobs" ? "งานที่ฉันกำลังดำเนินการ" :
              "ประวัติการทำงานของฉัน"}
           </h1>
         </div>
@@ -350,6 +369,103 @@ export function TechMobileView({
           </button>
         </div>
       </div>
+
+      {/* TAB 0: All Assets */}
+      {activeTab === "assets" && (
+        <div className="space-y-4 animate-in fade-in">
+          <div className="grid grid-cols-3 gap-3">
+            <div className="biz-card p-4 flex flex-col gap-1">
+              <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground">
+                <Snowflake className="h-3.5 w-3.5 text-primary" /> ทั้งหมด
+              </div>
+              <div className="text-xl font-bold text-foreground">{assetSummary.total}</div>
+            </div>
+            <div className="biz-card p-4 flex flex-col gap-1">
+              <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground">
+                <Wrench className="h-3.5 w-3.5 text-red-500" /> รอซ่อม
+              </div>
+              <div className="text-xl font-bold text-foreground">{assetSummary.repairJobs}</div>
+            </div>
+            <div className="biz-card p-4 flex flex-col gap-1">
+              <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground">
+                <Droplets className="h-3.5 w-3.5 text-amber-500" /> รอล้าง
+              </div>
+              <div className="text-xl font-bold text-foreground">{assetSummary.cleaningJobs}</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {filteredAssets.length === 0 ? (
+              <div className="col-span-full py-12 text-center text-xs text-muted-foreground border border-dashed border-border rounded-2xl">
+                ไม่มีเครื่องปรับอากาศในระบบ
+              </div>
+            ) : (
+              paginatedAssets.map((unit) => (
+                <div key={unit.id} className="biz-card p-5 space-y-4 hover:border-slate-400 transition-all relative overflow-hidden">
+                  {unit.isOverdue && (
+                    <div
+                      className={`absolute top-0 right-0 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1 shadow-sm ${
+                        unit.status === "broken" ? "bg-red-500" : "bg-amber-500"
+                      }`}
+                    >
+                      <Clock className="w-3 h-3" /> {unit.status === "broken" ? "รอซ่อม" : "รอล้าง"}
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between pr-8">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-base font-bold text-foreground">{unit.acCode}</span>
+                      <span className="rounded-md bg-secondary px-2 py-0.5 text-[10px] font-bold text-foreground">
+                        {unit.brand} {unit.btu ? `(${unit.btu} BTU)` : ""}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="text-xs text-muted-foreground font-medium leading-relaxed">
+                    {unit.location}
+                  </div>
+
+                  <div className="pt-2 flex items-center justify-between text-xs border-t border-border">
+                    <div className="flex flex-col">
+                      <span className="text-[11px] font-bold text-muted-foreground">ล้างล่าสุด</span>
+                      <span className="text-[10px] text-muted-foreground mt-1">
+                        {unit.lastCleanedAt ? format(new Date(unit.lastCleanedAt), "dd/MM/yyyy") : "ยังไม่เคยล้าง"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {activeTab === "assets" && totalAssetsPages > 1 && (
+        <div className="py-4 mt-2">
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  href="#"
+                  onClick={(e) => { e.preventDefault(); setAssetsPage(p => Math.max(1, p - 1)); }}
+                  className={assetsPage === 1 ? "pointer-events-none opacity-50" : ""}
+                />
+              </PaginationItem>
+              <PaginationItem>
+                <span className="text-xs font-medium text-muted-foreground px-4">
+                  หน้า {assetsPage} จาก {totalAssetsPages}
+                </span>
+              </PaginationItem>
+              <PaginationItem>
+                <PaginationNext
+                  href="#"
+                  onClick={(e) => { e.preventDefault(); setAssetsPage(p => Math.min(totalAssetsPages, p + 1)); }}
+                  className={assetsPage === totalAssetsPages ? "pointer-events-none opacity-50" : ""}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
 
       {/* TAB 1: Job Pool */}
       {activeTab === "pool" && (

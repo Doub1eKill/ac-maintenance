@@ -6,7 +6,7 @@ import { addDays, addMonths, addYears } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
-import { syncOverdueMaintenanceWorkOrders } from "@/lib/maintenance";
+import { syncOverdueMaintenanceWorkOrders, getTechnicianAssetList } from "@/lib/maintenance";
 import { MaintenanceAction } from "@/generated/prisma/client";
 
 async function verifyTechnician() {
@@ -49,7 +49,7 @@ export async function getTechnicianData() {
   try {
     await syncOverdueMaintenanceWorkOrders(universityId);
 
-    const [university, pendingOrdersRaw, myJobsRaw, completedJobsRaw] = await Promise.all([
+    const [university, pendingOrdersRaw, myJobsRaw, completedJobsRaw, assetListResult] = await Promise.all([
       prisma.university.findUnique({ where: { id: universityId } }),
       prisma.workOrder.findMany({
         where: { universityId, status: "pending" },
@@ -100,6 +100,7 @@ export async function getTechnicianData() {
         orderBy: { completedAt: "desc" },
         take: 50,
       }),
+      getTechnicianAssetList(universityId),
     ]);
 
     const jobPool = pendingOrdersRaw.map((wo) => ({
@@ -149,6 +150,8 @@ export async function getTechnicianData() {
       myJobs,
       completedJobs,
       buildings,
+      assetList: assetListResult.units,
+      assetSummary: assetListResult.summary,
     };
   } catch (error) {
     console.error("Technician Data query failed:", error);
@@ -159,6 +162,8 @@ export async function getTechnicianData() {
       myJobs: [],
       completedJobs: [],
       buildings: [],
+      assetList: [],
+      assetSummary: { total: 0, cleaningJobs: 0, repairJobs: 0 },
     };
   }
 }

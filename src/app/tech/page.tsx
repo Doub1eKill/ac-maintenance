@@ -18,7 +18,8 @@ export default async function TechHomePage() {
     redirect("/");
   }
 
-  const { dbError, universityName, jobPool, myJobs, completedJobs, buildings } = await getTechnicianData();
+  const { dbError, universityName, jobPool, myJobs, completedJobs, buildings, assetList, assetSummary } =
+    await getTechnicianData();
 
   return (
     <TechMobileView
@@ -33,6 +34,8 @@ export default async function TechHomePage() {
       myJobs={myJobs}
       completedJobs={completedJobs}
       buildings={buildings}
+      assetList={assetList}
+      assetSummary={assetSummary}
     />
   );
 }
