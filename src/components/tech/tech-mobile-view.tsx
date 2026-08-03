@@ -411,17 +411,14 @@ export function TechMobileView({
                       <Clock className="w-3 h-3" /> {unit.status === "broken" ? "รอซ่อม" : "รอล้าง"}
                     </div>
                   )}
-                  <div className="flex items-center justify-between pr-8">
+                  <div className="pr-8 space-y-1">
+                    <div className="text-sm font-bold text-foreground leading-snug">{unit.location}</div>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-base font-bold text-foreground">{unit.acCode}</span>
+                      <span className="font-mono text-xs font-bold text-muted-foreground">{unit.acCode}</span>
                       <span className="rounded-md bg-secondary px-2 py-0.5 text-[10px] font-bold text-foreground">
                         {unit.brand} {unit.btu ? `(${unit.btu} BTU)` : ""}
                       </span>
                     </div>
-                  </div>
-
-                  <div className="text-xs text-muted-foreground font-medium leading-relaxed">
-                    {unit.location}
                   </div>
 
                   <div className="pt-2 flex items-center justify-between text-xs border-t border-border">
@@ -482,17 +479,14 @@ export function TechMobileView({
                     <Clock className="w-3 h-3" /> ด่วน
                   </div>
                 )}
-                <div className="flex items-center justify-between pr-8">
+                <div className="pr-8 space-y-1">
+                  <div className="text-sm font-bold text-foreground leading-snug">{job.location}</div>
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-base font-bold text-foreground">{job.acCode}</span>
+                    <span className="font-mono text-xs font-bold text-muted-foreground">{job.acCode}</span>
                     <span className="rounded-md bg-secondary px-2 py-0.5 text-[10px] font-bold text-foreground">
                       {job.brand} {job.btu ? `(${job.btu} BTU)` : ""}
                     </span>
                   </div>
-                </div>
-
-                <div className="text-xs text-muted-foreground font-medium leading-relaxed">
-                  {job.location}
                 </div>
 
                 <div className="pt-2 flex items-center justify-between text-xs border-t border-border">
@@ -558,19 +552,20 @@ export function TechMobileView({
                 className={idx === 0 ? "biz-card-dark p-5 space-y-4 shadow-md" : "biz-card p-5 space-y-4 hover:border-slate-400 transition-all"}
               >
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className={`font-mono text-base font-bold ${idx === 0 ? "text-white" : "text-foreground"}`}>
-                      {job.acCode}
-                    </span>
-                    <span className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${idx === 0 ? "bg-slate-800 text-muted-foreground" : "bg-secondary text-foreground"}`}>
-                      {job.brand}
-                    </span>
+                  <div className="space-y-1">
+                    <div className={`text-sm font-bold leading-snug ${idx === 0 ? "text-white" : "text-foreground"}`}>
+                      {job.location}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs font-bold text-muted-foreground">
+                        {job.acCode}
+                      </span>
+                      <span className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${idx === 0 ? "bg-slate-800 text-muted-foreground" : "bg-secondary text-foreground"}`}>
+                        {job.brand}
+                      </span>
+                    </div>
                   </div>
                   <MoreVertical className={`h-4 w-4 ${idx === 0 ? "text-muted-foreground" : "text-muted-foreground"}`} />
-                </div>
-
-                <div className={`text-xs font-medium leading-relaxed ${idx === 0 ? "text-muted-foreground" : "text-muted-foreground"}`}>
-                  {job.location}
                 </div>
 
                 <div className={`pt-2 flex items-center justify-between text-xs border-t ${idx === 0 ? "border-slate-800 text-muted-foreground" : "border-border text-muted-foreground"}`}>
@@ -635,17 +630,16 @@ export function TechMobileView({
             paginatedCompletedJobs.map((job) => (
               <div key={job.id} className="biz-card p-5 space-y-4 hover:border-slate-400 transition-all bg-muted">
                 <div className="flex items-center justify-between opacity-80">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-base font-bold text-muted-foreground">{job.acCode}</span>
-                    <span className="rounded-md bg-accent px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
-                      {job.brand}
-                    </span>
+                  <div className="space-y-1">
+                    <div className="text-sm font-bold text-muted-foreground leading-snug">{job.location}</div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs font-bold text-muted-foreground">{job.acCode}</span>
+                      <span className="rounded-md bg-accent px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
+                        {job.brand}
+                      </span>
+                    </div>
                   </div>
                   <CheckCircle2 className="h-5 w-5 text-success" />
-                </div>
-
-                <div className="text-xs text-muted-foreground font-medium leading-relaxed">
-                  {job.location}
                 </div>
 
                 <div className="pt-2 flex items-center justify-between text-xs border-t border-border text-muted-foreground">
