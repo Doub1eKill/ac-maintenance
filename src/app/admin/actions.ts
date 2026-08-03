@@ -187,6 +187,7 @@ export async function getOrgAdminData() {
       id: wo.id.toString(),
       acCode: wo.airConditioner.acCode,
       brand: wo.airConditioner.acBrand?.name || wo.airConditioner.brand || "ไม่ระบุ",
+      btu: wo.airConditioner.btu,
       location: `${wo.airConditioner.room.building.name} (${wo.airConditioner.room.building.abbreviation}) - ห้อง ${wo.airConditioner.room.name}`,
       status: wo.status,
       priority: wo.priority,

@@ -68,6 +68,7 @@ interface WorkOrderItem {
   id: string;
   acCode: string;
   brand: string;
+  btu: number | null;
   location: string;
   status: string;
   priority: string | null;
@@ -670,7 +671,9 @@ export function AdminDashboardView({
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="font-medium text-foreground">{wo.location}</div>
-                          <div className="text-xs text-muted-foreground">{wo.brand}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {wo.brand} {wo.btu ? `(${wo.btu} BTU)` : ""}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-muted-foreground">
                           {wo.createdAt ? new Date(wo.createdAt).toLocaleDateString("th-TH") : "-"}
@@ -1201,7 +1204,9 @@ export function AdminDashboardView({
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-muted-foreground">ยี่ห้อ:</span>
-                        <span className="font-medium text-foreground">{selectedWorkOrderDetails.brand}</span>
+                        <span className="font-medium text-foreground">
+                          {selectedWorkOrderDetails.brand} {selectedWorkOrderDetails.btu ? `(${selectedWorkOrderDetails.btu} BTU)` : ""}
+                        </span>
                       </div>
                       <div className="flex justify-between items-start">
                         <span className="text-muted-foreground">สถานที่:</span>
