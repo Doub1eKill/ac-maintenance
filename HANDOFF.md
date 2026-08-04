@@ -8,7 +8,7 @@
 - `src/app/api/**` (Route Handlers)
 - `src/lib/**` (auth, prisma client, business logic helpers เช่น `maintenance.ts`)
 
-ถ้าต้องการให้เพิ่ม/แก้อะไรใน Backend (เช่น field ใหม่ใน response, endpoint ใหม่, logic การคำนวณ) ให้ **เขียนคำขอไว้ในไฟล์นี้** (เพิ่ม section ใหม่ด้านล่าง หรือ comment ในหัวข้อ Backlog ที่เกี่ยวข้อง) แล้ว commit/push ขึ้น Git — Backend จะถูกทำโดย Claude/เจ้าของโปรเจกต์เท่านั้น เหตุผล: ป้องกัน schema/migration ชนกันข้ามเครื่อง และป้องกัน business logic (เช่น multi-tenant isolation, auth guard) ถูกแก้โดยไม่เข้าใจผลกระทบทั้งระบบ
+ถ้าต้องการให้เพิ่ม/แก้อะไรใน Backend (เช่น field ใหม่ใน response, endpoint ใหม่, logic การคำนวณ) ให้ **เขียนคำขอไว้ในไฟล์นี้** (เพิ่ม section ใหม่ด้านล่าง หรือ comment ในหัวข้อ Backlog ที่เกี่ยวข้อง) แล้ว commit/push ขึ้น Git — Backend จะถูกทำโดย DoubleKill (เจ้าของโปรเจกต์) เท่านั้น เหตุผล: ป้องกัน schema/migration ชนกันข้ามเครื่อง และป้องกัน business logic (เช่น multi-tenant isolation, auth guard) ถูกแก้โดยไม่เข้าใจผลกระทบทั้งระบบ
 
 ---
 
@@ -21,13 +21,13 @@
 npx prisma migrate deploy
 npx prisma generate
 ```
-ถ้าคำสั่งนี้แจ้งว่ามี migration ใหม่ที่ยังไม่ apply แปลว่าฐานข้อมูลของคุณ "ไม่ตรงกัน" กับที่ Claude แก้ไว้ — รันตามนี้แล้วข้อมูลจะ sync ให้อัตโนมัติ (migration ทุกไฟล์ในโปรเจกต์นี้เขียนให้ idempotent แล้ว รันซ้ำได้ไม่พัง ไม่ต้องกลัวข้อมูลซ้ำ/หาย)
+ถ้าคำสั่งนี้แจ้งว่ามี migration ใหม่ที่ยังไม่ apply แปลว่าฐานข้อมูลของคุณ "ไม่ตรงกัน" กับที่ DoubleKill แก้ไว้ — รันตามนี้แล้วข้อมูลจะ sync ให้อัตโนมัติ (migration ทุกไฟล์ในโปรเจกต์นี้เขียนให้ idempotent แล้ว รันซ้ำได้ไม่พัง ไม่ต้องกลัวข้อมูลซ้ำ/หาย)
 
 **ล่าสุด (27 กรกฎาคม 2026):** เพิ่ม migration `20260727161239_backfill_maintenance_schedules_and_ac_catalog` — เป็น **data migration** (ไม่ใช่ schema change) backfill ตาราง `maintenance_schedules` (189 แถว, รอบ 3 เดือน) และ `ac_brands`/`ac_models` (5 ยี่ห้อ, 189 รุ่น) ที่ว่างเปล่ามาตลอด **ต้อง `migrate deploy` ก่อน ไม่งั้นปฏิทินซ่อมบำรุงกับหน้า Master Data จะยังว่างเหมือนเดิม**
 
 **ถ้าฝั่งเพื่อนมีข้อมูลเพิ่มเติมในเครื่องตัวเอง** (เช่น สร้าง user/มหาวิทยาลัยทดสอบเพิ่ม, แก้ข้อมูลผ่าน `prisma studio`, หรือ seed อะไรใหม่ที่อยากให้อีกฝั่งมีด้วย):
 - **ห้าม** แก้ `schema.prisma` หรือสร้าง migration เอง (ผิดกฎด้านบน)
-- ให้เขียนสรุปไว้ใน `HANDOFF.md` ว่าเพิ่ม/แก้ข้อมูลอะไรไปบ้าง (ตาราง, เงื่อนไข, ตัวอย่างค่า) แล้ว commit/push โค้ดตามปกติ — Claude จะเขียน data migration ให้ในรอบถัดไปเหมือนที่ทำข้อ backfill นี้
+- ให้เขียนสรุปไว้ใน `HANDOFF.md` ว่าเพิ่ม/แก้ข้อมูลอะไรไปบ้าง (ตาราง, เงื่อนไข, ตัวอย่างค่า) แล้ว commit/push โค้ดตามปกติ — DoubleKill จะเขียน data migration ให้ในรอบถัดไปเหมือนที่ทำข้อ backfill นี้
 
 ---
 
@@ -63,7 +63,7 @@ npx prisma generate
 - **Semantic Theming:** Audited and replaced hardcoded Tailwind color utility classes (e.g., `slate`, `sky`, `indigo`, `emerald`, `amber`) with semantic theme variables (e.g., `bg-background`, `bg-muted`, `bg-primary`, `bg-success`, `text-warning-foreground`, `border-border`) to fully support the dynamic HSL theme preset (`b7WjPrGOe`).
 - **Layout Alignment:** Fixed visual asymmetries, such as the vertical separator spacing in the sidebar trigger (`dashboard-layout.tsx`) and text overlapping in chart dropdowns.
 
-### 5. Backend Work Session (Claude — 27 กรกฎาคม 2026)
+### 5. Backend Work Session (DoubleKill — 27 กรกฎาคม 2026)
 
 แก้/เพิ่ม Backend ตาม Backlog ด้านล่างครบทุกข้อที่เป็นงาน Backend แล้ว (UI ยังไม่ได้ทำ — ดูหมายเหตุใน checklist แต่ละข้อ):
 
@@ -161,7 +161,7 @@ npm run build
 
 ## ✅ Backlog (แยกตาม Role) — บันทึกเมื่อ 27 กรกฎาคม 2026
 
-> **หมายเหตุ:** ข้อที่ขึ้น `[Backend ✅]` แปลว่า Claude ทำฝั่ง Backend เสร็จแล้ว รอแค่ UI มาเรียกใช้ — ดู endpoint/field ที่ต้องเรียกในหัวข้อ "Backend Work Session" ด้านบน ไม่ต้อง checklist [x] จนกว่า UI จะเสร็จด้วย
+> **หมายเหตุ:** ข้อที่ขึ้น `[Backend ✅]` แปลว่า DoubleKill ทำฝั่ง Backend เสร็จแล้ว รอแค่ UI มาเรียกใช้ — ดู endpoint/field ที่ต้องเรียกในหัวข้อ "Backend Work Session" ด้านบน ไม่ต้อง checklist [x] จนกว่า UI จะเสร็จด้วย
 
 ### Technician
 - [x] 1. `[Backend ✅ — เรียก GET /api/tech/units]` Dashboard: แสดง List แอร์ทั้งหมดพร้อมวันที่ล้างล่าสุดต่อท้ายแต่ละรายการ เรียงจากไม่ได้ล้างนานที่สุดไปหาน้อยที่สุด ยกเว้นเครื่องที่ถึงกำหนดล้างแล้ว (มี work_order สถานะ pending จาก auto-check 3 เดือน) ต้องอยู่บนสุดเสมอไม่ว่าลำดับวันที่จะเป็นอย่างไร — เพิ่ม section สรุปจำนวนงานแยกตามประเภท (งานล้างกี่งาน งานซ่อมกี่งาน) — [เพิ่มแท็บ "แอร์ทั้งหมด" ในหน้า Technician แล้ว, ดึงข้อมูลแบบ SSR ผ่าน `getTechnicianAssetList()` (`src/lib/maintenance.ts`, ใช้ร่วมกับ endpoint เดิม) แทนการ fetch ฝั่ง client]
@@ -183,4 +183,66 @@ npm run build
 
 ---
 
-*Handoff document last updated: July 27, 2026.*
+## ⚡ ข้อเสนอปรับปรุงประสิทธิภาพ (Performance Backlog) — เสนอเมื่อ 4 สิงหาคม 2026
+
+ผลจากการตรวจโค้ดทั้งโปรเจกต์ (DoubleKill) — **ยังไม่ได้ลงมือทำข้อไหนเลย** รอตกลงกันก่อน
+แบ่งตามเจ้าของงานตามกฎ "ห้ามแก้ Backend เอง" ด้านบนของไฟล์นี้
+
+> **บริบทสำคัญ:** ตอนนี้ข้อมูลยังเล็ก (73 แอร์/มหาวิทยาลัย, 607 maintenance_logs) ทุกหน้าจึงยังเร็วอยู่
+> ข้อ **P1, P4, P6, P12** ให้ผลทันทีตั้งแต่วันนี้ ส่วนข้อที่เหลือจะเริ่มรู้สึกตอนข้อมูลโต
+
+### 🟢 กลุ่ม A — DoubleKill ทำได้เลย (Backend/DB ล้วน ไม่กระทบ UI)
+
+ทั้งกลุ่มนี้ **return shape เดิมทุก field** ฝั่ง UI ไม่ต้องแก้อะไรและไม่ต้องรอ
+
+- [ ] **P1.** `getOrgAdminData()` — ย้าย `brands: await prisma.acBrand.findMany(...)` (บรรทัด ~276 ใน `src/app/admin/actions.ts`) เข้าไปใน `Promise.all` ตอนนี้มันอยู่ใน return object เลยรัน **หลัง** query อื่นเสร็จหมด = เสีย round trip ฟรี 1 รอบทุกครั้งที่โหลดหน้า
+- [ ] **P2.** `getOrgAdminData()` — รวม query `pendingUsersRaw` + `allUsersRaw` เป็นอันเดียว (`allUsers` เป็น superset ของ `pendingUsers` อยู่แล้ว) แล้ว filter ใน memory + ใส่ `select` เพื่อไม่ดึง password hash เข้ามาโดยไม่จำเป็น
+- [ ] **P3.** `syncOverdueMaintenanceWorkOrders()` — ใส่ throttle (เช็คครั้งเดียวต่อ N นาที) ตอนนี้ยิง query เช็ค + อาจเขียน DB **ทุกครั้ง**ที่โหลด `/admin`, `/tech`, `/api/tech/units` แม้ไม่มีอะไรให้ทำ
+- [ ] **P4.** `bulkClaimWorkOrdersAction()` — เปลี่ยนจากวน `updateMany` ทีละ id ใน transaction (รับ 20 งาน = 20 round trip ถือ lock ยาว) เป็น `updateMany` ครั้งเดียวด้วย `id: { in: ids }` แล้ว `findMany` เช็คผล = เหลือ 2 query, และเปลี่ยน audit log จาก `Promise.all` ของ `create` ทีละอันเป็น `createMany`
+- [ ] **P5.** เพิ่ม DB index ที่ขาด: `air_conditioners.status` และ `air_conditioners.deleted_at` (query กรอง 2 ตัวนี้ตลอดแต่ยังไม่มี index) — ทำเป็น migration ปกติ
+- [ ] **P6.** ย่อ/บีบรูปตอนอัปโหลดใน `saveUpload()` (`src/app/tech/actions.ts`) ตอนนี้เซฟไฟล์ดิบลง `public/uploads` ไม่ย่อเลย → รูปจากมือถือช่าง 3-5MB ถูกเก็บและส่งกลับเต็มขนาด **น่าจะกระทบผู้ใช้จริงมากที่สุดในระยะยาว เพราะช่างใช้เน็ตมือถือ** (URL ที่คืนยังเป็นรูปแบบเดิม UI ไม่ต้องแก้)
+
+### 🟡 กลุ่ม B — ต้องตกลงกันก่อน / ทำร่วมกัน
+
+- [ ] **P7. ลบหน้า `/dashboard` ที่เป็นโค้ด demo ค้างอยู่** ← **ต้องการคำตอบจาก Esther03u**
+
+  `src/app/dashboard/page.tsx` เป็น scaffold ของ shadcn ล้วนๆ ใช้ `data.json` ปลอม 16KB **ไม่มีลิงก์จากหน้าไหนเลย** และ **ไม่อยู่ใน matcher ของ `src/proxy.ts` → เป็น public route ที่เปิดได้โดยไม่ต้องล็อกอิน** (build ขึ้นเป็น `○ /dashboard` static) — อาจเป็นต้นตอของ **backlog #11** ด้วย
+
+  มันลาก dependency หนักเข้า bundle: `@dnd-kit` (4 packages) + recharts ตัวซ้ำ + component ~1,500 บรรทัด
+
+  ⚠️ **คำถามถึง Esther03u:** ยังอยากเก็บ `src/components/data-table.tsx` (763 บรรทัด มี sorting/pagination/drag-drop ครบ) ไว้เป็นต้นแบบสำหรับ **backlog #10** (กราฟ Super Admin) หรือ **P13** (pagination) ไหม? ถ้าไม่ใช้แล้วบอกได้เลย DoubleKill จะลบให้ทั้งชุด
+
+  ⚠️ **จุดที่พลาดง่ายมากถ้าลบเอง — ชื่อไฟล์ชนกัน:**
+
+  | ❌ ห้ามลบ (หน้าจริงใช้อยู่) | ✅ ลบได้ (demo ใช้อย่างเดียว) |
+  |---|---|
+  | `src/components/admin/chart-area-interactive.tsx` | `src/components/chart-area-interactive.tsx` (ตัว root) |
+  | `src/components/ui/sidebar.tsx` ← `dashboard-layout.tsx` ใช้ | `src/components/app-sidebar.tsx`, `nav-documents/main/secondary/user.tsx` |
+  | `ui/table.tsx`, `ui/checkbox.tsx`, `ui/tabs.tsx`, `ui/breadcrumb.tsx`, `ui/chart.tsx` | `data-table.tsx`, `section-cards.tsx`, `site-header.tsx`, `ui/drawer.tsx`, `ui/toggle-group.tsx`, `ui/avatar.tsx` |
+
+- [ ] **P8. เปลี่ยน `include` เป็น `select` ในงาน query หนัก** (DoubleKill ทำ แต่ต้องเทสต์ทุกหน้าร่วมกัน)
+
+  ตอนนี้ `getOrgAdminData()` ดึง buildings → rooms → airConditioners แบบ full row + `acBrand` + `acModel` + `maintenanceSchedules` ทั้งหมด ทั้งที่ UI ใช้ไม่กี่ field
+
+  ⚠️ **นี่คือข้อที่เสี่ยงพังแบบเงียบที่สุด** ถ้า `select` ไม่ครบสัก field เดียวที่ UI อ่านอยู่ หน้าจะขึ้น `undefined` โดย TypeScript อาจไม่จับ (props เป็น inferred type) → DoubleKill จะไล่ audit ทุก field ที่ UI ใช้ก่อน และต้องเทสต์ครบทุกหน้าก่อน merge
+
+- [ ] **P9. เพิ่ม `loading.tsx` + Suspense** (DoubleKill วางโครง → Esther03u ปรับหน้าตา)
+
+  ทั้งโปรเจกต์มี Suspense จุดเดียวที่ `master-data` ผลคือ `/admin` `/tech` **ขาวค้าง**จนกว่า query ที่ช้าที่สุดจะเสร็จทั้งหมด — เป็นไฟล์ใหม่ ไม่แตะของเดิม แต่ skeleton ที่ผู้ใช้เห็นควรให้เข้ากับธีม/Alert ที่เพิ่ง standardize ไป
+
+### 🔴 กลุ่ม C — งานฝั่ง UI (Esther03u)
+
+DoubleKill จะไม่แตะไฟล์เหล่านี้ ถ้าต้องการให้ backend เพิ่ม field/endpoint อะไรรองรับ เขียนคำขอไว้ในไฟล์นี้ได้เลย
+
+- [ ] **P10.** แยก client component ก้อนยักษ์ — `admin-dashboard-view.tsx` **1,299 บรรทัด** / `tech-mobile-view.tsx` 992 บรรทัด ทั้งคู่เป็น `"use client"` และรับข้อมูล**ทั้งหมด**เป็น props → ข้อมูลถูก serialize ลง RSC payload ส่งข้ามเน็ตแล้ว hydrate ทั้งก้อน ส่วนที่ไม่ต้อง interactive ควรแยกเป็น Server Component
+- [ ] **P11.** ใส่ `next/dynamic` — ตอนนี้**ไม่มีเลยสักจุด** ปฏิทิน/กราฟ recharts/modal โหลดมาพร้อมหน้าแรกทั้งหมดทั้งที่ผู้ใช้ยังไม่เห็น (chunk ใหญ่สุด 332KB)
+- [ ] **P12.** ปฏิทิน — ตอนนี้เกิด waterfall: SSR เสร็จ → hydrate → ค่อย `fetch` → ค่อย render และดึง schedule **ทั้ง 73 รายการ**ทุกครั้งทั้งที่แสดงทีละเดือน
+  - 💡 **Backend พร้อมอยู่แล้ว:** `/api/admin/maintenance-schedules` รับ query param `start`/`end` อยู่แล้วแต่**ยังไม่เคยเอาไปใช้กรอง** — ถ้าอยากให้ DoubleKill ทำ filter ให้ทำงานจริง เขียนคำขอไว้ได้เลย
+  - หรือถ้าส่งข้อมูลผ่าน props จาก SSR แทนการ fetch ก็ตัดรอบ fetch ทิ้งได้เลย
+- [ ] **P13.** `<img>` → `next/image` — ทั้งโปรเจกต์**ไม่มี `next/image` เลยสักจุด** ใช้ `<img>` ดิบที่ `admin-dashboard-view.tsx` (~บรรทัด 1173) สำหรับรูปหลักฐานงานซ่อม (ทำคู่กับ **P6** ฝั่ง backend จะได้ผลเต็มที่)
+- [ ] **P14.** Pagination จริงบนกระดานใบงาน — ตอนนี้ `take: 50` เป็นการตัดเฉยๆ ไม่มีปุ่มหน้าถัดไป **พอเกิน 50 ใบข้อมูลจะหายเงียบๆ**
+  - 💡 ต้องการ backend ทำ cursor/total count ให้ไหม? เขียนคำขอไว้ได้เลย
+
+---
+
+*Handoff document last updated: August 4, 2026.*
