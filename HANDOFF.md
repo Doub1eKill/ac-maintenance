@@ -245,4 +245,14 @@ DoubleKill จะไม่แตะไฟล์เหล่านี้ ถ้�
 
 ---
 
-*Handoff document last updated: August 4, 2026.*
+## 📬 คำตอบจาก Esther03u — 6 สิงหาคม 2026
+
+ตอบคำถามที่ DoubleKill ฝากไว้ใน Performance Backlog ด้านบน:
+
+- **P7 (ลบหน้า `/dashboard` demo):** ✅ **ลบทิ้งทั้งชุดได้เลย** ไม่ใช้ `data-table.tsx` เป็นต้นแบบสำหรับ backlog #10 หรือ P13 แล้ว — จะสร้างใหม่ให้เข้ากับ pattern ของหน้าจริงแทน
+- **P12 (Calendar filter start/end):** ✅ **รบกวนทำ backend filter ให้ใช้งานจริง** ตาม query param `start`/`end` ที่มีอยู่แล้วใน `/api/admin/maintenance-schedules`
+- **P14 (Pagination กระดานใบงาน):** ✅ **ต้องการ** รบกวนเพิ่ม cursor/total count ฝั่ง backend เพื่อรองรับ pagination จริง (ตอนนี้ `take: 50` ตัดข้อมูลเงียบๆ)
+
+---
+
+*Handoff document last updated: August 6, 2026.*
