@@ -191,10 +191,10 @@ export function AdminDashboardView({
 
   const getWorkOrderRowClassName = (wo: WorkOrderItem) => {
     const borderClass =
-      wo.status === "pending" ? "border-warning" :
-      wo.status === "claimed" ? "border-primary" :
-      wo.status === "completed" ? "border-success" :
-      "border-transparent";
+      wo.status === "pending" ? "border-l-warning" :
+      wo.status === "claimed" ? "border-l-primary" :
+      wo.status === "completed" ? "border-l-success" :
+      "border-l-transparent";
 
     const tintClass =
       wo.priority === "critical" ? "bg-red-50/60" :

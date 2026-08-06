@@ -245,6 +245,18 @@ DoubleKill จะไม่แตะไฟล์เหล่านี้ ถ้�
 
 ---
 
+## 🎨 UI/Styling Backlog — Deferred Backend Requests
+
+### Work Order Board Table Styling (6 สิงหาคม 2026)
+
+- [ ] **S1. `[Backend — add airConditioner.status to workOrders mapping]`** เพิ่มคอลัมน์ "ประเภทงาน" (repair vs. cleaning/maintenance) บนกระดานใบงาน ซึ่งตั้งไว้นอกขอบเขตของงาน Task 1 (row styling) เพื่อไม่โอเวอร์โหลด
+
+  **คำขอ:** เพิ่ม `airConditioner.status` (จาก `air_conditioners.status` เช่น `"broken"`, `"needs_cleaning"`) เข้าไปใน `workOrders` mapping ของ `getOrgAdminData()` (`src/app/admin/actions.ts:186-205`) เพื่อให้ frontend สามารถอนุมาน "ประเภทงาน" ได้เหมือนวิธีเดียวกับที่ `src/lib/maintenance.ts` ทำสำหรับ technician view (status === `"broken"` → repair, status === `"needs_cleaning"` → cleaning)
+
+  ⚠️ **นี่คือการเพิ่มแบบ additive เท่านั้น** ไม่มีการเปลี่ยน return shape อื่น — เพิ่มฟิลด์เดียวในลูป map แล้วเสร็จ
+
+---
+
 ## 📬 คำตอบจาก Esther03u — 6 สิงหาคม 2026
 
 ตอบคำถามที่ DoubleKill ฝากไว้ใน Performance Backlog ด้านบน:
