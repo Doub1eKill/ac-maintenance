@@ -189,6 +189,23 @@ export function AdminDashboardView({
 
   const priorityRank = (p: string | null) => (p === "critical" ? 0 : p === "high" ? 1 : 2);
 
+  const getWorkOrderRowClassName = (wo: WorkOrderItem) => {
+    const borderClass =
+      wo.status === "pending" ? "border-warning" :
+      wo.status === "claimed" ? "border-primary" :
+      wo.status === "completed" ? "border-success" :
+      "border-transparent";
+
+    const tintClass =
+      wo.priority === "critical" ? "bg-red-50/60" :
+      wo.priority === "high" ? "bg-orange-50/40" :
+      "";
+
+    const fadeClass = wo.status === "completed" ? "opacity-60" : "";
+
+    return `border-l-4 ${borderClass} ${tintClass} ${fadeClass}`.trim();
+  };
+
   const combinedMaintenanceRows = useMemo((): MaintenanceRow[] => {
     const urgentIds = new Set(urgentUnits.map((u) => u.id));
 
@@ -661,12 +678,12 @@ export function AdminDashboardView({
                     </tr>
                   ) : (
                     paginatedWorkOrders.map((wo) => (
-                      <tr 
-                        key={wo.id} 
-                        className="hover:bg-muted transition-colors cursor-pointer"
+                      <tr
+                        key={wo.id}
+                        className={`hover:bg-muted transition-colors cursor-pointer ${getWorkOrderRowClassName(wo)}`}
                         onClick={() => setSelectedWorkOrderDetails(wo)}
                       >
-                        <td className="px-6 py-4 whitespace-nowrap font-mono font-bold text-foreground">
+                        <td className="px-6 py-4 whitespace-nowrap font-mono font-bold text-base text-foreground">
                           {wo.acCode}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -692,17 +709,20 @@ export function AdminDashboardView({
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-center">
                           {wo.status === "pending" && (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-warning/20 text-warning-foreground border border-warning/30">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-warning/20 text-warning-foreground border border-warning/30">
+                              <Clock className="h-3 w-3" />
                               รอดำเนินการ
                             </span>
                           )}
                           {wo.status === "claimed" && (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary/20 text-primary border border-primary/30">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary/20 text-primary border border-primary/30">
+                              <Wrench className="h-3 w-3" />
                               กำลังดำเนินการ
                             </span>
                           )}
                           {wo.status === "completed" && (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-success/20 text-success-foreground border border-success/30">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-success/20 text-success-foreground border border-success/30">
+                              <CheckCircle2 className="h-3 w-3" />
                               เสร็จสิ้น
                             </span>
                           )}
