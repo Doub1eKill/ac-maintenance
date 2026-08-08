@@ -8,6 +8,12 @@ import { logAudit } from "@/lib/audit";
 import { syncOverdueMaintenanceWorkOrders } from "@/lib/maintenance";
 import { format, subDays } from "date-fns";
 
+// How many work orders the board loads at once. Not exported directly (a
+// "use server" file may only export async functions) — the UI receives it as
+// getOrgAdminData().workOrderPage.pageSize so it can render real paging
+// controls instead of silently showing only the newest page.
+const WORK_ORDER_PAGE_SIZE = 50;
+
 async function verifyOrgAdmin() {
   const session = await auth();
   if (!session?.user || session.user.role !== "org_admin" || !session.user.universityId) {
@@ -28,9 +34,11 @@ export async function getOrgAdminData() {
       buildings,
       workOrdersRaw,
       techsRaw,
-      pendingUsersRaw,
       allUsersRaw,
       maintenanceLogsRaw,
+      brands,
+      totalWorkOrders,
+      pendingWorkOrders,
     ] = await Promise.all([
       prisma.university.findUnique({ where: { id: universityId } }),
       prisma.building.findMany({
@@ -71,26 +79,41 @@ export async function getOrgAdminData() {
           assignedToUser: true,
         },
         orderBy: { createdAt: "desc" },
-        take: 50,
+        take: WORK_ORDER_PAGE_SIZE,
       }),
       prisma.user.findMany({
         where: { universityId, role: "technician", status: "active" },
         select: { id: true, name: true, email: true },
       }),
-      prisma.user.findMany({
-        where: { universityId, status: "pending" },
-        orderBy: { createdAt: "desc" },
-      }),
+      // One query for every user in the tenant; the pending-approval list is
+      // just a filter over this (it used to be a second, redundant query).
+      // Explicit select so the password hash never leaves the database.
       prisma.user.findMany({
         where: { universityId },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          status: true,
+          createdAt: true,
+        },
         orderBy: { createdAt: "desc" },
       }),
       prisma.maintenanceLog.findMany({
-        where: { 
+        where: {
           airConditioner: { room: { building: { universityId } } },
           performedAt: { gte: subDays(new Date(), 7) }
         },
+        // Only performedAt is used (to bucket the weekly activity chart).
+        select: { performedAt: true },
       }),
+      prisma.acBrand.findMany({ include: { models: true }, orderBy: { name: 'asc' } }),
+      // Counted in SQL, not derived from workOrdersRaw: that list is capped at
+      // WORK_ORDER_PAGE_SIZE, so counting pending inside it under-reports as
+      // soon as the tenant has more work orders than one page.
+      prisma.workOrder.count({ where: { universityId } }),
+      prisma.workOrder.count({ where: { universityId, status: "pending" } }),
     ]);
 
     // Aggregate metrics
@@ -181,8 +204,6 @@ export async function getOrgAdminData() {
       };
     });
 
-    const pendingWorkOrders = workOrdersRaw.filter((wo) => wo.status === "pending").length;
-
     const workOrders = workOrdersRaw.map((wo) => ({
       id: wo.id.toString(),
       acCode: wo.airConditioner.acCode,
@@ -204,15 +225,6 @@ export async function getOrgAdminData() {
       airConditionerId: wo.airConditionerId.toString(),
     }));
 
-    const pendingUsers = pendingUsersRaw.map((u) => ({
-      id: u.id.toString(),
-      name: u.name,
-      email: u.email,
-      role: u.role,
-      status: u.status,
-      createdAt: u.createdAt ? u.createdAt.toISOString() : null,
-    }));
-
     const allUsers = allUsersRaw.map((u) => ({
       id: u.id.toString(),
       name: u.name,
@@ -221,6 +233,9 @@ export async function getOrgAdminData() {
       status: u.status,
       createdAt: u.createdAt ? u.createdAt.toISOString() : null,
     }));
+
+    // Same rows, same createdAt-desc order as the old dedicated query.
+    const pendingUsers = allUsers.filter((u) => u.status === "pending");
 
     // Flatten AC list for Create Work Order dropdown
     const allAcUnits: Array<{ id: string; label: string }> = [];
@@ -268,12 +283,18 @@ export async function getOrgAdminData() {
       },
       weeklyActivity,
       workOrders,
+      workOrderPage: {
+        total: totalWorkOrders,
+        pageSize: WORK_ORDER_PAGE_SIZE,
+        loaded: workOrders.length,
+        hasMore: totalWorkOrders > workOrders.length,
+      },
       urgentUnits,
       buildings: buildingList,
       allAcUnits,
       pendingUsers,
       allUsers,
-      brands: await prisma.acBrand.findMany({ include: { models: true }, orderBy: { name: 'asc' } }),
+      brands,
     };
   } catch (error) {
     console.error("Org Admin Data query failed:", error);
@@ -291,6 +312,7 @@ export async function getOrgAdminData() {
       },
       weeklyActivity: [],
       workOrders: [],
+      workOrderPage: { total: 0, pageSize: WORK_ORDER_PAGE_SIZE, loaded: 0, hasMore: false },
       urgentUnits: [],
       buildings: [],
       allAcUnits: [],
