@@ -190,8 +190,10 @@ npm run build
 
 > **สถานะ 9 สิงหาคม 2026:**
 > - **กลุ่ม A เสร็จหมด** (P1–P4, P6) ยกเว้น **P5 ที่ยกเลิกโดยตั้งใจ** — ดูเหตุผลด้านล่าง
-> - **กลุ่ม B เสร็จเฉพาะ P7** — **P8 และ P9 ยังค้าง เป็นงานฝั่ง DoubleKill**
+> - **กลุ่ม B เสร็จหมด** (P7, P8, P9)
 > - **กลุ่ม C ยังไม่เริ่ม** เป็นงาน UI ของ Esther03u ทั้งหมด แต่ **backend รองรับพร้อมแล้วทุกข้อ**
+>
+> ✅ **ไม่มีงาน backend ค้างแล้ว** — ที่เหลือทั้งหมดเป็นงาน UI
 >
 > **บริบท:** ตอนนี้ข้อมูลยังเล็ก (73 แอร์/มหาวิทยาลัย, 607 maintenance_logs) ทุกหน้าจึงยังเร็วอยู่
 > ข้อที่เหลือจะเริ่มรู้สึกตอนข้อมูลโต
@@ -231,15 +233,23 @@ npm run build
 
   ℹ️ ตอนลบต้องระวังไฟล์ชื่อชนกัน — `components/chart-area-interactive.tsx` (demo, ลบแล้ว) กับ `components/admin/chart-area-interactive.tsx` (ของจริง ยังอยู่) ส่วน `ui/sidebar`, `ui/chart`, `ui/table`, `ui/checkbox`, `ui/tabs`, `ui/breadcrumb` เก็บไว้ทั้งหมดเพราะหน้าจริงใช้
 
-- [ ] **P8. เปลี่ยน `include` เป็น `select` ในงาน query หนัก** (DoubleKill ทำ แต่ต้องเทสต์ทุกหน้าร่วมกัน)
+- [x] **P8. เปลี่ยน `include` เป็น `select` ในงาน query หนัก** — **เสร็จแล้ว**
 
-  ตอนนี้ `getOrgAdminData()` ดึง buildings → rooms → airConditioners แบบ full row + `acBrand` + `acModel` + `maintenanceSchedules` ทั้งหมด ทั้งที่ UI ใช้ไม่กี่ field
+  `getOrgAdminData()` เดิมดึง buildings → rooms → airConditioners แบบ full row + `acBrand` + `acModel` + `maintenanceSchedules` เต็มๆ และใบงานดึง full row + user 3 คนเต็มๆ ต่อ 1 ใบ ตอนนี้ `select` เฉพาะ field ที่ใช้จริงแล้ว
 
-  ⚠️ **นี่คือข้อที่เสี่ยงพังแบบเงียบที่สุด** ถ้า `select` ไม่ครบสัก field เดียวที่ UI อ่านอยู่ หน้าจะขึ้น `undefined` โดย TypeScript อาจไม่จับ (props เป็น inferred type) → DoubleKill จะไล่ audit ทุก field ที่ UI ใช้ก่อน และต้องเทสต์ครบทุกหน้าก่อน merge
+  🐛 **แก้บั๊กที่เจอระหว่างทาง — admin ลงทะเบียนแอร์ใหม่ไม่ได้เลย:** `brands` เป็นค่าเดียวที่ส่งดิบจาก Prisma ไม่ได้ map ทำให้ `id` เป็น BigInt แต่ค่าที่ `<select>` คืนมาเป็น string การเทียบ `brands.find(b => b.id === selectedBrandId)` จึง false เสมอ → **ช่องรุ่นว่างเปล่าตลอด** และเพราะ field นั้นเป็น `required` จึงบันทึกไม่ได้เลย
 
-- [ ] **P9. เพิ่ม `loading.tsx` + Suspense** (DoubleKill วางโครง → Esther03u ปรับหน้าตา)
+  map ให้เป็น string เหมือนลิสต์อื่นแล้ว — ทดสอบแล้วเลือก Carrier ขึ้น 37 รุ่น, LG ขึ้น 44 รุ่น (เดิมได้ 0 ทั้งคู่)
 
-  ทั้งโปรเจกต์มี Suspense จุดเดียวที่ `master-data` ผลคือ `/admin` `/tech` **ขาวค้าง**จนกว่า query ที่ช้าที่สุดจะเสร็จทั้งหมด — เป็นไฟล์ใหม่ ไม่แตะของเดิม แต่ skeleton ที่ผู้ใช้เห็นควรให้เข้ากับธีม/Alert ที่เพิ่ง standardize ไป
+  ✅ ตรวจครบทั้ง 7 แท็บ + โมดัลรายละเอียดใบงาน ไม่มี `undefined` โผล่ (เป็นอาการที่จะเกิดถ้า `select` ตกสัก field)
+
+- [x] **P9. เพิ่ม `loading.tsx`** — **เสร็จแล้ว (โครง — หน้าตายังปรับได้)**
+
+  สาเหตุที่ขาวค้าง: ทั้ง 3 หน้า render `DashboardLayout` จากใน `page.tsx` ไม่ใช่ `layout.tsx` ระหว่างรอ query จึงไม่มีอะไรบนจอเลย
+
+  เพิ่ม `src/components/layout/dashboard-loading.tsx` ใช้ร่วมกัน + `loading.tsx` ที่ `/admin`, `/tech`, `/super-admin` โครง skeleton ล้อรูปทรงจริง (sidebar rail, header h-16, แถว metric, panel เนื้อหา) เพื่อไม่ให้ layout กระตุกตอนข้อมูลมา ใส่ `aria-busy` + ข้อความ sr-only ให้ screen reader รู้ว่ากำลังโหลด
+
+  📌 **ถึง Esther03u:** ตั้งใจทำให้เรียบๆ ไว้ — **หน้าตาปรับได้ตามใจเลย** ใช้ `ui/skeleton` กับ semantic token อยู่แล้ว ถ้าอยากให้เข้ากับธีมมากกว่านี้แก้ที่ `dashboard-loading.tsx` ที่เดียวจบทั้ง 3 หน้า จำนวนการ์ด metric ปรับผ่าน prop `metricCount`
 
 ### 🔴 กลุ่ม C — งานฝั่ง UI (Esther03u)
 
