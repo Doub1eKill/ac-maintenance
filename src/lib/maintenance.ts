@@ -1,5 +1,66 @@
 import { prisma } from "@/lib/prisma";
 
+// The timezone the institutions actually operate in. Timestamps (performedAt,
+// claimedAt) are stored as UTC instants and render correctly wherever they're
+// read, so they don't need this — but MaintenanceSchedule.lastPerformedAt and
+// .nextDueDate are @db.Date, i.e. a calendar day with no time attached, and
+// "the day it was cleaned" means the day here, not the day in UTC. Between
+// midnight and 07:00 local those disagree: a job closed at 02:00 would record
+// yesterday's date and schedule the next visit a day early, and a unit due
+// today wouldn't be picked up as overdue until 07:00.
+const APP_TIME_ZONE = "Asia/Bangkok";
+
+// Today's calendar date in APP_TIME_ZONE, anchored at UTC midnight so it
+// round-trips through a DATE column unchanged.
+export function businessDateToday(): Date {
+  // en-CA formats as YYYY-MM-DD, which is directly parseable as an ISO date.
+  const ymd = new Intl.DateTimeFormat("en-CA", {
+    timeZone: APP_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+
+  return new Date(`${ymd}T00:00:00.000Z`);
+}
+
+// Advances a business date by a maintenance interval. Uses UTC setters rather
+// than date-fns so the calendar day is preserved regardless of the runtime's
+// own timezone — date-fns operates on local-time fields, which would read the
+// wrong day off a UTC-midnight anchor on any host west of Greenwich.
+export function addMaintenanceInterval(
+  base: Date,
+  value: number,
+  unit: string
+): Date {
+  const next = new Date(base);
+
+  if (unit === "days") {
+    next.setUTCDate(next.getUTCDate() + value);
+    return next;
+  }
+
+  // Month and year arithmetic can land on a day the target month doesn't have
+  // (31 Jan + 1 month, or 29 Feb + 1 year). JS silently rolls those forward
+  // into the following month — 31 Jan + 1 would become 3 Mar. Clamp to the
+  // last day of the intended month instead, which is what date-fns did before
+  // and what "same day next cycle" is meant to mean.
+  const dayOfMonth = next.getUTCDate();
+
+  if (unit === "years") {
+    next.setUTCFullYear(next.getUTCFullYear() + value);
+  } else {
+    next.setUTCMonth(next.getUTCMonth() + value);
+  }
+
+  if (next.getUTCDate() !== dayOfMonth) {
+    // Day 0 of the month we overflowed into = last day of the intended month.
+    next.setUTCDate(0);
+  }
+
+  return next;
+}
+
 // How long a tenant's overdue-check result is considered fresh enough to
 // skip re-running. Due dates move on a 3-month cycle, so re-checking more
 // often than this buys nothing.
@@ -31,13 +92,15 @@ export async function syncOverdueMaintenanceWorkOrders(universityId: bigint) {
   // window don't all pile onto the same check.
   lastOverdueCheckAt.set(tenantKey, Date.now());
 
-  const now = new Date();
+  // Compared against nextDueDate, which is a calendar day — so this has to be
+  // today's date here, not the UTC instant (see APP_TIME_ZONE above).
+  const today = businessDateToday();
 
   try {
     const overdue = await prisma.maintenanceSchedule.findMany({
       where: {
         isActive: true,
-        nextDueDate: { lte: now },
+        nextDueDate: { lte: today },
         airConditioner: {
           deletedAt: null,
           room: { building: { universityId } },

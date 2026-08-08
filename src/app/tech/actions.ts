@@ -2,11 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { addDays, addMonths, addYears } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { logAudit, logAuditMany } from "@/lib/audit";
-import { syncOverdueMaintenanceWorkOrders, getTechnicianAssetList } from "@/lib/maintenance";
+import {
+  syncOverdueMaintenanceWorkOrders,
+  getTechnicianAssetList,
+  businessDateToday,
+  addMaintenanceInterval,
+} from "@/lib/maintenance";
 import { MaintenanceAction } from "@/generated/prisma/client";
 
 async function verifyTechnician() {
@@ -365,16 +369,20 @@ export async function logMaintenanceAction(formData: FormData) {
       });
 
       if (schedule) {
-        const nextDueDate =
-          schedule.frequencyUnit === "days"
-            ? addDays(performedAt, schedule.frequencyValue)
-            : schedule.frequencyUnit === "years"
-            ? addYears(performedAt, schedule.frequencyValue)
-            : addMonths(performedAt, schedule.frequencyValue);
+        // Both columns are @db.Date (a calendar day), so they're derived from
+        // today's date in the operating timezone rather than from performedAt,
+        // which is a UTC instant: a job closed after midnight local time would
+        // otherwise be filed under yesterday and re-scheduled a day early.
+        const performedOn = businessDateToday();
+        const nextDueDate = addMaintenanceInterval(
+          performedOn,
+          schedule.frequencyValue,
+          schedule.frequencyUnit
+        );
 
         await tx.maintenanceSchedule.update({
           where: { id: schedule.id },
-          data: { lastPerformedAt: performedAt, nextDueDate },
+          data: { lastPerformedAt: performedOn, nextDueDate },
         });
       }
     });
