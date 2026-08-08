@@ -185,40 +185,49 @@ npm run build
 
 ## ⚡ ข้อเสนอปรับปรุงประสิทธิภาพ (Performance Backlog) — เสนอเมื่อ 4 สิงหาคม 2026
 
-ผลจากการตรวจโค้ดทั้งโปรเจกต์ (DoubleKill) — **ยังไม่ได้ลงมือทำข้อไหนเลย** รอตกลงกันก่อน
+ผลจากการตรวจโค้ดทั้งโปรเจกต์ (DoubleKill)
 แบ่งตามเจ้าของงานตามกฎ "ห้ามแก้ Backend เอง" ด้านบนของไฟล์นี้
 
-> **บริบทสำคัญ:** ตอนนี้ข้อมูลยังเล็ก (73 แอร์/มหาวิทยาลัย, 607 maintenance_logs) ทุกหน้าจึงยังเร็วอยู่
-> ข้อ **P1, P4, P6, P12** ให้ผลทันทีตั้งแต่วันนี้ ส่วนข้อที่เหลือจะเริ่มรู้สึกตอนข้อมูลโต
+> **สถานะ 9 สิงหาคม 2026:** กลุ่ม A + B ทำเสร็จหมดแล้ว (ยกเว้น P5 ที่ยกเลิกโดยตั้งใจ — ดูเหตุผลด้านล่าง)
+> เหลือแต่ **กลุ่ม C ซึ่งเป็นงานฝั่ง UI ของ Esther03u** — backend รองรับพร้อมแล้วทุกข้อ
+>
+> **บริบท:** ตอนนี้ข้อมูลยังเล็ก (73 แอร์/มหาวิทยาลัย, 607 maintenance_logs) ทุกหน้าจึงยังเร็วอยู่
+> ข้อที่เหลือจะเริ่มรู้สึกตอนข้อมูลโต
 
-### 🟢 กลุ่ม A — DoubleKill ทำได้เลย (Backend/DB ล้วน ไม่กระทบ UI)
+### 🟢 กลุ่ม A — Backend/DB ล้วน (เสร็จแล้ว)
 
-ทั้งกลุ่มนี้ **return shape เดิมทุก field** ฝั่ง UI ไม่ต้องแก้อะไรและไม่ต้องรอ
+ทั้งกลุ่มนี้ **return shape เดิมทุก field** ฝั่ง UI ไม่ต้องแก้อะไร
 
-- [ ] **P1.** `getOrgAdminData()` — ย้าย `brands: await prisma.acBrand.findMany(...)` (บรรทัด ~276 ใน `src/app/admin/actions.ts`) เข้าไปใน `Promise.all` ตอนนี้มันอยู่ใน return object เลยรัน **หลัง** query อื่นเสร็จหมด = เสีย round trip ฟรี 1 รอบทุกครั้งที่โหลดหน้า
-- [ ] **P2.** `getOrgAdminData()` — รวม query `pendingUsersRaw` + `allUsersRaw` เป็นอันเดียว (`allUsers` เป็น superset ของ `pendingUsers` อยู่แล้ว) แล้ว filter ใน memory + ใส่ `select` เพื่อไม่ดึง password hash เข้ามาโดยไม่จำเป็น
-- [ ] **P3.** `syncOverdueMaintenanceWorkOrders()` — ใส่ throttle (เช็คครั้งเดียวต่อ N นาที) ตอนนี้ยิง query เช็ค + อาจเขียน DB **ทุกครั้ง**ที่โหลด `/admin`, `/tech`, `/api/tech/units` แม้ไม่มีอะไรให้ทำ
-- [ ] **P4.** `bulkClaimWorkOrdersAction()` — เปลี่ยนจากวน `updateMany` ทีละ id ใน transaction (รับ 20 งาน = 20 round trip ถือ lock ยาว) เป็น `updateMany` ครั้งเดียวด้วย `id: { in: ids }` แล้ว `findMany` เช็คผล = เหลือ 2 query, และเปลี่ยน audit log จาก `Promise.all` ของ `create` ทีละอันเป็น `createMany`
-- [ ] **P5.** เพิ่ม DB index ที่ขาด: `air_conditioners.status` และ `air_conditioners.deleted_at` (query กรอง 2 ตัวนี้ตลอดแต่ยังไม่มี index) — ทำเป็น migration ปกติ
-- [ ] **P6.** ย่อ/บีบรูปตอนอัปโหลดใน `saveUpload()` (`src/app/tech/actions.ts`) ตอนนี้เซฟไฟล์ดิบลง `public/uploads` ไม่ย่อเลย → รูปจากมือถือช่าง 3-5MB ถูกเก็บและส่งกลับเต็มขนาด **น่าจะกระทบผู้ใช้จริงมากที่สุดในระยะยาว เพราะช่างใช้เน็ตมือถือ** (URL ที่คืนยังเป็นรูปแบบเดิม UI ไม่ต้องแก้)
+- [x] **P1.** `getOrgAdminData()` — ย้าย `brands: await prisma.acBrand.findMany(...)` เข้าไปใน `Promise.all` (เดิมอยู่ใน return object เลยรัน **หลัง** query อื่นเสร็จหมด = เสีย round trip ฟรีทุกครั้งที่โหลดหน้า)
+- [x] **P2.** `getOrgAdminData()` — รวม query `pendingUsersRaw` + `allUsersRaw` เป็นอันเดียวแล้ว filter ใน memory + ใส่ `select` → **password hash ไม่ถูกดึงออกจาก DB อีกแล้ว**
+- [x] **P3.** `syncOverdueMaintenanceWorkOrders()` — throttle 5 นาที/tenant (เดิมยิง query + อาจเขียน DB **ทุกครั้ง**ที่โหลด `/admin`, `/tech`, `/api/tech/units`) ถ้า query ล้มเหลวจะไม่ถูก cache เป็น "เช็คแล้ว"
+- [x] **P4.** `bulkClaimWorkOrdersAction()` — จากวน `updateMany` ทีละ id (รับ 20 งาน = 20 round trip ถือ lock ยาว) เหลือ **2 query** + audit เปลี่ยนเป็น `logAuditMany` (`createMany`)
+  - ⚠️ รายละเอียดที่ต้องรู้: `work_orders.claimed_at` เป็น `Timestamp(0)` = ความละเอียดระดับวินาที ถ้าส่ง `Date` ที่มี milliseconds จะถูกตัดตอนเขียนแล้วอ่านกลับมาเทียบไม่ตรง โค้ดจึง align เป็นวินาทีก่อนใช้
+- [x] **P6.** ย่อรูปตอนอัปโหลดใน `saveUpload()` — downscale 1600px + JPEG quality 80 + หมุนตาม EXIF, ถ้าประมวลผลล้มเหลวจะเซฟไฟล์เดิมแทน (ไม่ทำหลักฐานหาย) URL ที่คืนรูปแบบเดิม UI ไม่ต้องแก้
+  - `sharp` เดิมเป็นแค่ transitive dep ของ Next.js — ประกาศใน `package.json` ให้ชัดแล้วเพราะตอนนี้ import ตรง
+
+#### ❌ P5 — ยกเลิกโดยตั้งใจ (ทดสอบแล้วไม่คุ้ม)
+
+ข้อเสนอเดิมคือเพิ่ม index บน `air_conditioners.status` และ `.deleted_at` — **ทดสอบด้วย `EXPLAIN` แล้วพบว่าไม่ควรทำ:**
+
+| Index | ผลทดสอบ |
+|---|---|
+| `deleted_at` | MySQL เลือก `room_id_index` แทน ไม่แตะเลย + ข้อมูล 189/189 แถวเป็น NULL (selectivity 0%) |
+| `status` | ใช้ได้ถ้ามี query แบบ `WHERE status='broken'` เดี่ยวๆ **แต่แอปไม่มี query แบบนั้น** — ที่มีคือ `id IN (...) AND status='normal'` (ใช้ PK อยู่แล้ว) กับ `CASE WHEN ac.status` ใน aggregate (full scan โดยธรรมชาติ) |
+
+ถ้าใส่ไปจะทำให้ทุก INSERT/UPDATE บน `air_conditioners` ช้าลงโดยไม่ได้อะไรกลับมา **อย่าเพิ่มกลับเข้ามาโดยไม่ได้ EXPLAIN ใหม่ก่อน**
 
 ### 🟡 กลุ่ม B — ต้องตกลงกันก่อน / ทำร่วมกัน
 
-- [ ] **P7. ลบหน้า `/dashboard` ที่เป็นโค้ด demo ค้างอยู่** ← **ต้องการคำตอบจาก Esther03u**
+- [x] **P7. ลบหน้า `/dashboard` ที่เป็นโค้ด demo ค้างอยู่** — **ลบแล้ว**
 
-  `src/app/dashboard/page.tsx` เป็น scaffold ของ shadcn ล้วนๆ ใช้ `data.json` ปลอม 16KB **ไม่มีลิงก์จากหน้าไหนเลย** และ **ไม่อยู่ใน matcher ของ `src/proxy.ts` → เป็น public route ที่เปิดได้โดยไม่ต้องล็อกอิน** (build ขึ้นเป็น `○ /dashboard` static) — อาจเป็นต้นตอของ **backlog #11** ด้วย
+  เป็น scaffold ของ shadcn ล้วนๆ ใช้ `data.json` ปลอม ไม่มีลิงก์จากหน้าไหน และไม่อยู่ใน matcher ของ `src/proxy.ts` → **เป็น public route ที่เปิดได้โดยไม่ต้องล็อกอิน** ลบไปทั้งหมด 2,750 บรรทัด + ถอน 5 packages (`@dnd-kit` ×4 + `vaul`)
 
-  มันลาก dependency หนักเข้า bundle: `@dnd-kit` (4 packages) + recharts ตัวซ้ำ + component ~1,500 บรรทัด
+  ⚠️ **แก้คำพูดเดิมในเอกสารนี้:** ตอนเสนอผมเขียนว่า "ลาก dependency หนักเข้า bundle" — **ไม่ถูกทั้งหมด** Next.js แยก chunk ตาม route อยู่แล้ว `@dnd-kit` จึงโหลดเฉพาะตอนเข้า `/dashboard` ผู้ใช้จริงที่เข้า `/admin`/`/tech` ไม่เคยโหลดเลย **ผลที่ได้จริงคือ:** ปิด public route ที่ไม่มี auth + ลบ dead code + ลด package (install/build เร็วขึ้น) ไม่ใช่ bundle เล็กลงสำหรับผู้ใช้
 
-  ⚠️ **คำถามถึง Esther03u:** ยังอยากเก็บ `src/components/data-table.tsx` (763 บรรทัด มี sorting/pagination/drag-drop ครบ) ไว้เป็นต้นแบบสำหรับ **backlog #10** (กราฟ Super Admin) หรือ **P13** (pagination) ไหม? ถ้าไม่ใช้แล้วบอกได้เลย DoubleKill จะลบให้ทั้งชุด
+  📌 **`data-table.tsx` ลบไปด้วยตามที่ Esther03u อนุมัติ** (ดูหัวข้อ "คำตอบจาก Esther03u" ด้านล่าง) — ถ้าเปลี่ยนใจอยากได้กลับมาเป็นต้นแบบ ดึงคืนจาก git ได้: `git show 181269d^:src/components/data-table.tsx > src/components/data-table.tsx`
 
-  ⚠️ **จุดที่พลาดง่ายมากถ้าลบเอง — ชื่อไฟล์ชนกัน:**
-
-  | ❌ ห้ามลบ (หน้าจริงใช้อยู่) | ✅ ลบได้ (demo ใช้อย่างเดียว) |
-  |---|---|
-  | `src/components/admin/chart-area-interactive.tsx` | `src/components/chart-area-interactive.tsx` (ตัว root) |
-  | `src/components/ui/sidebar.tsx` ← `dashboard-layout.tsx` ใช้ | `src/components/app-sidebar.tsx`, `nav-documents/main/secondary/user.tsx` |
-  | `ui/table.tsx`, `ui/checkbox.tsx`, `ui/tabs.tsx`, `ui/breadcrumb.tsx`, `ui/chart.tsx` | `data-table.tsx`, `section-cards.tsx`, `site-header.tsx`, `ui/drawer.tsx`, `ui/toggle-group.tsx`, `ui/avatar.tsx` |
+  ℹ️ ตอนลบต้องระวังไฟล์ชื่อชนกัน — `components/chart-area-interactive.tsx` (demo, ลบแล้ว) กับ `components/admin/chart-area-interactive.tsx` (ของจริง ยังอยู่) ส่วน `ui/sidebar`, `ui/chart`, `ui/table`, `ui/checkbox`, `ui/tabs`, `ui/breadcrumb` เก็บไว้ทั้งหมดเพราะหน้าจริงใช้
 
 - [ ] **P8. เปลี่ยน `include` เป็น `select` ในงาน query หนัก** (DoubleKill ทำ แต่ต้องเทสต์ทุกหน้าร่วมกัน)
 
@@ -237,11 +246,15 @@ DoubleKill จะไม่แตะไฟล์เหล่านี้ ถ้�
 - [ ] **P10.** แยก client component ก้อนยักษ์ — `admin-dashboard-view.tsx` **1,299 บรรทัด** / `tech-mobile-view.tsx` 992 บรรทัด ทั้งคู่เป็น `"use client"` และรับข้อมูล**ทั้งหมด**เป็น props → ข้อมูลถูก serialize ลง RSC payload ส่งข้ามเน็ตแล้ว hydrate ทั้งก้อน ส่วนที่ไม่ต้อง interactive ควรแยกเป็น Server Component
 - [ ] **P11.** ใส่ `next/dynamic` — ตอนนี้**ไม่มีเลยสักจุด** ปฏิทิน/กราฟ recharts/modal โหลดมาพร้อมหน้าแรกทั้งหมดทั้งที่ผู้ใช้ยังไม่เห็น (chunk ใหญ่สุด 332KB)
 - [ ] **P12.** ปฏิทิน — ตอนนี้เกิด waterfall: SSR เสร็จ → hydrate → ค่อย `fetch` → ค่อย render และดึง schedule **ทั้ง 73 รายการ**ทุกครั้งทั้งที่แสดงทีละเดือน
-  - 💡 **Backend พร้อมอยู่แล้ว:** `/api/admin/maintenance-schedules` รับ query param `start`/`end` อยู่แล้วแต่**ยังไม่เคยเอาไปใช้กรอง** — ถ้าอยากให้ DoubleKill ทำ filter ให้ทำงานจริง เขียนคำขอไว้ได้เลย
-  - หรือถ้าส่งข้อมูลผ่าน props จาก SSR แทนการ fetch ก็ตัดรอบ fetch ทิ้งได้เลย
-- [ ] **P13.** `<img>` → `next/image` — ทั้งโปรเจกต์**ไม่มี `next/image` เลยสักจุด** ใช้ `<img>` ดิบที่ `admin-dashboard-view.tsx` (~บรรทัด 1173) สำหรับรูปหลักฐานงานซ่อม (ทำคู่กับ **P6** ฝั่ง backend จะได้ผลเต็มที่)
-- [ ] **P14.** Pagination จริงบนกระดานใบงาน — ตอนนี้ `take: 50` เป็นการตัดเฉยๆ ไม่มีปุ่มหน้าถัดไป **พอเกิน 50 ใบข้อมูลจะหายเงียบๆ**
-  - 💡 ต้องการ backend ทำ cursor/total count ให้ไหม? เขียนคำขอไว้ได้เลย
+  - ✅ **Backend เสร็จแล้ว** `/api/admin/maintenance-schedules` กรองตาม `start`/`end` ได้จริงแล้ว
+    - `?start=2026-09-01&end=2026-09-30` → คืนเฉพาะที่ครบกำหนดในช่วงนั้น (ทดสอบแล้ว: 15 จาก 73 รายการ)
+    - **ไม่ส่ง param = คืนทั้งหมดเหมือนเดิม** ของเดิมไม่พัง / วันที่ผิดรูปแบบถูกเมินเฉยๆ ไม่ error
+  - เหลือฝั่ง UI: ส่งช่วงเดือนที่กำลังแสดงไปด้วย หรือส่งข้อมูลผ่าน props จาก SSR แทน `fetch` ก็ตัดรอบ waterfall ทิ้งได้เลย
+- [ ] **P13.** `<img>` → `next/image` — ทั้งโปรเจกต์**ไม่มี `next/image` เลยสักจุด** ใช้ `<img>` ดิบที่ `admin-dashboard-view.tsx` (~บรรทัด 1173) สำหรับรูปหลักฐานงานซ่อม (**P6 ฝั่ง backend เสร็จแล้ว** — รูปที่อัปโหลดใหม่ถูกย่อเหลือ 1600px แล้ว ทำ P13 คู่ด้วยจะได้ผลเต็มที่)
+- [ ] **P14.** Pagination จริงบนกระดานใบงาน
+  - ✅ **Backend เสร็จแล้ว** `getOrgAdminData()` คืน `workOrderPage: { total, pageSize, loaded, hasMore }` ใช้ทำปุ่มหน้าถัดไปได้เลย
+  - ✅ **แถมแก้บั๊กที่เจอระหว่างทาง:** ตัวเลข "รอดำเนินการ" เดิมนับ pending จากลิสต์ที่ถูก `take: 50` ตัดไว้แล้ว เลยแสดง **47 ทั้งที่จริงมี 48** — เปลี่ยนไปนับด้วย SQL `count()` แล้ว
+  - เหลือฝั่ง UI: ทำปุ่มเปลี่ยนหน้า (ตอนนี้ยังโหลดแค่หน้าแรก 50 รายการ)
 
 ---
 
@@ -253,6 +266,31 @@ DoubleKill จะไม่แตะไฟล์เหล่านี้ ถ้�
 - **P12 (Calendar filter start/end):** ✅ **รบกวนทำ backend filter ให้ใช้งานจริง** ตาม query param `start`/`end` ที่มีอยู่แล้วใน `/api/admin/maintenance-schedules`
 - **P14 (Pagination กระดานใบงาน):** ✅ **ต้องการ** รบกวนเพิ่ม cursor/total count ฝั่ง backend เพื่อรองรับ pagination จริง (ตอนนี้ `take: 50` ตัดข้อมูลเงียบๆ)
 
+> **ทำครบทั้ง 3 ข้อแล้ว** (9 ส.ค. 2026) — ดูรายละเอียดที่ P7 / P12 / P14 ด้านบน
+
 ---
 
-*Handoff document last updated: August 6, 2026.*
+## 🔧 บั๊กที่เจอเพิ่มระหว่างทำ Performance Backlog (แก้แล้วทั้งคู่)
+
+### P15 — `/register` ถูก prerender ตอน build
+
+หน้าสมัครสมาชิกอ่านรายชื่อมหาวิทยาลัยจาก DB แต่เป็น static prerender (`○ /register`) ผลคือ **มหาวิทยาลัยที่เพิ่มใหม่จะไม่ขึ้นใน dropdown จนกว่าจะ rebuild** และถ้า DB ต่อไม่ได้ตอน build หน้าจะถูก ship มาพร้อม dropdown ว่างถาวร (เกิดขึ้นจริงระหว่าง session นี้ตอน MySQL ล่ม)
+
+แก้ด้วย `export const dynamic = "force-dynamic"` — route เปลี่ยนจาก `○` เป็น `ƒ` แล้ว
+
+### P16 — วันที่ระดับวันคลาดไป 1 วันช่วงเที่ยงคืนถึง 7 โมงเช้า
+
+`MaintenanceSchedule.lastPerformedAt` และ `.nextDueDate` เป็น **`@db.Date`** (วันปฏิทิน ไม่มีเวลา) แต่ถูกคำนวณจาก `new Date()` ซึ่งเป็น UTC instant ไทยเป็น UTC+7 ดังนั้น **ช่วง 00:00–06:59 น. วันที่แบบ UTC ยังเป็นเมื่อวาน**:
+- ช่างปิดงานตอนตี 2 → บันทึกเป็นเมื่อวาน + นัดครั้งหน้าเร็วไป 1 วัน
+- เครื่องที่ครบกำหนดวันนี้ ไม่ถูก auto-check เจอจนถึง 7 โมงเช้า
+
+แก้โดยเพิ่ม `businessDateToday()` + `addMaintenanceInterval()` ใน `src/lib/maintenance.ts`
+
+**⚠️ สิ่งที่ต้องรู้ถ้าจะแตะเรื่องวันที่ในอนาคต:**
+1. **แยกให้ออกระหว่าง "เวลา" กับ "วัน"** — `performedAt` / `claimedAt` เป็น timestamp เต็ม เก็บเป็น UTC instant **ถูกอยู่แล้ว ห้ามแก้** (ตรวจแล้ว UI แสดงเวลาไทยถูกต้องมาตลอด) ส่วนที่เป็น `@db.Date` เท่านั้นที่ต้องใช้ `businessDateToday()`
+2. **อย่าใช้ `date-fns` กับค่าที่ปักไว้ที่ UTC midnight** — `date-fns` อ่านค่าแบบ local time ถ้า deploy บนเซิร์ฟเวอร์ที่ offset ติดลบ (เช่นสหรัฐฯ) จะได้วันผิด `addMaintenanceInterval()` เลยใช้ UTC setter และหนีบวันสิ้นเดือนเอง (31 ม.ค. + 1 เดือน = 28 ก.พ. ไม่ใช่ 3 มี.ค.) — เทียบกับ `date-fns` แล้วตรงกันครบ 11 เคส
+3. **MySQL `NOW()` เป็นเวลาไทย (+07) แต่ข้อมูลในตารางเป็น UTC** ห่างกัน 7 ชม. ถ้าจะเขียน raw SQL ที่เทียบ timestamp ระวังจุดนี้ (ตอนนี้ยังไม่มี raw SQL ไหนที่เทียบเวลา)
+
+---
+
+*Handoff document last updated: August 9, 2026.*
