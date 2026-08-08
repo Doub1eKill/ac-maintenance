@@ -40,7 +40,13 @@ interface Schedule {
   lastPerformedByName: string | null;
   nextDueDate: string;
   isActive: boolean;
+  jobType: "repair" | "cleaning";
 }
+
+const JOB_TYPE_LABEL: Record<Schedule["jobType"], string> = {
+  repair: "งานซ่อม",
+  cleaning: "งานล้าง",
+};
 
 function formatFrequencyLabel(value: number, unit: string) {
   const unitLabel = unit === "days" ? "วัน" : unit === "years" ? "ปี" : "เดือน";
@@ -195,7 +201,16 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
                     onClick={() => setSelectedEvent(event)}
                     className={`cursor-pointer border px-1.5 py-1 rounded-md text-[10px] font-semibold flex items-center justify-between truncate transition-colors ${badgeClass}`}
                   >
-                    <span className="truncate">{event.acCode}</span>
+                    {/* Type first so it reads at a glance, then the unit code —
+                        a tech needs to know both what the job is and which
+                        machine. Narrow cells truncate the tail, so the full
+                        text is on the title attribute too. */}
+                    <span
+                      className="truncate"
+                      title={`${JOB_TYPE_LABEL[event.jobType]} - ${event.acCode}`}
+                    >
+                      {JOB_TYPE_LABEL[event.jobType]} - {event.acCode}
+                    </span>
                     {status === "overdue" && <AlertTriangle className="h-3 w-3 shrink-0 ml-1" />}
                   </div>
                 );
@@ -226,7 +241,7 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
             <div className="space-y-1">
               <h3 className="text-base font-bold text-foreground flex items-center gap-2">
                 <Wrench className="h-5 w-5 text-primary" />
-                ข้อมูลรอบบำรุงรักษา
+                {JOB_TYPE_LABEL[selectedEvent.jobType]}
               </h3>
               <p className="text-xs text-muted-foreground font-medium">รหัสเครื่อง: {selectedEvent.acCode}</p>
             </div>

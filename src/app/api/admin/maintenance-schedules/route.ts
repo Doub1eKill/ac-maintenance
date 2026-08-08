@@ -86,6 +86,13 @@ export async function GET(request: NextRequest) {
         brand: s.airConditioner.acBrand?.name ?? s.airConditioner.brand ?? "ไม่ระบุ",
         location: `${s.airConditioner.room.building.name} - ${s.airConditioner.room.name}`,
         lastPerformedByName: lastLog?.technician.name ?? null,
+        // Nothing stores a job type for *upcoming* work: maintenance_schedules
+        // is the cleaning cycle, and work_orders only carries a status. So it's
+        // inferred from the unit's current condition, the same split the admin
+        // dashboard already uses for its repair/cleaning counts — a unit that's
+        // broken needs fixing, anything else is due for its routine clean.
+        // The Thai wording lives in the UI with the rest of the copy.
+        jobType: s.airConditioner.status === "broken" ? "repair" : "cleaning",
       };
     });
 
