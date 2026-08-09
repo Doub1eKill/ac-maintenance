@@ -27,6 +27,7 @@ import {
   User,
   Settings,
   Activity,
+  ImageOff,
 } from "lucide-react";
 import { AnimatedIcon } from "@/components/ui/animated-icon";
 import {
@@ -179,6 +180,7 @@ export function AdminDashboardView({
   const [teamPage, setTeamPage] = useState(1);
   const [workOrdersPage, setWorkOrdersPage] = useState(1);
   const [selectedWorkOrderDetails, setSelectedWorkOrderDetails] = useState<WorkOrderItem | null>(null);
+  const [brokenEvidenceImages, setBrokenEvidenceImages] = useState<Record<string, boolean>>({});
   const ITEMS_PER_PAGE = 10;
 
   useEffect(() => {
@@ -186,6 +188,10 @@ export function AdminDashboardView({
     setTeamPage(1);
     setWorkOrdersPage(1);
   }, [globalSearch]);
+
+  useEffect(() => {
+    setBrokenEvidenceImages({});
+  }, [selectedWorkOrderDetails?.id]);
 
   const priorityRank = (p: string | null) => (p === "critical" ? 0 : p === "high" ? 1 : 2);
 
@@ -204,6 +210,22 @@ export function AdminDashboardView({
     const fadeClass = wo.status === "completed" ? "opacity-60" : "";
 
     return `border-l-4 ${borderClass} ${tintClass} ${fadeClass}`.trim();
+  };
+
+  const normalizeWorkOrderImages = (images: unknown): string[] => {
+    if (Array.isArray(images)) return images;
+    if (typeof images === "string" && images.trim()) {
+      if (images.trim().startsWith("[")) {
+        try {
+          const parsed = JSON.parse(images);
+          return Array.isArray(parsed) ? parsed : [images];
+        } catch {
+          return [images];
+        }
+      }
+      return [images];
+    }
+    return [];
   };
 
   const combinedMaintenanceRows = useMemo((): MaintenanceRow[] => {
@@ -1104,12 +1126,12 @@ export function AdminDashboardView({
       )}
       {/* Enterprise Detail Dialog (Audit Trail) */}
       <Dialog open={!!selectedWorkOrderDetails} onOpenChange={(open) => { if (!open) setSelectedWorkOrderDetails(null) }}>
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto p-0 border-0 rounded-2xl overflow-hidden">
+        <DialogContent className="sm:max-w-4xl max-h-[85vh] overflow-y-auto p-0 border-0 rounded-2xl">
           {selectedWorkOrderDetails && (
             <div className="flex flex-col h-full bg-muted">
               {/* Header */}
               <div className="bg-white px-6 py-5 border-b border-border sticky top-0 z-10">
-                <div className="flex items-start justify-between">
+                <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
                       <ClipboardList className="h-6 w-6 text-primary" />
@@ -1119,30 +1141,30 @@ export function AdminDashboardView({
                       รายละเอียดการแจ้งซ่อมและประวัติการทำงาน (Audit Trail)
                     </p>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-2">
                     {selectedWorkOrderDetails.priority === 'critical' && (
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-800 border border-red-200">
-                        ด่วนที่สุด (Critical)
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-800 border border-red-200">
+                        <AlertTriangle className="h-3.5 w-3.5" /> ด่วนที่สุด (Critical)
                       </span>
                     )}
                     {selectedWorkOrderDetails.priority === 'high' && (
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-800 border border-orange-200">
-                        ด่วน (High)
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-800 border border-orange-200">
+                        <AlertTriangle className="h-3.5 w-3.5" /> ด่วน (High)
                       </span>
                     )}
                     {selectedWorkOrderDetails.status === "pending" && (
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-warning/20 text-warning-foreground border border-warning/30">
-                        รอดำเนินการ
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-warning/20 text-warning-foreground border border-warning/30">
+                        <Clock className="h-3.5 w-3.5" /> รอดำเนินการ
                       </span>
                     )}
                     {selectedWorkOrderDetails.status === "claimed" && (
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-primary/20 text-primary border border-primary/30">
-                        กำลังดำเนินการ
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-primary/20 text-primary border border-primary/30">
+                        <Wrench className="h-3.5 w-3.5" /> กำลังดำเนินการ
                       </span>
                     )}
                     {selectedWorkOrderDetails.status === "completed" && (
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-success/20 text-success-foreground border border-success/30">
-                        เสร็จสิ้น
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-success/20 text-success-foreground border border-success/30">
+                        <CheckCircle2 className="h-3.5 w-3.5" /> เสร็จสิ้น
                       </span>
                     )}
                   </div>
@@ -1184,27 +1206,35 @@ export function AdminDashboardView({
                       <MessageSquare className="h-4 w-4 text-muted-foreground" />
                       รูปภาพประกอบ (Media/Evidence)
                     </h3>
-                    {selectedWorkOrderDetails.images ? (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                        {Array.isArray(selectedWorkOrderDetails.images) 
-                          ? selectedWorkOrderDetails.images.map((img: string, idx: number) => (
-                              <div key={idx} className="aspect-square rounded-lg border border-border overflow-hidden bg-secondary relative group cursor-pointer">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={img} alt="Work Order Evidence" className="w-full h-full object-cover transition-transform group-hover:scale-105" />
-                              </div>
-                            ))
-                          : (
-                            <div className="col-span-full py-8 text-center text-sm text-muted-foreground bg-muted rounded-lg border border-dashed border-border">
-                              รูปแบบรูปภาพไม่ถูกต้อง
+                    {(() => {
+                      const evidenceImages = normalizeWorkOrderImages(selectedWorkOrderDetails.images);
+                      return evidenceImages.length > 0 ? (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                          {evidenceImages.map((img, idx) => (
+                            <div key={idx} className="aspect-square rounded-lg border border-border overflow-hidden bg-secondary relative group cursor-pointer">
+                              {brokenEvidenceImages[img] ? (
+                                <div className="w-full h-full flex flex-col items-center justify-center gap-1.5 text-muted-foreground px-2 text-center">
+                                  <ImageOff className="h-5 w-5" />
+                                  <span className="text-[11px] leading-tight">โหลดรูปไม่สำเร็จ</span>
+                                </div>
+                              ) : (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={img}
+                                  alt="Work Order Evidence"
+                                  className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                                  onError={() => setBrokenEvidenceImages((prev) => ({ ...prev, [img]: true }))}
+                                />
+                              )}
                             </div>
-                          )
-                        }
-                      </div>
-                    ) : (
-                      <div className="py-8 text-center text-sm text-muted-foreground bg-muted rounded-lg border border-dashed border-border">
-                        ไม่มีรูปภาพประกอบ
-                      </div>
-                    )}
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="py-8 text-center text-sm text-muted-foreground bg-muted rounded-lg border border-dashed border-border">
+                          ไม่มีรูปภาพประกอบ
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
 
@@ -1230,7 +1260,7 @@ export function AdminDashboardView({
                       </div>
                       <div className="flex justify-between items-start">
                         <span className="text-muted-foreground">สถานที่:</span>
-                        <span className="font-medium text-foreground text-right max-w-[150px]">{selectedWorkOrderDetails.location}</span>
+                        <span className="font-medium text-foreground text-right break-words">{selectedWorkOrderDetails.location}</span>
                       </div>
                     </div>
                   </div>
