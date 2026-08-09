@@ -90,7 +90,7 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
 
   const renderHeader = () => {
     return (
-      <div className="flex items-center justify-between py-4 px-6 border-b border-border bg-white rounded-t-2xl">
+      <div className="flex items-center justify-between py-3 px-6 border-b border-border bg-white rounded-t-2xl shrink-0">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-primary/10 text-primary rounded-lg border border-primary/20">
             <CalendarIcon className="h-5 w-5" />
@@ -132,12 +132,12 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
 
     for (let i = 0; i < 7; i++) {
       days.push(
-        <div key={i} className="text-center py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-wider bg-muted border-b border-border">
+        <div key={i} className="text-center py-2 text-[11px] font-bold text-muted-foreground uppercase tracking-wider bg-muted border-b border-border">
           {format(addDays(startDate, i), "EEEE", { locale: th })}
         </div>
       );
     }
-    return <div className="grid grid-cols-7">{days}</div>;
+    return <div className="grid grid-cols-7 shrink-0">{days}</div>;
   };
 
   const renderCells = () => {
@@ -163,13 +163,13 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
         const isTodayDate = isSameDay(day, today);
 
         days.push(
-          <div 
-            key={day.toString()} 
-            className={`min-h-[100px] border-b border-r border-border p-2 transition-all ${
+          <div
+            key={day.toString()}
+            className={`h-full flex flex-col border-b border-r border-border p-2 transition-all ${
               !isCurrentMonth ? "bg-muted/50 text-muted-foreground" : "bg-white hover:bg-muted"
             }`}
           >
-            <div className="flex justify-between items-start">
+            <div className="flex justify-between items-start shrink-0">
               <span className={`text-xs font-bold flex h-6 w-6 items-center justify-center rounded-full ${
                 isTodayDate ? "bg-primary text-white shadow-md" : "text-foreground"
               }`}>
@@ -181,8 +181,8 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
                 </span>
               )}
             </div>
-            
-            <div className="mt-2 flex flex-col gap-1 overflow-y-auto max-h-[80px] no-scrollbar">
+
+            <div className="mt-1 flex flex-col gap-1 overflow-y-auto flex-1 min-h-0 no-scrollbar">
               {dayEvents.map((event) => {
                 const status = getEventStatus(new Date(event.nextDueDate));
                 let badgeClass = "bg-primary/10 text-primary border-primary/20 hover:bg-primary/20";
@@ -206,13 +206,13 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
         day = addDays(day, 1);
       }
       rows.push(
-        <div className="grid grid-cols-7" key={day.toString()}>
+        <div className="grid grid-cols-7 flex-1 min-h-0" key={day.toString()}>
           {days}
         </div>
       );
       days = [];
     }
-    return <div className="border-l border-border">{rows}</div>;
+    return <div className="border-l border-border flex-1 min-h-0 flex flex-col">{rows}</div>;
   };
 
   const renderEventModal = () => {
@@ -282,7 +282,7 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
   };
 
   return (
-    <div className="biz-card relative animate-in fade-in shadow-sm rounded-2xl overflow-hidden bg-white border border-border">
+    <div className="biz-card relative animate-in fade-in shadow-sm rounded-2xl overflow-hidden bg-white border border-border flex flex-col h-[600px]">
       {isLoading && (
         <div className="absolute inset-0 z-10 bg-white/50 backdrop-blur-sm flex items-center justify-center">
           <AnimatedIcon icon={Clock} size={24} animation="spin" className="text-primary" />
