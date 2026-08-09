@@ -116,7 +116,9 @@ export function ProfilePanel({ user, universityName }: ProfilePanelProps) {
           <Alert className="border-primary/30 bg-primary/10">
             <CheckCircle2 className="text-primary" />
             <AlertTitle>ส่งคำขอแล้ว</AlertTitle>
-            <AlertDescription>{resetState.message}</AlertDescription>
+            <AlertDescription>
+              หากอีเมลนี้มีอยู่ในระบบ ลิงก์สำหรับตั้งรหัสผ่านใหม่จะถูกส่งไปที่อีเมลนี้
+            </AlertDescription>
           </Alert>
         )}
 
