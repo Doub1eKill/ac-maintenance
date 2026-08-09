@@ -61,6 +61,7 @@ import {
 import { DashboardLayout, NavItem } from "@/components/layout/dashboard-layout";
 import { AssetManager } from "@/components/admin/asset-manager";
 import { MaintenanceCalendar } from "@/components/shared/maintenance-calendar";
+import { ProfilePanel } from "@/components/admin/profile-panel";
 import { QrCodeManager } from "@/components/admin/qr-code-manager";
 import { ChartAreaInteractive } from "@/components/admin/chart-area-interactive";
 import { UpcomingMaintenanceTable, type MaintenanceRow, type UrgentMaintenanceAC } from "@/components/admin/upcoming-maintenance-table";
@@ -1008,6 +1009,11 @@ export function AdminDashboardView({
       {/* Maintenance Calendar View */}
       {activeTab === "calendar" && (
         <MaintenanceCalendar onCreateWorkOrder={handleOpenCalendarWorkOrder} />
+      )}
+
+      {/* Profile View */}
+      {activeTab === "profile" && (
+        <ProfilePanel user={user} universityName={universityName} />
       )}
 
       {/* Modal: Create Work Order */}
