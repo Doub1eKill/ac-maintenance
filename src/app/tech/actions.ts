@@ -2,11 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { addDays, addMonths, addYears } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { logAudit } from "@/lib/audit";
-import { syncOverdueMaintenanceWorkOrders, getTechnicianAssetList } from "@/lib/maintenance";
+import { logAudit, logAuditMany } from "@/lib/audit";
+import {
+  syncOverdueMaintenanceWorkOrders,
+  getTechnicianAssetList,
+  businessDateToday,
+  addMaintenanceInterval,
+} from "@/lib/maintenance";
 import { MaintenanceAction } from "@/generated/prisma/client";
 
 async function verifyTechnician() {
@@ -20,15 +24,48 @@ async function verifyTechnician() {
 import { promises as fs } from "fs";
 import path from "path";
 
+// Evidence photos come straight off a technician's phone camera, which means
+// 3-5 MB files at 4000px+ — far more than the UI ever displays, and paid for
+// twice: once on the tech's mobile upload, again on every admin who views the
+// work order. Downscale and re-encode before writing to disk.
+const MAX_IMAGE_DIMENSION = 1600;
+const IMAGE_QUALITY = 80;
+
 // Helper function to save uploaded file
 async function saveUpload(file: File | null): Promise<string | null> {
   if (!file || file.size === 0) return null;
-  
+
   try {
     const buffer = Buffer.from(await file.arrayBuffer());
-    const filename = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
+    const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
     const uploadDir = path.join(process.cwd(), "public/uploads");
     await fs.mkdir(uploadDir, { recursive: true });
+
+    if (file.type?.startsWith("image/")) {
+      try {
+        const { default: sharp } = await import("sharp");
+        const processed = await sharp(buffer)
+          // withoutEnlargement: a photo already smaller than the cap is left
+          // at its own size rather than being upscaled into a bigger file.
+          .rotate() // honour EXIF orientation before stripping metadata
+          .resize(MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION, {
+            fit: "inside",
+            withoutEnlargement: true,
+          })
+          .jpeg({ quality: IMAGE_QUALITY, mozjpeg: true })
+          .toBuffer();
+
+        const filename = `${Date.now()}-${safeName.replace(/\.[^.]+$/, "")}.jpg`;
+        await fs.writeFile(path.join(uploadDir, filename), processed);
+        return `/uploads/${filename}`;
+      } catch (imageError) {
+        // Corrupt/unsupported image, or sharp unavailable on this platform —
+        // fall through and store the original rather than losing the evidence.
+        console.error("Image processing failed, storing original:", imageError);
+      }
+    }
+
+    const filename = `${Date.now()}-${safeName}`;
     await fs.writeFile(path.join(uploadDir, filename), buffer);
     return `/uploads/${filename}`;
   } catch (error) {
@@ -192,44 +229,53 @@ export async function bulkClaimWorkOrdersAction(workOrderIds: string[]) {
   }
 
   const ids = workOrderIds.map((id) => BigInt(id));
-  const claimedAt = new Date();
+  // Second-aligned on purpose: work_orders.claimed_at is Timestamp(0), so a
+  // Date carrying milliseconds would be truncated on write and would no
+  // longer equal this value when we read the claimed rows back below.
+  const claimedAt = new Date(Math.floor(Date.now() / 1000) * 1000);
 
   try {
-    // Claim each selected id under a status=pending guard so a job someone
-    // else grabbed a moment ago is silently skipped instead of failing (or
-    // double-claiming) the whole batch.
-    const claimedIds = await prisma.$transaction(async (tx) => {
-      const successes: bigint[] = [];
-      for (const id of ids) {
-        const { count } = await tx.workOrder.updateMany({
-          where: { id, status: "pending", universityId },
-          data: { status: "claimed", claimedBy: techId, claimedAt },
-        });
-        if (count > 0) successes.push(id);
-      }
-      return successes;
+    const { claimedCount, claimedIds } = await prisma.$transaction(async (tx) => {
+      // One guarded write for the whole batch instead of a round trip per id.
+      // The status=pending guard is what makes this safe: a job another tech
+      // grabbed a moment ago simply isn't matched, so it's skipped rather
+      // than double-claimed, and `count` is the exact number won.
+      const { count } = await tx.workOrder.updateMany({
+        where: { id: { in: ids }, status: "pending", universityId },
+        data: { status: "claimed", claimedBy: techId, claimedAt },
+      });
+
+      if (count === 0) return { claimedCount: 0, claimedIds: [] as bigint[] };
+
+      // Read back which of the requested ids this call is now holding, to
+      // attribute the audit rows. Scoped by claimedBy + claimedAt so a
+      // batch claimed earlier by the same tech isn't picked up.
+      const rows = await tx.workOrder.findMany({
+        where: { id: { in: ids }, status: "claimed", claimedBy: techId, claimedAt },
+        select: { id: true },
+      });
+
+      return { claimedCount: count, claimedIds: rows.map((r) => r.id) };
     });
 
-    await Promise.all(
-      claimedIds.map((id) =>
-        logAudit({
-          universityId,
-          userId: techId,
-          action: "CLAIM_WORKORDER",
-          entityType: "workOrder",
-          entityId: id,
-          newValues: { status: "claimed", claimedBy: techId.toString(), bulk: true },
-          ipAddress: "server_action",
-        })
-      )
+    await logAuditMany(
+      claimedIds.map((id) => ({
+        universityId,
+        userId: techId,
+        action: "CLAIM_WORKORDER",
+        entityType: "workOrder",
+        entityId: id,
+        newValues: { status: "claimed", claimedBy: techId.toString(), bulk: true },
+        ipAddress: "server_action",
+      }))
     );
 
     revalidatePath("/tech");
 
     return {
       success: true,
-      claimedCount: claimedIds.length,
-      skippedCount: ids.length - claimedIds.length,
+      claimedCount,
+      skippedCount: ids.length - claimedCount,
     };
   } catch (error) {
     console.error("Failed to bulk claim work orders:", error);
@@ -323,16 +369,20 @@ export async function logMaintenanceAction(formData: FormData) {
       });
 
       if (schedule) {
-        const nextDueDate =
-          schedule.frequencyUnit === "days"
-            ? addDays(performedAt, schedule.frequencyValue)
-            : schedule.frequencyUnit === "years"
-            ? addYears(performedAt, schedule.frequencyValue)
-            : addMonths(performedAt, schedule.frequencyValue);
+        // Both columns are @db.Date (a calendar day), so they're derived from
+        // today's date in the operating timezone rather than from performedAt,
+        // which is a UTC instant: a job closed after midnight local time would
+        // otherwise be filed under yesterday and re-scheduled a day early.
+        const performedOn = businessDateToday();
+        const nextDueDate = addMaintenanceInterval(
+          performedOn,
+          schedule.frequencyValue,
+          schedule.frequencyUnit
+        );
 
         await tx.maintenanceSchedule.update({
           where: { id: schedule.id },
-          data: { lastPerformedAt: performedAt, nextDueDate },
+          data: { lastPerformedAt: performedOn, nextDueDate },
         });
       }
     });

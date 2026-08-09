@@ -14,13 +14,30 @@ export async function GET(request: NextRequest) {
     const start = searchParams.get("start");
     const end = searchParams.get("end");
 
-    // Build the query to fetch maintenance schedules
-    // If start and end are provided, we can filter, but for now we'll fetch all active schedules
-    // within the university.
-    
+    // Optional window on nextDueDate so a calendar showing one month can ask
+    // for just that month instead of pulling every schedule in the tenant.
+    // Omitting both params keeps the previous behaviour (return everything),
+    // so existing callers are unaffected. Unparseable dates are ignored
+    // rather than erroring, to avoid breaking a caller over a bad param.
+    const startDate = start ? new Date(start) : null;
+    const endDate = end ? new Date(end) : null;
+    const validStart = startDate && !Number.isNaN(startDate.getTime()) ? startDate : null;
+    const validEnd = endDate && !Number.isNaN(endDate.getTime()) ? endDate : null;
+
+    const dueDateFilter =
+      validStart || validEnd
+        ? {
+            nextDueDate: {
+              ...(validStart ? { gte: validStart } : {}),
+              ...(validEnd ? { lte: validEnd } : {}),
+            },
+          }
+        : {};
+
     const schedules = await prisma.maintenanceSchedule.findMany({
       where: {
         isActive: true,
+        ...dueDateFilter,
         airConditioner: {
           room: {
             building: {
@@ -69,6 +86,13 @@ export async function GET(request: NextRequest) {
         brand: s.airConditioner.acBrand?.name ?? s.airConditioner.brand ?? "ไม่ระบุ",
         location: `${s.airConditioner.room.building.name} - ${s.airConditioner.room.name}`,
         lastPerformedByName: lastLog?.technician.name ?? null,
+        // Nothing stores a job type for *upcoming* work: maintenance_schedules
+        // is the cleaning cycle, and work_orders only carries a status. So it's
+        // inferred from the unit's current condition, the same split the admin
+        // dashboard already uses for its repair/cleaning counts — a unit that's
+        // broken needs fixing, anything else is due for its routine clean.
+        // The Thai wording lives in the UI with the rest of the copy.
+        jobType: s.airConditioner.status === "broken" ? "repair" : "cleaning",
       };
     });
 

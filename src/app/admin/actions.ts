@@ -8,6 +8,12 @@ import { logAudit } from "@/lib/audit";
 import { syncOverdueMaintenanceWorkOrders } from "@/lib/maintenance";
 import { format, subDays } from "date-fns";
 
+// How many work orders the board loads at once. Not exported directly (a
+// "use server" file may only export async functions) — the UI receives it as
+// getOrgAdminData().workOrderPage.pageSize so it can render real paging
+// controls instead of silently showing only the newest page.
+const WORK_ORDER_PAGE_SIZE = 50;
+
 async function verifyOrgAdmin() {
   const session = await auth();
   if (!session?.user || session.user.role !== "org_admin" || !session.user.universityId) {
@@ -28,21 +34,50 @@ export async function getOrgAdminData() {
       buildings,
       workOrdersRaw,
       techsRaw,
-      pendingUsersRaw,
       allUsersRaw,
       maintenanceLogsRaw,
+      brandsRaw,
+      totalWorkOrders,
+      pendingWorkOrders,
     ] = await Promise.all([
-      prisma.university.findUnique({ where: { id: universityId } }),
+      prisma.university.findUnique({
+        where: { id: universityId },
+        select: { name: true },
+      }),
+      // This is the widest query on the page — every building, room and unit
+      // in the tenant. `include` pulled full rows plus full acBrand, acModel
+      // and maintenanceSchedules records; the shaping below uses a handful of
+      // columns, so select exactly those.
       prisma.building.findMany({
         where: { universityId },
-        include: {
+        select: {
+          id: true,
+          name: true,
+          abbreviation: true,
           rooms: {
-            include: {
+            select: {
+              id: true,
+              name: true,
+              floor: true,
               airConditioners: {
-                include: { 
-                  acBrand: true, 
-                  acModel: true,
-                  maintenanceSchedules: true
+                select: {
+                  id: true,
+                  acCode: true,
+                  qrCode: true,
+                  brand: true,
+                  model: true,
+                  btu: true,
+                  status: true,
+                  acBrand: { select: { name: true } },
+                  acModel: { select: { name: true } },
+                  maintenanceSchedules: {
+                    select: {
+                      isActive: true,
+                      frequencyValue: true,
+                      frequencyUnit: true,
+                      nextDueDate: true,
+                    },
+                  },
                 },
                 orderBy: { acCode: "asc" },
               },
@@ -54,43 +89,82 @@ export async function getOrgAdminData() {
       }),
       prisma.workOrder.findMany({
         where: { universityId },
-        include: {
+        select: {
+          id: true,
+          status: true,
+          priority: true,
+          issueDescription: true,
+          resolutionNotes: true,
+          images: true,
+          assignedAt: true,
+          claimedAt: true,
+          completedAt: true,
+          createdAt: true,
+          airConditionerId: true,
           airConditioner: {
-            include: {
-              acBrand: true,
-              acModel: true,
+            select: {
+              acCode: true,
+              brand: true,
+              btu: true,
               room: {
-                include: {
-                  building: true,
+                select: {
+                  name: true,
+                  building: { select: { name: true, abbreviation: true } },
                 },
               },
+              acBrand: { select: { name: true } },
             },
           },
-          claimedByUser: true,
-          reportedByUser: true,
-          assignedToUser: true,
+          claimedByUser: { select: { name: true } },
+          reportedByUser: { select: { name: true } },
+          assignedToUser: { select: { name: true } },
         },
         orderBy: { createdAt: "desc" },
-        take: 50,
+        take: WORK_ORDER_PAGE_SIZE,
       }),
       prisma.user.findMany({
         where: { universityId, role: "technician", status: "active" },
         select: { id: true, name: true, email: true },
       }),
-      prisma.user.findMany({
-        where: { universityId, status: "pending" },
-        orderBy: { createdAt: "desc" },
-      }),
+      // One query for every user in the tenant; the pending-approval list is
+      // just a filter over this (it used to be a second, redundant query).
+      // Explicit select so the password hash never leaves the database.
       prisma.user.findMany({
         where: { universityId },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          status: true,
+          createdAt: true,
+        },
         orderBy: { createdAt: "desc" },
       }),
       prisma.maintenanceLog.findMany({
-        where: { 
+        where: {
           airConditioner: { room: { building: { universityId } } },
           performedAt: { gte: subDays(new Date(), 7) }
         },
+        // Only performedAt is used (to bucket the weekly activity chart).
+        select: { performedAt: true },
       }),
+      prisma.acBrand.findMany({
+        select: {
+          id: true,
+          name: true,
+          models: {
+            select: { id: true, name: true, defaultBtu: true },
+            orderBy: { name: 'asc' },
+          },
+        },
+        orderBy: { name: 'asc' },
+      }),
+      // Counted in SQL, not derived from workOrdersRaw: that list is capped at
+      // WORK_ORDER_PAGE_SIZE, so counting pending inside it under-reports as
+      // soon as the tenant has more work orders than one page.
+      prisma.workOrder.count({ where: { universityId } }),
+      prisma.workOrder.count({ where: { universityId, status: "pending" } }),
     ]);
 
     // Aggregate metrics
@@ -181,8 +255,6 @@ export async function getOrgAdminData() {
       };
     });
 
-    const pendingWorkOrders = workOrdersRaw.filter((wo) => wo.status === "pending").length;
-
     const workOrders = workOrdersRaw.map((wo) => ({
       id: wo.id.toString(),
       acCode: wo.airConditioner.acCode,
@@ -204,7 +276,7 @@ export async function getOrgAdminData() {
       airConditionerId: wo.airConditionerId.toString(),
     }));
 
-    const pendingUsers = pendingUsersRaw.map((u) => ({
+    const allUsers = allUsersRaw.map((u) => ({
       id: u.id.toString(),
       name: u.name,
       email: u.email,
@@ -213,13 +285,22 @@ export async function getOrgAdminData() {
       createdAt: u.createdAt ? u.createdAt.toISOString() : null,
     }));
 
-    const allUsers = allUsersRaw.map((u) => ({
-      id: u.id.toString(),
-      name: u.name,
-      email: u.email,
-      role: u.role,
-      status: u.status,
-      createdAt: u.createdAt ? u.createdAt.toISOString() : null,
+    // Same rows, same createdAt-desc order as the old dedicated query.
+    const pendingUsers = allUsers.filter((u) => u.status === "pending");
+
+    // Ids stringified like every other list here. This was the one value
+    // returned straight off Prisma, and it broke the register-AC form: the
+    // brand <select> hands back a string, so `brands.find(b => b.id ===
+    // selectedBrandId)` never matched a BigInt id and the model dropdown
+    // stayed empty — with the field marked required, no unit could be added.
+    const brands = brandsRaw.map((b) => ({
+      id: b.id.toString(),
+      name: b.name,
+      models: b.models.map((m) => ({
+        id: m.id.toString(),
+        name: m.name,
+        defaultBtu: m.defaultBtu,
+      })),
     }));
 
     // Flatten AC list for Create Work Order dropdown
@@ -268,12 +349,18 @@ export async function getOrgAdminData() {
       },
       weeklyActivity,
       workOrders,
+      workOrderPage: {
+        total: totalWorkOrders,
+        pageSize: WORK_ORDER_PAGE_SIZE,
+        loaded: workOrders.length,
+        hasMore: totalWorkOrders > workOrders.length,
+      },
       urgentUnits,
       buildings: buildingList,
       allAcUnits,
       pendingUsers,
       allUsers,
-      brands: await prisma.acBrand.findMany({ include: { models: true }, orderBy: { name: 'asc' } }),
+      brands,
     };
   } catch (error) {
     console.error("Org Admin Data query failed:", error);
@@ -291,6 +378,7 @@ export async function getOrgAdminData() {
       },
       weeklyActivity: [],
       workOrders: [],
+      workOrderPage: { total: 0, pageSize: WORK_ORDER_PAGE_SIZE, loaded: 0, hasMore: false },
       urgentUnits: [],
       buildings: [],
       allAcUnits: [],

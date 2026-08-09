@@ -27,3 +27,22 @@ export async function logAudit(params: AuditLogParams) {
     }
   });
 }
+
+// Batch variant: one INSERT for the whole set instead of one round trip per
+// entity. Use when a single user action touches many rows (e.g. bulk claim).
+export async function logAuditMany(entries: AuditLogParams[]) {
+  if (entries.length === 0) return;
+
+  return await prisma.systemAuditLog.createMany({
+    data: entries.map((params) => ({
+      universityId: params.universityId,
+      userId: params.userId,
+      action: params.action,
+      entityType: params.entityType,
+      entityId: params.entityId,
+      oldValues: params.oldValues ?? undefined,
+      newValues: params.newValues ?? undefined,
+      ipAddress: params.ipAddress,
+    })),
+  });
+}
