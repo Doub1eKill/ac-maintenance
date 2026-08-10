@@ -39,6 +39,7 @@ export async function getOrgAdminData() {
       brandsRaw,
       totalWorkOrders,
       pendingWorkOrders,
+      currentUser,
     ] = await Promise.all([
       prisma.university.findUnique({
         where: { id: universityId },
@@ -106,6 +107,11 @@ export async function getOrgAdminData() {
               acCode: true,
               brand: true,
               btu: true,
+              // The unit's own condition, surfaced as `acStatus` below so the
+              // board can label a row repair vs. cleaning. Nothing stores a
+              // job type for a work order itself, so this is the same signal
+              // the technician view and the calendar already infer from.
+              status: true,
               room: {
                 select: {
                   name: true,
@@ -165,6 +171,23 @@ export async function getOrgAdminData() {
       // soon as the tenant has more work orders than one page.
       prisma.workOrder.count({ where: { universityId } }),
       prisma.workOrder.count({ where: { universityId, status: "pending" } }),
+      // The signed-in admin's own profile, read from the database rather than
+      // taken from the session. The session is a JWT minted at sign-in, so a
+      // name changed through updateProfileAction would keep showing the old
+      // value until the next login — this row is always current.
+      prisma.user.findUnique({
+        where: { id: BigInt(session.user.id) },
+        select: {
+          name: true,
+          email: true,
+          role: true,
+          phones: {
+            where: { isPrimary: true },
+            select: { phoneNumber: true },
+            take: 1,
+          },
+        },
+      }),
     ]);
 
     // Aggregate metrics
@@ -260,6 +283,9 @@ export async function getOrgAdminData() {
       acCode: wo.airConditioner.acCode,
       brand: wo.airConditioner.acBrand?.name || wo.airConditioner.brand || "ไม่ระบุ",
       btu: wo.airConditioner.btu,
+      // Named apart from `status` below, which is the work order's own status
+      // (pending/claimed/...). "broken" -> repair job, anything else -> cleaning.
+      acStatus: wo.airConditioner.status,
       location: `${wo.airConditioner.room.building.name} (${wo.airConditioner.room.building.abbreviation}) - ห้อง ${wo.airConditioner.room.name}`,
       status: wo.status,
       priority: wo.priority,
@@ -338,6 +364,14 @@ export async function getOrgAdminData() {
     return {
       dbError: null,
       universityName: university?.name || "มหาวิทยาลัย",
+      // Everything the profile card needs, in one place. Falls back to the
+      // session values only if the row somehow can't be read.
+      profile: {
+        name: currentUser?.name ?? session.user.name ?? "",
+        email: currentUser?.email ?? session.user.email ?? "",
+        role: currentUser?.role ?? session.user.role,
+        phone: currentUser?.phones[0]?.phoneNumber ?? null,
+      },
       metrics: {
         totalUnits,
         brokenOrCleaningUnits,
@@ -367,6 +401,14 @@ export async function getOrgAdminData() {
     return {
       dbError: "ไม่สามารถเชื่อมต่อฐานข้อมูล MariaDB/MySQL ได้ (Connection Pool Timeout) - กรุณาตรวจสอบว่าเซิร์ฟเวอร์ MySQL บนพอร์ต 3307 เปิดใช้งานอยู่ และเรียกใช้ 'npx tsx prisma/seed.ts'",
       universityName: "มหาวิทยาลัย",
+      // Session-only fallback: the database is unreachable on this path, so
+      // the card still renders with whatever the JWT carries.
+      profile: {
+        name: session.user.name ?? "",
+        email: session.user.email ?? "",
+        role: session.user.role,
+        phone: null,
+      },
       metrics: {
         totalUnits: 0,
         brokenOrCleaningUnits: 0,
@@ -423,6 +465,98 @@ export async function updateUserStatusByOrgAdminAction(
   } catch (error) {
     console.error("Failed to update user status by org admin:", error);
     return { error: "ไม่สามารถอัปเดตสถานะผู้ใช้ได้ กรุณาลองใหม่อีกครั้ง" };
+  }
+}
+
+const updateProfileSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, "กรุณากรอกชื่อ-นามสกุล")
+    .max(255, "ชื่อ-นามสกุลยาวเกินไป"),
+  // Left deliberately permissive — Thai numbers get written with and without
+  // spaces, dashes and a +66 prefix, and rejecting a real number a user typed
+  // their own way is worse here than storing it slightly unevenly.
+  phone: z
+    .string()
+    .trim()
+    .max(20, "เบอร์โทรศัพท์ยาวเกินไป")
+    .refine(
+      (v) => v === "" || /^[\d+\-\s()]{9,20}$/.test(v),
+      "รูปแบบเบอร์โทรศัพท์ไม่ถูกต้อง"
+    )
+    .optional(),
+});
+
+/**
+ * Updates the signed-in user's own name and primary phone number.
+ *
+ * Guarded on the session alone rather than through verifyOrgAdmin(): it only
+ * ever writes to the caller's own row, so there's nothing a technician could
+ * reach here that they shouldn't, and the technician profile page planned in
+ * F5 can reuse this instead of a near-identical copy under tech/.
+ *
+ * `phone` distinguishes three cases: omitted leaves the number untouched, ""
+ * clears it, and a value replaces it. The previous number is deleted, not
+ * kept as a secondary — see the transaction below.
+ */
+export async function updateProfileAction(name: string, phone?: string) {
+  const session = await auth();
+  if (!session?.user?.id || session.user.status !== "active") {
+    throw new Error("Unauthorized: sign-in required");
+  }
+
+  const parsed = updateProfileSchema.safeParse({ name, phone });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message || "ข้อมูลไม่ถูกต้อง" };
+  }
+
+  const userId = BigInt(session.user.id);
+  const { name: newName, phone: newPhone } = parsed.data;
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: userId },
+        data: { name: newName },
+      });
+
+      if (newPhone === undefined) return;
+
+      // Replace the old number rather than demoting it to a secondary. The
+      // profile form exposes a single phone field, so a number the user typed
+      // over should not survive as a row they can neither see nor delete.
+      // Only the primary is removed — any secondary numbers on the account
+      // were recorded elsewhere and aren't this form's to discard.
+      await tx.userPhone.deleteMany({ where: { userId, isPrimary: true } });
+
+      if (newPhone === "") return;
+
+      // The new number may already exist as one of those secondaries, and
+      // [userId, phoneNumber] is unique — promote that row instead of
+      // inserting a duplicate that would violate the constraint.
+      const existing = await tx.userPhone.findUnique({
+        where: { userId_phoneNumber: { userId, phoneNumber: newPhone } },
+        select: { id: true },
+      });
+
+      if (existing) {
+        await tx.userPhone.update({
+          where: { id: existing.id },
+          data: { isPrimary: true },
+        });
+      } else {
+        await tx.userPhone.create({
+          data: { userId, phoneNumber: newPhone, isPrimary: true },
+        });
+      }
+    });
+
+    revalidatePath(session.user.role === "technician" ? "/tech" : "/admin");
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to update own profile:", error);
+    return { error: "ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่อีกครั้ง" };
   }
 }
 
