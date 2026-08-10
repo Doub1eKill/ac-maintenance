@@ -349,4 +349,116 @@ DoubleKill จะไม่แตะไฟล์เหล่านี้ ถ้�
 
 ---
 
-*Handoff document last updated: August 9, 2026.*
+## 🆕 Feature Backlog — วางแผนละเอียดแล้ว พร้อมเริ่มทำ (10 สิงหาคม 2026)
+
+> ผ่านการคุยรายละเอียด/ตัดสินใจกับเจ้าของโปรเจกต์ครบทุกข้อแล้ว (เดิมเป็นแค่ขอบเขตกว้างๆ ตอนบันทึกครั้งแรก) ยังไม่ได้ลงมือเขียนโค้ดข้อไหนเลย — เอกสารนี้คือแผนที่ตกลงกันแล้ว รอเริ่มทำตามลำดับ
+
+### F1. ถอดระบบ Multi-tenant + Super Admin ออกทั้งหมด — ใช้เฉพาะภายใน มรภ.ภูเก็ต
+
+**การตัดสินใจที่ล็อกแล้ว:**
+- **`acCode` รูปแบบใหม่:** `[BLDG]-[ROOM]-[NN]` (ตัด segment มหาวิทยาลัยออก ให้สั้นและอ่านง่ายขึ้น) — ของเดิม 189 เครื่องต้อง rename รหัสระหว่างทำ data migration
+- **ข้อมูลเดิม:** เก็บเฉพาะข้อมูลของ PKRU ลบข้อมูลมหาวิทยาลัยอื่นทั้งชุดออก (buildings/rooms/AC/users/work orders/logs) — เหตุผล: ข้อมูลทั้งหมดเป็น seed จำลอง (faker) อยู่แล้ว ไม่ใช่ข้อมูลจริงที่ต้องรักษาไว้ทุกฝั่ง แต่ subset ของ PKRU มีข้อมูลครบพร้อม demo/ทดสอบ flow ได้ทันที (73 เครื่อง + work order + log) ประหยัดเวลากว่าการ re-seed ใหม่ทั้งระบบ
+- **บัญชี `super_admin` เดิม:** ลบทิ้งไปเลย
+
+**Schema (`prisma/schema.prisma`):**
+| เปลี่ยน | รายละเอียด |
+|---|---|
+| ลบ model `University` | ทั้ง model |
+| `Building` | ลบ `universityId` + relation `university`; unique `[universityId, abbreviation]`/`[universityId, name]` → เหลือ unique เดี่ยวบน `abbreviation`/`name` (กลายเป็น global unique) |
+| `User` | ลบ `universityId` + relation + index ที่เกี่ยวข้อง |
+| `WorkOrder` | ลบ `universityId` (denormalized field) + relation + index |
+| `SystemAuditLog` | ลบ `universityId` + relation + index |
+| `enum UserRole` | ลบ `super_admin` เหลือ `org_admin \| technician` (คงชื่อ `org_admin` ไว้เพื่อลดจุดที่ต้องแก้ ถึงจะไม่มี "org" อื่นแล้วก็ตาม) |
+
+**ไฟล์ backend ที่ต้องแก้ (ยืนยันจากโค้ดจริงแล้ว):**
+`src/app/admin/actions.ts`, `src/app/tech/actions.ts` (เกือบทุกฟังก์ชันใช้ `universityId` scope query — ตัด filter ออกทั้งหมด), `src/app/api/admin/maintenance-schedules/route.ts`, `src/app/api/tech/units/route.ts`, `src/lib/maintenance.ts` (`syncOverdueMaintenanceWorkOrders` ตัด parameter tenant ออก — throttle เปลี่ยนจาก per-tenant เป็น global ตัวเดียว), `src/lib/audit.ts` (ตัด `universityId` ออกจาก `logAudit`/`logAuditMany` params), `src/lib/auth.ts` + `src/lib/auth.config.ts` (ตัด `universityId` ออกจาก JWT/session callback, ลบ role check `super_admin` ใน `authorized()`, ลบ matcher `/super-admin/:path*` และ `/api/super-admin/:path*`), `src/types/next-auth.d.ts` (ตัด `universityId` ออกจาก session/JWT type), `src/app/register/actions.ts` + `register-form.tsx` (ตัด dropdown เลือกมหาวิทยาลัย, `isInstitutionalDomain` ปรับให้เช็คเฉพาะโดเมน มรภ.ภูเก็ต), `src/app/admin/actions.ts` line ~685 (`acCode` generation ตัด `room.building.university.abbreviation` ออก)
+
+**ลบทั้งไฟล์:** `src/app/super-admin/**` (รวม `master-data/**`), `src/app/api/super-admin/**`
+
+**UI ที่ต้องแก้ตาม:** `login-form.tsx` (ปุ่ม quick-login super admin), `nav-header.tsx`/`dashboard-layout.tsx` (เงื่อนไข role `super_admin` + การแสดง `universityName`), `page.tsx` (root redirect ไป `/super-admin`), `qr/[id]/page.tsx` (include `building.university` ที่ไม่มีแล้ว)
+
+**⚠️ Dependency สำคัญกับ F7:** `/super-admin/master-data` (จัดการยี่ห้อ/รุ่นแอร์ — `AcBrand`/`AcModel`) ถูกลบไปด้วยในข้อนี้ ต้องย้ายฟังก์ชันนี้ไปเป็นเมนูแยกของ org_admin ตาม F7 ไม่งั้นจะไม่มีทางเพิ่มยี่ห้อ/รุ่นแอร์ใหม่ได้อีกเลยหลัง F1 เสร็จ
+
+**ลำดับแนะนำ:** cleanup ข้อมูลมหาวิทยาลัยอื่นในDB ก่อน → แก้ schema + สร้าง migration (รวม rename `acCode` เดิม 189 ตัว) → แก้ backend ให้ build ผ่าน (TypeScript จะฟ้องทุกจุดที่ยังอ้าง `universityId`/`university` ใช้เป็น checklist ได้เลย) → ลบโฟลเดอร์ super-admin → แก้ UI ที่เหลือ → ทดสอบ flow org_admin/technician ใหม่ทั้งหมด
+
+---
+
+### F2. ปฏิทิน — Drill-down ตามอาคารเมื่อวันเดียวมีงานเยอะ
+
+**ตัดสินใจแล้ว:** ช่องปฏิทินของวันที่มีงานเยอะ ให้แสดงเป็น **รายชื่อตึกพร้อมจำนวนงาน** แทนการเรียงทีละงาน กดชื่อตึก → เปิดดูรายละเอียดงานทั้งหมดของตึกนั้นในวันนั้น (2 ระดับ: วัน → ตึก → รายการงาน)
+
+| | งาน |
+|---|---|
+| **Backend** | `/api/admin/maintenance-schedules/route.ts` ตอนนี้คืน `location` เป็น string รวม (`"ตึก A - ห้อง 301"`) เพิ่ม field แยก `buildingId`/`buildingName` ต่างหาก (แก้แค่ select เพิ่ม ไม่กระทบ query เดิม) |
+| **Frontend** | `maintenance-calendar.tsx` ปรับ day cell: group ข้อมูลตาม `buildingName` ก่อน render เป็น list ชื่อตึก + จำนวนงาน กดแล้วเปิด modal/panel แสดงรายการงานของตึกนั้นในวันนั้น |
+
+---
+
+### F3. เพิ่มหน้า/ส่วนแสดงประวัติการดูแลรักษาของแอร์แต่ละตัว
+
+| | งาน |
+|---|---|
+| **Backend** | เพิ่ม action ใหม่ `getAirConditionerHistory(acId)` คืน `MaintenanceLog` ทั้งหมดเรียงล่าสุดก่อน (query pattern นี้มีอยู่แล้วใน `qr/[id]/page.tsx` — แนะนำแยกเป็น shared helper ใน `src/lib/maintenance.ts` ให้ทั้ง QR page และ action ใหม่เรียกร่วมกัน ลดโค้ดซ้ำ) |
+| **Frontend** | เพิ่มปุ่ม/โมดัล "ดูประวัติ" ใน `asset-manager.tsx` แสดง timeline (รูปแบบเดียวกับที่มีอยู่แล้วในหน้า QR) |
+
+---
+
+### F4. เพิ่มวันที่ติดตั้งแอร์ (`installedAt`) + default
+
+| | งาน |
+|---|---|
+| **Backend** | `createAirConditionerAction` (`admin/actions.ts` ~บรรทัด 651) เพิ่มรับ `installedAt` จากฟอร์ม, validate ผ่าน `acSchema` เป็น optional, ไม่กรอก → default เป็น `businessDateToday()` |
+| **Frontend** | เพิ่ม date input ในฟอร์มเพิ่มแอร์ (`asset-manager.tsx`) เป็น optional พร้อมข้อความบอกว่าไม่กรอก = ใช้วันนี้ |
+
+---
+
+### F6. QR Code — ดูประวัติได้โดยไม่ต้อง Login แต่บันทึกงานต้อง Login
+
+ยืนยันจากโค้ดจริง: `src/app/qr/[id]/page.tsx` ตอนนี้บังคับ login อยู่แล้ว (เช็ค `session?.user` แล้วเด้งหน้า "ไม่มีสิทธิ์เข้าถึง") และเป็นหน้า read-only ล้วนๆ ไม่มีปุ่มบันทึกงานอยู่แล้วด้วย **ตัดสินใจแล้วว่าไม่ต้องซ่อนชื่อช่างที่เคยทำงาน แม้จะเปิดเป็น public**
+
+| | งาน |
+|---|---|
+| **Backend** | ตัด auth gate ออกจาก `qr/[id]/page.tsx` ให้ query แสดงได้เลยไม่ต้องมี session (query ตรงด้วย prisma อยู่แล้ว ไม่ผ่าน guarded action ทำง่าย) |
+| **Frontend** | เพิ่มปุ่ม "บันทึกงานซ่อมบำรุง" (ตอนนี้ไม่มี) กดแล้วถ้ายังไม่ login → redirect `/login` พร้อม callbackUrl กลับมาหน้า QR เดิม ถ้า login แล้ว → พาไปฟอร์มบันทึกงาน (ผูกกับ `logMaintenanceAction` ที่มีอยู่แล้ว) |
+
+---
+
+### F5. หน้า "โปรไฟล์/preference ส่วนตัว" (ทุก role) + "ตั้งค่าระบบ" (เฉพาะ org_admin)
+
+> **⚠️ อัปเดต 10 ส.ค. 2026 หลัง `git pull`:** Esther03u สร้าง `src/components/admin/profile-panel.tsx` ไปแล้ว (commit `c426bf0`/`2234cf8`) ครอบคลุมส่วน "โปรไฟล์ของ org_admin" ไปบางส่วน — แผนด้านล่างปรับให้ต่อยอดจากของที่มีอยู่แล้ว **ไม่ใช่สร้างใหม่ทับ** และคำขอ backend S2/S3 ในหัวข้อ "UI/Styling Backlog" ด้านบนคือส่วนหนึ่งของงานนี้ (ทำ S2/S3 = ปิดงานโปรไฟล์ฝั่ง org_admin ไปด้วยในตัว)
+
+แบ่งเป็น 2 ชั้นตามที่ตกลงกัน:
+
+**1) โปรไฟล์/preference ส่วนตัว — org_admin และ technician เข้าถึงเหมือนกัน**
+- แก้ไขข้อมูลตัวเอง (ชื่อ, เบอร์โทรผ่าน `UserPhone`) — **ตรงกับคำขอ S2 + S3 ที่ Esther03u ฝากไว้แล้ว** ทำเป็น action เดียว `updateProfileAction(name: string, phone?: string)` ใน `src/app/admin/actions.ts` ตามที่ S3 เสนอ (ยึด `session.user.id` เท่านั้น ห้ามรับ userId จาก client)
+- **รูปโปรไฟล์** — ต้องเพิ่ม field `avatarUrl` ใน `User` schema (ยังไม่มี) แล้วรวม upload เข้ากับ `updateProfileAction` เดียวกัน โดยใช้ `saveUpload()` เดิมจาก `tech/actions.ts` ร่วมกัน (มี resize/EXIF/sharp ครบแล้ว — ควรย้ายไป `src/lib/` เพื่อให้ import ข้ามโมดูลได้สะอาด)
+- **เปลี่ยนรหัสผ่านตัวเอง — ตัดสินใจแล้ว: ใช้ reset-link flow เดิม** (`requestPasswordReset` → อีเมล → `/reset-password?token=`) ไม่ทำแบบกรอกรหัสเก่ายืนยันในหน้าเดียว — ProfilePanel ที่ Esther03u ทำไว้ใช้วิธีนี้อยู่แล้ว จึงไม่ต้องแก้ UI ส่วนนี้เลย และช่างก็ใช้ flow เดียวกันได้ทันทีเมื่อทำหน้าโปรไฟล์ฝั่ง technician
+  - 🔴 **Blocker ที่ต้องแก้ก่อน flow นี้จะใช้งานได้จริง:** `src/app/request-password-reset/actions.ts:37` ยังเป็น dev-mode — ลิงก์ถูก `console.log` ไม่ได้ส่งอีเมล **ต้องตั้งค่า SMTP ก่อน** ไม่งั้นผู้ใช้จริงจะกดปุ่มแล้วไม่ได้รับอะไรเลย ถือเป็น prerequisite ของ F5 (ดูหัวข้อ "งานที่ควรทำก่อน deploy" — เดิมบันทึกไว้ว่าต้องทำก่อน deploy อยู่แล้ว ตอนนี้กลายเป็นงานที่บล็อกฟีเจอร์ด้วย)
+  - ⚠️ **ข้อจำกัดที่รับทราบแล้ว:** comment ใน `src/lib/reset-token.ts` ระบุว่า token แบบ HMAC stateless นี้ออกแบบมาสำหรับ "ออกลิงก์ครั้งเดียวจำนวนมากตอน migration" ไม่ใช่ self-service ที่ใช้ซ้ำบ่อย — **token ใช้ซ้ำได้จนกว่าจะหมดอายุ 1 ชม. และ revoke ก่อนกำหนดไม่ได้** ถ้าภายหลังพบว่าเป็นปัญหาจริง ค่อยเปลี่ยนไปเก็บ token ในตาราง DB (มี single-use flag + revoke ได้) แยกเป็นงานต่างหาก
+- **ธีมมืด/สว่าง** — เป็น preference ส่วนบุคคลตรงนี้ ไม่ใช่ค่ากลางที่มีผลกับทุกคน (ยืนยันแล้ว)
+- **หน้าโปรไฟล์ฝั่ง technician ยังไม่มี** — ProfilePanel ปัจจุบันผูกอยู่กับ `admin-dashboard-view.tsx` เท่านั้น ต้องทำให้ช่างเข้าถึงได้ด้วย (แนะนำ refactor `profile-panel.tsx` ให้เป็น shared component ใน `src/components/shared/` แล้วเรียกจากทั้ง 2 ฝั่ง แทนการ copy)
+
+**2) ตั้งค่าระบบ — เฉพาะ org_admin**
+- รอบซ่อมบำรุง Default — ต้องมีที่เก็บค่า เสนอสร้างตารางใหม่เล็กๆ `SystemSettings` (แถวเดียว/singleton) เก็บ `defaultFrequencyValue`/`defaultFrequencyUnit`
+- **แก้ข้อมูล/รีเซ็ตรหัสผ่านให้ user คนอื่น** — กรณีช่างลืมรหัสผ่านจริงๆ ให้ org_admin แก้ข้อมูล+ตั้งรหัสใหม่ให้ได้โดยไม่ต้องรู้รหัสเดิม (`adminResetUserPasswordAction`, เฉพาะ org_admin) ต่อยอดจากหน้าจัดการ user ที่มีอยู่แล้ว
+  - **ยังจำเป็นถึงแม้จะเลือกใช้ reset-link แล้ว** เพราะ reset-link ต้องเข้าถึงอีเมลได้ ถ้าช่างเข้าอีเมลไม่ได้/อีเมลผิด จะไม่มีทางกู้บัญชีเลย ทางนี้เป็น fallback ที่ไม่พึ่งอีเมล
+  - ทางเลือกที่ทำได้เลยตอนนี้โดยไม่ต้องรอ SMTP: ตั้ง `password = NULL` ให้ user (schema ออกแบบไว้แล้วว่า NULL = "ต้องตั้งรหัสใหม่ก่อนเข้าระบบ" — ดู comment ใน `User.password`) แล้ว `authorize()` จะโยน `PasswordResetRequired` ให้เอง ไม่ต้องให้ admin เห็น/ตั้งรหัสของคนอื่นด้วยซ้ำ ปลอดภัยกว่าการให้ admin พิมพ์รหัสใหม่แล้วบอกปากเปล่า
+- *แนะนำเพิ่ม (ถ้าสนใจ):* ข้อมูลองค์กร (ชื่อ/ที่อยู่/เบอร์โทร) — เดิมเก็บใน `University` ที่ถูกลบใน F1 ถ้ายังอยากให้มีชื่อหน่วยงานแสดงในระบบ (หัวกระดาษ, หน้า QR) เก็บในตาราง `SystemSettings` เดียวกันได้เลย
+- *แนะนำเพิ่ม (ถ้าสนใจ):* หน้าดู audit log — `system_audit_logs` มีข้อมูลอยู่แล้วแต่ไม่มี UI เลยหลังตัด super-admin ออก org_admin อาจอยากเห็นว่าใครทำอะไรไปบ้าง
+
+**หมายเหตุ:** "จัดการยี่ห้อ/รุ่นแอร์" **ไม่ได้รวมอยู่ในตั้งค่าระบบข้างต้น** — แยกเป็นเมนูของตัวเองต่างหาก ดู F7 ด้านล่าง
+
+---
+
+### F7. เมนู "จัดการยี่ห้อ/รุ่นแอร์" (Master Data) — แยกเป็นเมนูของตัวเอง
+
+ย้ายมาจาก `/super-admin/master-data` ที่ถูกลบทิ้งใน F1 — ตัดสินใจแล้วให้แยกเป็นเมนู/หน้าของตัวเองต่างหาก ไม่รวมกับ "ตั้งค่าระบบ" ใน F5 เพื่อให้เห็นชัดและจัดการง่าย เฉพาะ org_admin เข้าถึงได้
+
+| | งาน |
+|---|---|
+| **Backend** | ฟังก์ชัน CRUD เดิมมีอยู่ครบแล้วใน `src/app/super-admin/master-data/actions.ts` (`getAcMasterData`, `createAcBrandAction`, `createAcModelAction`) — ย้ายไฟล์ไปเป็น `src/app/admin/master-data/actions.ts` แล้วเปลี่ยน guard จาก `verifySuperAdmin()` เป็น `verifyOrgAdmin()` เท่านั้น ไม่ต้องเขียนใหม่ |
+| **Frontend** | ย้าย `master-data-client.tsx` + หน้า `page.tsx` จาก `src/app/super-admin/master-data/` มาเป็น `src/app/admin/master-data/` เพิ่มลิงก์เมนูใหม่ในแถบนำทางของ org_admin (`nav-header.tsx`/`dashboard-layout.tsx`) แยกจากเมนู "ตั้งค่า" |
+
+---
+
+*Handoff document last updated: August 10, 2026.*
