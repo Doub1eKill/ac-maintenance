@@ -1,10 +1,22 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
+import { getMaintenanceHistory } from "@/lib/maintenance";
+import type { MaintenanceAction } from "@/generated/prisma/enums";
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
 import { ArrowLeft, Clock, CalendarClock, Settings2, ShieldCheck, ClipboardPen, LogIn } from "lucide-react";
 import Link from "next/link";
+
+// Thai wording for the log's action, kept here with the rest of this page's
+// copy rather than beside the query — same split as JOB_TYPE_LABEL in the
+// maintenance calendar, so changing the wording never means editing a
+// server module.
+const MAINTENANCE_ACTION_LABEL: Record<MaintenanceAction, string> = {
+  cleaning: "ล้างแอร์",
+  repair: "ซ่อมแซม",
+  refill_refrigerant: "เติมน้ำยาแอร์",
+};
 
 /**
  * Reached by scanning the QR sticker on a unit, so it is deliberately
@@ -26,20 +38,23 @@ export default async function QRCodePage(props: { params: Promise<{ id: string }
 
   const ac = await prisma.airConditioner.findUnique({
     where: { qrCode: params.id },
-    include: {
+    select: {
+      id: true,
+      acCode: true,
+      brand: true,
+      model: true,
+      btu: true,
+      status: true,
       room: {
-        include: { building: true }
+        select: { name: true, building: { select: { name: true } } },
       },
-      acBrand: true,
-      acModel: true,
-      maintenanceLogs: {
-        include: { technician: true },
-        orderBy: { performedAt: 'desc' }
-      },
+      acBrand: { select: { name: true } },
+      acModel: { select: { name: true } },
       maintenanceSchedules: {
         where: { isActive: true },
-        take: 1
-      }
+        take: 1,
+        select: { frequencyValue: true, frequencyUnit: true, nextDueDate: true },
+      },
     }
   });
 
@@ -48,6 +63,9 @@ export default async function QRCodePage(props: { params: Promise<{ id: string }
   }
 
   const activeSchedule = ac.maintenanceSchedules[0];
+  // Same helper the asset manager's history panel uses, so the two views
+  // can't drift apart in what they consider this unit's record.
+  const history = await getMaintenanceHistory(ac.id);
 
   return (
     <div className="min-h-screen bg-slate-50 pb-12">
@@ -117,17 +135,17 @@ export default async function QRCodePage(props: { params: Promise<{ id: string }
             <Clock className="w-4 h-4" /> ประวัติการซ่อมบำรุง
           </h2>
           
-          {ac.maintenanceLogs.length === 0 ? (
+          {history.length === 0 ? (
             <div className="text-center py-6 text-slate-500 text-sm">
               ยังไม่มีประวัติการซ่อมบำรุง
             </div>
           ) : (
             <div className="space-y-4">
-              {ac.maintenanceLogs.map(log => (
-                <div key={log.id.toString()} className="relative pl-6 border-l-2 border-slate-100 last:border-0 pb-4 last:pb-0">
+              {history.map(log => (
+                <div key={log.id} className="relative pl-6 border-l-2 border-slate-100 last:border-0 pb-4 last:pb-0">
                   <div className="absolute -left-[5px] top-0 w-2 h-2 rounded-full bg-emerald-500"></div>
-                  <div className="text-xs font-bold text-slate-900 mb-1">{log.action === 'cleaning' ? 'ล้างแอร์' : log.action === 'repair' ? 'ซ่อมแซม' : 'เติมน้ำยาแอร์'}</div>
-                  <div className="text-[11px] text-slate-500 mb-2">{format(log.performedAt, "d MMM yyyy HH:mm", { locale: th })} • โดย {log.technician.name}</div>
+                  <div className="text-xs font-bold text-slate-900 mb-1">{MAINTENANCE_ACTION_LABEL[log.action]}</div>
+                  <div className="text-[11px] text-slate-500 mb-2">{format(new Date(log.performedAt), "d MMM yyyy HH:mm", { locale: th })} • โดย {log.technicianName}</div>
                   {log.notes && (
                     <div className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg border border-slate-100">{log.notes}</div>
                   )}

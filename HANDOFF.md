@@ -524,10 +524,52 @@ const byBuilding = jobs.reduce<Record<string, { name: string; jobs: Job[] }>>((a
 
 ### F3. เพิ่มหน้า/ส่วนแสดงประวัติการดูแลรักษาของแอร์แต่ละตัว
 
-| | งาน |
-|---|---|
-| **Backend** | เพิ่ม action ใหม่ `getAirConditionerHistory(acId)` คืน `MaintenanceLog` ทั้งหมดเรียงล่าสุดก่อน (query pattern นี้มีอยู่แล้วใน `qr/[id]/page.tsx` — แนะนำแยกเป็น shared helper ใน `src/lib/maintenance.ts` ให้ทั้ง QR page และ action ใหม่เรียกร่วมกัน ลดโค้ดซ้ำ) |
-| **Frontend** | เพิ่มปุ่ม/โมดัล "ดูประวัติ" ใน `asset-manager.tsx` แสดง timeline (รูปแบบเดียวกับที่มีอยู่แล้วในหน้า QR) |
+- [x] **Backend เสร็จแล้ว (11 ส.ค. 2026)**
+- [ ] **Frontend รอ Esther03u** — ดูคำขอด้านล่าง
+
+**Server Action ใหม่: `getAirConditionerHistory(airConditionerId: string)`** (`src/app/admin/actions.ts`)
+
+คืนทั้งข้อมูลเครื่องและประวัติในครั้งเดียว จะได้ไม่ต้องยิง 2 รอบ:
+
+```ts
+{
+  unit: {
+    acCode: string;
+    brand: string;          // ยี่ห้อจาก catalog ถ้าไม่มีใช้ค่าที่พิมพ์เอง ถ้าไม่มีอีกเป็น "ไม่ระบุ"
+    model: string | null;
+    btu: number | null;
+    status: "normal" | "broken" | "needs_cleaning";
+    location: string;       // "ชื่อตึก - ห้อง xxx"
+    installedAt: string | null;   // ISO
+  },
+  history: Array<{
+    id: string;
+    action: "cleaning" | "repair" | "refill_refrigerant";
+    performedAt: string;          // ISO — เป็น UTC instant ให้แปลงเป็นเวลาไทยตอนแสดง
+    technicianName: string;
+    notes: string | null;
+    beforePhotoUrl: string | null;
+    afterPhotoUrl: string | null;
+  }>
+}
+```
+
+กรณีผิดพลาดคืน `{ error: string }` (ข้อความไทย พร้อมแสดงเลย) — เช็คด้วย `"error" in result` ก่อนใช้
+
+**เรียงจากล่าสุดไปเก่าสุดให้แล้ว** และ **มี URL รูปก่อน/หลัง** ซึ่งหน้า QR ไม่ได้แสดง แต่ฝั่ง admin น่าจะอยากเห็นเป็นหลักฐาน
+
+**ป้ายภาษาไทยของประเภทงาน** (ก๊อปไปใช้ได้เลย — หน้า QR ใช้ชุดนี้):
+```ts
+const MAINTENANCE_ACTION_LABEL: Record<string, string> = {
+  cleaning: "ล้างแอร์",
+  repair: "ซ่อมแซม",
+  refill_refrigerant: "เติมน้ำยาแอร์",
+};
+```
+
+**📌 คำขอ:** เพิ่มปุ่ม "ดูประวัติ" ในการ์ดแอร์แต่ละใบใน `src/components/admin/asset-manager.tsx` (ตอนนี้มีปุ่ม "ล้างทุก X เดือน" กับ "QR Code" อยู่แล้ว) กดแล้วเปิดโมดัลแสดง timeline — หน้าตาลอกจากหน้า QR ได้เลย (`src/app/qr/[id]/page.tsx` ส่วน "ประวัติการซ่อมบำรุง")
+
+**หมายเหตุการ refactor:** query ประวัติถูกย้ายไปเป็น `getMaintenanceHistory()` ใน `src/lib/maintenance.ts` แล้ว หน้า QR เปลี่ยนมาเรียกตัวนี้แทน query ของตัวเอง เพื่อไม่ให้ 2 หน้านิยาม "ประวัติของเครื่องนี้" ไม่ตรงกัน — ทดสอบแล้วหน้า QR แสดงผลเหมือนเดิมทุกอย่าง
 
 ---
 

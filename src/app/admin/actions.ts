@@ -9,6 +9,7 @@ import {
   syncOverdueMaintenanceWorkOrders,
   businessDateToday,
   businessDateFrom,
+  getMaintenanceHistory,
 } from "@/lib/maintenance";
 import { ORGANISATION_NAME } from "@/lib/organisation";
 import { format, subDays } from "date-fns";
@@ -848,6 +849,69 @@ export async function createAirConditionerAction(formData: FormData) {
   } catch (error) {
     console.error(error);
     return { error: "เกิดข้อผิดพลาดในการลงทะเบียนแอร์" };
+  }
+}
+
+/**
+ * One unit's full service record, for the "ดูประวัติ" view in the asset
+ * manager. Returns the unit's identifying details alongside the log so the
+ * caller can title the panel without a second round trip.
+ *
+ * Guarded on an active session rather than on org_admin: the same history is
+ * already public on the QR page, so restricting it further here would only
+ * stop a technician reusing this, not protect anything.
+ */
+export async function getAirConditionerHistory(airConditionerId: string) {
+  const session = await auth();
+  if (!session?.user?.id || session.user.status !== "active") {
+    throw new Error("Unauthorized: sign-in required");
+  }
+
+  let acId: bigint;
+  try {
+    acId = BigInt(airConditionerId);
+  } catch {
+    return { error: "รหัสเครื่องปรับอากาศไม่ถูกต้อง" };
+  }
+
+  try {
+    const [ac, history] = await Promise.all([
+      prisma.airConditioner.findUnique({
+        where: { id: acId },
+        select: {
+          acCode: true,
+          brand: true,
+          model: true,
+          btu: true,
+          status: true,
+          installedAt: true,
+          acBrand: { select: { name: true } },
+          acModel: { select: { name: true } },
+          room: {
+            select: { name: true, building: { select: { name: true } } },
+          },
+        },
+      }),
+      getMaintenanceHistory(acId),
+    ]);
+
+    if (!ac) return { error: "ไม่พบเครื่องปรับอากาศ" };
+
+    return {
+      unit: {
+        acCode: ac.acCode,
+        brand: ac.acBrand?.name ?? ac.brand ?? "ไม่ระบุ",
+        model: ac.acModel?.name ?? ac.model ?? null,
+        btu: ac.btu,
+        status: ac.status,
+        location: `${ac.room.building.name} - ห้อง ${ac.room.name}`,
+        installedAt: ac.installedAt ? ac.installedAt.toISOString() : null,
+      },
+      history,
+    };
+  } catch (error) {
+    console.error("Failed to load air conditioner history:", error);
+    return { error: "ไม่สามารถโหลดประวัติการซ่อมบำรุงได้" };
   }
 }
 

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import type { MaintenanceAction } from "@/generated/prisma/enums";
 
 // The timezone the institutions actually operate in. Timestamps (performedAt,
 // claimedAt) are stored as UTC instants and render correctly wherever they're
@@ -157,6 +158,51 @@ export async function syncOverdueMaintenanceWorkOrders() {
     lastOverdueCheckAt = null;
     throw error;
   }
+}
+
+export interface MaintenanceHistoryEntry {
+  id: string;
+  action: MaintenanceAction;
+  performedAt: string;
+  technicianName: string;
+  notes: string | null;
+  beforePhotoUrl: string | null;
+  afterPhotoUrl: string | null;
+}
+
+// One unit's full service record, newest first. Shared by the public QR page
+// and the admin asset manager so both describe the same history the same way
+// — the QR page grew this query first and it would otherwise have been copied
+// to reach it from anywhere else.
+//
+// Everything here is already visible to anyone who scans the unit's QR code,
+// so callers decide who may *reach* it, not what it may contain.
+export async function getMaintenanceHistory(
+  airConditionerId: bigint
+): Promise<MaintenanceHistoryEntry[]> {
+  const logs = await prisma.maintenanceLog.findMany({
+    where: { airConditionerId },
+    orderBy: { performedAt: "desc" },
+    select: {
+      id: true,
+      action: true,
+      performedAt: true,
+      notes: true,
+      beforePhotoUrl: true,
+      afterPhotoUrl: true,
+      technician: { select: { name: true } },
+    },
+  });
+
+  return logs.map((log) => ({
+    id: log.id.toString(),
+    action: log.action,
+    performedAt: log.performedAt.toISOString(),
+    technicianName: log.technician.name,
+    notes: log.notes,
+    beforePhotoUrl: log.beforePhotoUrl,
+    afterPhotoUrl: log.afterPhotoUrl,
+  }));
 }
 
 export interface TechnicianAssetUnit {
