@@ -24,6 +24,32 @@ export function businessDateToday(): Date {
   return new Date(`${ymd}T00:00:00.000Z`);
 }
 
+// Parses a YYYY-MM-DD string (what <input type="date"> submits) into the same
+// UTC-midnight anchor businessDateToday() produces, so both round-trip through
+// a DATE column identically. Returns null for anything that isn't a real
+// calendar day — including shapes Date would otherwise accept and quietly
+// reshuffle, like "2026-02-31" rolling forward into March.
+export function businessDateFrom(ymd: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd.trim());
+  if (!match) return null;
+
+  const [, year, month, day] = match;
+  const parsed = new Date(`${year}-${month}-${day}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime())) return null;
+
+  // Round-trip check: Date accepts an out-of-range day and rolls it into the
+  // next month, so compare the parts back to catch that.
+  if (
+    parsed.getUTCFullYear() !== Number(year) ||
+    parsed.getUTCMonth() + 1 !== Number(month) ||
+    parsed.getUTCDate() !== Number(day)
+  ) {
+    return null;
+  }
+
+  return parsed;
+}
+
 // Advances a business date by a maintenance interval. Uses UTC setters rather
 // than date-fns so the calendar day is preserved regardless of the runtime's
 // own timezone — date-fns operates on local-time fields, which would read the

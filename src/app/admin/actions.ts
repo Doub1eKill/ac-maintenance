@@ -5,7 +5,11 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
-import { syncOverdueMaintenanceWorkOrders } from "@/lib/maintenance";
+import {
+  syncOverdueMaintenanceWorkOrders,
+  businessDateToday,
+  businessDateFrom,
+} from "@/lib/maintenance";
 import { ORGANISATION_NAME } from "@/lib/organisation";
 import { format, subDays } from "date-fns";
 
@@ -753,24 +757,38 @@ const acSchema = z.object({
   acModelId: z.string().optional(),
   customBrand: z.string().optional(),
   customModel: z.string().optional(),
-  btu: z.string().transform(val => val ? parseInt(val, 10) : null).nullable()
+  btu: z.string().transform(val => val ? parseInt(val, 10) : null).nullable(),
+  // Optional: an empty field means "today", handled below. Only the shape is
+  // checked here so the error message can name the field.
+  installedAt: z
+    .string()
+    .trim()
+    .refine((v) => v === "" || businessDateFrom(v) !== null, "วันที่ติดตั้งไม่ถูกต้อง")
+    .optional(),
 });
 
 export async function createAirConditionerAction(formData: FormData) {
   await verifyOrgAdmin();
 
+  // Every optional field is read with `?? undefined`. The form renders only
+  // one of the two brand branches at a time, so the inputs belonging to the
+  // other one are absent from the DOM entirely and formData.get() returns
+  // null for them — and z.string().optional() accepts undefined but rejects
+  // null, which failed the whole parse with a bare "Invalid input" no matter
+  // which branch was used.
   const parsed = acSchema.safeParse({
     roomId: formData.get("roomId"),
     brandType: formData.get("brandType"),
-    acModelId: formData.get("acModelId"),
-    customBrand: formData.get("customBrand"),
-    customModel: formData.get("customModel"),
+    acModelId: formData.get("acModelId") ?? undefined,
+    customBrand: formData.get("customBrand") ?? undefined,
+    customModel: formData.get("customModel") ?? undefined,
     btu: formData.get("btu"),
+    installedAt: formData.get("installedAt") ?? undefined,
   });
-  
+
   if (!parsed.success) return { error: parsed.error.issues[0]?.message || "ข้อมูลไม่ถูกต้อง" };
   const data = parsed.data;
-  
+
   if (data.brandType === "master" && !data.acModelId) {
     return { error: "กรุณาเลือกรุ่นแอร์" };
   }
@@ -795,12 +813,20 @@ export async function createAirConditionerAction(formData: FormData) {
     const acCode = `${room.building.abbreviation}-${room.name}-${unitCount.toString().padStart(2, '0')}`;
     const qrCode = crypto.randomUUID();
     
+    // installed_at is a DATE column, so it needs a calendar day anchored at
+    // UTC midnight — not `new Date()`, whose UTC date is still yesterday
+    // between 00:00 and 07:00 here (the same trap P16 fixed for the
+    // maintenance schedule dates). Left blank, registration means today.
+    const installedAt = data.installedAt
+      ? businessDateFrom(data.installedAt)
+      : businessDateToday();
+
     let dbData: any = {
       roomId: room.id,
       acCode,
       qrCode,
       btu: data.btu,
-      installedAt: new Date()
+      installedAt,
     };
     
     if (data.brandType === "master") {

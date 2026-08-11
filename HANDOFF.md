@@ -508,10 +508,51 @@ DoubleKill จะไม่แตะไฟล์เหล่านี้ ถ้�
 
 ### F4. เพิ่มวันที่ติดตั้งแอร์ (`installedAt`) + default
 
-| | งาน |
-|---|---|
-| **Backend** | `createAirConditionerAction` (`admin/actions.ts` ~บรรทัด 651) เพิ่มรับ `installedAt` จากฟอร์ม, validate ผ่าน `acSchema` เป็น optional, ไม่กรอก → default เป็น `businessDateToday()` |
-| **Frontend** | เพิ่ม date input ในฟอร์มเพิ่มแอร์ (`asset-manager.tsx`) เป็น optional พร้อมข้อความบอกว่าไม่กรอก = ใช้วันนี้ |
+- [x] **Backend เสร็จแล้ว (11 ส.ค. 2026)** — `createAirConditionerAction` รับ `installedAt` จากฟอร์มแล้ว
+- [ ] **Frontend รอ Esther03u** — ดูคำขอด้านล่าง
+
+**สิ่งที่ backend ทำแล้ว:**
+- `acSchema` รับ field ใหม่ชื่อ **`installedAt`** เป็น **optional** รูปแบบ **`YYYY-MM-DD`** (ตรงกับที่ `<input type="date">` ส่งมาพอดี ไม่ต้องแปลงอะไร)
+- **ไม่ส่งมาหรือส่งค่าว่าง = ใช้วันที่วันนี้** (ตามเวลาไทย) — ฟอร์มปัจจุบันที่ยังไม่มีช่องนี้จึงยังทำงานได้ปกติ ไม่พัง
+- กรอกรูปแบบผิดหรือวันที่ไม่มีจริง (เช่น `2026-02-31`) จะคืน error ข้อความไทยว่า *"วันที่ติดตั้งไม่ถูกต้อง"*
+
+**🐛 แก้บั๊กไปด้วยระหว่างทาง 2 ข้อ:**
+
+1. **`installedAt` บันทึกผิดวันช่วงกลางคืน** — ของเดิมเขียน `installedAt: new Date()` ลงคอลัมน์ `@db.Date` ซึ่งเป็นบั๊กชุดเดียวกับ **P16** ลงทะเบียนแอร์ช่วง 00:00–06:59 น. จะบันทึกวันติดตั้งเป็น**เมื่อวาน** ตอนนี้ใช้ `businessDateToday()` แล้ว
+
+2. **🔴 ลงทะเบียนแอร์ไม่ได้เลยทั้งสองแบบ (บั๊กเดิม เจอตอนกดทดสอบจริง)** — กดปุ่มแล้วขึ้น error ว่า `Invalid input` เฉยๆ ไม่บอกสาเหตุ
+
+   **สาเหตุ:** `z.string().optional()` ของ Zod รับ `undefined` แต่ **ไม่รับ `null`** ส่วน `formData.get()` คืน **`null`** เมื่อไม่มี input ชื่อนั้นใน DOM — และฟอร์มนี้ render แค่ฝั่งเดียวตามแท็บที่เลือก:
+   - เลือก **"รุ่นมาตรฐาน"** → ไม่มี input `customBrand`/`customModel` → ทั้งคู่เป็น `null` → parse ล้ม
+   - เลือก **"กำหนดเอง"** → ไม่มี input `acModelId` → เป็น `null` → parse ล้ม
+
+   **แก้แล้ว** โดยอ่านทุก field ที่เป็น optional ด้วย `?? undefined` (`btu` ไม่โดนเพราะประกาศเป็น `.nullable()` ซึ่งรับ `null` ได้อยู่แล้ว ส่วน `assignToUserId` กับ `notes` ตรวจแล้วปลอดภัยเพราะใช้ `|| undefined` อยู่ก่อนแล้ว)
+
+   ⚠️ **บทเรียนเดียวกับบั๊ก brand dropdown:** build ผ่าน TypeScript ผ่าน แต่พังตอนใช้จริง — เจอเพราะไปกดปุ่มลงทะเบียนจริง **ถ้าเขียน schema ใหม่ที่มี `.optional()` แล้วอ่านค่าจาก `formData.get()` ต้องใส่ `?? undefined` เสมอ**
+
+**ทดสอบด้วยการรันจริงแล้ว:** ลงทะเบียนแอร์ใหม่ผ่านหน้าเว็บสำเร็จ ได้รหัส `B467711-1-19179-03` (รูปแบบใหม่หลัง F1 นับลำดับต่อจากเครื่องเดิมถูกต้อง) และ `installed_at` เป็นวันที่ไทยวันนี้ — ลบข้อมูลทดสอบออกแล้ว
+
+**📌 คำขอถึง Esther03u — เพิ่มช่องวันที่ในฟอร์มลงทะเบียนแอร์**
+
+ไฟล์ `src/components/admin/asset-manager.tsx` ในโมดัล "ลงทะเบียนเครื่องปรับอากาศ" (~บรรทัด 450 ก่อนปุ่ม submit) เพิ่มช่องนี้:
+
+```tsx
+<div>
+  <label className="mb-1.5 block font-bold text-foreground">
+    วันที่ติดตั้ง (ไม่บังคับ)
+  </label>
+  <input
+    name="installedAt"
+    type="date"
+    className="w-full rounded-xl border border-border px-3.5 py-2.5 text-foreground focus:border-primary focus:outline-none"
+  />
+  <p className="mt-1 text-[11px] text-muted-foreground">ไม่กรอก = ใช้วันที่วันนี้</p>
+</div>
+```
+
+**ต้องวางไว้นอกเงื่อนไข `acBrandType === "master" ? ... : ...`** เพื่อให้ขึ้นทั้งสองแบบ (ตอนนี้ช่อง BTU อยู่ในฝั่ง "กำหนดเอง" อย่างเดียว — ถ้าเอาช่องวันที่ไปวางในนั้นด้วย คนที่เลือกรุ่นมาตรฐานจะกรอกวันที่ไม่ได้)
+
+ชื่อ field ต้องเป็น **`installedAt`** เป๊ะๆ เพราะ backend อ่านจาก `formData.get("installedAt")`
 
 ---
 
