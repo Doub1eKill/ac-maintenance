@@ -490,10 +490,35 @@ DoubleKill จะไม่แตะไฟล์เหล่านี้ ถ้�
 
 **ตัดสินใจแล้ว:** ช่องปฏิทินของวันที่มีงานเยอะ ให้แสดงเป็น **รายชื่อตึกพร้อมจำนวนงาน** แทนการเรียงทีละงาน กดชื่อตึก → เปิดดูรายละเอียดงานทั้งหมดของตึกนั้นในวันนั้น (2 ระดับ: วัน → ตึก → รายการงาน)
 
-| | งาน |
-|---|---|
-| **Backend** | `/api/admin/maintenance-schedules/route.ts` ตอนนี้คืน `location` เป็น string รวม (`"ตึก A - ห้อง 301"`) เพิ่ม field แยก `buildingId`/`buildingName` ต่างหาก (แก้แค่ select เพิ่ม ไม่กระทบ query เดิม) |
-| **Frontend** | `maintenance-calendar.tsx` ปรับ day cell: group ข้อมูลตาม `buildingName` ก่อน render เป็น list ชื่อตึก + จำนวนงาน กดแล้วเปิด modal/panel แสดงรายการงานของตึกนั้นในวันนั้น |
+- [x] **Backend เสร็จแล้ว (11 ส.ค. 2026)**
+- [ ] **Frontend รอ Esther03u** — ดูคำขอด้านล่าง
+
+**สิ่งที่ backend ทำแล้ว:** `/api/admin/maintenance-schedules` เพิ่ม 3 field ใหม่ต่อ 1 รายการ
+
+| field ใหม่ | ตัวอย่างค่า | ใช้ทำอะไร |
+|---|---|---|
+| `buildingId` | `"3"` | ใช้เป็น key ตอน group / เป็น id ของกลุ่ม (เป็น string แล้ว ไม่ใช่ BigInt) |
+| `buildingName` | `"Administration Building 293183"` | ชื่อตึกที่แสดงบนหัวกลุ่ม |
+| `roomName` | `"4-568994"` | ชื่อห้อง แยกออกมาเพื่อไม่ต้องแสดงชื่อตึกซ้ำในแต่ละแถวย่อย |
+
+**`location` เดิมยังอยู่เหมือนเดิมทุกประการ** (`"ชื่อตึก - ชื่อห้อง"`) โค้ดที่ใช้อยู่ตอนนี้ไม่ต้องแก้อะไรถ้ายังไม่พร้อมทำ
+
+**📌 คำขอถึง Esther03u — ปรับ `src/components/shared/maintenance-calendar.tsx`**
+
+group รายการของแต่ละวันด้วย `buildingId` ก่อน render เช่น:
+
+```ts
+const byBuilding = jobs.reduce<Record<string, { name: string; jobs: Job[] }>>((acc, job) => {
+  (acc[job.buildingId] ??= { name: job.buildingName, jobs: [] }).jobs.push(job);
+  return acc;
+}, {});
+```
+
+แล้วในช่องวันแสดงเป็น `ชื่อตึก (จำนวนงาน)` กดแล้วเปิด modal/panel แสดงรายการงานของตึกนั้น โดยในโมดัลใช้ `roomName` + `acCode` + `jobType` ได้เลย ไม่ต้องโชว์ชื่อตึกซ้ำ
+
+⚠️ **ข้อมูล seed ปัจจุบันมีมากสุดแค่ 2 งาน/วัน** ทำให้ทดสอบหน้าตาแบบ "วันเดียว 100 งาน" ไม่ได้จากข้อมูลจริง ถ้าจะลองให้เห็นผลชัด แนะนำ mock ข้อมูลฝั่ง client ชั่วคราวตอนพัฒนา หรือบอก DoubleKill ให้เขียน script ยัดข้อมูลทดสอบให้
+
+**หมายเหตุ:** ระหว่างทางเปลี่ยน query จาก `include` เป็น `select` ด้วย (เดิมดึง `room` กับ `building` มาทั้งแถว) — ทดสอบแล้ว response เดิมครบทุก field ปฏิทินแสดงผลเหมือนเดิม และ filter `start`/`end` ของ P12 ยังทำงานถูกต้อง
 
 ---
 
