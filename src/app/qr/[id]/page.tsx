@@ -160,8 +160,12 @@ export default async function QRCodePage(props: { params: Promise<{ id: string }
             sent to sign in. The action itself re-checks the role, so this is
             signposting rather than a gate. */}
         {isTechnician ? (
+          // Carries the unit's code rather than its id: the technician view
+          // already has scanQrCodeAction(acCode), which returns the unit and
+          // any open job, so the receiving side needs no new backend to
+          // pre-fill from this.
           <Link
-            href="/tech"
+            href={`/tech?ac=${encodeURIComponent(ac.acCode)}`}
             className="flex items-center justify-center gap-2 w-full bg-slate-900 text-white rounded-2xl py-3.5 font-bold hover:bg-slate-800 transition-colors shadow-sm"
           >
             <ClipboardPen className="w-4 h-4" />

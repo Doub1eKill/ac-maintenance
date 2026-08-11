@@ -657,6 +657,95 @@ export async function assignWorkOrderAction(workOrderId: string, assignToUserId:
   }
 }
 
+/**
+ * Cancels a work order that shouldn't have been raised — the usual case being
+ * a fault reported against the wrong machine.
+ *
+ * Cancelling also clears the unit's condition, because the two go together:
+ * the status was set to broken by the report being cancelled, so leaving it
+ * behind would keep the unit looking faulty with nothing outstanding to
+ * explain why. It only resets to normal once nothing else is open against the
+ * unit — a second report, or a cleaning due from the schedule, still describes
+ * something real.
+ *
+ * Only pending or claimed orders can be cancelled. A completed one has
+ * maintenance logs hanging off it recording work that genuinely happened, and
+ * cancelling that would misrepresent the unit's history.
+ */
+export async function cancelWorkOrderAction(workOrderId: string, reason?: string) {
+  const session = await verifyOrgAdmin();
+
+  let wId: bigint;
+  try {
+    wId = BigInt(workOrderId);
+  } catch {
+    return { error: "ไม่พบใบงานซ่อมบำรุง" };
+  }
+
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      const workOrder = await tx.workOrder.findUnique({
+        where: { id: wId },
+        select: { id: true, status: true, airConditionerId: true },
+      });
+
+      if (!workOrder) return { error: "ไม่พบใบงานซ่อมบำรุง" };
+      if (workOrder.status === "cancelled") return { error: "ใบงานนี้ถูกยกเลิกไปแล้ว" };
+      if (workOrder.status === "completed") {
+        return { error: "ไม่สามารถยกเลิกใบงานที่ปิดงานแล้วได้ เพราะมีประวัติการปฏิบัติงานผูกอยู่" };
+      }
+
+      await tx.workOrder.update({
+        where: { id: wId },
+        data: { status: "cancelled", resolutionNotes: reason?.trim() || null },
+      });
+
+      const stillOpen = await tx.workOrder.count({
+        where: {
+          airConditionerId: workOrder.airConditionerId,
+          status: { in: ["pending", "claimed"] },
+        },
+      });
+
+      if (stillOpen === 0) {
+        await tx.airConditioner.update({
+          where: { id: workOrder.airConditionerId },
+          data: { status: "normal" },
+        });
+      }
+
+      return {
+        airConditionerId: workOrder.airConditionerId,
+        previousStatus: workOrder.status,
+        statusReset: stillOpen === 0,
+      };
+    });
+
+    if ("error" in result) return result;
+
+    await logAudit({
+      userId: BigInt(session.user.id!),
+      action: "CANCEL_WORKORDER",
+      entityType: "workOrder",
+      entityId: wId,
+      oldValues: { status: result.previousStatus },
+      newValues: {
+        status: "cancelled",
+        reason: reason?.trim() || null,
+        airConditionerResetToNormal: result.statusReset,
+      },
+      ipAddress: "server_action",
+    });
+
+    revalidatePath("/admin");
+    revalidatePath("/tech");
+    return { success: true, statusReset: result.statusReset };
+  } catch (error) {
+    console.error("Failed to cancel work order:", error);
+    return { error: "ไม่สามารถยกเลิกใบงานได้ กรุณาลองใหม่อีกครั้ง" };
+  }
+}
+
 const buildingSchema = z.object({
   name: z.string().min(1, "กรุณาระบุชื่ออาคาร"),
   abbreviation: z.string().min(1, "กรุณาระบุตัวย่ออาคาร"),

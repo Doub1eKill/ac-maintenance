@@ -281,7 +281,10 @@ export async function bulkClaimWorkOrdersAction(workOrderIds: string[]) {
 }
 
 const logActionSchema = z.object({
-  workOrderId: z.string().min(1),
+  // Optional: a technician who walks up to a unit and fixes it on the spot has
+  // no work order to close. One is created for them (see below) so the visit
+  // is still attached to a job rather than floating loose.
+  workOrderId: z.string().optional(),
   airConditionerId: z.string().min(1),
   actions: z.string().min(1), // JSON stringified array of actions
   notes: z.string().optional(),
@@ -294,7 +297,7 @@ export async function logMaintenanceAction(formData: FormData) {
   const techId = BigInt(session.user.id!);
 
   const raw = {
-    workOrderId: formData.get("workOrderId"),
+    workOrderId: formData.get("workOrderId") || undefined,
     airConditionerId: formData.get("airConditionerId"),
     actions: formData.get("actions"),
     notes: formData.get("notes") || undefined,
@@ -310,7 +313,6 @@ export async function logMaintenanceAction(formData: FormData) {
   const { workOrderId, airConditionerId, actions, notes, repairDetail, acStatus } = parsed.data;
 
   try {
-    const wId = BigInt(workOrderId);
     const acId = BigInt(airConditionerId);
 
     // Parse actions JSON
@@ -337,25 +339,50 @@ export async function logMaintenanceAction(formData: FormData) {
     const beforePhotoUrl = await saveUpload(beforePhotoFile);
     const afterPhotoUrl = await saveUpload(afterPhotoFile);
 
-    // 1. Create Multiple Maintenance Logs (one for each action checked)
     const performedAt = new Date();
-    const logsData = actionsArray.map(action => ({
-      airConditionerId: acId,
-      workOrderId: wId,
-      userId: techId,
-      action: action as MaintenanceAction,
-      notes,
-      // Only the repair row carries it; a cleaning row in the same visit has
-      // nothing to say about what was fixed.
-      repairDetail: action === "repair" ? repairDetail : null,
-      beforePhotoUrl,
-      afterPhotoUrl,
-      performedAt,
-    }));
 
-    await prisma.$transaction(async (tx) => {
+    const { workOrderId: closedWorkOrderId, wasAutoCreated } = await prisma.$transaction(async (tx) => {
+      // 0. Walk-up work: no job was raised in advance, so one is opened and
+      //    closed in the same breath. Every log row points at a work order,
+      //    and the admin board shows the visit rather than silently missing
+      //    it. Created inside the transaction so a later failure can't leave
+      //    a completed job with nothing recorded against it.
+      let wId: bigint;
+      if (workOrderId) {
+        wId = BigInt(workOrderId);
+      } else {
+        const created = await tx.workOrder.create({
+          data: {
+            airConditionerId: acId,
+            status: "completed",
+            priority: "low",
+            issueDescription: "ช่างเข้าปฏิบัติงานหน้างานโดยไม่มีใบงานล่วงหน้า (ระบบสร้างอัตโนมัติ)",
+            reportedById: techId,
+            claimedBy: techId,
+            claimedAt: performedAt,
+            completedAt: performedAt,
+          },
+          select: { id: true },
+        });
+        wId = created.id;
+      }
+
       // 1. Create Multiple Maintenance Logs (one for each action checked)
-      await tx.maintenanceLog.createMany({ data: logsData });
+      await tx.maintenanceLog.createMany({
+        data: actionsArray.map((action) => ({
+          airConditionerId: acId,
+          workOrderId: wId,
+          userId: techId,
+          action: action as MaintenanceAction,
+          notes,
+          // Only the repair row carries it; a cleaning row in the same visit
+          // has nothing to say about what was fixed.
+          repairDetail: action === "repair" ? repairDetail : null,
+          beforePhotoUrl,
+          afterPhotoUrl,
+          performedAt,
+        })),
+      });
 
       // 2. Mark Work Order as completed
       await tx.workOrder.update({
@@ -393,14 +420,23 @@ export async function logMaintenanceAction(formData: FormData) {
           data: { lastPerformedAt: performedOn, nextDueDate },
         });
       }
+
+      return { workOrderId: wId, wasAutoCreated: !workOrderId };
     });
 
     await logAudit({
       userId: techId,
       action: "COMPLETE_WORKORDER",
       entityType: "workOrder",
-      entityId: wId,
-      newValues: { status: "completed", actions: actionsArray, acStatus },
+      entityId: closedWorkOrderId,
+      newValues: {
+        status: "completed",
+        actions: actionsArray,
+        acStatus,
+        // Distinguishes a job the technician was assigned from one the system
+        // opened for them on the spot, which is otherwise invisible later.
+        autoCreatedWorkOrder: wasAutoCreated,
+      },
       ipAddress: "server_action",
     });
 
