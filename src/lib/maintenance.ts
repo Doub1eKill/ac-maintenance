@@ -164,8 +164,10 @@ export interface MaintenanceHistoryEntry {
   id: string;
   action: MaintenanceAction;
   performedAt: string;
+  technicianId: string;
   technicianName: string;
   notes: string | null;
+  repairDetail: string | null;
   beforePhotoUrl: string | null;
   afterPhotoUrl: string | null;
 }
@@ -188,8 +190,10 @@ export async function getMaintenanceHistory(
       action: true,
       performedAt: true,
       notes: true,
+      repairDetail: true,
       beforePhotoUrl: true,
       afterPhotoUrl: true,
+      userId: true,
       technician: { select: { name: true } },
     },
   });
@@ -198,8 +202,12 @@ export async function getMaintenanceHistory(
     id: log.id.toString(),
     action: log.action,
     performedAt: log.performedAt.toISOString(),
+    // Exposed so a technician viewing history can tell which entries are
+    // theirs to correct without the client guessing from the name.
+    technicianId: log.userId.toString(),
     technicianName: log.technician.name,
     notes: log.notes,
+    repairDetail: log.repairDetail,
     beforePhotoUrl: log.beforePhotoUrl,
     afterPhotoUrl: log.afterPhotoUrl,
   }));

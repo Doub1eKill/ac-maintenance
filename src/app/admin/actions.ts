@@ -852,6 +852,124 @@ export async function createAirConditionerAction(formData: FormData) {
   }
 }
 
+const updateAcSchema = z.object({
+  airConditionerId: z.string().min(1, "ไม่พบเครื่องปรับอากาศ"),
+  brandType: z.enum(["master", "other"]),
+  acModelId: z.string().optional(),
+  customBrand: z.string().optional(),
+  customModel: z.string().optional(),
+  btu: z.string().transform((val) => (val ? parseInt(val, 10) : null)).nullable(),
+  status: z.enum(["normal", "broken", "needs_cleaning"]),
+  installedAt: z
+    .string()
+    .trim()
+    .refine((v) => v === "" || businessDateFrom(v) !== null, "วันที่ติดตั้งไม่ถูกต้อง")
+    .optional(),
+});
+
+/**
+ * Corrects a unit's own record: what it is, when it was installed, and what
+ * condition it is in.
+ *
+ * Deliberately cannot move a unit to another room. acCode is derived from the
+ * building and room at registration and is printed on the QR sticker, so a
+ * move would either invalidate the label or leave the code describing a place
+ * the unit no longer is — and the schema's comment on WorkOrder relies on
+ * roomId never changing.
+ *
+ * Status is editable here because the usual reason to touch it is a mistake:
+ * a unit marked broken by a report against the wrong machine has no other way
+ * back to normal. Note this only rewrites the unit's condition — an open work
+ * order raised for it stays open, since cancelling someone's job is a
+ * different decision from correcting a status.
+ */
+export async function updateAirConditionerAction(formData: FormData) {
+  const session = await verifyOrgAdmin();
+
+  const parsed = updateAcSchema.safeParse({
+    airConditionerId: formData.get("airConditionerId"),
+    brandType: formData.get("brandType"),
+    acModelId: formData.get("acModelId") ?? undefined,
+    customBrand: formData.get("customBrand") ?? undefined,
+    customModel: formData.get("customModel") ?? undefined,
+    btu: formData.get("btu"),
+    status: formData.get("status"),
+    installedAt: formData.get("installedAt") ?? undefined,
+  });
+
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message || "ข้อมูลไม่ถูกต้อง" };
+  const data = parsed.data;
+
+  if (data.brandType === "master" && !data.acModelId) {
+    return { error: "กรุณาเลือกรุ่นแอร์" };
+  }
+  if (data.brandType === "other" && !data.customBrand) {
+    return { error: "กรุณาระบุยี่ห้อแอร์" };
+  }
+
+  try {
+    const acId = BigInt(data.airConditionerId);
+    const existing = await prisma.airConditioner.findUnique({
+      where: { id: acId },
+      select: { id: true, status: true, btu: true, installedAt: true },
+    });
+
+    if (!existing) return { error: "ไม่พบเครื่องปรับอากาศ" };
+
+    // The two brand paths are mutually exclusive: switching to a catalogue
+    // model must clear the typed-in text, and switching away must clear the
+    // foreign keys, or the unit would keep answering to whichever the display
+    // code happens to prefer.
+    const brandFields =
+      data.brandType === "master"
+        ? await (async () => {
+            const model = await prisma.acModel.findUnique({
+              where: { id: BigInt(data.acModelId!) },
+              select: { id: true, brandId: true },
+            });
+            if (!model) return null;
+            return { acBrandId: model.brandId, acModelId: model.id, brand: null, model: null };
+          })()
+        : { acBrandId: null, acModelId: null, brand: data.customBrand, model: data.customModel ?? null };
+
+    if (!brandFields) return { error: "ไม่พบรุ่นแอร์ที่เลือก" };
+
+    await prisma.airConditioner.update({
+      where: { id: acId },
+      data: {
+        ...brandFields,
+        btu: data.btu,
+        status: data.status,
+        installedAt: data.installedAt ? businessDateFrom(data.installedAt) : null,
+      },
+    });
+
+    await logAudit({
+      userId: BigInt(session.user.id!),
+      action: "UPDATE_AIRCONDITIONER",
+      entityType: "airConditioner",
+      entityId: acId,
+      oldValues: {
+        status: existing.status,
+        btu: existing.btu,
+        installedAt: existing.installedAt?.toISOString() ?? null,
+      },
+      newValues: {
+        status: data.status,
+        btu: data.btu,
+        installedAt: data.installedAt || null,
+      },
+      ipAddress: "server_action",
+    });
+
+    revalidatePath("/admin");
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to update air conditioner:", error);
+    return { error: "ไม่สามารถบันทึกข้อมูลเครื่องปรับอากาศได้" };
+  }
+}
+
 /**
  * One unit's full service record, for the "ดูประวัติ" view in the asset
  * manager. Returns the unit's identifying details alongside the log so the
@@ -912,6 +1030,104 @@ export async function getAirConditionerHistory(airConditionerId: string) {
   } catch (error) {
     console.error("Failed to load air conditioner history:", error);
     return { error: "ไม่สามารถโหลดประวัติการซ่อมบำรุงได้" };
+  }
+}
+
+const updateLogSchema = z.object({
+  logId: z.string().min(1),
+  action: z.enum(["cleaning", "repair", "refill_refrigerant"]),
+  notes: z.string().trim().optional(),
+  repairDetail: z.string().trim().optional(),
+});
+
+/**
+ * Corrects a maintenance log a technician got wrong — the job type they
+ * ticked, the note they wrote, or what they said was repaired.
+ *
+ * A technician may only correct their own entries; an org admin may correct
+ * any. The ownership check reads userId from the row itself rather than
+ * trusting anything the client sends, so a technician cannot edit a
+ * colleague's work by passing someone else's log id.
+ *
+ * What it will not touch: performedAt, the photos, and which unit the log
+ * belongs to. Those are the parts that make the entry evidence of a
+ * particular visit — a wrong one should be raised with an admin, not quietly
+ * rewritten. Every change is written to the audit log with its previous
+ * values, since this edits history rather than current state.
+ */
+export async function updateMaintenanceLogAction(
+  logId: string,
+  action: "cleaning" | "repair" | "refill_refrigerant",
+  notes?: string,
+  repairDetail?: string
+) {
+  const session = await auth();
+  if (!session?.user?.id || session.user.status !== "active") {
+    throw new Error("Unauthorized: sign-in required");
+  }
+
+  const parsed = updateLogSchema.safeParse({ logId, action, notes, repairDetail });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message || "ข้อมูลไม่ถูกต้อง" };
+  }
+  const data = parsed.data;
+
+  if (data.action === "repair" && !data.repairDetail) {
+    return { error: "กรุณาระบุรายละเอียดการซ่อม" };
+  }
+
+  let id: bigint;
+  try {
+    id = BigInt(data.logId);
+  } catch {
+    return { error: "ไม่พบรายการประวัติ" };
+  }
+
+  try {
+    const log = await prisma.maintenanceLog.findUnique({
+      where: { id },
+      select: { id: true, userId: true, action: true, notes: true, repairDetail: true },
+    });
+
+    if (!log) return { error: "ไม่พบรายการประวัติ" };
+
+    const isOwner = log.userId.toString() === session.user.id;
+    const isAdmin = session.user.role === "org_admin";
+    if (!isOwner && !isAdmin) {
+      return { error: "แก้ไขได้เฉพาะประวัติที่คุณเป็นผู้บันทึกเท่านั้น" };
+    }
+
+    await prisma.maintenanceLog.update({
+      where: { id },
+      data: {
+        action: data.action,
+        notes: data.notes || null,
+        // Cleared when the entry is no longer a repair, so a corrected job
+        // type can't leave repair text stranded on a cleaning record.
+        repairDetail: data.action === "repair" ? data.repairDetail : null,
+      },
+    });
+
+    await logAudit({
+      userId: BigInt(session.user.id),
+      action: "UPDATE_MAINTENANCE_LOG",
+      entityType: "maintenanceLog",
+      entityId: id,
+      oldValues: { action: log.action, notes: log.notes, repairDetail: log.repairDetail },
+      newValues: {
+        action: data.action,
+        notes: data.notes || null,
+        repairDetail: data.action === "repair" ? data.repairDetail : null,
+      },
+      ipAddress: "server_action",
+    });
+
+    revalidatePath("/admin");
+    revalidatePath("/tech");
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to update maintenance log:", error);
+    return { error: "ไม่สามารถแก้ไขประวัติได้" };
   }
 }
 

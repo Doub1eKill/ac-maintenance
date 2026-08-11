@@ -173,6 +173,12 @@ model MaintenanceLog {
   userId           BigInt            @map("user_id") @db.UnsignedBigInt // the technician who performed the work
   action           MaintenanceAction
   notes            String?           @db.Text
+  // What was actually repaired. Kept apart from `notes` (which is a free
+  // remark about the visit as a whole) so repair work can be searched and
+  // reported on without parsing prose. Only ever set on rows whose action is
+  // `repair` — a visit that also cleaned the unit writes a separate row, and
+  // that row has nothing to say here.
+  repairDetail     String?           @map("repair_detail") @db.Text
   beforePhotoUrl       String?       @map("before_photo_url") @db.VarChar(255)
   afterPhotoUrl        String?       @map("after_photo_url") @db.VarChar(255)
   customerSignatureUrl String?       @map("customer_signature_url") @db.VarChar(255)

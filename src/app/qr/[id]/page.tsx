@@ -174,7 +174,7 @@ export default async function QRCodePage(props: { params: Promise<{ id: string }
               หากคุณเป็นช่างซ่อมบำรุงและต้องการบันทึกผลการปฏิบัติงานของเครื่องนี้ กรุณาเข้าสู่ระบบก่อน
             </p>
             <Link
-              href="/login"
+              href={`/login?callbackUrl=${encodeURIComponent(`/qr/${params.id}`)}`}
               className="inline-flex items-center justify-center gap-2 w-full bg-slate-900 text-white rounded-xl py-2.5 font-bold hover:bg-slate-800 transition-colors"
             >
               <LogIn className="w-4 h-4" />

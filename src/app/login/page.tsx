@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { AuthLayout } from "@/components/auth/auth-layout";
 import { LoginForm } from "@/components/login-form";
 
@@ -12,7 +13,13 @@ export default function LoginPage() {
       title="ยินดีต้อนรับเข้าสู่ระบบ"
       subtitle="กรุณากรอกอีเมลและรหัสผ่านเพื่อเข้าสู่บัญชีใช้งานของคุณ"
     >
-      <LoginForm />
+      {/* LoginForm reads ?callbackUrl through useSearchParams, which can only
+          be resolved per request. Without this boundary the whole page opts
+          out of static prerendering and the build fails outright; with it,
+          only the form waits for the request while the shell stays static. */}
+      <Suspense fallback={<div className="h-[420px]" aria-busy="true" />}>
+        <LoginForm />
+      </Suspense>
     </AuthLayout>
   );
 }

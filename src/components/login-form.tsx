@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff, AlertTriangle, Building2, Wrench, ArrowRight } from "lucide-react";
 import { AnimatedIcon } from "@/components/ui/animated-icon";
@@ -18,8 +18,24 @@ const ERROR_MESSAGES: Record<string, string> = {
   CredentialsSignin: "อีเมลหรือรหัสผ่านไม่ถูกต้อง กรุณาตรวจสอบและลองใหม่อีกครั้ง",
 };
 
+/**
+ * Only same-origin paths are honoured as a return destination. Taking the
+ * value straight from the query string would let a link like
+ * /login?callbackUrl=https://elsewhere.example send someone off-site the
+ * moment they signed in, with the credibility of having just authenticated.
+ * A leading "//" is rejected too — the browser reads it as a protocol-relative
+ * URL, so "//evil.example" is off-site despite looking like a path.
+ */
+function safeCallbackUrl(raw: string | null): string | null {
+  if (!raw) return null;
+  if (!raw.startsWith("/") || raw.startsWith("//")) return null;
+  return raw;
+}
+
 export function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackUrl = safeCallbackUrl(searchParams.get("callbackUrl"));
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -58,7 +74,9 @@ export function LoginForm() {
       return;
     }
 
-    router.push("/");
+    // Back to wherever they were sent from — the QR page a technician scanned,
+    // say. Without one, "/" routes them to their own dashboard by role.
+    router.push(callbackUrl ?? "/");
     router.refresh();
   }
 

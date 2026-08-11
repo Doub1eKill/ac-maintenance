@@ -285,6 +285,7 @@ const logActionSchema = z.object({
   airConditionerId: z.string().min(1),
   actions: z.string().min(1), // JSON stringified array of actions
   notes: z.string().optional(),
+  repairDetail: z.string().trim().optional(),
   acStatus: z.enum(["normal", "broken", "needs_cleaning"]),
 });
 
@@ -297,6 +298,7 @@ export async function logMaintenanceAction(formData: FormData) {
     airConditionerId: formData.get("airConditionerId"),
     actions: formData.get("actions"),
     notes: formData.get("notes") || undefined,
+    repairDetail: formData.get("repairDetail") || undefined,
     acStatus: formData.get("acStatus") || "normal",
   };
 
@@ -305,7 +307,7 @@ export async function logMaintenanceAction(formData: FormData) {
     return { error: parsed.error.issues[0]?.message || "ข้อมูลไม่ถูกต้อง" };
   }
 
-  const { workOrderId, airConditionerId, actions, notes, acStatus } = parsed.data;
+  const { workOrderId, airConditionerId, actions, notes, repairDetail, acStatus } = parsed.data;
 
   try {
     const wId = BigInt(workOrderId);
@@ -320,6 +322,12 @@ export async function logMaintenanceAction(formData: FormData) {
       }
     } catch (e) {
       return { error: "รูปแบบประเภทงานไม่ถูกต้อง" };
+    }
+
+    // A repair has to say what was repaired — the whole point of recording it
+    // is so the next technician can see what was already done to this unit.
+    if (actionsArray.includes("repair") && !repairDetail) {
+      return { error: "กรุณาระบุรายละเอียดการซ่อม" };
     }
 
     // Process File Uploads
@@ -337,6 +345,9 @@ export async function logMaintenanceAction(formData: FormData) {
       userId: techId,
       action: action as MaintenanceAction,
       notes,
+      // Only the repair row carries it; a cleaning row in the same visit has
+      // nothing to say about what was fixed.
+      repairDetail: action === "repair" ? repairDetail : null,
       beforePhotoUrl,
       afterPhotoUrl,
       performedAt,
