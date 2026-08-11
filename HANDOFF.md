@@ -37,6 +37,25 @@
 
 ---
 
+## 🧹 ถึง Esther03u — ไฟล์ UI ที่ไม่มีใครเรียกใช้ ลบได้ไหม? (11 สิงหาคม 2026)
+
+ตรวจทั้งโปรเจกต์แล้วพบไฟล์เหล่านี้ **ไม่มีไฟล์ไหนในระบบ import เลยสักที่** DoubleKill ไม่ลบเองเพราะทั้งหมดอยู่ในเลนของคุณ — ช่วยยืนยันทีละข้อว่าจะลบหรือเก็บไว้ แล้วเขียนตอบไว้ในไฟล์นี้ได้เลย
+
+| ไฟล์ | คืออะไร | หมายเหตุ |
+|---|---|---|
+| `src/components/layout/nav-header.tsx` | Header แถบบนแบบเก่า | **น่าจะลบได้แน่นอนที่สุด** — ถูกแทนที่ด้วย `dashboard-layout.tsx` ที่มี `<header>` + `SidebarHeader` ในตัวแล้ว ทุกหน้าใช้ตัวใหม่หมด |
+| `src/components/examples/c-pagination-3.tsx` | ตัวอย่าง pagination จาก ReUI registry | **ระวัง** — น่าจะเก็บไว้เป็นต้นแบบทำ **P14** (ปุ่มเปลี่ยนหน้ากระดานใบงาน) ที่ยังค้างอยู่ ถ้าจะใช้อย่าลบ |
+| `src/components/ui/label.tsx` | shadcn primitive | เพิ่มกลับได้ด้วย `npx shadcn add label` |
+| `src/components/ui/toggle.tsx` | shadcn primitive | เพิ่มกลับได้ด้วย `npx shadcn add toggle` |
+| `src/components/ui/option-wheel.tsx` + `option-wheel.css` | ตัวเลือกแบบวงล้อ | ไม่ใช่ของมาตรฐาน ถ้าลบแล้วอยากได้คืนต้องเขียนใหม่ (ดึงจาก git ได้) |
+| `src/components/ui/thai-alert-dialogs.tsx` | กล่องยืนยันภาษาไทย (`ConfirmDeleteDialog` ฯลฯ) | เขียนเองในโปรเจกต์ ไม่ใช่ของ registry — ถ้าลบแล้วอยากได้คืนต้องดึงจาก git |
+
+**ไม่ได้อยู่ในรายการนี้เพราะยังใช้อยู่จริง (เช็คแล้ว):** `examples/c-file-upload-4.tsx` (หน้าช่างใช้ และมันดึง `hooks/use-file-upload.ts` + `components/reui/alert.tsx` ต่อ — ทั้งสายต้องเก็บไว้)
+
+**`ui/sonner.tsx` (Toaster) ก็ไม่มีใครใช้เหมือนกัน แต่เจ้าของโปรเจกต์ตัดสินใจเก็บไว้แล้ว** พร้อม package `sonner` และ `next-themes` เพราะ `next-themes` คือไลบรารีสลับธีมมืด/สว่างที่ **F5 ต้องใช้**
+
+---
+
 ## 🗄️ Database Sync — สำคัญมาก อ่านก่อน pull/push ทุกครั้ง
 
 โปรเจกต์นี้ใช้ MySQL local (XAMPP) แยกเครื่องกัน — **โค้ดที่ push ขึ้น Git ไม่ได้ทำให้ฐานข้อมูลของอีกฝั่งตรงกันอัตโนมัติ** ต้องใช้ Prisma Migration เป็นตัวกลางเสมอ
