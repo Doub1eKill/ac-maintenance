@@ -6,12 +6,12 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 
 export const metadata = {
-  title: "จัดการข้อมูลพื้นฐาน | Super Admin",
+  title: "จัดการข้อมูลพื้นฐาน | AC Maintenance System",
 };
 
 export default async function MasterDataPage() {
   const session = await auth();
-  if (!session?.user || session.user.role !== "super_admin") {
+  if (!session?.user || session.user.role !== "org_admin") {
     redirect("/login");
   }
 

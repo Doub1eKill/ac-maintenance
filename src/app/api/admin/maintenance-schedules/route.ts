@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
   try {
     const session = await auth();
     const allowedRoles = ["org_admin", "technician"];
-    if (!session || !allowedRoles.includes(session.user.role) || !session.user.universityId) {
+    if (!session || !allowedRoles.includes(session.user.role)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -38,13 +38,6 @@ export async function GET(request: NextRequest) {
       where: {
         isActive: true,
         ...dueDateFilter,
-        airConditioner: {
-          room: {
-            building: {
-              universityId: session.user.universityId
-            }
-          }
-        }
       },
       include: {
         airConditioner: {

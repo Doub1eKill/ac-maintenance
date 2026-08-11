@@ -22,8 +22,8 @@ export const authConfig = {
     // Lives here (not only in auth.ts) because proxy.ts builds its own
     // NextAuth(authConfig) instance to read the session cheaply. If these
     // two callbacks were missing from that instance, proxy would only see
-    // NextAuth's default session shape (id/name/email/image) — role/status/
-    // universityId would be undefined, and every role check below would
+    // NextAuth's default session shape (id/name/email/image) — role and
+    // status would be undefined, and every role check below would
     // silently fail closed, redirecting even a correctly logged-in user.
     // `user` is only defined on initial sign-in — this stamps the
     // Prisma-sourced values onto the token once, so no DB call is needed
@@ -32,7 +32,6 @@ export const authConfig = {
       if (user) {
         token.role = user.role;
         token.status = user.status;
-        token.universityId = user.universityId;
       }
       return token;
     },
@@ -40,7 +39,6 @@ export const authConfig = {
       session.user.id = token.sub as string;
       session.user.role = token.role as any;
       session.user.status = token.status as any;
-      session.user.universityId = token.universityId as any;
       return session;
     },
     authorized({ auth, request }) {
@@ -49,10 +47,9 @@ export const authConfig = {
 
       const isAdminRoute = pathname.startsWith("/admin");
       const isTechRoute = pathname.startsWith("/tech");
-      const isSuperAdminRoute = pathname.startsWith("/super-admin") || pathname.startsWith("/api/super-admin");
 
       if (!isLoggedIn) {
-        return isAdminRoute || isTechRoute || isSuperAdminRoute ? false : true;
+        return isAdminRoute || isTechRoute ? false : true;
       }
 
       // Suspended/pending accounts never had a chance to reach this
@@ -64,14 +61,7 @@ export const authConfig = {
         return false;
       }
 
-      // Mirrors the old Laravel route groups: /admin/* = org_admin only,
-      // /tech/* = technician only. super_admin deliberately has no
-      // equivalent CRUD area here either (see the original Laravel
-      // decision: super_admin has no university_id to scope admin
-      // resources by).
-      if (isSuperAdminRoute) {
-        return auth.user.role === "super_admin";
-      }
+      // /admin/* = org_admin only, /tech/* = technician only.
       if (isAdminRoute) {
         return auth.user.role === "org_admin";
       }

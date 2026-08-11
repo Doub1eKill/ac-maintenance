@@ -29,7 +29,7 @@ export default async function QRCodePage(props: { params: Promise<{ id: string }
     where: { qrCode: params.id },
     include: {
       room: {
-        include: { building: { include: { university: true } } }
+        include: { building: true }
       },
       acBrand: true,
       acModel: true,

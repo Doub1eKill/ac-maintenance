@@ -950,7 +950,7 @@ export function AdminDashboardView({
                       {u.status === "active" ? (
                         <button
                           onClick={() => handleUserStatus(u.id, "suspended")}
-                          disabled={isPending || u.role === "super_admin"}
+                          disabled={isPending}
                           className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-700 hover:bg-red-100 transition-colors disabled:opacity-40"
                         >
                           ระงับสิทธิ์
@@ -958,7 +958,7 @@ export function AdminDashboardView({
                       ) : (
                         <button
                           onClick={() => handleUserStatus(u.id, "active")}
-                          disabled={isPending || u.role === "super_admin"}
+                          disabled={isPending}
                           className="rounded-lg border border-success/30 bg-success/10 px-2.5 py-1 text-[11px] font-bold text-success-foreground hover:bg-success/20 transition-colors disabled:opacity-40"
                         >
                           เปิดใช้งาน

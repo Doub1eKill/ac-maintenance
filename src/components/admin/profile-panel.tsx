@@ -15,7 +15,6 @@ interface ProfilePanelProps {
 }
 
 const ROLE_LABEL: Record<string, string> = {
-  super_admin: "ผู้ดูแลระบบสูงสุด",
   org_admin: "ผู้บริหารองค์กร",
   technician: "ช่างซ่อมบำรุง",
 };

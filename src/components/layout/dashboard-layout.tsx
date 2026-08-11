@@ -90,12 +90,7 @@ export function DashboardLayout({
   searchValue = "",
   children,
 }: DashboardLayoutProps) {
-  const roleLabel =
-    user.role === "super_admin"
-      ? "ผู้ดูแลระบบสูงสุด"
-      : user.role === "org_admin"
-      ? "ผู้บริหารองค์กร"
-      : "ช่างซ่อมบำรุง";
+  const roleLabel = user.role === "org_admin" ? "ผู้บริหารองค์กร" : "ช่างซ่อมบำรุง";
 
   const currentNav = navItems.find((item) => item.id === activeTab) || navItems[0];
 

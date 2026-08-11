@@ -5,7 +5,7 @@
 // It intentionally does NOT re-check the database — per Next.js's own
 // guidance, Proxy runs separately from the rest of the app and Server
 // Functions can bypass it entirely, so every Server Action/Route Handler
-// that mutates data re-validates auth/role/tenant on its own regardless of
+// that mutates data re-validates auth and role on its own regardless of
 // this file's outcome.
 import NextAuth from "next-auth";
 import { authConfig } from "@/lib/auth.config";
@@ -13,5 +13,5 @@ import { authConfig } from "@/lib/auth.config";
 export default NextAuth(authConfig).auth;
 
 export const config = {
-  matcher: ["/admin/:path*", "/tech/:path*", "/super-admin/:path*", "/api/super-admin/:path*"],
+  matcher: ["/admin/:path*", "/tech/:path*"],
 };

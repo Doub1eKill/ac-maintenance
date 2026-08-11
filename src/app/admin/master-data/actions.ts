@@ -5,16 +5,19 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 
-async function verifySuperAdmin() {
+// The AC brand/model catalogue used to live under /super-admin. That role is
+// gone, and with a single organisation there is no tenant boundary to keep it
+// away from — so it moved here and answers to the org admin instead.
+async function verifyOrgAdmin() {
   const session = await auth();
-  if (!session?.user || session.user.role !== "super_admin") {
-    throw new Error("Unauthorized: Super Admin access required");
+  if (!session?.user || session.user.role !== "org_admin") {
+    throw new Error("Unauthorized: Org Admin access required");
   }
   return session;
 }
 
 export async function getAcMasterData() {
-  await verifySuperAdmin();
+  await verifyOrgAdmin();
   
   try {
     const brands = await prisma.acBrand.findMany({
@@ -53,7 +56,7 @@ const brandSchema = z.object({
 });
 
 export async function createAcBrandAction(formData: FormData) {
-  await verifySuperAdmin();
+  await verifyOrgAdmin();
   
   const parsed = brandSchema.safeParse({ name: formData.get("name") });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message };
@@ -65,7 +68,7 @@ export async function createAcBrandAction(formData: FormData) {
     if (existing) return { error: "มียี่ห้อนี้อยู่ในระบบแล้ว" };
     
     await prisma.acBrand.create({ data: { name: parsed.data.name } });
-    revalidatePath("/super-admin/master-data");
+    revalidatePath("/admin/master-data");
     return { success: true };
   } catch (error) {
     console.error(error);
@@ -80,7 +83,7 @@ const modelSchema = z.object({
 });
 
 export async function createAcModelAction(formData: FormData) {
-  await verifySuperAdmin();
+  await verifyOrgAdmin();
   
   const parsed = modelSchema.safeParse({
     brandId: formData.get("brandId"),
@@ -113,7 +116,7 @@ export async function createAcModelAction(formData: FormData) {
       }
     });
     
-    revalidatePath("/super-admin/master-data");
+    revalidatePath("/admin/master-data");
     return { success: true };
   } catch (error) {
     console.error(error);

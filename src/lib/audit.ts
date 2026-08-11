@@ -1,7 +1,6 @@
 import { prisma } from "./prisma";
 
 interface AuditLogParams {
-  universityId: bigint;
   userId: bigint;
   action: string;
   entityType: string;
@@ -16,7 +15,6 @@ interface AuditLogParams {
 export async function logAudit(params: AuditLogParams) {
   return await prisma.systemAuditLog.create({
     data: {
-      universityId: params.universityId,
       userId: params.userId,
       action: params.action,
       entityType: params.entityType,
@@ -35,7 +33,6 @@ export async function logAuditMany(entries: AuditLogParams[]) {
 
   return await prisma.systemAuditLog.createMany({
     data: entries.map((params) => ({
-      universityId: params.universityId,
       userId: params.userId,
       action: params.action,
       entityType: params.entityType,

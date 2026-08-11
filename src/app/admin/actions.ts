@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { syncOverdueMaintenanceWorkOrders } from "@/lib/maintenance";
+import { ORGANISATION_NAME } from "@/lib/organisation";
 import { format, subDays } from "date-fns";
 
 // How many work orders the board loads at once. Not exported directly (a
@@ -16,7 +17,7 @@ const WORK_ORDER_PAGE_SIZE = 50;
 
 async function verifyOrgAdmin() {
   const session = await auth();
-  if (!session?.user || session.user.role !== "org_admin" || !session.user.universityId) {
+  if (!session?.user || session.user.role !== "org_admin") {
     throw new Error("Unauthorized: Org Admin access required");
   }
   return session;
@@ -24,13 +25,11 @@ async function verifyOrgAdmin() {
 
 export async function getOrgAdminData() {
   const session = await verifyOrgAdmin();
-  const universityId = BigInt(session.user.universityId!);
 
   try {
-    await syncOverdueMaintenanceWorkOrders(universityId);
+    await syncOverdueMaintenanceWorkOrders();
 
     const [
-      university,
       buildings,
       workOrdersRaw,
       techsRaw,
@@ -41,16 +40,11 @@ export async function getOrgAdminData() {
       pendingWorkOrders,
       currentUser,
     ] = await Promise.all([
-      prisma.university.findUnique({
-        where: { id: universityId },
-        select: { name: true },
-      }),
-      // This is the widest query on the page — every building, room and unit
-      // in the tenant. `include` pulled full rows plus full acBrand, acModel
-      // and maintenanceSchedules records; the shaping below uses a handful of
+      // This is the widest query on the page — every building, room and unit.
+      // `include` pulled full rows plus full acBrand, acModel and
+      // maintenanceSchedules records; the shaping below uses a handful of
       // columns, so select exactly those.
       prisma.building.findMany({
-        where: { universityId },
         select: {
           id: true,
           name: true,
@@ -89,7 +83,6 @@ export async function getOrgAdminData() {
         orderBy: { name: "asc" },
       }),
       prisma.workOrder.findMany({
-        where: { universityId },
         select: {
           id: true,
           status: true,
@@ -129,14 +122,13 @@ export async function getOrgAdminData() {
         take: WORK_ORDER_PAGE_SIZE,
       }),
       prisma.user.findMany({
-        where: { universityId, role: "technician", status: "active" },
+        where: { role: "technician", status: "active" },
         select: { id: true, name: true, email: true },
       }),
-      // One query for every user in the tenant; the pending-approval list is
-      // just a filter over this (it used to be a second, redundant query).
-      // Explicit select so the password hash never leaves the database.
+      // One query for every user; the pending-approval list is just a filter
+      // over this (it used to be a second, redundant query). Explicit select
+      // so the password hash never leaves the database.
       prisma.user.findMany({
-        where: { universityId },
         select: {
           id: true,
           name: true,
@@ -148,10 +140,7 @@ export async function getOrgAdminData() {
         orderBy: { createdAt: "desc" },
       }),
       prisma.maintenanceLog.findMany({
-        where: {
-          airConditioner: { room: { building: { universityId } } },
-          performedAt: { gte: subDays(new Date(), 7) }
-        },
+        where: { performedAt: { gte: subDays(new Date(), 7) } },
         // Only performedAt is used (to bucket the weekly activity chart).
         select: { performedAt: true },
       }),
@@ -168,9 +157,9 @@ export async function getOrgAdminData() {
       }),
       // Counted in SQL, not derived from workOrdersRaw: that list is capped at
       // WORK_ORDER_PAGE_SIZE, so counting pending inside it under-reports as
-      // soon as the tenant has more work orders than one page.
-      prisma.workOrder.count({ where: { universityId } }),
-      prisma.workOrder.count({ where: { universityId, status: "pending" } }),
+      // soon as there are more work orders than one page.
+      prisma.workOrder.count(),
+      prisma.workOrder.count({ where: { status: "pending" } }),
       // The signed-in admin's own profile, read from the database rather than
       // taken from the session. The session is a JWT minted at sign-in, so a
       // name changed through updateProfileAction would keep showing the old
@@ -363,7 +352,9 @@ export async function getOrgAdminData() {
 
     return {
       dbError: null,
-      universityName: university?.name || "มหาวิทยาลัย",
+      // Still the university's name, just no longer a per-tenant lookup —
+      // the field keeps its name so the UI reading it needs no change.
+      universityName: ORGANISATION_NAME,
       // Everything the profile card needs, in one place. Falls back to the
       // session values only if the row somehow can't be read.
       profile: {
@@ -400,7 +391,7 @@ export async function getOrgAdminData() {
     console.error("Org Admin Data query failed:", error);
     return {
       dbError: "ไม่สามารถเชื่อมต่อฐานข้อมูล MariaDB/MySQL ได้ (Connection Pool Timeout) - กรุณาตรวจสอบว่าเซิร์ฟเวอร์ MySQL บนพอร์ต 3307 เปิดใช้งานอยู่ และเรียกใช้ 'npx tsx prisma/seed.ts'",
-      universityName: "มหาวิทยาลัย",
+      universityName: ORGANISATION_NAME,
       // Session-only fallback: the database is unreachable on this path, so
       // the card still renders with whatever the JWT carries.
       profile: {
@@ -435,20 +426,15 @@ export async function updateUserStatusByOrgAdminAction(
   newStatus: "active" | "suspended"
 ) {
   const session = await verifyOrgAdmin();
-  const universityId = BigInt(session.user.universityId!);
 
   try {
     const targetUser = await prisma.user.findUnique({
       where: { id: BigInt(targetUserId) },
-      select: { id: true, universityId: true, role: true },
+      select: { id: true },
     });
 
-    if (!targetUser || targetUser.universityId !== universityId) {
-      return { error: "ไม่พบผู้ใช้หรือผู้ใช้ไม่ได้อยู่ในสังกัดมหาวิทยาลัยนี้" };
-    }
-
-    if (targetUser.role === "super_admin") {
-      return { error: "ไม่มีสิทธิ์ปรับเปลี่ยนสถานะของ Super Admin" };
+    if (!targetUser) {
+      return { error: "ไม่พบผู้ใช้" };
     }
 
     await prisma.user.update({
@@ -457,7 +443,7 @@ export async function updateUserStatusByOrgAdminAction(
     });
 
     console.log(
-      `[AUDIT TRAIL] User status updated by OrgAdmin (AdminID: ${session.user.id}, Tenant: ${universityId}): TargetUser ${targetUserId} -> Status: ${newStatus} at ${new Date().toISOString()}`
+      `[AUDIT TRAIL] User status updated by OrgAdmin (AdminID: ${session.user.id}): TargetUser ${targetUserId} -> Status: ${newStatus} at ${new Date().toISOString()}`
     );
 
     revalidatePath("/admin");
@@ -567,7 +553,6 @@ const createWorkOrderSchema = z.object({
 
 export async function createWorkOrderAction(formData: FormData) {
   const session = await verifyOrgAdmin();
-  const universityId = BigInt(session.user.universityId!);
 
   const raw = {
     airConditionerId: formData.get("airConditionerId"),
@@ -587,7 +572,6 @@ export async function createWorkOrderAction(formData: FormData) {
     const workOrder = await prisma.workOrder.create({
       data: {
         airConditionerId: acId,
-        universityId: universityId,
         status: assignTo ? "claimed" : "pending",
         claimedBy: assignTo,
         claimedAt: assignTo ? new Date() : null,
@@ -595,7 +579,6 @@ export async function createWorkOrderAction(formData: FormData) {
     });
 
     await logAudit({
-      universityId: universityId,
       userId: BigInt(session.user.id!),
       action: "CREATE_WORKORDER",
       entityType: "workOrder",
@@ -620,16 +603,15 @@ export async function createWorkOrderAction(formData: FormData) {
 
 export async function assignWorkOrderAction(workOrderId: string, assignToUserId: string) {
   const session = await verifyOrgAdmin();
-  const universityId = BigInt(session.user.universityId!);
 
   try {
     const workOrder = await prisma.workOrder.findUnique({
       where: { id: BigInt(workOrderId) },
-      select: { universityId: true, status: true },
+      select: { status: true },
     });
 
-    if (!workOrder || workOrder.universityId !== universityId) {
-      return { error: "ไม่พบใบงานซ่อมบำรุง หรือไม่มีสิทธิ์เข้าถึง" };
+    if (!workOrder) {
+      return { error: "ไม่พบใบงานซ่อมบำรุง" };
     }
     if (workOrder.status !== "pending") {
       return { error: "ไม่สามารถมอบหมายงานได้ (งานอาจถูกรับไปแล้ว)" };
@@ -637,10 +619,10 @@ export async function assignWorkOrderAction(workOrderId: string, assignToUserId:
 
     const techUser = await prisma.user.findUnique({
       where: { id: BigInt(assignToUserId) },
-      select: { universityId: true, role: true, status: true },
+      select: { role: true, status: true },
     });
 
-    if (!techUser || techUser.universityId !== universityId || techUser.role !== "technician" || techUser.status !== "active") {
+    if (!techUser || techUser.role !== "technician" || techUser.status !== "active") {
       return { error: "ไม่พบข้อมูลช่างเทคนิค หรือช่างเทคนิคไม่ได้อยู่ในสถานะที่พร้อมรับงาน" };
     }
 
@@ -654,7 +636,6 @@ export async function assignWorkOrderAction(workOrderId: string, assignToUserId:
     });
 
     await logAudit({
-      universityId: universityId,
       userId: BigInt(session.user.id!),
       action: "ASSIGN_WORKORDER",
       entityType: "workOrder",
@@ -677,32 +658,29 @@ const buildingSchema = z.object({
 });
 
 export async function createBuildingAction(formData: FormData) {
-  const session = await verifyOrgAdmin();
-  const universityId = BigInt(session.user.universityId!);
-  
+  await verifyOrgAdmin();
+
   const parsed = buildingSchema.safeParse({
     name: formData.get("name"),
     abbreviation: formData.get("abbreviation"),
   });
-  
+
   if (!parsed.success) return { error: parsed.error.issues[0]?.message || "ข้อมูลไม่ถูกต้อง" };
-  
+
   try {
     const existing = await prisma.building.findFirst({
       where: {
-        universityId,
         OR: [
           { name: parsed.data.name },
           { abbreviation: parsed.data.abbreviation }
         ]
       }
     });
-    
+
     if (existing) return { error: "มีชื่อหรือตัวย่ออาคารนี้ในระบบแล้ว" };
-    
+
     await prisma.building.create({
       data: {
-        universityId,
         name: parsed.data.name,
         abbreviation: parsed.data.abbreviation
       }
@@ -723,9 +701,8 @@ const roomSchema = z.object({
 });
 
 export async function createRoomAction(formData: FormData) {
-  const session = await verifyOrgAdmin();
-  const universityId = BigInt(session.user.universityId!);
-  
+  await verifyOrgAdmin();
+
   const parsed = roomSchema.safeParse({
     buildingId: formData.get("buildingId"),
     name: formData.get("name"),
@@ -735,12 +712,11 @@ export async function createRoomAction(formData: FormData) {
   if (!parsed.success) return { error: parsed.error.issues[0]?.message || "ข้อมูลไม่ถูกต้อง" };
   
   try {
-    // Verify building belongs to university
     const building = await prisma.building.findUnique({
       where: { id: BigInt(parsed.data.buildingId) }
     });
-    
-    if (!building || building.universityId !== universityId) {
+
+    if (!building) {
       return { error: "อาคารไม่ถูกต้อง" };
     }
     
@@ -781,9 +757,8 @@ const acSchema = z.object({
 });
 
 export async function createAirConditionerAction(formData: FormData) {
-  const session = await verifyOrgAdmin();
-  const universityId = BigInt(session.user.universityId!);
-  
+  await verifyOrgAdmin();
+
   const parsed = acSchema.safeParse({
     roomId: formData.get("roomId"),
     brandType: formData.get("brandType"),
@@ -804,19 +779,20 @@ export async function createAirConditionerAction(formData: FormData) {
   }
 
   try {
-    // Verify room belongs to university
     const room = await prisma.room.findUnique({
       where: { id: BigInt(data.roomId) },
-      include: { building: { include: { university: true } }, airConditioners: true }
+      include: { building: true, airConditioners: true }
     });
-    
-    if (!room || room.building.universityId !== universityId) {
+
+    if (!room) {
       return { error: "ห้องไม่ถูกต้อง" };
     }
-    
-    // Generate AC Code: [UNI]-[BLDG]-[ROOM]-[NN]
+
+    // Generate AC Code: [BLDG]-[ROOM]-[NN]. The university segment this used
+    // to carry was dropped along with multi-tenancy — one institution means
+    // the building abbreviation is already unique on its own.
     const unitCount = room.airConditioners.length + 1;
-    const acCode = `${room.building.university.abbreviation}-${room.building.abbreviation}-${room.name}-${unitCount.toString().padStart(2, '0')}`;
+    const acCode = `${room.building.abbreviation}-${room.name}-${unitCount.toString().padStart(2, '0')}`;
     const qrCode = crypto.randomUUID();
     
     let dbData: any = {
@@ -856,9 +832,8 @@ const scheduleSchema = z.object({
 });
 
 export async function saveMaintenanceScheduleAction(formData: FormData) {
-  const session = await verifyOrgAdmin();
-  const universityId = BigInt(session.user.universityId!);
-  
+  await verifyOrgAdmin();
+
   const parsed = scheduleSchema.safeParse({
     airConditionerId: formData.get("airConditionerId"),
     frequencyValue: formData.get("frequencyValue"),
@@ -871,11 +846,11 @@ export async function saveMaintenanceScheduleAction(formData: FormData) {
   try {
     const ac = await prisma.airConditioner.findUnique({
       where: { id: BigInt(data.airConditionerId) },
-      include: { room: { include: { building: true } } }
+      select: { id: true }
     });
 
-    if (!ac || ac.room.building.universityId !== universityId) {
-      return { error: "ไม่มีสิทธิ์ในการเข้าถึง" };
+    if (!ac) {
+      return { error: "ไม่พบเครื่องปรับอากาศ" };
     }
 
     // Calculate nextDueDate

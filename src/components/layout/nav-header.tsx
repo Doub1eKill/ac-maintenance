@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { signOut } from "next-auth/react";
-import { Zap, Building2, LogOut, ShieldCheck, Wrench, UserCheck } from "lucide-react";
+import { Zap, Building2, LogOut, Wrench, UserCheck } from "lucide-react";
 import { AnimatedIcon } from "@/components/ui/animated-icon";
 
 interface NavHeaderProps {
@@ -16,25 +16,13 @@ interface NavHeaderProps {
 
 export function NavHeader({ user }: NavHeaderProps) {
   const roleBadgeColor =
-    user.role === "super_admin"
-      ? "border-purple-500/40 bg-purple-500/10 text-purple-300 shadow-purple-500/10"
-      : user.role === "org_admin"
+    user.role === "org_admin"
       ? "border-sky-500/40 bg-sky-500/10 text-sky-300 shadow-sky-500/10"
       : "border-emerald-500/40 bg-emerald-500/10 text-emerald-300 shadow-emerald-500/10";
 
-  const roleLabel =
-    user.role === "super_admin"
-      ? "Platform Super Admin"
-      : user.role === "org_admin"
-      ? "Org Administrator"
-      : "Field Technician";
+  const roleLabel = user.role === "org_admin" ? "Org Administrator" : "Field Technician";
 
-  const RoleIcon =
-    user.role === "super_admin"
-      ? ShieldCheck
-      : user.role === "org_admin"
-      ? UserCheck
-      : Wrench;
+  const RoleIcon = user.role === "org_admin" ? UserCheck : Wrench;
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-xl transition-all">

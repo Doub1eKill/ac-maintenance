@@ -4,7 +4,7 @@ import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Eye, EyeOff, AlertTriangle, ShieldCheck, Building2, Wrench, ArrowRight } from "lucide-react";
+import { Eye, EyeOff, AlertTriangle, Building2, Wrench, ArrowRight } from "lucide-react";
 import { AnimatedIcon } from "@/components/ui/animated-icon";
 import {
   Alert,
@@ -27,7 +27,7 @@ export function LoginForm() {
   const [emailInput, setEmailInput] = useState("");
   const [passwordInput, setPasswordInput] = useState("");
 
-  function quickFillAccount(email: string, role: string) {
+  function quickFillAccount(email: string) {
     setEmailInput(email);
     setPasswordInput("Password123!");
     setError(null);
@@ -69,19 +69,10 @@ export function LoginForm() {
         <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
           <span>ทดสอบเข้าสู่ระบบด่วน (บัญชีผู้ใช้จำลอง)</span>
         </div>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
-            onClick={() => quickFillAccount("superadmin@ac-maintenance.com", "super_admin")}
-            className="flex flex-col items-center justify-center rounded-xl border border-purple-200 bg-purple-50 p-2 text-center hover:bg-purple-100 transition-all group shadow-2xs"
-          >
-            <ShieldCheck className="h-4 w-4 text-purple-700 mb-1" />
-            <span className="text-[10px] font-bold text-purple-900">ผู้ดูแลระบบสูงสุด</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => quickFillAccount("admin@pkru.ac.th", "org_admin")}
+            onClick={() => quickFillAccount("admin@pkru.ac.th")}
             className="flex flex-col items-center justify-center rounded-xl border border-sky-200 bg-sky-50 p-2 text-center hover:bg-sky-100 transition-all group shadow-2xs"
           >
             <Building2 className="h-4 w-4 text-sky-700 mb-1" />
@@ -90,7 +81,7 @@ export function LoginForm() {
 
           <button
             type="button"
-            onClick={() => quickFillAccount("tech@pkru.ac.th", "technician")}
+            onClick={() => quickFillAccount("tech@pkru.ac.th")}
             className="flex flex-col items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 p-2 text-center hover:bg-emerald-100 transition-all group shadow-2xs"
           >
             <Wrench className="h-4 w-4 text-emerald-700 mb-1" />

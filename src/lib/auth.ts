@@ -84,7 +84,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             name: user.name,
             role: user.role,
             status: user.status,
-            universityId: user.universityId ? Number(user.universityId) : null,
           };
         } catch (error) {
           if (error instanceof CredentialsSignin) {

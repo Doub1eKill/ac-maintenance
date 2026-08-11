@@ -10,18 +10,7 @@ import {
   AlertTitle,
   AlertDescription,
 } from "@/components/ui/alert";
-import {
-  NativeSelect,
-  NativeSelectOption,
-} from "@/components/ui/native-select";
-
-interface UniversityOption {
-  id: string;
-  name: string;
-  abbreviation: string;
-}
-
-export function RegisterForm({ universities }: { universities: UniversityOption[] }) {
+export function RegisterForm() {
   const [state, formAction, isPending] = useActionState<RegisterState, FormData>(
     registerUser,
     null
@@ -108,24 +97,6 @@ export function RegisterForm({ universities }: { universities: UniversityOption[
             <span>แอดมินสถาบัน</span>
           </button>
         </div>
-      </div>
-
-      {/* University Selector */}
-      <div>
-        <label htmlFor="universityId" className="mb-1.5 block text-xs font-bold text-slate-800">
-          เลือกมหาวิทยาลัย / สถาบันการศึกษาสังกัด
-        </label>
-        <NativeSelect name="universityId" required className="w-full h-auto py-3 px-3.5 rounded-xl border-slate-200 bg-white text-xs text-slate-900 shadow-2xs" defaultValue="">
-          <NativeSelectOption value="" disabled>-- กรุณาเลือกสถาบันการศึกษา --</NativeSelectOption>
-          {universities.map((uni) => (
-            <NativeSelectOption 
-              key={uni.id} 
-              value={uni.id} 
-            >
-              {uni.name} ({uni.abbreviation})
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
       </div>
 
       {/* Name Input */}

@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { AuthLayout } from "@/components/auth/auth-layout";
-import { Clock, Building2, Phone, MapPin, AlertCircle, ArrowLeft, RefreshCw } from "lucide-react";
+import { Clock, Building2, AlertCircle, ArrowLeft, RefreshCw } from "lucide-react";
+import { ORGANISATION_NAME } from "@/lib/organisation";
 
 export const metadata = {
   title: "รอการอนุมัติสิทธิ์ | AC Maintenance System",
@@ -22,9 +23,7 @@ export default async function PendingApprovalPage({ searchParams }: PendingAppro
     try {
       userDetails = await prisma.user.findUnique({
         where: { email },
-        include: {
-          university: true,
-        },
+        select: { email: true, name: true },
       });
     } catch (err) {
       console.error("PendingApprovalPage user query error:", err);
@@ -52,11 +51,11 @@ export default async function PendingApprovalPage({ searchParams }: PendingAppro
           </div>
         </div>
 
-        {/* Registered User & University Context */}
+        {/* Registered User */}
         {userDetails && (
           <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4 shadow-2xs">
             <div className="text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-100 pb-2">
-              ข้อมูลบัญชีและหน่วยงานสังกัด
+              ข้อมูลบัญชี
             </div>
 
             <div className="space-y-2.5 text-xs text-slate-700">
@@ -70,30 +69,12 @@ export default async function PendingApprovalPage({ searchParams }: PendingAppro
                 <span className="font-bold text-slate-900">{userDetails.name}</span>
               </div>
 
-              {userDetails.university && (
-                <>
-                  <div className="pt-2 border-t border-slate-100 space-y-2">
-                    <div className="flex items-start gap-2 text-slate-900 font-bold">
-                      <Building2 className="h-4 w-4 text-slate-700 shrink-0 mt-0.5" />
-                      <span>{userDetails.university.name} ({userDetails.university.abbreviation})</span>
-                    </div>
-
-                    {userDetails.university.address && (
-                      <div className="flex items-start gap-2 text-slate-600 pl-6">
-                        <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0 mt-0.5" />
-                        <span>{userDetails.university.address}</span>
-                      </div>
-                    )}
-
-                    {userDetails.university.phone && (
-                      <div className="flex items-center gap-2 text-slate-600 pl-6 font-mono">
-                        <Phone className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                        <span>{userDetails.university.phone}</span>
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
+              <div className="pt-2 border-t border-slate-100">
+                <div className="flex items-start gap-2 text-slate-900 font-bold">
+                  <Building2 className="h-4 w-4 text-slate-700 shrink-0 mt-0.5" />
+                  <span>{ORGANISATION_NAME}</span>
+                </div>
+              </div>
             </div>
           </div>
         )}

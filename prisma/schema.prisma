@@ -3,13 +3,15 @@
 // onDelete/onUpdate behavior below was cross-checked against the actual FK
 // constraints in information_schema.REFERENTIAL_CONSTRAINTS and matches exactly.
 // Reasoning comments are carried over from the original Laravel migrations so the
-// "why" isn't lost in the framework migration.
+// "why" isn't lost in the framework migration. The leftover Laravel framework
+// tables (cache, jobs, sessions, …) were dropped in commit 5b97552.
 //
-// Laravel framework tables (cache, cache_locks, failed_jobs, job_batches, jobs,
-// migrations, password_reset_tokens, sessions) are intentionally NOT modeled here —
-// they belonged to Laravel's queue/cache/session infrastructure, which Next.js
-// replaces with its own mechanisms. The tables themselves are left untouched in
-// MySQL; Prisma just doesn't manage them.
+// The system was originally built multi-tenant, with a University at the root of
+// the Building/Room/AirConditioner tree and a super_admin role above the tenant
+// admins. It now serves a single institution, so that layer is gone: there is no
+// University model, no university_id columns, and no super_admin role. Scoping a
+// query to "this organisation" is no longer something the application has to do —
+// every row in the database already belongs to it.
 
 generator client {
   provider = "prisma-client"
@@ -20,39 +22,18 @@ datasource db {
   provider = "mysql"
 }
 
-model University {
-  id           BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
-  name         String    @unique(map: "universities_name_unique") @db.VarChar(255) // natural key of the institution
-  abbreviation String    @unique(map: "universities_abbreviation_unique") @db.VarChar(10) // feeds ac_code's first segment, e.g. "PKRU"
-  address      String?   @db.VarChar(255)
-  phone        String?   @db.VarChar(255)
-  createdAt    DateTime? @map("created_at") @db.Timestamp(0)
-  updatedAt    DateTime? @map("updated_at") @db.Timestamp(0)
-
-  buildings  Building[]
-  users      User[]
-  workOrders WorkOrder[]
-  systemAuditLogs SystemAuditLog[]
-
-  @@map("universities")
-}
-
 model Building {
   id           BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
-  universityId BigInt    @map("university_id") @db.UnsignedBigInt
-  name         String    @db.VarChar(255)
-  abbreviation String    @db.VarChar(10) // feeds ac_code's second segment, e.g. "B1" — unique per university only
+  name         String    @unique(map: "buildings_name_unique") @db.VarChar(255)
+  abbreviation String    @unique(map: "buildings_abbreviation_unique") @db.VarChar(10) // feeds ac_code's first segment, e.g. "B1"
   createdAt    DateTime? @map("created_at") @db.Timestamp(0)
   updatedAt    DateTime? @map("updated_at") @db.Timestamp(0)
 
-  // 1:N — one university has many buildings, a building belongs to exactly
-  // one university. Tenant boundary starts here.
-  // RESTRICT: deleting a tenant must not silently wipe its buildings/rooms/units.
-  university University @relation(fields: [universityId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "buildings_university_id_foreign")
-  rooms      Room[]
+  // Buildings sit at the root now that University is gone. Name and
+  // abbreviation used to be unique per tenant; with one institution left,
+  // uniqueness is simply global.
+  rooms Room[]
 
-  @@unique([universityId, abbreviation], map: "buildings_university_id_abbreviation_unique")
-  @@unique([universityId, name], map: "buildings_university_id_name_unique")
   @@map("buildings")
 }
 
@@ -64,8 +45,7 @@ model Room {
   createdAt  DateTime? @map("created_at") @db.Timestamp(0)
   updatedAt  DateTime? @map("updated_at") @db.Timestamp(0)
 
-  // 1:N — one building has many rooms. university_id is deliberately NOT
-  // duplicated here — tenant is derived via rooms -> buildings -> university.
+  // 1:N — one building has many rooms.
   // RESTRICT: force explicit room reassignment before a building can be removed.
   building        Building         @relation(fields: [buildingId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "rooms_building_id_foreign")
   airConditioners AirConditioner[]
@@ -76,7 +56,6 @@ model Room {
 
 model User {
   id              BigInt     @id @default(autoincrement()) @db.UnsignedBigInt
-  universityId    BigInt?    @map("university_id") @db.UnsignedBigInt // nullable: super_admin is platform-level, not tied to a tenant
   role            UserRole   @default(technician)
   status          UserStatus @default(pending) // separate from role — an account can be a valid technician and still be pending/suspended
   name            String     @db.VarChar(255)
@@ -95,10 +74,6 @@ model User {
   updatedAt       DateTime?  @map("updated_at") @db.Timestamp(0)
   deletedAt       DateTime?  @map("deleted_at") @db.Timestamp(0)
 
-  // 1:N — one university has many users, a user belongs to at most one
-  // university. RESTRICT (not the optional-relation default of SetNull):
-  // deleting a tenant must not silently orphan/erase its staff accounts.
-  university        University?      @relation(fields: [universityId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "users_university_id_foreign")
   phones            UserPhone[]
   maintenanceLogs   MaintenanceLog[]
   claimedWorkOrders WorkOrder[]      @relation("work_orders_claimed_by")
@@ -106,8 +81,11 @@ model User {
   assignedWorkOrders WorkOrder[]     @relation("work_orders_assigned_to")
   systemAuditLogs   SystemAuditLog[]
 
-  @@index([universityId, role], map: "users_university_id_role_index")
-  @@index([universityId, status], map: "users_university_id_status_index")
+  // Replaces the two tenant-prefixed indexes this table used to carry. The
+  // one query that filters users looks for active technicians, so a single
+  // composite over exactly that pair covers it — and one index costs less on
+  // write than the two it replaces.
+  @@index([role, status], map: "users_role_status_index")
   @@map("users")
 }
 
@@ -221,14 +199,6 @@ model MaintenanceLog {
 model WorkOrder {
   id               BigInt          @id @default(autoincrement()) @db.UnsignedBigInt
   airConditionerId BigInt          @map("air_conditioner_id") @db.UnsignedBigInt
-  // Deliberately denormalized (the rest of this schema derives tenant via
-  // join on purpose). Justified here because: 1) the technician pool page
-  // queries "pending work orders for my university" on every dashboard
-  // load — a genuinely hot path; 2) zero staleness risk, since
-  // AirConditioner.roomId is immutable after registration, so the
-  // university a unit belongs to can never change out from under this
-  // column once set.
-  universityId     BigInt          @map("university_id") @db.UnsignedBigInt
   status           WorkOrderStatus @default(pending)
   priority         String?         @default("low") @db.VarChar(20)
   issueDescription String?         @map("issue_description") @db.Text
@@ -245,7 +215,6 @@ model WorkOrder {
 
   // RESTRICT: semi-transactional table, never cascade.
   airConditioner  AirConditioner   @relation(fields: [airConditionerId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "work_orders_air_conditioner_id_foreign")
-  university      University       @relation(fields: [universityId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "work_orders_university_id_foreign")
   // SET NULL: optional reference — nullable until claimed. This app never
   // hard-deletes users (accounts are suspended via User.status instead),
   // so this is a safety net more than an expected path.
@@ -254,7 +223,9 @@ model WorkOrder {
   claimedByUser   User?            @relation("work_orders_claimed_by", fields: [claimedBy], references: [id], onDelete: SetNull, onUpdate: Restrict, map: "work_orders_claimed_by_foreign")
   maintenanceLogs MaintenanceLog[]
 
-  @@index([universityId, status, createdAt], map: "work_orders_university_id_status_created_at_index")
+  // The pool page reads pending orders newest-first on every dashboard load;
+  // this is the same index as before minus its now-meaningless tenant prefix.
+  @@index([status, createdAt], map: "work_orders_status_created_at_index")
   @@index([airConditionerId, status], map: "work_orders_air_conditioner_id_status_index")
   @@index([claimedBy], map: "work_orders_claimed_by_index")
   @@map("work_orders")
@@ -262,7 +233,6 @@ model WorkOrder {
 
 model SystemAuditLog {
   id           BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
-  universityId BigInt   @map("university_id") @db.UnsignedBigInt
   userId       BigInt   @map("user_id") @db.UnsignedBigInt
   action       String   @db.VarChar(100)
   entityType   String   @map("entity_type") @db.VarChar(50)
@@ -272,10 +242,9 @@ model SystemAuditLog {
   ipAddress    String?  @map("ip_address") @db.VarChar(45)
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamp(0)
 
-  university University @relation(fields: [universityId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "audit_university_fk")
-  user       User       @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "audit_user_fk")
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "audit_user_fk")
 
-  @@index([universityId, entityType, entityId], map: "audit_tenant_entity_idx")
+  @@index([entityType, entityId], map: "audit_entity_idx")
   @@map("system_audit_logs")
 }
 
@@ -296,7 +265,9 @@ model MaintenanceSchedule {
 }
 
 enum UserRole {
-  super_admin
+  // org_admin keeps its name despite there being only one organisation now —
+  // renaming it would touch every role check, session type and seeded row for
+  // no behavioural gain.
   org_admin
   technician
 

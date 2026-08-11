@@ -21,62 +21,35 @@ async function main() {
   await prisma.user.deleteMany({
     where: {
       email: {
-        notIn: ["superadmin@ac-maintenance.com", "admin@pkru.ac.th", "tech@pkru.ac.th"]
+        notIn: ["admin@pkru.ac.th", "tech@pkru.ac.th"]
       }
     }
-  });
-
-  console.log("🏫 Seeding University...");
-  const pkru = await prisma.university.upsert({
-    where: { abbreviation: "PKRU" },
-    update: {},
-    create: {
-      name: "มหาวิทยาลัยราชภัฏภูเก็ต (Phuket Rajabhat University)",
-      abbreviation: "PKRU",
-      address: "21 หมู่ 6 ถ.เทพกระษัตรี ต.รัษฎา อ.เมือง จ.ภูเก็ต 83000",
-      phone: "076-211-959",
-    },
   });
 
   console.log("👥 Seeding Users...");
   const defaultPasswordHash = await bcrypt.hash("Password123!", 10);
 
-  const superAdmin = await prisma.user.upsert({
-    where: { email: "superadmin@ac-maintenance.com" },
-    update: { password: defaultPasswordHash, status: "active", role: "super_admin" },
-    create: {
-      name: "Super Admin (ผู้ดูแลระบบส่วนกลาง)",
-      email: "superadmin@ac-maintenance.com",
-      password: defaultPasswordHash,
-      role: "super_admin",
-      status: "active",
-      universityId: null,
-    },
-  });
-
   const orgAdmin = await prisma.user.upsert({
     where: { email: "admin@pkru.ac.th" },
-    update: { password: defaultPasswordHash, status: "active", role: "org_admin", universityId: pkru.id },
+    update: { password: defaultPasswordHash, status: "active", role: "org_admin" },
     create: {
       name: "ผู้ดูแลระบบ มรภ.ภูเก็ต (Org Admin)",
       email: "admin@pkru.ac.th",
       password: defaultPasswordHash,
       role: "org_admin",
       status: "active",
-      universityId: pkru.id,
     },
   });
 
   const techUser = await prisma.user.upsert({
     where: { email: "tech@pkru.ac.th" },
-    update: { password: defaultPasswordHash, status: "active", role: "technician", universityId: pkru.id },
+    update: { password: defaultPasswordHash, status: "active", role: "technician" },
     create: {
       name: "สมชาย ช่างซ่อม (Technician)",
       email: "tech@pkru.ac.th",
       password: defaultPasswordHash,
       role: "technician",
       status: "active",
-      universityId: pkru.id,
     },
   });
 
@@ -95,10 +68,10 @@ async function main() {
 
   console.log("🏢 Seeding Buildings and Rooms...");
   const bldgSci = await prisma.building.create({
-    data: { universityId: pkru.id, name: "อาคารวิทยาศาสตร์", abbreviation: "SCI" }
+    data: { name: "อาคารวิทยาศาสตร์", abbreviation: "SCI" }
   });
   const bldgEdu = await prisma.building.create({
-    data: { universityId: pkru.id, name: "อาคารครุศาสตร์", abbreviation: "EDU" }
+    data: { name: "อาคารครุศาสตร์", abbreviation: "EDU" }
   });
 
   const roomSci101 = await prisma.room.create({ data: { buildingId: bldgSci.id, name: "101", floor: 1 } });
@@ -115,7 +88,7 @@ async function main() {
       roomId: roomSci101.id,
       acBrandId: daikin.id,
       acModelId: daikinModel2.id,
-      acCode: "PKRU-SCI-101-01",
+      acCode: "SCI-101-01",
       qrCode: crypto.randomUUID(),
       btu: 18000,
       status: "normal",
@@ -127,7 +100,7 @@ async function main() {
       roomId: roomSci101.id,
       acBrandId: daikin.id,
       acModelId: daikinModel2.id,
-      acCode: "PKRU-SCI-101-02",
+      acCode: "SCI-101-02",
       qrCode: crypto.randomUUID(),
       btu: 18000,
       status: "needs_cleaning",
@@ -141,7 +114,7 @@ async function main() {
       roomId: roomSci102.id,
       acBrandId: panasonic.id,
       acModelId: panaModel.id,
-      acCode: "PKRU-SCI-102-01",
+      acCode: "SCI-102-01",
       qrCode: crypto.randomUUID(),
       btu: 18000,
       status: "normal",
@@ -156,7 +129,7 @@ async function main() {
         roomId: roomEdu201.id,
         acBrandId: mitsu.id,
         acModelId: mitsuModel2.id,
-        acCode: `PKRU-EDU-201-0${i}`,
+        acCode: `EDU-201-0${i}`,
         qrCode: crypto.randomUUID(),
         btu: 24000,
         status: i === 4 ? "broken" : "normal",
@@ -171,7 +144,7 @@ async function main() {
       roomId: roomEdu202.id,
       acBrandId: daikin.id,
       acModelId: daikinModel1.id,
-      acCode: "PKRU-EDU-202-01",
+      acCode: "EDU-202-01",
       qrCode: crypto.randomUUID(),
       btu: 12000,
       status: "normal",
@@ -183,7 +156,7 @@ async function main() {
       roomId: roomEdu202.id,
       acBrandId: daikin.id,
       acModelId: daikinModel1.id,
-      acCode: "PKRU-EDU-202-02",
+      acCode: "EDU-202-02",
       qrCode: crypto.randomUUID(),
       btu: 12000,
       status: "normal",
@@ -209,7 +182,6 @@ async function main() {
   // Pending Work Order
   await prisma.workOrder.create({
     data: {
-      universityId: pkru.id,
       airConditionerId: acs[1].id, // needs_cleaning
       status: "pending",
       priority: "high",
@@ -222,7 +194,6 @@ async function main() {
   // Claimed Work Order
   await prisma.workOrder.create({
     data: {
-      universityId: pkru.id,
       airConditionerId: acs[6].id, // broken
       status: "claimed",
       priority: "critical",
@@ -238,7 +209,6 @@ async function main() {
   // Completed Work Order
   const completedWo = await prisma.workOrder.create({
     data: {
-      universityId: pkru.id,
       airConditionerId: acs[4].id,
       status: "completed",
       priority: "low",

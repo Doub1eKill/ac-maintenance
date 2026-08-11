@@ -4,7 +4,7 @@ import { syncOverdueMaintenanceWorkOrders, getTechnicianAssetList } from "@/lib/
 
 async function verifyTechnician() {
   const session = await auth();
-  if (!session?.user || session.user.role !== "technician" || !session.user.universityId) {
+  if (!session?.user || session.user.role !== "technician") {
     return null;
   }
   return session.user;
@@ -18,11 +18,9 @@ export async function GET() {
   const tech = await verifyTechnician();
   if (!tech) return new NextResponse("Unauthorized", { status: 401 });
 
-  const universityId = BigInt(tech.universityId!);
-
   try {
-    await syncOverdueMaintenanceWorkOrders(universityId);
-    const { units, summary } = await getTechnicianAssetList(universityId);
+    await syncOverdueMaintenanceWorkOrders();
+    const { units, summary } = await getTechnicianAssetList();
 
     return NextResponse.json({ units, summary });
   } catch (error) {

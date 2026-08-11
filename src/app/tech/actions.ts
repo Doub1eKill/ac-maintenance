@@ -12,10 +12,11 @@ import {
   addMaintenanceInterval,
 } from "@/lib/maintenance";
 import { MaintenanceAction } from "@/generated/prisma/client";
+import { ORGANISATION_NAME } from "@/lib/organisation";
 
 async function verifyTechnician() {
   const session = await auth();
-  if (!session?.user || session.user.role !== "technician" || !session.user.universityId) {
+  if (!session?.user || session.user.role !== "technician") {
     throw new Error("Unauthorized: Technician access required");
   }
   return session;
@@ -80,16 +81,14 @@ function formatAcLocation(room: { name: string; floor: number | null; building: 
 
 export async function getTechnicianData() {
   const session = await verifyTechnician();
-  const universityId = BigInt(session.user.universityId!);
   const techId = BigInt(session.user.id!);
 
   try {
-    await syncOverdueMaintenanceWorkOrders(universityId);
+    await syncOverdueMaintenanceWorkOrders();
 
-    const [university, pendingOrdersRaw, myJobsRaw, completedJobsRaw, assetListResult] = await Promise.all([
-      prisma.university.findUnique({ where: { id: universityId } }),
+    const [pendingOrdersRaw, myJobsRaw, completedJobsRaw, assetListResult] = await Promise.all([
       prisma.workOrder.findMany({
-        where: { universityId, status: "pending" },
+        where: { status: "pending" },
         include: {
           airConditioner: {
             include: {
@@ -105,7 +104,7 @@ export async function getTechnicianData() {
         orderBy: { createdAt: "desc" },
       }),
       prisma.workOrder.findMany({
-        where: { universityId, claimedBy: techId, status: "claimed" },
+        where: { claimedBy: techId, status: "claimed" },
         include: {
           airConditioner: {
             include: {
@@ -121,7 +120,7 @@ export async function getTechnicianData() {
         orderBy: { claimedAt: "desc" },
       }),
       prisma.workOrder.findMany({
-        where: { universityId, claimedBy: techId, status: "completed" },
+        where: { claimedBy: techId, status: "completed" },
         include: {
           airConditioner: {
             include: {
@@ -137,7 +136,7 @@ export async function getTechnicianData() {
         orderBy: { completedAt: "desc" },
         take: 50,
       }),
-      getTechnicianAssetList(universityId),
+      getTechnicianAssetList(),
     ]);
 
     const jobPool = pendingOrdersRaw.map((wo) => ({
@@ -182,7 +181,7 @@ export async function getTechnicianData() {
 
     return {
       dbError: null,
-      universityName: university?.name || "มหาวิทยาลัย",
+      universityName: ORGANISATION_NAME,
       jobPool,
       myJobs,
       completedJobs,
@@ -194,7 +193,7 @@ export async function getTechnicianData() {
     console.error("Technician Data query failed:", error);
     return {
       dbError: "ไม่สามารถเชื่อมต่อฐานข้อมูล MariaDB/MySQL ได้ (Connection Pool Timeout) - กรุณาตรวจสอบว่าเซิร์ฟเวอร์ MySQL บนพอร์ต 3307 เปิดใช้งานอยู่ และเรียกใช้ 'npx tsx prisma/seed.ts'",
-      universityName: "มหาวิทยาลัย",
+      universityName: ORGANISATION_NAME,
       jobPool: [],
       myJobs: [],
       completedJobs: [],
@@ -222,7 +221,6 @@ export async function claimWorkOrderAction(workOrderId: string) {
 export async function bulkClaimWorkOrdersAction(workOrderIds: string[]) {
   const session = await verifyTechnician();
   const techId = BigInt(session.user.id!);
-  const universityId = BigInt(session.user.universityId!);
 
   if (!Array.isArray(workOrderIds) || workOrderIds.length === 0) {
     return { error: "กรุณาเลือกงานอย่างน้อย 1 รายการ" };
@@ -241,7 +239,7 @@ export async function bulkClaimWorkOrdersAction(workOrderIds: string[]) {
       // grabbed a moment ago simply isn't matched, so it's skipped rather
       // than double-claimed, and `count` is the exact number won.
       const { count } = await tx.workOrder.updateMany({
-        where: { id: { in: ids }, status: "pending", universityId },
+        where: { id: { in: ids }, status: "pending" },
         data: { status: "claimed", claimedBy: techId, claimedAt },
       });
 
@@ -260,7 +258,6 @@ export async function bulkClaimWorkOrdersAction(workOrderIds: string[]) {
 
     await logAuditMany(
       claimedIds.map((id) => ({
-        universityId,
         userId: techId,
         action: "CLAIM_WORKORDER",
         entityType: "workOrder",
@@ -388,7 +385,6 @@ export async function logMaintenanceAction(formData: FormData) {
     });
 
     await logAudit({
-      universityId: BigInt(session.user.universityId!),
       userId: techId,
       action: "COMPLETE_WORKORDER",
       entityType: "workOrder",
@@ -407,12 +403,11 @@ export async function logMaintenanceAction(formData: FormData) {
 }
 
 export async function scanQrCodeAction(acCode: string) {
-  const session = await verifyTechnician();
-  const universityId = BigInt(session.user.universityId!);
+  await verifyTechnician();
 
   try {
     const ac = await prisma.airConditioner.findFirst({
-      where: { acCode, room: { building: { universityId } } },
+      where: { acCode },
       include: {
         acBrand: true,
         room: {

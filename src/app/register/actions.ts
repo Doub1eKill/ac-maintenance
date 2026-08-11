@@ -15,33 +15,8 @@ const registerSchema = z.object({
   name: z.string().min(2, "ชื่อ-นามสกุล ต้องมีความยาวอย่างน้อย 2 ตัวอักษร"),
   email: z.string().email("กรุณากรอกอีเมลให้ถูกต้อง"),
   password: z.string().min(8, "รหัสผ่านต้องมีความยาวอย่างน้อย 8 ตัวอักษร"),
-  universityId: z.string().min(1, "กรุณาเลือกมหาวิทยาลัย/หน่วยงานสังกัด"),
   role: z.enum(["technician", "org_admin"]).default("technician"),
 });
-
-export async function getUniversities() {
-  try {
-    const universities = await prisma.university.findMany({
-      select: {
-        id: true,
-        name: true,
-        abbreviation: true,
-      },
-      orderBy: {
-        name: "asc",
-      },
-    });
-
-    return universities.map((u) => ({
-      id: u.id.toString(),
-      name: u.name,
-      abbreviation: u.abbreviation,
-    }));
-  } catch (error) {
-    console.error("Failed to fetch universities:", error);
-    return [];
-  }
-}
 
 const PUBLIC_EMAIL_DOMAINS = [
   "gmail.com",
@@ -53,7 +28,7 @@ const PUBLIC_EMAIL_DOMAINS = [
   "aol.com",
 ];
 
-function isInstitutionalDomain(emailDomain: string, universityAbbr?: string): boolean {
+function isInstitutionalDomain(emailDomain: string): boolean {
   const domain = emailDomain.toLowerCase();
 
   // Public webmail domains require manual Org Admin verification
@@ -62,16 +37,7 @@ function isInstitutionalDomain(emailDomain: string, universityAbbr?: string): bo
   }
 
   // Official educational domains (.ac.th, .edu, .edu.th)
-  if (domain.endsWith(".ac.th") || domain.endsWith(".edu") || domain.endsWith(".edu.th")) {
-    return true;
-  }
-
-  // Matches university abbreviation in domain name
-  if (universityAbbr && domain.includes(universityAbbr.toLowerCase())) {
-    return true;
-  }
-
-  return false;
+  return domain.endsWith(".ac.th") || domain.endsWith(".edu") || domain.endsWith(".edu.th");
 }
 
 export async function registerUser(
@@ -82,7 +48,6 @@ export async function registerUser(
     name: formData.get("name"),
     email: formData.get("email"),
     password: formData.get("password"),
-    universityId: formData.get("universityId"),
     role: formData.get("role") || "technician",
   };
 
@@ -93,7 +58,7 @@ export async function registerUser(
     return { error: firstError };
   }
 
-  const { name, email, password, universityId, role } = parsed.data;
+  const { name, email, password, role } = parsed.data;
 
   try {
     const cleanEmail = email.toLowerCase().trim();
@@ -107,14 +72,8 @@ export async function registerUser(
       return { error: "อีเมลนี้ถูกลงทะเบียนในระบบเรียบร้อยแล้ว" };
     }
 
-    // Fetch university info for domain matching & auto-approval
-    const targetUni = await prisma.university.findUnique({
-      where: { id: BigInt(universityId) },
-      select: { name: true, abbreviation: true },
-    });
-
     const emailDomain = cleanEmail.split("@")[1] || "";
-    const isVerifiedDomain = isInstitutionalDomain(emailDomain, targetUni?.abbreviation);
+    const isVerifiedDomain = isInstitutionalDomain(emailDomain);
     
     // Enterprise Auto-Approval Rule:
     // Institutional/university emails (.ac.th, .edu) auto-activate.
@@ -129,7 +88,6 @@ export async function registerUser(
         name,
         email: cleanEmail,
         password: hashedPassword,
-        universityId: BigInt(universityId),
         role: role as UserRole,
         status: initialStatus,
       },
@@ -145,7 +103,7 @@ export async function registerUser(
     return {
       success: true,
       message:
-        "ลงทะเบียนสำเร็จ! บัญชีของคุณอยู่ระหว่างรอการตรวจสอบและอนุมัติสิทธิ์จากผู้ดูแลระบบมหาวิทยาลัย (Pending Approval)",
+        "ลงทะเบียนสำเร็จ! บัญชีของคุณอยู่ระหว่างรอการตรวจสอบและอนุมัติสิทธิ์จากผู้ดูแลระบบ (Pending Approval)",
     };
   } catch (error) {
     console.error("Registration error:", error);
