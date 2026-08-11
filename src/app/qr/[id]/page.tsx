@@ -1,29 +1,28 @@
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
-import { ArrowLeft, Clock, CalendarClock, Settings2, ShieldCheck, ShieldAlert } from "lucide-react";
+import { ArrowLeft, Clock, CalendarClock, Settings2, ShieldCheck, ClipboardPen, LogIn } from "lucide-react";
 import Link from "next/link";
 
+/**
+ * Reached by scanning the QR sticker on a unit, so it is deliberately
+ * readable without signing in — anyone standing in front of the machine can
+ * see what it is and what has been done to it. The qrCode in the URL is a
+ * random uuid rather than the sequential acCode, so the page can only be
+ * opened by someone who has the sticker (or the link) in hand.
+ *
+ * Recording work is a different matter and still requires an account:
+ * logMaintenanceAction is guarded by verifyTechnician() regardless of how
+ * the technician got here, so this page only decides which call to action to
+ * show, never whether the write is allowed.
+ */
 export default async function QRCodePage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   const session = await auth();
-
-  if (!session?.user || session.user.status === 'pending') {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 text-center max-w-sm w-full">
-          <ShieldAlert className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h1 className="text-lg font-bold text-slate-900 mb-2">ไม่มีสิทธิ์เข้าถึง</h1>
-          <p className="text-sm text-slate-500 mb-6">เฉพาะเจ้าหน้าที่และช่างซ่อมบำรุงที่เข้าสู่ระบบแล้วเท่านั้น จึงจะสามารถดูข้อมูลได้</p>
-          <Link href="/login" className="block w-full bg-slate-900 text-white rounded-xl py-2.5 font-bold hover:bg-slate-800 transition-colors">
-            เข้าสู่ระบบ
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  const isSignedIn = Boolean(session?.user && session.user.status === "active");
+  const isTechnician = isSignedIn && session!.user.role === "technician";
 
   const ac = await prisma.airConditioner.findUnique({
     where: { qrCode: params.id },
@@ -54,9 +53,13 @@ export default async function QRCodePage(props: { params: Promise<{ id: string }
     <div className="min-h-screen bg-slate-50 pb-12">
       <div className="bg-slate-900 text-white pb-16 pt-6 px-4">
         <div className="max-w-2xl mx-auto">
-          <Link href={session.user.role === 'technician' ? '/tech' : '/admin'} className="inline-flex items-center gap-1.5 text-slate-300 hover:text-white transition-colors text-sm font-medium mb-6">
-            <ArrowLeft className="w-4 h-4" /> กลับสู่หน้าหลัก
-          </Link>
+          {/* Only shown to signed-in staff: someone who arrived by scanning
+              the sticker has no dashboard to go "back" to. */}
+          {isSignedIn && (
+            <Link href={isTechnician ? '/tech' : '/admin'} className="inline-flex items-center gap-1.5 text-slate-300 hover:text-white transition-colors text-sm font-medium mb-6">
+              <ArrowLeft className="w-4 h-4" /> กลับสู่หน้าหลัก
+            </Link>
+          )}
           <h1 className="text-2xl font-bold tracking-tight mb-2">ข้อมูลเครื่องปรับอากาศ</h1>
           <div className="flex items-center gap-3">
             <div className="px-3 py-1 bg-white/20 rounded-lg font-mono text-sm tracking-widest font-bold">
@@ -133,6 +136,34 @@ export default async function QRCodePage(props: { params: Promise<{ id: string }
             </div>
           )}
         </div>
+
+        {/* Recording work needs an account. A technician is sent to their
+            workspace, where the existing logging flow lives; anyone else is
+            sent to sign in. The action itself re-checks the role, so this is
+            signposting rather than a gate. */}
+        {isTechnician ? (
+          <Link
+            href="/tech"
+            className="flex items-center justify-center gap-2 w-full bg-slate-900 text-white rounded-2xl py-3.5 font-bold hover:bg-slate-800 transition-colors shadow-sm"
+          >
+            <ClipboardPen className="w-4 h-4" />
+            บันทึกงานซ่อมบำรุง
+          </Link>
+        ) : !isSignedIn ? (
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 text-center">
+            <LogIn className="w-8 h-8 text-slate-400 mx-auto mb-3" />
+            <p className="text-sm text-slate-600 mb-4">
+              หากคุณเป็นช่างซ่อมบำรุงและต้องการบันทึกผลการปฏิบัติงานของเครื่องนี้ กรุณาเข้าสู่ระบบก่อน
+            </p>
+            <Link
+              href="/login"
+              className="inline-flex items-center justify-center gap-2 w-full bg-slate-900 text-white rounded-xl py-2.5 font-bold hover:bg-slate-800 transition-colors"
+            >
+              <LogIn className="w-4 h-4" />
+              เข้าสู่ระบบ
+            </Link>
+          </div>
+        ) : null}
       </div>
     </div>
   );
