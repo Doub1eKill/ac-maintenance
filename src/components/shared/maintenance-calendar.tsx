@@ -82,7 +82,17 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
     async function fetchSchedules() {
       setIsLoading(true);
       try {
-        const res = await fetch('/api/admin/maintenance-schedules');
+        // The grid shows the leading/trailing days of neighboring months
+        // too, so the fetched range covers the full visible grid, not just
+        // the strict calendar month — otherwise events on those edge days
+        // would silently vanish.
+        const gridStart = startOfWeek(startOfMonth(currentMonth));
+        const gridEnd = endOfWeek(endOfMonth(currentMonth));
+        const params = new URLSearchParams({
+          start: format(gridStart, "yyyy-MM-dd"),
+          end: format(gridEnd, "yyyy-MM-dd"),
+        });
+        const res = await fetch(`/api/admin/maintenance-schedules?${params}`);
         if (res.ok) {
           const data = await res.json();
           setSchedules(data);
@@ -94,7 +104,7 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
       }
     }
     fetchSchedules();
-  }, []);
+  }, [currentMonth]);
 
   const nextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
   const prevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
