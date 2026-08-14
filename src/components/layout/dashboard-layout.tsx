@@ -58,6 +58,9 @@ export interface NavItem {
   badge?: number;
   description?: string;
   group?: string;
+  // A real route to navigate to instead of switching the in-page tab —
+  // for pages that live outside the tabbed dashboard (e.g. Master Data).
+  href?: string;
 }
 
 interface DashboardLayoutProps {
@@ -136,24 +139,35 @@ export function DashboardLayout({
                   {items.map((item) => {
                     const isActive = activeTab === item.id;
                     const Icon = item.icon;
+                    const content = (
+                      <>
+                        <div className="flex items-center gap-2.5">
+                          <Icon className="h-4 w-4" />
+                          <span className="font-semibold text-xs">{item.label}</span>
+                        </div>
+                        {item.badge !== undefined && item.badge > 0 && (
+                          <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
+                            {item.badge}
+                          </span>
+                        )}
+                      </>
+                    );
                     return (
                       <SidebarMenuItem key={item.id}>
-                        <SidebarMenuButton
-                          isActive={isActive}
-                          onClick={() => setActiveTab(item.id)}
-                          tooltip={item.label}
-                          className="w-full justify-between"
-                        >
-                          <div className="flex items-center gap-2.5">
-                            <Icon className="h-4 w-4" />
-                            <span className="font-semibold text-xs">{item.label}</span>
-                          </div>
-                          {item.badge !== undefined && item.badge > 0 && (
-                            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
-                              {item.badge}
-                            </span>
-                          )}
-                        </SidebarMenuButton>
+                        {item.href ? (
+                          <SidebarMenuButton asChild tooltip={item.label} className="w-full justify-between">
+                            <Link href={item.href}>{content}</Link>
+                          </SidebarMenuButton>
+                        ) : (
+                          <SidebarMenuButton
+                            isActive={isActive}
+                            onClick={() => setActiveTab(item.id)}
+                            tooltip={item.label}
+                            className="w-full justify-between"
+                          >
+                            {content}
+                          </SidebarMenuButton>
+                        )}
                       </SidebarMenuItem>
                     );
                   })}

@@ -1,6 +1,7 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import { getAcMasterData } from "./actions";
-import { Database, Plus, Settings2 } from "lucide-react";
+import { ArrowLeft, Database, Settings2 } from "lucide-react";
 import { MasterDataClient } from "./master-data-client";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
@@ -18,7 +19,15 @@ export default async function MasterDataPage() {
   const { brands } = await getAcMasterData();
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-10">
+    <div className="space-y-6 max-w-5xl mx-auto pb-10 p-6">
+      <Link
+        href="/admin"
+        className="inline-flex items-center gap-1.5 text-sm font-bold text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        กลับสู่แดชบอร์ด
+      </Link>
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-zinc-900 flex items-center gap-2">

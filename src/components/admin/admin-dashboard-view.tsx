@@ -28,6 +28,7 @@ import {
   Settings,
   Activity,
   ImageOff,
+  Database,
 } from "lucide-react";
 import { AnimatedIcon } from "@/components/ui/animated-icon";
 import {
@@ -470,6 +471,13 @@ export function AdminDashboardView({
       label: "จัดการ QR Code",
       icon: QrCode,
       group: "ระบบทรัพย์สิน",
+    },
+    {
+      id: "master_data",
+      label: "จัดการยี่ห้อ/รุ่นแอร์",
+      icon: Database,
+      group: "ระบบทรัพย์สิน",
+      href: "/admin/master-data",
     },
     {
       id: "profile",
