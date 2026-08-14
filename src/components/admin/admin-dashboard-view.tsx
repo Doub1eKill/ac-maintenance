@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition, useEffect, useMemo } from "react";
+import Image from "next/image";
 import { createWorkOrderAction, updateUserStatusByOrgAdminAction, assignWorkOrderAction } from "@/app/admin/actions";
 import {
   Building2,
@@ -1239,11 +1240,12 @@ export function AdminDashboardView({
                                   <span className="text-[11px] leading-tight">โหลดรูปไม่สำเร็จ</span>
                                 </div>
                               ) : (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img
+                                <Image
                                   src={img}
                                   alt="Work Order Evidence"
-                                  className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                                  fill
+                                  sizes="(max-width: 640px) 50vw, 33vw"
+                                  className="object-cover transition-transform group-hover:scale-105"
                                   onError={() => setBrokenEvidenceImages((prev) => ({ ...prev, [img]: true }))}
                                 />
                               )}
