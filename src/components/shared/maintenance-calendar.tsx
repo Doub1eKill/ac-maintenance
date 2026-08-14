@@ -24,6 +24,7 @@ import {
   Clock, 
   Wrench,
   AlertTriangle,
+  Building2,
   X
 } from "lucide-react";
 import { AnimatedIcon } from "@/components/ui/animated-icon";
@@ -34,6 +35,9 @@ interface Schedule {
   acCode: string;
   brand: string;
   location: string;
+  buildingId: string;
+  buildingName: string;
+  roomName: string;
   frequencyValue: number;
   frequencyUnit: string;
   lastPerformedAt: string | null;
@@ -42,6 +46,10 @@ interface Schedule {
   isActive: boolean;
   jobType: "repair" | "cleaning";
 }
+
+// Beyond this many jobs, a day cell lists buildings instead of individual
+// jobs — otherwise the cell overflows into an unreadable scroll of pills.
+const DAY_GROUP_THRESHOLD = 4;
 
 const JOB_TYPE_LABEL: Record<Schedule["jobType"], string> = {
   repair: "งานซ่อม",
@@ -64,6 +72,11 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedEvent, setSelectedEvent] = useState<Schedule | null>(null);
+  const [selectedDayBuilding, setSelectedDayBuilding] = useState<{
+    date: Date;
+    buildingName: string;
+    jobs: Schedule[];
+  } | null>(null);
 
   useEffect(() => {
     async function fetchSchedules() {
@@ -189,32 +202,55 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
             </div>
 
             <div className="mt-1 flex flex-col gap-1 overflow-y-auto flex-1 min-h-0 no-scrollbar">
-              {dayEvents.map((event) => {
-                const status = getEventStatus(new Date(event.nextDueDate));
-                let badgeClass = "bg-primary/10 text-primary border-primary/20 hover:bg-primary/20";
-                if (status === "overdue") badgeClass = "bg-red-50 text-red-700 border-red-100 hover:bg-red-100";
-                if (status === "warning") badgeClass = "bg-warning/10 text-warning-foreground border-warning/20 hover:bg-warning/20";
-
-                return (
+              {dayEvents.length > DAY_GROUP_THRESHOLD ? (
+                // Too many to list one-by-one in a day cell — group by
+                // building instead, drilling down to the job list on click.
+                Object.values(
+                  dayEvents.reduce<Record<string, { name: string; jobs: Schedule[] }>>((acc, job) => {
+                    (acc[job.buildingId] ??= { name: job.buildingName, jobs: [] }).jobs.push(job);
+                    return acc;
+                  }, {})
+                ).map((group) => (
                   <div
-                    key={event.id}
-                    onClick={() => setSelectedEvent(event)}
-                    className={`cursor-pointer border px-1.5 py-1 rounded-md text-[10px] font-semibold flex items-center justify-between truncate transition-colors ${badgeClass}`}
+                    key={group.name}
+                    onClick={() => setSelectedDayBuilding({ date: cloneDay, buildingName: group.name, jobs: group.jobs })}
+                    className="cursor-pointer border px-1.5 py-1 rounded-md text-[10px] font-semibold flex items-center justify-between truncate transition-colors bg-primary/10 text-primary border-primary/20 hover:bg-primary/20"
                   >
-                    {/* Type first so it reads at a glance, then the unit code —
-                        a tech needs to know both what the job is and which
-                        machine. Narrow cells truncate the tail, so the full
-                        text is on the title attribute too. */}
-                    <span
-                      className="truncate"
-                      title={`${JOB_TYPE_LABEL[event.jobType]} - ${event.acCode}`}
-                    >
-                      {JOB_TYPE_LABEL[event.jobType]} - {event.acCode}
+                    <span className="truncate flex items-center gap-1" title={`${group.name} (${group.jobs.length} งาน)`}>
+                      <Building2 className="h-3 w-3 shrink-0" />
+                      {group.name} ({group.jobs.length})
                     </span>
-                    {status === "overdue" && <AlertTriangle className="h-3 w-3 shrink-0 ml-1" />}
+                    <ChevronRight className="h-3 w-3 shrink-0 ml-1" />
                   </div>
-                );
-              })}
+                ))
+              ) : (
+                dayEvents.map((event) => {
+                  const status = getEventStatus(new Date(event.nextDueDate));
+                  let badgeClass = "bg-primary/10 text-primary border-primary/20 hover:bg-primary/20";
+                  if (status === "overdue") badgeClass = "bg-red-50 text-red-700 border-red-100 hover:bg-red-100";
+                  if (status === "warning") badgeClass = "bg-warning/10 text-warning-foreground border-warning/20 hover:bg-warning/20";
+
+                  return (
+                    <div
+                      key={event.id}
+                      onClick={() => setSelectedEvent(event)}
+                      className={`cursor-pointer border px-1.5 py-1 rounded-md text-[10px] font-semibold flex items-center justify-between truncate transition-colors ${badgeClass}`}
+                    >
+                      {/* Type first so it reads at a glance, then the unit code —
+                          a tech needs to know both what the job is and which
+                          machine. Narrow cells truncate the tail, so the full
+                          text is on the title attribute too. */}
+                      <span
+                        className="truncate"
+                        title={`${JOB_TYPE_LABEL[event.jobType]} - ${event.acCode}`}
+                      >
+                        {JOB_TYPE_LABEL[event.jobType]} - {event.acCode}
+                      </span>
+                      {status === "overdue" && <AlertTriangle className="h-3 w-3 shrink-0 ml-1" />}
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
         );
@@ -296,6 +332,53 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
     );
   };
 
+  const renderDayBuildingModal = () => {
+    if (!selectedDayBuilding) return null;
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-xs p-4">
+        <div className="w-full max-w-sm rounded-2xl border border-border bg-white shadow-xl animate-in fade-in zoom-in-95 max-h-[80vh] flex flex-col">
+          <div className="p-5 border-b border-border flex items-start justify-between shrink-0">
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+                <Building2 className="h-5 w-5 text-primary" />
+                {selectedDayBuilding.buildingName}
+              </h3>
+              <p className="text-xs text-muted-foreground font-medium">
+                {format(selectedDayBuilding.date, "d MMMM yyyy", { locale: th })} • {selectedDayBuilding.jobs.length} งาน
+              </p>
+            </div>
+            <button onClick={() => setSelectedDayBuilding(null)} className="p-1 text-muted-foreground hover:text-foreground rounded-lg hover:bg-secondary transition-colors">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="p-3 space-y-1.5 overflow-y-auto">
+            {selectedDayBuilding.jobs.map((job) => {
+              const status = getEventStatus(new Date(job.nextDueDate));
+              return (
+                <div
+                  key={job.id}
+                  onClick={() => {
+                    setSelectedEvent(job);
+                    setSelectedDayBuilding(null);
+                  }}
+                  className="cursor-pointer rounded-xl border border-border p-3 text-xs hover:bg-muted transition-colors flex items-center justify-between gap-2"
+                >
+                  <div className="min-w-0">
+                    <div className="font-bold text-foreground truncate">{JOB_TYPE_LABEL[job.jobType]} - {job.acCode}</div>
+                    <div className="text-muted-foreground text-[11px] truncate">ห้อง {job.roomName}</div>
+                  </div>
+                  {status === "overdue" && <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-red-600" />}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="biz-card relative animate-in fade-in shadow-sm rounded-2xl overflow-hidden bg-white border border-border flex flex-col h-[600px]">
       {isLoading && (
@@ -307,6 +390,7 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
       {renderDays()}
       {renderCells()}
       {renderEventModal()}
+      {renderDayBuildingModal()}
     </div>
   );
 }
