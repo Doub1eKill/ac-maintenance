@@ -21,6 +21,7 @@ export default async function AdminHomePage() {
   const {
     dbError,
     universityName,
+    profile,
     metrics,
     workOrders,
     buildings,
@@ -41,6 +42,7 @@ export default async function AdminHomePage() {
       }}
       dbError={dbError}
       universityName={universityName}
+      profile={profile}
       metrics={metrics}
       workOrders={workOrders}
       buildings={buildings}

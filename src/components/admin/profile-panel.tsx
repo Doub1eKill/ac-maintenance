@@ -1,15 +1,17 @@
 "use client";
 
-import { useState, useActionState } from "react";
-import { User, Mail, Building2, KeyRound, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { useState, useTransition, useActionState } from "react";
+import { User, Mail, Phone, Building2, KeyRound, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { requestPasswordReset, type RequestResetState } from "@/app/request-password-reset/actions";
+import { updateProfileAction } from "@/app/admin/actions";
 
 interface ProfilePanelProps {
-  user: {
-    name?: string | null;
-    email?: string | null;
+  profile: {
+    name: string;
+    email: string;
     role?: string | null;
+    phone: string | null;
   };
   universityName: string;
 }
@@ -19,16 +21,27 @@ const ROLE_LABEL: Record<string, string> = {
   technician: "ช่างซ่อมบำรุง",
 };
 
-export function ProfilePanel({ user, universityName }: ProfilePanelProps) {
-  const [name, setName] = useState(user.name ?? "");
-  const [showBackendPendingNotice, setShowBackendPendingNotice] = useState(false);
+export function ProfilePanel({ profile, universityName }: ProfilePanelProps) {
+  const [name, setName] = useState(profile.name);
+  const [phone, setPhone] = useState(profile.phone ?? "");
+  const [saveResult, setSaveResult] = useState<{ success?: boolean; error?: string } | null>(null);
+  const [isSaving, startSaveTransition] = useTransition();
+
   const [resetState, resetFormAction, isResetPending] = useActionState<RequestResetState, FormData>(
     requestPasswordReset,
     null
   );
 
-  const initials = user.name ? user.name.slice(0, 2).toUpperCase() : "US";
-  const roleLabel = user.role ? ROLE_LABEL[user.role] ?? user.role : "-";
+  const initials = profile.name ? profile.name.slice(0, 2).toUpperCase() : "US";
+  const roleLabel = profile.role ? ROLE_LABEL[profile.role] ?? profile.role : "-";
+
+  const handleSave = () => {
+    setSaveResult(null);
+    startSaveTransition(async () => {
+      const result = await updateProfileAction(name, phone);
+      setSaveResult(result);
+    });
+  };
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -41,7 +54,7 @@ export function ProfilePanel({ user, universityName }: ProfilePanelProps) {
           <div>
             <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
               <User className="h-4 w-4 text-muted-foreground" />
-              {user.name || "-"}
+              {profile.name || "-"}
             </h3>
             <span className="inline-flex items-center gap-1 mt-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary/20 text-primary border border-primary/30">
               {roleLabel}
@@ -67,6 +80,23 @@ export function ProfilePanel({ user, universityName }: ProfilePanelProps) {
           </div>
 
           <div>
+            <label htmlFor="profile-phone" className="mb-1.5 block text-xs font-bold text-foreground">
+              เบอร์โทรศัพท์
+            </label>
+            <div className="relative">
+              <Phone className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                id="profile-phone"
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="081-234-5678"
+                className="w-full rounded-xl border border-border bg-muted pl-10 pr-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
+              />
+            </div>
+          </div>
+
+          <div>
             <label htmlFor="profile-email" className="mb-1.5 block text-xs font-bold text-foreground">
               อีเมล
             </label>
@@ -75,27 +105,34 @@ export function ProfilePanel({ user, universityName }: ProfilePanelProps) {
               className="flex items-center gap-2 rounded-xl border border-border bg-muted/50 px-3.5 py-2.5 text-sm text-muted-foreground"
             >
               <Mail className="h-4 w-4 shrink-0" />
-              {user.email || "-"}
+              {profile.email || "-"}
             </div>
           </div>
         </div>
 
-        {showBackendPendingNotice && (
-          <Alert className="border-warning/30 bg-warning/10">
-            <AlertTriangle className="text-warning" />
-            <AlertTitle>ยังบันทึกไม่ได้ในตอนนี้</AlertTitle>
-            <AlertDescription>
-              ฟีเจอร์นี้ยังไม่เชื่อมต่อกับระบบหลังบ้าน — มีการฝากคำขอไว้ให้ทีม Backend แล้ว
-            </AlertDescription>
+        {saveResult?.success && (
+          <Alert className="border-primary/30 bg-primary/10">
+            <CheckCircle2 className="text-primary" />
+            <AlertTitle>บันทึกแล้ว</AlertTitle>
+            <AlertDescription>ข้อมูลโปรไฟล์ของคุณถูกอัปเดตเรียบร้อย</AlertDescription>
+          </Alert>
+        )}
+
+        {saveResult?.error && (
+          <Alert variant="destructive">
+            <AlertTriangle />
+            <AlertTitle>บันทึกไม่สำเร็จ</AlertTitle>
+            <AlertDescription>{saveResult.error}</AlertDescription>
           </Alert>
         )}
 
         <button
           type="button"
-          onClick={() => setShowBackendPendingNotice(true)}
-          className="w-full sm:w-auto rounded-xl bg-foreground px-5 py-2.5 text-sm font-bold text-white hover:bg-primary/90 transition-colors"
+          onClick={handleSave}
+          disabled={isSaving}
+          className="w-full sm:w-auto rounded-xl bg-foreground px-5 py-2.5 text-sm font-bold text-white hover:bg-primary/90 disabled:opacity-50 transition-colors"
         >
-          บันทึกการเปลี่ยนแปลง
+          {isSaving ? "กำลังบันทึก..." : "บันทึกการเปลี่ยนแปลง"}
         </button>
       </div>
 
@@ -122,14 +159,14 @@ export function ProfilePanel({ user, universityName }: ProfilePanelProps) {
         )}
 
         <form action={resetFormAction}>
-          <input type="hidden" name="email" value={user.email ?? ""} />
+          <input type="hidden" name="email" value={profile.email ?? ""} />
           <p className="text-xs text-muted-foreground mb-3">
             ลิงก์สำหรับตั้งรหัสผ่านใหม่จะถูกส่งไปที่{" "}
-            <span className="font-bold text-foreground">{user.email || "-"}</span>
+            <span className="font-bold text-foreground">{profile.email || "-"}</span>
           </p>
           <button
             type="submit"
-            disabled={isResetPending || !user.email}
+            disabled={isResetPending || !profile.email}
             className="w-full sm:w-auto rounded-xl border border-border bg-white px-5 py-2.5 text-sm font-bold text-foreground hover:bg-secondary disabled:opacity-50 transition-colors"
           >
             {isResetPending ? "กำลังส่งคำขอ..." : "ส่งลิงก์เปลี่ยนรหัสผ่าน"}

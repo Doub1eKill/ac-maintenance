@@ -134,6 +134,12 @@ interface AdminDashboardViewProps {
   };
   dbError?: string | null;
   universityName: string;
+  profile: {
+    name: string;
+    email: string;
+    role?: string | null;
+    phone: string | null;
+  };
   metrics: {
     totalUnits: number;
     brokenOrCleaningUnits: number;
@@ -157,6 +163,7 @@ export function AdminDashboardView({
   user,
   dbError,
   universityName,
+  profile,
   metrics,
   weeklyActivity = [],
   workOrders,
@@ -1013,7 +1020,7 @@ export function AdminDashboardView({
 
       {/* Profile View */}
       {activeTab === "profile" && (
-        <ProfilePanel user={user} universityName={universityName} />
+        <ProfilePanel profile={profile} universityName={universityName} />
       )}
 
       {/* Modal: Create Work Order */}
