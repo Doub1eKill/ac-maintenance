@@ -2,10 +2,11 @@
 
 import { useState, useTransition, useEffect } from "react";
 import {
-  Building2, Plus, ChevronDown, ChevronUp, X, QrCode, CalendarClock, Printer, CheckCircle2, AlertTriangle
+  Building2, Plus, ChevronDown, ChevronUp, X, QrCode, CalendarClock, Printer, CheckCircle2, AlertTriangle, Clock
 } from "lucide-react";
 import { createBuildingAction, createRoomAction, createAirConditionerAction, saveMaintenanceScheduleAction } from "@/app/admin/actions";
 import { QRCodeSVG } from "qrcode.react";
+import { AcHistoryModal } from "@/components/admin/ac-history-modal";
 import {
   Alert,
   AlertDescription,
@@ -80,6 +81,7 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
   const [showAddAc, setShowAddAc] = useState<{ roomId: string } | null>(null);
   const [showPmSettings, setShowPmSettings] = useState<ACUnit | null>(null);
   const [showQrCode, setShowQrCode] = useState<ACUnit | null>(null);
+  const [showHistoryFor, setShowHistoryFor] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   // AC Form state
@@ -280,17 +282,23 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
                           </div>
                           
                           <div className="flex items-center gap-2 pt-2 border-t border-border">
-                            <button 
+                            <button
                               onClick={() => setShowPmSettings(ac)}
                               className="flex-1 rounded border border-border bg-white py-1.5 text-[10px] font-bold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors text-center"
                             >
                               {ac.maintenanceSchedule ? `ล้างทุก ${ac.maintenanceSchedule.frequencyValue} ${ac.maintenanceSchedule.frequencyUnit === 'days' ? 'วัน' : ac.maintenanceSchedule.frequencyUnit === 'months' ? 'เดือน' : 'ปี'}` : 'ตั้งค่าล้างแอร์'}
                             </button>
-                            <button 
+                            <button
                               onClick={() => setShowQrCode(ac)}
                               className="flex-1 rounded border border-border bg-white py-1.5 text-[10px] font-bold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors text-center"
                             >
                               QR Code
+                            </button>
+                            <button
+                              onClick={() => setShowHistoryFor(ac.id)}
+                              className="flex-1 inline-flex items-center justify-center gap-1 rounded border border-border bg-white py-1.5 text-[10px] font-bold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors text-center"
+                            >
+                              <Clock className="h-3 w-3" /> ดูประวัติ
                             </button>
                           </div>
                         </div>
@@ -579,6 +587,13 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
             </button>
           </div>
         </div>
+      )}
+
+      {showHistoryFor && (
+        <AcHistoryModal
+          airConditionerId={showHistoryFor}
+          onClose={() => setShowHistoryFor(null)}
+        />
       )}
     </div>
   );
