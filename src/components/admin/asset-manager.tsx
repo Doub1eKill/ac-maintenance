@@ -449,6 +449,18 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
                 </>
               )}
 
+              <div>
+                <label className="mb-1.5 block font-bold text-foreground">
+                  วันที่ติดตั้ง (ไม่บังคับ)
+                </label>
+                <input
+                  name="installedAt"
+                  type="date"
+                  className="w-full rounded-xl border border-border px-3.5 py-2.5 text-foreground focus:border-primary focus:outline-none"
+                />
+                <p className="mt-1 text-[11px] text-muted-foreground">ไม่กรอก = ใช้วันที่วันนี้</p>
+              </div>
+
               <button type="submit" disabled={isPending} className="w-full rounded-xl bg-foreground py-2.5 font-bold text-white hover:bg-primary/90 disabled:opacity-50 mt-4">
                 {isPending ? "กำลังบันทึก..." : "ลงทะเบียนเครื่องปรับอากาศ"}
               </button>
