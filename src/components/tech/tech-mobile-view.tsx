@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useTransition, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { claimWorkOrderAction, bulkClaimWorkOrdersAction, logMaintenanceAction, scanQrCodeAction } from "@/app/tech/actions";
 import type { TechnicianAssetUnit, TechnicianAssetSummary } from "@/lib/maintenance";
 import { Checkbox } from "@/components/ui/checkbox";
-import { MaintenanceCalendar } from "@/components/shared/maintenance-calendar";
 import {
   Wrench,
   QrCode,
@@ -31,6 +31,20 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { AnimatedIcon } from "@/components/ui/animated-icon";
+
+// Pulls in date-fns and its own markup — split out of the initial bundle
+// since only the calendar tab needs it.
+const MaintenanceCalendar = dynamic(
+  () => import("@/components/shared/maintenance-calendar").then((m) => m.MaintenanceCalendar),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-64 items-center justify-center rounded-2xl border border-border bg-white">
+        <AnimatedIcon icon={Clock} size={24} animation="spin" className="text-primary" />
+      </div>
+    ),
+  }
+);
 import {
   Alert,
   AlertTitle,

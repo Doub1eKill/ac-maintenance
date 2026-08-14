@@ -60,13 +60,32 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import dynamic from "next/dynamic";
 import { DashboardLayout, NavItem } from "@/components/layout/dashboard-layout";
 import { AssetManager } from "@/components/admin/asset-manager";
-import { MaintenanceCalendar } from "@/components/shared/maintenance-calendar";
 import { ProfilePanel } from "@/components/admin/profile-panel";
 import { QrCodeManager } from "@/components/admin/qr-code-manager";
-import { ChartAreaInteractive } from "@/components/admin/chart-area-interactive";
 import { UpcomingMaintenanceTable, type MaintenanceRow, type UrgentMaintenanceAC } from "@/components/admin/upcoming-maintenance-table";
+
+// Both pull in a chunk of their own weight (recharts, date-fns) that only
+// the tab actually showing them needs to pay for — code-split instead of
+// bundling them into every load of this file.
+const MaintenanceCalendar = dynamic(
+  () => import("@/components/shared/maintenance-calendar").then((m) => m.MaintenanceCalendar),
+  { ssr: false, loading: () => <ChunkLoadingFallback /> }
+);
+const ChartAreaInteractive = dynamic(
+  () => import("@/components/admin/chart-area-interactive").then((m) => m.ChartAreaInteractive),
+  { ssr: false, loading: () => <ChunkLoadingFallback /> }
+);
+
+function ChunkLoadingFallback() {
+  return (
+    <div className="flex h-64 items-center justify-center rounded-2xl border border-border bg-white">
+      <AnimatedIcon icon={Clock} size={24} animation="spin" className="text-primary" />
+    </div>
+  );
+}
 
 interface WorkOrderItem {
   id: string;
