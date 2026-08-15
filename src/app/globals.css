@@ -210,3 +210,48 @@ body {
     @apply font-sans;
   }
 }
+
+/*
+ * Sonner (toast) self-injects its own <style> at runtime, scoped as
+ * [data-sonner-toaster][data-sonner-theme="light"/"dark"] (2 attribute
+ * selectors). Matching only [data-sonner-toaster] here (1 attribute
+ * selector) LOSES to that on specificity even with !important — !important
+ * only wins ties, it doesn't outrank a more specific selector. So this is
+ * scoped identically (repeating [data-sonner-toaster] once more to also
+ * clear its unscoped font-family/border-radius rule) to guarantee priority
+ * regardless of which <style> tag lands in the DOM first.
+ *
+ * Mixed against --popover (the same surface --normal-bg already uses, and
+ * what --success-foreground/--destructive-foreground/etc. are tuned to sit
+ * on in the app's own badges/pills) rather than literal white/black, so it
+ * automatically tracks light/dark instead of needing separate values here.
+ *
+ * Mixed "in oklab", not "in oklch": --popover is oklch(1 0 0), i.e. white
+ * with a *literal* hue of 0deg (not the "none"/powerless hue the `white`
+ * keyword carries). color-mix(in oklch, ...) interpolates hue through that
+ * real 0deg, dragging a heavily-white-weighted mix toward pink/red instead
+ * of staying on the source color's hue. oklab has no hue angle to skew
+ * through — it blends the a/b axes directly — so it doesn't have this bug.
+ */
+[data-sonner-toaster][data-sonner-toaster] {
+  font-family: inherit !important;
+}
+
+[data-sonner-toaster][data-sonner-toaster][data-sonner-theme="light"],
+[data-sonner-toaster][data-sonner-toaster][data-sonner-theme="dark"] {
+  --success-bg: color-mix(in oklab, var(--success) 18%, var(--popover)) !important;
+  --success-border: color-mix(in oklab, var(--success) 35%, var(--popover)) !important;
+  --success-text: var(--success-foreground) !important;
+
+  --error-bg: color-mix(in oklab, var(--destructive) 14%, var(--popover)) !important;
+  --error-border: color-mix(in oklab, var(--destructive) 32%, var(--popover)) !important;
+  --error-text: var(--destructive-foreground) !important;
+
+  --warning-bg: color-mix(in oklab, var(--warning) 20%, var(--popover)) !important;
+  --warning-border: color-mix(in oklab, var(--warning) 38%, var(--popover)) !important;
+  --warning-text: var(--warning-foreground) !important;
+
+  --info-bg: color-mix(in oklab, var(--info) 18%, var(--popover)) !important;
+  --info-border: color-mix(in oklab, var(--info) 35%, var(--popover)) !important;
+  --info-text: var(--info-foreground) !important;
+}

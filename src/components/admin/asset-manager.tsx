@@ -1,18 +1,13 @@
 "use client";
 
 import { useState, useTransition, useEffect } from "react";
+import { toast } from "sonner";
 import {
-  Building2, Plus, ChevronDown, ChevronUp, X, QrCode, CalendarClock, Printer, CheckCircle2, AlertTriangle, Clock
+  Building2, Plus, ChevronDown, ChevronUp, X, QrCode, CalendarClock, Printer, Clock
 } from "lucide-react";
 import { createBuildingAction, createRoomAction, createAirConditionerAction, saveMaintenanceScheduleAction } from "@/app/admin/actions";
 import { QRCodeSVG } from "qrcode.react";
 import { AcHistoryModal } from "@/components/admin/ac-history-modal";
-import {
-  Alert,
-  AlertDescription,
-  AlertAction,
-} from "@/components/ui/alert";
-import { AnimatedIcon } from "@/components/ui/animated-icon";
 import {
   NativeSelect,
   NativeSelectOption,
@@ -82,7 +77,6 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
   const [showPmSettings, setShowPmSettings] = useState<ACUnit | null>(null);
   const [showQrCode, setShowQrCode] = useState<ACUnit | null>(null);
   const [showHistoryFor, setShowHistoryFor] = useState<string | null>(null);
-  const [toastMessage, setToastMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   // AC Form state
   const [acBrandType, setAcBrandType] = useState<"master" | "other">("master");
@@ -118,62 +112,58 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
 
   async function handleAddBuilding(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setToastMessage(null);
     const formData = new FormData(e.currentTarget);
     startTransition(async () => {
       const res = await createBuildingAction(formData);
-      if (res.error) setToastMessage({ type: "error", text: res.error });
+      if (res.error) toast.error(res.error);
       else {
         setShowAddBuilding(false);
-        setToastMessage({ type: "success", text: "เพิ่มอาคารสำเร็จ" });
+        toast.success("เพิ่มอาคารสำเร็จ");
       }
     });
   }
 
   async function handleAddRoom(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setToastMessage(null);
     const formData = new FormData(e.currentTarget);
     if (showAddRoom) formData.append("buildingId", showAddRoom.buildingId);
     startTransition(async () => {
       const res = await createRoomAction(formData);
-      if (res.error) setToastMessage({ type: "error", text: res.error });
+      if (res.error) toast.error(res.error);
       else {
         setShowAddRoom(null);
-        setToastMessage({ type: "success", text: "เพิ่มห้องสำเร็จ" });
+        toast.success("เพิ่มห้องสำเร็จ");
       }
     });
   }
 
   async function handleAddAc(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setToastMessage(null);
     const formData = new FormData(e.currentTarget);
     if (showAddAc) formData.append("roomId", showAddAc.roomId);
     formData.append("brandType", acBrandType);
-    
+
     startTransition(async () => {
       const res = await createAirConditionerAction(formData);
-      if (res.error) setToastMessage({ type: "error", text: res.error });
+      if (res.error) toast.error(res.error);
       else {
         setShowAddAc(null);
-        setToastMessage({ type: "success", text: "ลงทะเบียนแอร์สำเร็จ" });
+        toast.success("ลงทะเบียนแอร์สำเร็จ");
       }
     });
   }
 
   async function handleSavePmSettings(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setToastMessage(null);
     const formData = new FormData(e.currentTarget);
     if (showPmSettings) formData.append("airConditionerId", showPmSettings.id);
-    
+
     startTransition(async () => {
       const res = await saveMaintenanceScheduleAction(formData);
-      if (res.error) setToastMessage({ type: "error", text: res.error });
+      if (res.error) toast.error(res.error);
       else {
         setShowPmSettings(null);
-        setToastMessage({ type: "success", text: "บันทึกรอบการล้างแอร์สำเร็จ" });
+        toast.success("บันทึกรอบการล้างแอร์สำเร็จ");
       }
     });
   }
@@ -182,37 +172,6 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
 
   return (
     <div className="biz-card p-6 space-y-5 animate-in fade-in">
-      {toastMessage && (
-        <Alert
-          className={toastMessage.type === "success"
-            ? "border-success/30 bg-success/10 text-success-foreground"
-            : "border-red-200 bg-red-50 text-destructive"
-          }
-        >
-          {toastMessage.type === "success" ? (
-            <AnimatedIcon icon={CheckCircle2} size={16} animation="bounce" className="text-success" />
-          ) : (
-            <AnimatedIcon icon={AlertTriangle} size={16} animation="wiggle" className="text-destructive" />
-          )}
-          <AlertDescription
-            className={toastMessage.type === "success"
-              ? "text-success-foreground font-semibold"
-              : "text-destructive font-semibold"
-            }
-          >
-            {toastMessage.text}
-          </AlertDescription>
-          <AlertAction>
-            <button
-              onClick={() => setToastMessage(null)}
-              className="text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </AlertAction>
-        </Alert>
-      )}
-
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-border pb-4 gap-4">
         <h2 className="text-base font-bold text-foreground flex items-center gap-2">
           <Building2 className="h-5 w-5 text-foreground" />

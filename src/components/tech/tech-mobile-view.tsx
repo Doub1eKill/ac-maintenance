@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { toast } from "sonner";
 import dynamic from "next/dynamic";
 import { claimWorkOrderAction, bulkClaimWorkOrdersAction, logMaintenanceAction } from "@/app/tech/actions";
 import type { TechnicianAssetUnit, TechnicianAssetSummary } from "@/lib/maintenance";
@@ -9,7 +10,6 @@ import {
   QrCode,
   ClipboardList,
   CheckCircle2,
-  X,
   AlertTriangle,
   Calendar,
   Clock,
@@ -20,7 +20,6 @@ import {
   Alert,
   AlertTitle,
   AlertDescription,
-  AlertAction,
 } from "@/components/ui/alert";
 import { DashboardLayout, NavItem } from "@/components/layout/dashboard-layout";
 import {
@@ -89,38 +88,32 @@ export function TechMobileView({
   // Action Logger Modal State
   const [selectedJobForLog, setSelectedJobForLog] = useState<TechJobItem | null>(null);
 
-  // Notification Toast State
-  const [toastMessage, setToastMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-
   function handleClaim(workOrderId: string) {
-    setToastMessage(null);
     startTransition(async () => {
       const res = await claimWorkOrderAction(workOrderId);
       if (res.error) {
-        setToastMessage({ type: "error", text: res.error });
+        toast.error(res.error);
       } else {
-        setToastMessage({ type: "success", text: "รับงานเรียบร้อยแล้ว! งานถูกย้ายไปที่แท็บ 'งานของฉัน'" });
+        toast.success("รับงานเรียบร้อยแล้ว! งานถูกย้ายไปที่แท็บ 'งานของฉัน'");
         setActiveTab("my_jobs");
       }
     });
   }
 
   function handleBulkClaim(workOrderIds: string[]): Promise<boolean> {
-    setToastMessage(null);
     return new Promise((resolve) => {
       startTransition(async () => {
         const res = await bulkClaimWorkOrdersAction(workOrderIds);
         if ("error" in res) {
-          setToastMessage({ type: "error", text: res.error ?? "เกิดข้อผิดพลาดในการรับงานหลายรายการ" });
+          toast.error(res.error ?? "เกิดข้อผิดพลาดในการรับงานหลายรายการ");
           resolve(false);
           return;
         }
-        setToastMessage({
-          type: "success",
-          text: `รับงานสำเร็จ ${res.claimedCount} งาน${
+        toast.success(
+          `รับงานสำเร็จ ${res.claimedCount} งาน${
             res.skippedCount > 0 ? ` (ข้าม ${res.skippedCount} งานที่ถูกรับไปแล้ว)` : ""
-          } งานถูกย้ายไปที่แท็บ 'งานของฉัน'`,
-        });
+          } งานถูกย้ายไปที่แท็บ 'งานของฉัน'`
+        );
         setActiveTab("my_jobs");
         resolve(true);
       });
@@ -128,13 +121,12 @@ export function TechMobileView({
   }
 
   function handleLogActionSubmit(formData: FormData) {
-    setToastMessage(null);
     startTransition(async () => {
       const res = await logMaintenanceAction(formData);
       if (res.error) {
-        setToastMessage({ type: "error", text: res.error });
+        toast.error(res.error);
       } else {
-        setToastMessage({ type: "success", text: "บันทึกประวัติการซ่อมบำรุงและปิดงานสำเร็จ!" });
+        toast.success("บันทึกประวัติการซ่อมบำรุงและปิดงานสำเร็จ!");
         setSelectedJobForLog(null);
       }
     });
@@ -194,38 +186,6 @@ export function TechMobileView({
           <AnimatedIcon icon={AlertTriangle} size={16} animation="wiggle" className="text-warning" />
           <AlertTitle className="font-bold text-warning-foreground">การแจ้งเตือนการเชื่อมต่อฐานข้อมูล</AlertTitle>
           <AlertDescription className="text-warning-foreground/90 font-normal">{dbError}</AlertDescription>
-        </Alert>
-      )}
-
-      {/* Toast Notification */}
-      {toastMessage && (
-        <Alert
-          className={toastMessage.type === "success"
-            ? "border-success/30 bg-success/10 text-success-foreground"
-            : "border-red-200 bg-red-50 text-destructive"
-          }
-        >
-          {toastMessage.type === "success" ? (
-            <AnimatedIcon icon={CheckCircle2} size={16} animation="bounce" className="text-success" />
-          ) : (
-            <AnimatedIcon icon={AlertTriangle} size={16} animation="wiggle" className="text-destructive" />
-          )}
-          <AlertDescription
-            className={toastMessage.type === "success"
-              ? "text-success-foreground font-semibold"
-              : "text-destructive font-semibold"
-            }
-          >
-            {toastMessage.text}
-          </AlertDescription>
-          <AlertAction>
-            <button
-              onClick={() => setToastMessage(null)}
-              className="text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </AlertAction>
         </Alert>
       )}
 
@@ -321,10 +281,10 @@ export function TechMobileView({
         onClose={() => setShowQrModal(false)}
         onClaim={handleClaim}
         onPlaceholderCreated={() => {
-          setToastMessage({ type: "success", text: "สร้างใบงานบำรุงรักษาเรียบร้อย (จำลอง)" });
+          toast.success("สร้างใบงานบำรุงรักษาเรียบร้อย (จำลอง)");
           setShowQrModal(false);
         }}
-        onScanError={(message) => setToastMessage({ type: "error", text: message })}
+        onScanError={(message) => toast.error(message)}
       />
 
       {/* Modal: Action Logger Sheet */}
@@ -333,7 +293,7 @@ export function TechMobileView({
         isPending={isPending}
         onClose={() => setSelectedJobForLog(null)}
         onSubmit={handleLogActionSubmit}
-        onValidationError={(message) => setToastMessage({ type: "error", text: message })}
+        onValidationError={(message) => toast.error(message)}
       />
     </DashboardLayout>
   );

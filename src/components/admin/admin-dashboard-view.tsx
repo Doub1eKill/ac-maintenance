@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { toast } from "sonner";
 import { createWorkOrderAction, updateUserStatusByOrgAdminAction, assignWorkOrderAction } from "@/app/admin/actions";
 import {
   Building2,
   Snowflake,
   AlertTriangle,
   ClipboardList,
-  CheckCircle2,
   Clock,
   X,
   Calendar,
@@ -22,7 +22,6 @@ import {
   Alert,
   AlertTitle,
   AlertDescription,
-  AlertAction,
 } from "@/components/ui/alert";
 import dynamic from "next/dynamic";
 import { DashboardLayout, NavItem } from "@/components/layout/dashboard-layout";
@@ -109,28 +108,26 @@ export function AdminDashboardView({
   const [selectedAcForWorkOrder, setSelectedAcForWorkOrder] = useState<string | null>(null);
   const [selectedOrderToAssign, setSelectedOrderToAssign] = useState<string | null>(null);
   const [globalSearch, setGlobalSearch] = useState("");
-  const [toastMessage, setToastMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [selectedWorkOrderDetails, setSelectedWorkOrderDetails] = useState<WorkOrderItem | null>(null);
 
   const activeTechnicians = allUsers.filter((u) => u.role === "technician" && u.status === "active");
 
   async function handleCreateOrderSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setToastMessage(null);
     const formData = new FormData(e.currentTarget);
     const acId = formData.get("airConditionerId") as string;
 
     if (!acId) {
-      setToastMessage({ type: "error", text: "กรุณาเลือกเครื่องปรับอากาศที่ต้องการแจ้งซ่อม" });
+      toast.error("กรุณาเลือกเครื่องปรับอากาศที่ต้องการแจ้งซ่อม");
       return;
     }
 
     startTransition(async () => {
       const res = await createWorkOrderAction(formData);
       if (res.error) {
-        setToastMessage({ type: "error", text: res.error });
+        toast.error(res.error);
       } else {
-        setToastMessage({ type: "success", text: "ออกใบงานซ่อมบำรุงด่วนเรียบร้อยแล้ว" });
+        toast.success("ออกใบงานซ่อมบำรุงด่วนเรียบร้อยแล้ว");
         setShowCreateModal(false);
       }
     });
@@ -139,21 +136,20 @@ export function AdminDashboardView({
   async function handleAssignSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!selectedOrderToAssign) return;
-    setToastMessage(null);
     const formData = new FormData(e.currentTarget);
     const assignToUserId = formData.get("assignToUserId") as string;
 
     if (!assignToUserId) {
-      setToastMessage({ type: "error", text: "กรุณาเลือกช่างเทคนิค" });
+      toast.error("กรุณาเลือกช่างเทคนิค");
       return;
     }
 
     startTransition(async () => {
       const res = await assignWorkOrderAction(selectedOrderToAssign, assignToUserId);
       if (res.error) {
-        setToastMessage({ type: "error", text: res.error });
+        toast.error(res.error);
       } else {
-        setToastMessage({ type: "success", text: "มอบหมายงานเรียบร้อยแล้ว" });
+        toast.success("มอบหมายงานเรียบร้อยแล้ว");
         setShowAssignModal(false);
         setSelectedOrderToAssign(null);
       }
@@ -166,16 +162,12 @@ export function AdminDashboardView({
   }
 
   function handleUserStatus(userId: string, newStatus: "active" | "suspended") {
-    setToastMessage(null);
     startTransition(async () => {
       const res = await updateUserStatusByOrgAdminAction(userId, newStatus);
       if (res.error) {
-        setToastMessage({ type: "error", text: res.error });
+        toast.error(res.error);
       } else {
-        setToastMessage({
-          type: "success",
-          text: newStatus === "active" ? "อนุมัติสิทธิ์เข้าใช้งานสำเร็จ" : "ระงับสิทธิ์เข้าใช้งานสำเร็จ",
-        });
+        toast.success(newStatus === "active" ? "อนุมัติสิทธิ์เข้าใช้งานสำเร็จ" : "ระงับสิทธิ์เข้าใช้งานสำเร็จ");
       }
     });
   }
@@ -277,38 +269,6 @@ export function AdminDashboardView({
           <AnimatedIcon icon={AlertTriangle} size={16} animation="wiggle" className="text-warning" />
           <AlertTitle className="font-bold text-warning-foreground">การแจ้งเตือนการเชื่อมต่อฐานข้อมูล</AlertTitle>
           <AlertDescription className="text-warning-foreground/90 font-normal">{dbError}</AlertDescription>
-        </Alert>
-      )}
-
-      {/* Toast Notification */}
-      {toastMessage && (
-        <Alert
-          className={toastMessage.type === "success"
-            ? "border-success/30 bg-success/10 text-success-foreground"
-            : "border-red-200 bg-red-50 text-destructive"
-          }
-        >
-          {toastMessage.type === "success" ? (
-            <AnimatedIcon icon={CheckCircle2} size={16} animation="bounce" className="text-success" />
-          ) : (
-            <AnimatedIcon icon={AlertTriangle} size={16} animation="wiggle" className="text-destructive" />
-          )}
-          <AlertDescription
-            className={toastMessage.type === "success"
-              ? "text-success-foreground font-semibold"
-              : "text-destructive font-semibold"
-            }
-          >
-            {toastMessage.text}
-          </AlertDescription>
-          <AlertAction>
-            <button
-              onClick={() => setToastMessage(null)}
-              className="text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </AlertAction>
         </Alert>
       )}
 
