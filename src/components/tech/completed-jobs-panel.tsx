@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
-import { CheckCircle2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import {
   Pagination,
   PaginationContent,
@@ -53,6 +53,16 @@ export function CompletedJobsPanel({ completedJobs, searchQuery, selectedBuildin
                     <span className="rounded-md bg-accent px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
                       {job.brand}
                     </span>
+                    {job.priority === "critical" && (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-800">
+                        <AlertTriangle className="h-3 w-3" /> ด่วนที่สุด
+                      </span>
+                    )}
+                    {job.priority === "high" && (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-orange-200 bg-orange-100 px-2 py-0.5 text-[10px] font-bold text-orange-800">
+                        <AlertTriangle className="h-3 w-3" /> ด่วน
+                      </span>
+                    )}
                   </div>
                 </div>
                 <CheckCircle2 className="h-5 w-5 text-success" />

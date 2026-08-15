@@ -554,6 +554,7 @@ export async function updateProfileAction(name: string, phone?: string) {
 const createWorkOrderSchema = z.object({
   airConditionerId: z.string().min(1, "กรุณาเลือกเครื่องปรับอากาศ"),
   assignToUserId: z.string().optional(),
+  priority: z.enum(["low", "high", "critical"]).default("low"),
 });
 
 export async function createWorkOrderAction(formData: FormData) {
@@ -562,6 +563,7 @@ export async function createWorkOrderAction(formData: FormData) {
   const raw = {
     airConditionerId: formData.get("airConditionerId"),
     assignToUserId: formData.get("assignToUserId") || undefined,
+    priority: formData.get("priority") || undefined,
   };
 
   const parsed = createWorkOrderSchema.safeParse(raw);
@@ -578,6 +580,7 @@ export async function createWorkOrderAction(formData: FormData) {
       data: {
         airConditionerId: acId,
         status: assignTo ? "claimed" : "pending",
+        priority: parsed.data.priority,
         claimedBy: assignTo,
         claimedAt: assignTo ? new Date() : null,
       },
@@ -588,7 +591,7 @@ export async function createWorkOrderAction(formData: FormData) {
       action: "CREATE_WORKORDER",
       entityType: "workOrder",
       entityId: workOrder.id,
-      newValues: { status: "pending", airConditionerId: acId.toString() },
+      newValues: { status: "pending", airConditionerId: acId.toString(), priority: parsed.data.priority },
       ipAddress: "server_action",
     });
 

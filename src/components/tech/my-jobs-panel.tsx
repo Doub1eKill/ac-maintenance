@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
-import { MoreVertical } from "lucide-react";
+import { AlertTriangle, MoreVertical } from "lucide-react";
 import {
   Pagination,
   PaginationContent,
@@ -58,6 +58,16 @@ export function MyJobsPanel({ myJobs, searchQuery, selectedBuilding, onSelectFor
                     <span className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${idx === 0 ? "bg-slate-800 text-muted-foreground" : "bg-secondary text-foreground"}`}>
                       {job.brand}
                     </span>
+                    {job.priority === "critical" && (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-800">
+                        <AlertTriangle className="h-3 w-3" /> ด่วนที่สุด
+                      </span>
+                    )}
+                    {job.priority === "high" && (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-orange-200 bg-orange-100 px-2 py-0.5 text-[10px] font-bold text-orange-800">
+                        <AlertTriangle className="h-3 w-3" /> ด่วน
+                      </span>
+                    )}
                   </div>
                 </div>
                 <MoreVertical className={`h-4 w-4 ${idx === 0 ? "text-muted-foreground" : "text-muted-foreground"}`} />

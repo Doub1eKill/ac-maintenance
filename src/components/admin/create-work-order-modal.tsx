@@ -137,6 +137,19 @@ export function CreateWorkOrderModal({
           </div>
 
           <div>
+            <label className="mb-1.5 block font-bold text-foreground">ระดับความเร่งด่วน</label>
+            <NativeSelect
+              name="priority"
+              defaultValue="low"
+              className="w-full h-auto py-3 px-3.5 rounded-xl border-border bg-muted text-xs text-foreground"
+            >
+              <NativeSelectOption value="low">ปกติ</NativeSelectOption>
+              <NativeSelectOption value="high">ด่วน (High)</NativeSelectOption>
+              <NativeSelectOption value="critical">ด่วนที่สุด (Critical)</NativeSelectOption>
+            </NativeSelect>
+          </div>
+
+          <div>
             <label className="mb-1.5 block font-bold text-foreground">มอบหมายช่างเทคนิค (ไม่บังคับ)</label>
             <NativeSelect name="assignToUserId" defaultValue="" className="w-full h-auto py-3 px-3.5 rounded-xl border-border bg-muted text-xs text-foreground">
               <NativeSelectOption value="">-- ไม่ระบุช่าง --</NativeSelectOption>

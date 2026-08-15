@@ -145,6 +145,7 @@ export async function getTechnicianData() {
       brand: wo.airConditioner.acBrand?.name || wo.airConditioner.brand || "ไม่ระบุ",
       btu: wo.airConditioner.btu,
       status: wo.airConditioner.status,
+      priority: wo.priority,
       location: formatAcLocation(wo.airConditioner.room),
       createdAt: wo.createdAt ? wo.createdAt.toISOString() : null,
     }));
@@ -156,6 +157,7 @@ export async function getTechnicianData() {
       btu: wo.airConditioner.btu,
       airConditionerId: wo.airConditionerId.toString(),
       status: wo.airConditioner.status,
+      priority: wo.priority,
       location: formatAcLocation(wo.airConditioner.room),
       claimedAt: wo.claimedAt ? wo.claimedAt.toISOString() : null,
     }));
@@ -167,6 +169,7 @@ export async function getTechnicianData() {
       btu: wo.airConditioner.btu,
       airConditionerId: wo.airConditionerId.toString(),
       status: wo.airConditioner.status,
+      priority: wo.priority,
       location: formatAcLocation(wo.airConditioner.room),
       completedAt: wo.completedAt ? wo.completedAt.toISOString() : null,
     }));
