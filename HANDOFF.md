@@ -450,6 +450,89 @@ DoubleKill จะไม่แตะไฟล์เหล่านี้ ถ้�
 
   **📌 คำขอ:** เพิ่ม server action ใหม่ (แนะนำ `getWorkOrdersPage(page: number)`) ที่รับเลขหน้าแล้ว query ด้วย `skip`/`take` ตาม `WORK_ORDER_PAGE_SIZE` คืน shape เดียวกับ `workOrders[]` ใน `getOrgAdminData()` จะได้ map ผลลัพธ์แบบเดิมได้เลยไม่ต้องแก้ UI ที่ render แถวอยู่แล้ว — เผื่อไว้ด้วยว่าถ้ามี filter/search ฝั่ง client (เช่นช่องค้นหารหัสแอร์) อยากให้ backend filter ตรงนี้ด้วยไหม หรือ UI จะ filter เฉพาะหน้าที่โหลดมาแล้วพอ (คุยกันได้)
 
+  **📌 อัปเดต 15 ส.ค. 2026 — ร่างโค้ดให้พร้อมก็อปวางเลย (Esther03u ทำ UI ฝั่ง `work-order-board.tsx` เสร็จรอเรียกอยู่ หลังแยกไฟล์ตาม P10 แล้ว):** ก็อปโครง select/map มาจาก `getOrgAdminData()` เป๊ะๆ (บรรทัด 90-127 กับ 275-297) เพื่อให้ shape ตรงกันแบบไม่ต้องเดา
+
+  ```ts
+  export async function getWorkOrdersPage(page: number) {
+    await verifyOrgAdmin();
+
+    const safePage = Math.max(1, Math.floor(page) || 1);
+
+    const workOrdersRaw = await prisma.workOrder.findMany({
+      select: {
+        id: true,
+        status: true,
+        priority: true,
+        issueDescription: true,
+        resolutionNotes: true,
+        images: true,
+        assignedAt: true,
+        claimedAt: true,
+        completedAt: true,
+        createdAt: true,
+        airConditionerId: true,
+        airConditioner: {
+          select: {
+            acCode: true,
+            brand: true,
+            btu: true,
+            status: true,
+            room: {
+              select: {
+                name: true,
+                building: { select: { name: true, abbreviation: true } },
+              },
+            },
+            acBrand: { select: { name: true } },
+          },
+        },
+        claimedByUser: { select: { name: true } },
+        reportedByUser: { select: { name: true } },
+        assignedToUser: { select: { name: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      skip: (safePage - 1) * WORK_ORDER_PAGE_SIZE,
+      take: WORK_ORDER_PAGE_SIZE,
+    });
+
+    // Same mapping as workOrders in getOrgAdminData() — keep the two in sync
+    // if either one changes, or the board will render two slightly different shapes.
+    const workOrders = workOrdersRaw.map((wo) => ({
+      id: wo.id.toString(),
+      acCode: wo.airConditioner.acCode,
+      brand: wo.airConditioner.acBrand?.name || wo.airConditioner.brand || "ไม่ระบุ",
+      btu: wo.airConditioner.btu,
+      acStatus: wo.airConditioner.status,
+      location: `${wo.airConditioner.room.building.name} (${wo.airConditioner.room.building.abbreviation}) - ห้อง ${wo.airConditioner.room.name}`,
+      status: wo.status,
+      priority: wo.priority,
+      issueDescription: wo.issueDescription,
+      resolutionNotes: wo.resolutionNotes,
+      images: wo.images,
+      reportedByName: wo.reportedByUser?.name || null,
+      assignedToName: wo.assignedToUser?.name || null,
+      assignedAt: wo.assignedAt ? wo.assignedAt.toISOString() : null,
+      claimedByName: wo.claimedByUser?.name || null,
+      claimedAt: wo.claimedAt ? wo.claimedAt.toISOString() : null,
+      completedAt: wo.completedAt ? wo.completedAt.toISOString() : null,
+      createdAt: wo.createdAt ? wo.createdAt.toISOString() : null,
+      airConditionerId: wo.airConditionerId.toString(),
+    }));
+
+    const total = await prisma.workOrder.count();
+
+    return {
+      workOrders,
+      page: safePage,
+      pageSize: WORK_ORDER_PAGE_SIZE,
+      total,
+      hasMore: safePage * WORK_ORDER_PAGE_SIZE < total,
+    };
+  }
+  ```
+
+  ไม่ filter ฝั่ง server เพิ่ม — ตาม `workOrder-board.tsx` ตอนนี้ค้นหา/กรองทำในหน้าที่โหลดมาแล้วฝั่ง client อยู่แล้ว (เหมือนพฤติกรรมเดิม) ถ้าอยากได้ server-side search ทีหลังค่อยเพิ่ม `where` แยกเป็นงานใหม่ได้ ไม่ต้องรวมกับ pagination รอบนี้
+
 ---
 
 ## 🎨 UI/Styling Backlog — Deferred Backend Requests
