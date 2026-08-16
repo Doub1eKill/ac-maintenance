@@ -589,6 +589,35 @@ DoubleKill จะไม่แตะไฟล์เหล่านี้ ถ้�
   2. `admin-dashboard-view.tsx` — เพิ่ม `profile` ใน props interface แล้วส่งต่อให้ `<ProfilePanel />`
   3. `profile-panel.tsx` — อ่าน `profile` แทน `user`, เพิ่มช่องเบอร์โทร, และเปลี่ยนปุ่ม "บันทึกการเปลี่ยนแปลง" ให้เรียก `updateProfileAction(name, phone)` จริง (ลบ `showBackendPendingNotice` ทิ้งได้)
 
+### Org Admin System Settings Page (16 สิงหาคม 2026)
+
+หน้า "ตั้งค่าระบบ" (`src/components/admin/settings-panel.tsx`) สร้าง UI ครบ 4 การ์ดแล้ว ตามสเปก `docs/superpowers/specs/2026-08-16-org-admin-system-settings-page-design.md` การ์ด "จัดการยี่ห้อ/รุ่นแอร์" ทำงานได้จริง (reuse ของเดิม ไม่ต้องรอ) ส่วนอีก 3 การ์ดเป็น UI placeholder รอ backend:
+
+- [ ] **S4.** การ์ด "รอบซ่อมบำรุงเริ่มต้น" — กดบันทึกแล้วโชว์แค่ข้อความเตือน ยังไม่มีที่เก็บค่า
+
+  **คำขอ:** สร้างตาราง `SystemSettings` ใหม่ (แถวเดียว/singleton, `id` ตายตัว = 1): `defaultFrequencyValue Int @default(6)`, `defaultFrequencyUnit String @default("months")`, `organisationName String?`, `organisationAddress String?`, `organisationPhone String?`, `updatedAt DateTime @updatedAt` (รวมกับ S5 ในตารางเดียวกัน) แล้วเพิ่ม Server Action `updateDefaultFrequencyAction(value: number, unit: string)` ใน `src/app/admin/actions.ts` — validate ด้วย Zod (`value > 0`, `unit` เป็นหนึ่งใน `"days" | "months" | "years"`) แล้ว upsert แถวเดียวนั้น พร้อม `logAudit`
+
+  **ตัดสินใจแล้ว:** เปลี่ยนค่า default นี้มีผลกับ**เครื่องปรับอากาศที่เพิ่มใหม่เท่านั้น** — `MaintenanceSchedule` ที่มีอยู่แล้วไม่ต้องอัปเดตย้อนหลัง จุดที่สร้าง `MaintenanceSchedule` ตอนเพิ่มเครื่องแอร์ใหม่ ให้อ่านค่าจาก `SystemSettings` แทนค่า hardcode `frequency_value`/`frequency_unit` ที่ตั้งไว้ใน `prisma/schema.prisma` ตอนนี้ (`prisma/schema.prisma:261-262`)
+
+- [ ] **S5.** การ์ด "ข้อมูลองค์กร" — กดบันทึกแล้วโชว์แค่ข้อความเตือนเหมือนกัน ชื่อหน่วยงานตอนนี้ยังเป็นค่าคงที่ `ORGANISATION_NAME` ใน `src/lib/organisation.ts` (ที่อยู่/เบอร์โทรไม่มีที่เก็บเลย)
+
+  **คำขอ:** เพิ่ม Server Action `updateOrganisationInfoAction(name: string, address?: string, phone?: string)` ใน `src/app/admin/actions.ts` — upsert แถว `SystemSettings` เดียวกับ S4 พร้อม `logAudit` แล้วเปลี่ยน `src/lib/organisation.ts` จาก export ค่าคงที่ `ORGANISATION_NAME` เป็นฟังก์ชัน async `getOrganisationName()` ที่อ่านจาก `SystemSettings.organisationName` (fallback เป็นสตริงเดิม `"มหาวิทยาลัยราชภัฏภูเก็ต"` ถ้ายังไม่เคยตั้งค่า) แล้วอัปเดต 2 จุดที่เรียกใช้ค่าคงที่เดิมอยู่ (`src/app/tech/actions.ts`, `src/app/admin/actions.ts`) ให้เรียก `await getOrganisationName()` แทน
+
+- [ ] **S6.** ปุ่ม "รีเซ็ตรหัสผ่าน" ในหน้าทีมพานเนล (`team-panel.tsx`) — กดยืนยันแล้วโชว์แค่ข้อความเตือน ยังไม่ได้รีเซ็ตจริง
+
+  **คำขอ:** เพิ่ม Server Action `adminResetUserPasswordAction(userId: string)` ใน `src/app/admin/actions.ts` — guard ด้วย `verifyOrgAdmin()` เดิม ตั้ง `password = NULL` ให้ user เป้าหมาย (ไม่ต้องสร้าง/ส่งรหัสผ่านใหม่ให้ admin เห็นเลย — schema ออกแบบไว้แล้วว่า `password = NULL` แปลว่า "ต้องตั้งรหัสใหม่ก่อนเข้าระบบ" และ `authorize()` จะบังคับ flow นี้ให้เอง) พร้อม `logAudit`
+
+- [ ] **S7.** การ์ด "ประวัติการใช้งานระบบ" — ตอนนี้เป็น empty-state เฉยๆ เพราะไม่มีฟังก์ชันอ่านข้อมูลเลย
+
+  **คำขอ:** เพิ่มฟังก์ชันอ่านข้อมูล เช่น `getAuditLogs({ page, actionFilter }?)` ใน `src/app/admin/actions.ts` (หรือไฟล์ใหม่ที่เหมาะสม) ดึง `system_audit_logs` เรียงจากล่าสุด ~200 รายการ join ชื่อผู้ทำ (`user.name`) มาด้วย — `src/lib/audit.ts` เขียนเข้าตารางนี้อยู่แล้วจากหลาย action (`CREATE_WORKORDER`, `ASSIGN_WORKORDER`, `CANCEL_WORKORDER`, `UPDATE_AIRCONDITIONER`, `UPDATE_MAINTENANCE_LOG`, `CLAIM_WORKORDER`, `COMPLETE_WORKORDER`) แต่ยังไม่มีใครอ่านกลับเลย
+
+  *(เสริม ไม่เร่งด่วน)* `src/app/admin/master-data/actions.ts` เรียก `revalidatePath("/admin/master-data")` ใน `createAcBrandAction`/`createAcModelAction` อยู่ 2 จุด — route นั้นถูกลบไปแล้ว (ย้าย UI มาไว้ในแท็บ "ตั้งค่าระบบ" ที่ `/admin` แทน) ฝั่ง UI ชดเชยด้วย `router.refresh()` ใน `master-data-client.tsx` ไปแล้วจึงไม่กระทบการใช้งานปัจจุบัน แต่ถ้าสะดวกตอนแตะไฟล์นี้ครั้งหน้า เปลี่ยนเป็น `revalidatePath("/admin")` จะตรงกับ route จริงมากกว่า
+
+**สิ่งที่ต้องทำฝั่ง UI เพื่อให้ครบวงจร เมื่อ backend เสร็จ** (backend พร้อมแล้ว DoubleKill ไม่แตะไฟล์ UI ตามกฎ):
+1. `settings-panel.tsx` — เปลี่ยนปุ่ม "บันทึก" ทั้ง 2 การ์ด (S4, S5) ให้เรียก action จริงแทนการโชว์ `NotConnectedAlert`
+2. `team-panel.tsx` — เปลี่ยน `onConfirm` ของ `ConfirmActionDialog` ให้เรียก `adminResetUserPasswordAction` จริง
+3. `settings-panel.tsx` — เปลี่ยนการ์ด "ประวัติการใช้งานระบบ" จาก empty-state เป็นตารางแสดงผลจริงจาก `getAuditLogs()`
+
 ---
 
 ## 📬 คำตอบจาก Esther03u — 6 สิงหาคม 2026
