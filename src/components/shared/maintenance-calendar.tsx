@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { 
   format, 
   addMonths, 
@@ -28,6 +28,14 @@ import {
   X
 } from "lucide-react";
 import { AnimatedIcon } from "@/components/ui/animated-icon";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 
 interface Schedule {
   id: string;
@@ -77,6 +85,10 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
     buildingName: string;
     jobs: Schedule[];
   } | null>(null);
+  const [selectedDay, setSelectedDay] = useState<Date | null>(null);
+  const [dayBuildingFilter, setDayBuildingFilter] = useState<string>("all");
+  const [dayRoomFilter, setDayRoomFilter] = useState<string>("all");
+  const [dayTypeFilter, setDayTypeFilter] = useState<Schedule["jobType"] | "all">("all");
 
   useEffect(() => {
     async function fetchSchedules() {
@@ -115,6 +127,52 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
     if (daysDiff < 0) return "overdue";
     if (daysDiff <= 7) return "warning";
     return "upcoming";
+  };
+
+  // All jobs on the clicked day, unfiltered — the base set the three
+  // dropdowns below narrow down from.
+  const dayJobs = useMemo(
+    () => (selectedDay ? schedules.filter((s) => isSameDay(new Date(s.nextDueDate), selectedDay)) : []),
+    [schedules, selectedDay]
+  );
+
+  const dayBuildingOptions = useMemo(
+    () => Array.from(new Set(dayJobs.map((job) => job.buildingName))).sort((a, b) => a.localeCompare(b, "th")),
+    [dayJobs]
+  );
+
+  // Room options narrow to the selected building so the dropdown never
+  // offers a room that has no job on this day under the current building
+  // filter.
+  const dayRoomOptions = useMemo(() => {
+    const jobsInBuilding =
+      dayBuildingFilter === "all" ? dayJobs : dayJobs.filter((job) => job.buildingName === dayBuildingFilter);
+    return Array.from(new Set(jobsInBuilding.map((job) => job.roomName))).sort((a, b) => a.localeCompare(b, "th"));
+  }, [dayJobs, dayBuildingFilter]);
+
+  const filteredDayJobs = useMemo(
+    () =>
+      dayJobs.filter(
+        (job) =>
+          (dayBuildingFilter === "all" || job.buildingName === dayBuildingFilter) &&
+          (dayRoomFilter === "all" || job.roomName === dayRoomFilter) &&
+          (dayTypeFilter === "all" || job.jobType === dayTypeFilter)
+      ),
+    [dayJobs, dayBuildingFilter, dayRoomFilter, dayTypeFilter]
+  );
+
+  const handleDayBuildingFilterChange = (value: string) => {
+    setDayBuildingFilter(value);
+    // Changing the building can orphan the currently selected room, so
+    // reset it rather than silently filtering to zero results.
+    setDayRoomFilter("all");
+  };
+
+  const closeDaySheet = () => {
+    setSelectedDay(null);
+    setDayBuildingFilter("all");
+    setDayRoomFilter("all");
+    setDayTypeFilter("all");
   };
 
   const renderHeader = () => {
@@ -199,9 +257,14 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
             }`}
           >
             <div className="flex justify-between items-start shrink-0">
-              <span className={`text-xs font-bold flex h-6 w-6 items-center justify-center rounded-full ${
-                isTodayDate ? "bg-primary text-white shadow-md" : "text-foreground"
-              }`}>
+              <span
+                onClick={() => setSelectedDay(cloneDay)}
+                className={`text-xs font-bold flex h-6 w-6 items-center justify-center rounded-full cursor-pointer transition-colors ${
+                  isTodayDate
+                    ? "bg-primary text-white shadow-md hover:bg-primary/90"
+                    : "text-foreground hover:bg-primary/10"
+                }`}
+              >
                 {formattedDate}
               </span>
               {dayEvents.length > 0 && (
@@ -389,6 +452,100 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
     );
   };
 
+  const renderDaySheet = () => {
+    return (
+      <Sheet open={selectedDay !== null} onOpenChange={(open) => !open && closeDaySheet()}>
+        <SheetContent side="right" className="data-[side=right]:sm:max-w-md">
+          {selectedDay && (
+            <>
+              <SheetHeader>
+                <SheetTitle>{format(selectedDay, "d MMMM yyyy", { locale: th })}</SheetTitle>
+                <SheetDescription>
+                  {filteredDayJobs.length} จาก {dayJobs.length} รายการ
+                </SheetDescription>
+              </SheetHeader>
+
+              <div className="px-6 space-y-3 shrink-0">
+                <div>
+                  <label className="mb-1 block text-xs font-bold text-foreground">อาคาร</label>
+                  <NativeSelect
+                    value={dayBuildingFilter}
+                    onChange={(e) => handleDayBuildingFilterChange(e.target.value)}
+                  >
+                    <NativeSelectOption value="all">ทุกอาคาร</NativeSelectOption>
+                    {dayBuildingOptions.map((name) => (
+                      <NativeSelectOption key={name} value={name}>
+                        {name}
+                      </NativeSelectOption>
+                    ))}
+                  </NativeSelect>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-bold text-foreground">ห้อง</label>
+                  <NativeSelect value={dayRoomFilter} onChange={(e) => setDayRoomFilter(e.target.value)}>
+                    <NativeSelectOption value="all">ทุกห้อง</NativeSelectOption>
+                    {dayRoomOptions.map((name) => (
+                      <NativeSelectOption key={name} value={name}>
+                        {name}
+                      </NativeSelectOption>
+                    ))}
+                  </NativeSelect>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-bold text-foreground">ประเภทงาน</label>
+                  <NativeSelect
+                    value={dayTypeFilter}
+                    onChange={(e) => setDayTypeFilter(e.target.value as Schedule["jobType"] | "all")}
+                  >
+                    <NativeSelectOption value="all">ทุกประเภท</NativeSelectOption>
+                    <NativeSelectOption value="repair">{JOB_TYPE_LABEL.repair}</NativeSelectOption>
+                    <NativeSelectOption value="cleaning">{JOB_TYPE_LABEL.cleaning}</NativeSelectOption>
+                  </NativeSelect>
+                </div>
+              </div>
+
+              <div className="p-6 pt-4 space-y-1.5 overflow-y-auto flex-1 min-h-0">
+                {dayJobs.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-8">ไม่มีงานในวันนี้</p>
+                ) : filteredDayJobs.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-8">
+                    ไม่พบรายการที่ตรงกับตัวกรองที่เลือก
+                  </p>
+                ) : (
+                  filteredDayJobs.map((job) => {
+                    const status = getEventStatus(new Date(job.nextDueDate));
+                    return (
+                      <div
+                        key={job.id}
+                        onClick={() => {
+                          setSelectedEvent(job);
+                          closeDaySheet();
+                        }}
+                        className="cursor-pointer rounded-xl border border-border p-3 text-xs hover:bg-muted transition-colors flex items-center justify-between gap-2"
+                      >
+                        <div className="min-w-0">
+                          <div className="font-bold text-foreground truncate">
+                            {JOB_TYPE_LABEL[job.jobType]} - {job.acCode}
+                          </div>
+                          <div className="text-muted-foreground text-[11px] truncate">
+                            {job.buildingName} • ห้อง {job.roomName}
+                          </div>
+                        </div>
+                        {status === "overdue" && <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-red-600" />}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
+    );
+  };
+
   return (
     <div className="biz-card relative animate-in fade-in shadow-sm rounded-2xl overflow-hidden bg-white border border-border flex flex-col h-[600px]">
       {isLoading && (
@@ -401,6 +558,7 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
       {renderCells()}
       {renderEventModal()}
       {renderDayBuildingModal()}
+      {renderDaySheet()}
     </div>
   );
 }
