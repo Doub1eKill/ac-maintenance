@@ -263,14 +263,14 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
         days.push(
           <div
             key={day.toString()}
-            className={`h-full flex flex-col border-b border-r border-border p-2 transition-all ${
+            onClick={() => setSelectedDay(cloneDay)}
+            className={`h-full flex flex-col border-b border-r border-border p-2 transition-all cursor-pointer ${
               !isCurrentMonth ? "bg-muted/50 text-muted-foreground" : "bg-white hover:bg-muted"
             }`}
           >
             <div className="flex justify-between items-start shrink-0">
               <button
                 type="button"
-                onClick={() => setSelectedDay(cloneDay)}
                 aria-label={format(cloneDay, "d MMMM yyyy", { locale: th })}
                 className={`text-xs font-bold flex h-6 w-6 items-center justify-center rounded-full cursor-pointer transition-colors ${
                   isTodayDate
@@ -299,7 +299,10 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
                 ).map((group) => (
                   <div
                     key={group.name}
-                    onClick={() => setSelectedDayBuilding({ date: cloneDay, buildingName: group.name, jobs: group.jobs })}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedDayBuilding({ date: cloneDay, buildingName: group.name, jobs: group.jobs });
+                    }}
                     className="cursor-pointer border px-1.5 py-1 rounded-md text-[10px] font-semibold flex items-center justify-between truncate transition-colors bg-primary/10 text-primary border-primary/20 hover:bg-primary/20"
                   >
                     <span className="truncate flex items-center gap-1" title={`${group.name} (${group.jobs.length} งาน)`}>
@@ -319,7 +322,10 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
                   return (
                     <div
                       key={event.id}
-                      onClick={() => setSelectedEvent(event)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedEvent(event);
+                      }}
                       className={`cursor-pointer border px-1.5 py-1 rounded-md text-[10px] font-semibold flex items-center justify-between truncate transition-colors ${badgeClass}`}
                     >
                       {/* Type first so it reads at a glance, then the unit code —
