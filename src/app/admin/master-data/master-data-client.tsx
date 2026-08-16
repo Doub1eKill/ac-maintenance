@@ -1,17 +1,18 @@
 "use client";
 
 import { useState, useRef, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { createAcBrandAction, createAcModelAction } from "./actions";
 import { Plus, Check, ChevronDown, ChevronRight, Wind } from "lucide-react";
 
-type ModelType = {
+export type ModelType = {
   id: string;
   brandId: string;
   name: string;
   defaultBtu: number | null;
 };
 
-type BrandType = {
+export type BrandType = {
   id: string;
   name: string;
   modelsCount: number;
@@ -50,6 +51,7 @@ export function MasterDataClient({ initialBrands }: { initialBrands: BrandType[]
 }
 
 function AddBrandCard() {
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -69,6 +71,7 @@ function AddBrandCard() {
         setSuccess(true);
         formRef.current?.reset();
         setTimeout(() => setSuccess(false), 3000);
+        router.refresh();
       }
     });
   };
@@ -107,6 +110,7 @@ function AddBrandCard() {
 }
 
 function BrandItem({ brand, isExpanded, onToggle }: { brand: BrandType, isExpanded: boolean, onToggle: () => void }) {
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -123,6 +127,7 @@ function BrandItem({ brand, isExpanded, onToggle }: { brand: BrandType, isExpand
         setError(result.error);
       } else if (result?.success) {
         formRef.current?.reset();
+        router.refresh();
       }
     });
   };
