@@ -143,11 +143,22 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
 
   // Room options narrow to the selected building so the dropdown never
   // offers a room that has no job on this day under the current building
-  // filter.
+  // filter. Use a composite key (buildingId::roomName) to distinguish rooms
+  // with the same name across different buildings.
   const dayRoomOptions = useMemo(() => {
     const jobsInBuilding =
       dayBuildingFilter === "all" ? dayJobs : dayJobs.filter((job) => job.buildingName === dayBuildingFilter);
-    return Array.from(new Set(jobsInBuilding.map((job) => job.roomName))).sort((a, b) => a.localeCompare(b, "th"));
+    const seen = new Map<string, { value: string; label: string }>();
+    for (const job of jobsInBuilding) {
+      const value = `${job.buildingId}::${job.roomName}`;
+      if (!seen.has(value)) {
+        seen.set(value, {
+          value,
+          label: dayBuildingFilter === "all" ? `${job.buildingName} • ${job.roomName}` : job.roomName,
+        });
+      }
+    }
+    return Array.from(seen.values()).sort((a, b) => a.label.localeCompare(b.label, "th"));
   }, [dayJobs, dayBuildingFilter]);
 
   const filteredDayJobs = useMemo(
@@ -155,7 +166,7 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
       dayJobs.filter(
         (job) =>
           (dayBuildingFilter === "all" || job.buildingName === dayBuildingFilter) &&
-          (dayRoomFilter === "all" || job.roomName === dayRoomFilter) &&
+          (dayRoomFilter === "all" || `${job.buildingId}::${job.roomName}` === dayRoomFilter) &&
           (dayTypeFilter === "all" || job.jobType === dayTypeFilter)
       ),
     [dayJobs, dayBuildingFilter, dayRoomFilter, dayTypeFilter]
@@ -257,8 +268,10 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
             }`}
           >
             <div className="flex justify-between items-start shrink-0">
-              <span
+              <button
+                type="button"
                 onClick={() => setSelectedDay(cloneDay)}
+                aria-label={format(cloneDay, "d MMMM yyyy", { locale: th })}
                 className={`text-xs font-bold flex h-6 w-6 items-center justify-center rounded-full cursor-pointer transition-colors ${
                   isTodayDate
                     ? "bg-primary text-white shadow-md hover:bg-primary/90"
@@ -266,7 +279,7 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
                 }`}
               >
                 {formattedDate}
-              </span>
+              </button>
               {dayEvents.length > 0 && (
                 <span className="text-[10px] font-bold text-muted-foreground">
                   {dayEvents.length} รายการ
@@ -485,9 +498,9 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
                   <label className="mb-1 block text-xs font-bold text-foreground">ห้อง</label>
                   <NativeSelect value={dayRoomFilter} onChange={(e) => setDayRoomFilter(e.target.value)}>
                     <NativeSelectOption value="all">ทุกห้อง</NativeSelectOption>
-                    {dayRoomOptions.map((name) => (
-                      <NativeSelectOption key={name} value={name}>
-                        {name}
+                    {dayRoomOptions.map((option) => (
+                      <NativeSelectOption key={option.value} value={option.value}>
+                        {option.label}
                       </NativeSelectOption>
                     ))}
                   </NativeSelect>
