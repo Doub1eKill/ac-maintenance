@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { getOrgAdminData } from "./actions";
+import { getAcMasterData } from "./master-data/actions";
 import { AdminDashboardView } from "@/components/admin/admin-dashboard-view";
 
 export const metadata = {
@@ -32,6 +33,7 @@ export default async function AdminHomePage() {
     weeklyActivity,
     urgentUnits,
   } = await getOrgAdminData();
+  const { brands: masterDataBrands } = await getAcMasterData();
 
   return (
     <AdminDashboardView
@@ -50,6 +52,7 @@ export default async function AdminHomePage() {
       pendingUsers={pendingUsers}
       allUsers={allUsers}
       brands={brands || []}
+      masterDataBrands={masterDataBrands}
       weeklyActivity={weeklyActivity}
       urgentUnits={urgentUnits}
     />

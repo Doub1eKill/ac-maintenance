@@ -15,7 +15,6 @@ import {
   QrCode,
   User,
   Settings,
-  Database,
 } from "lucide-react";
 import { AnimatedIcon } from "@/components/ui/animated-icon";
 import {
@@ -27,6 +26,7 @@ import dynamic from "next/dynamic";
 import { DashboardLayout, NavItem } from "@/components/layout/dashboard-layout";
 import { AssetManager } from "@/components/admin/asset-manager";
 import { ProfilePanel } from "@/components/admin/profile-panel";
+import { SettingsPanel } from "@/components/admin/settings-panel";
 import { QrCodeManager } from "@/components/admin/qr-code-manager";
 import { OverviewPanel } from "@/components/admin/overview-panel";
 import { WorkOrderBoard } from "@/components/admin/work-order-board";
@@ -37,6 +37,7 @@ import { AssignWorkOrderModal } from "@/components/admin/assign-work-order-modal
 import { WorkOrderDetailDialog } from "@/components/admin/work-order-detail-dialog";
 import type { WorkOrderItem, BuildingItem, PendingUser } from "@/components/admin/types";
 import type { UrgentMaintenanceAC } from "@/components/admin/upcoming-maintenance-table";
+import type { BrandType } from "@/app/admin/master-data/master-data-client";
 
 // Both pull in a chunk of their own weight (recharts, date-fns) that only
 // the tab actually showing them needs to pay for — code-split instead of
@@ -85,6 +86,7 @@ interface AdminDashboardViewProps {
   pendingUsers?: PendingUser[];
   allUsers?: PendingUser[];
   brands: any[];
+  masterDataBrands: BrandType[];
 }
 
 export function AdminDashboardView({
@@ -99,6 +101,7 @@ export function AdminDashboardView({
   pendingUsers = [],
   allUsers = [],
   brands = [],
+  masterDataBrands = [],
   urgentUnits = [],
 }: AdminDashboardViewProps) {
   const [activeTab, setActiveTab] = useState<string>("overview");
@@ -218,13 +221,6 @@ export function AdminDashboardView({
       group: "ระบบทรัพย์สิน",
     },
     {
-      id: "master_data",
-      label: "จัดการยี่ห้อ/รุ่นแอร์",
-      icon: Database,
-      group: "ระบบทรัพย์สิน",
-      href: "/admin/master-data",
-    },
-    {
       id: "profile",
       label: "จัดการโปรไฟล์",
       icon: User,
@@ -250,7 +246,7 @@ export function AdminDashboardView({
       setActiveTab={setActiveTab}
       navItems={adminNavItems}
       searchValue={globalSearch}
-      onSearchChange={["overview", "approvals", "calendar", "profile"].includes(activeTab) ? undefined : setGlobalSearch}
+      onSearchChange={["overview", "approvals", "calendar", "profile", "settings"].includes(activeTab) ? undefined : setGlobalSearch}
       searchPlaceholder={
         activeTab === "team" ? "ค้นหาชื่อ หรืออีเมล..." :
         activeTab === "assets" ? "ค้นหาชื่ออาคาร, เลขห้อง..." :
@@ -344,6 +340,11 @@ export function AdminDashboardView({
       {/* QR Code Manager */}
       {activeTab === "qr_codes" && (
         <QrCodeManager buildings={buildings} globalSearch={globalSearch} />
+      )}
+
+      {/* Settings View */}
+      {activeTab === "settings" && (
+        <SettingsPanel brands={masterDataBrands} universityName={universityName} />
       )}
 
       {/* Modal: Create Work Order */}
