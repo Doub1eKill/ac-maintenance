@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Users } from "lucide-react";
+import { Users, AlertTriangle } from "lucide-react";
 import {
   Pagination,
   PaginationContent,
@@ -9,6 +9,8 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { ConfirmActionDialog } from "@/components/ui/thai-alert-dialogs";
 import type { PendingUser } from "@/components/admin/types";
 
 interface TeamPanelProps {
@@ -22,6 +24,8 @@ const ITEMS_PER_PAGE = 10;
 
 export function TeamPanel({ allUsers, globalSearch, isPending, onUserStatus }: TeamPanelProps) {
   const [teamPage, setTeamPage] = useState(1);
+  const [resetTarget, setResetTarget] = useState<PendingUser | null>(null);
+  const [showResetNotice, setShowResetNotice] = useState(false);
 
   useEffect(() => {
     setTeamPage(1);
@@ -44,6 +48,16 @@ export function TeamPanel({ allUsers, globalSearch, isPending, onUserStatus }: T
           <span>ทำเนียบเจ้าหน้าที่และช่างซ่อมบำรุง ({allUsers.length})</span>
         </h2>
       </div>
+
+      {showResetNotice && (
+        <Alert className="border-warning/30 bg-warning/10">
+          <AlertTriangle className="text-warning" />
+          <AlertTitle>ยังไม่เชื่อมต่อกับระบบหลังบ้าน</AlertTitle>
+          <AlertDescription>
+            มีการฝากคำขอไว้ให้ทีม Backend แล้ว รหัสผ่านของผู้ใช้นี้ยังไม่ถูกรีเซ็ต
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="overflow-x-auto">
         <table className="w-full text-left text-xs text-foreground">
@@ -93,6 +107,12 @@ export function TeamPanel({ allUsers, globalSearch, isPending, onUserStatus }: T
                       เปิดใช้งาน
                     </button>
                   )}
+                  <button
+                    onClick={() => setResetTarget(u)}
+                    className="rounded-lg border border-border bg-muted px-2.5 py-1 text-[11px] font-bold text-foreground hover:bg-secondary transition-colors"
+                  >
+                    รีเซ็ตรหัสผ่าน
+                  </button>
                 </td>
               </tr>
             ))}
@@ -126,6 +146,22 @@ export function TeamPanel({ allUsers, globalSearch, isPending, onUserStatus }: T
           </div>
         )}
       </div>
+
+      <ConfirmActionDialog
+        isOpen={resetTarget !== null}
+        onOpenChange={(open) => !open && setResetTarget(null)}
+        title="ยืนยันการรีเซ็ตรหัสผ่าน"
+        description={
+          resetTarget
+            ? `ต้องการรีเซ็ตรหัสผ่านของ ${resetTarget.name} หรือไม่? ผู้ใช้จะต้องตั้งรหัสผ่านใหม่ก่อนเข้าใช้งานครั้งถัดไป`
+            : ""
+        }
+        confirmText="รีเซ็ตรหัสผ่าน"
+        onConfirm={() => {
+          setResetTarget(null);
+          setShowResetNotice(true);
+        }}
+      />
     </div>
   );
 }
