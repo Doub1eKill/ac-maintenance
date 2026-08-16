@@ -28,7 +28,7 @@ export function MasterDataClient({ initialBrands }: { initialBrands: BrandType[]
       <AddBrandCard />
       
       <div className="space-y-4">
-        <h2 className="text-lg font-bold text-slate-950">รายชื่อยี่ห้อและรุ่นแอร์</h2>
+        <h4 className="text-lg font-bold text-slate-950">รายชื่อยี่ห้อและรุ่นแอร์</h4>
         {initialBrands.length === 0 ? (
           <div className="text-center p-8 border border-dashed rounded-xl text-slate-500 bg-white">
             ยังไม่มีข้อมูลยี่ห้อแอร์ในระบบ

@@ -70,7 +70,7 @@ function DefaultFrequencyCard() {
           <label htmlFor="default-frequency-unit" className="mb-1.5 block text-xs font-bold text-foreground">
             หน่วย
           </label>
-          <NativeSelect id="default-frequency-unit" value={unit} onChange={(e) => setUnit(e.target.value)}>
+          <NativeSelect id="default-frequency-unit" value={unit} onChange={(e) => setUnit(e.target.value)} className="w-full h-auto py-3 px-3.5 rounded-xl border-border text-sm text-foreground">
             <NativeSelectOption value="days">วัน</NativeSelectOption>
             <NativeSelectOption value="months">เดือน</NativeSelectOption>
             <NativeSelectOption value="years">ปี</NativeSelectOption>
