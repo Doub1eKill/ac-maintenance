@@ -18,6 +18,7 @@ import {
   getOrganisationInfo,
   getOrganisationName,
 } from "@/lib/organisation";
+import { withDeadlockRetry } from "@/lib/db-retry";
 import { format, subDays } from "date-fns";
 
 // How many work orders the board loads at once. Not exported directly (a
@@ -766,7 +767,11 @@ export async function cancelWorkOrderAction(workOrderId: string, reason?: string
   }
 
   try {
-    const result = await prisma.$transaction(async (tx) => {
+    // Work order first, then the unit — the same order logMaintenanceAction
+    // takes, which is what stops the two from deadlocking when an admin
+    // cancels the very job a technician is closing. Don't reorder these.
+    const result = await withDeadlockRetry("cancelWorkOrderAction", () =>
+      prisma.$transaction(async (tx) => {
       const workOrder = await tx.workOrder.findUnique({
         where: { id: wId },
         select: { id: true, status: true, airConditionerId: true },
@@ -802,7 +807,8 @@ export async function cancelWorkOrderAction(workOrderId: string, reason?: string
         previousStatus: workOrder.status,
         statusReset: stillOpen === 0,
       };
-    });
+      })
+    );
 
     if ("error" in result) return result;
 

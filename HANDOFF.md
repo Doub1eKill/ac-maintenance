@@ -202,6 +202,81 @@ migration **สร้างแถวให้แล้ว** จึงไม่�
 
 ---
 
+## 🔒 ตรวจ lock-ordering + แก้ deadlock (18 สิงหาคม 2026) — Backend เสร็จ ไม่ต้องรอ UI
+
+ปิดข้อค้างเรื่อง "ความเสี่ยง lock-ordering ที่ยังไม่ได้ตรวจ" แล้ว **ทดสอบด้วยการรัน transaction ชนกันจริงบนฐานข้อมูล** ไม่ใช่แค่อ่านโค้ด
+
+### สรุปผลตรวจ
+
+**ต้นตอ:** ทุก transaction ที่ `INSERT` แถวลูก InnoDB จะจับ **shared lock (S)** บนแถวแม่เพื่อเช็ค foreign key ก่อน แล้วโค้ดค่อยไปขอ **exclusive lock (X)** บนแถวเดียวกันทีหลัง — จังหวะ upgrade S→X นี่แหละที่ทำให้สอง transaction ล็อกตายกัน
+
+| คู่ที่ทดสอบ | ผลก่อนแก้ | ผลหลังแก้ |
+|---|---|---|
+| auto-check (`syncOverdueMaintenanceWorkOrders`) **vs** บันทึกงาน (`logMaintenanceAction`) เครื่องเดียวกัน | 🔴 **ERROR 1213 Deadlock** | ✅ รอคิวแล้วผ่าน (~0.85 วิ) |
+| บันทึกงาน **vs** ยกเลิกใบงาน (`cancelWorkOrderAction`) ใบเดียวกัน | 🔴 **ERROR 1213 Deadlock** | ✅ รอคิวแล้วผ่าน (~0.82 วิ) |
+| ลงทะเบียนแอร์ (`createAirConditionerAction`) **vs** auto-check | ✅ ไม่ชนอยู่แล้ว | ✅ ไม่ชน |
+
+**คู่ที่เคยสงสัยไว้ (ลงทะเบียนแอร์ ชนกับ auto-check) ไม่ใช่ปัญหาเลย** — แถวแอร์ที่เพิ่ง `INSERT` แต่ยังไม่ commit มองไม่เห็นและล็อกไม่ได้จาก transaction อื่น auto-check จึงหาไม่เจอและ `updateMany` ก็แมตช์ไม่โดน ไม่มีทรัพยากรร่วมให้แย่งกัน
+
+### วิธีแก้: บังคับลำดับล็อกให้เหมือนกันทั้งระบบ
+
+**`work_orders` (X) → `air_conditioners` (X) → ค่อย INSERT แถวลูก** — จับ X บนแถวแม่ให้เสร็จก่อน FK check จะได้เจอ lock ที่ transaction ตัวเองถืออยู่แล้ว ไม่ต้อง upgrade
+
+| ไฟล์ | เปลี่ยนอะไร |
+|---|---|
+| `src/app/tech/actions.ts` → `logMaintenanceAction` | ย้าย `UPDATE work_orders` และ `UPDATE air_conditioners` ขึ้นมา**ก่อน** `INSERT maintenance_logs` (เดิม insert ก่อน) |
+| `src/lib/maintenance.ts` → `syncOverdueMaintenanceWorkOrders` | สลับ 2 คำสั่งใน `$transaction([...])` ให้ `updateMany` แอร์มาก่อน `createMany` ใบงาน |
+| `src/app/admin/actions.ts` → `cancelWorkOrderAction` | **ลำดับถูกอยู่แล้ว ไม่ได้แก้** เพิ่มแค่ comment กันคนมาสลับทีหลัง |
+| `src/lib/db-retry.ts` (**ไฟล์ใหม่**) | `withDeadlockRetry(label, fn)` — retry 3 ครั้งเมื่อเจอ error 1213 เป็นตาข่ายรองรับ ครอบ 4 transaction: บันทึกงาน, รับงานหลายใบ, ยกเลิกใบงาน, auto-check |
+
+**⚠️ อย่าสลับลำดับใน 2 ไฟล์แรกกลับ** ถึงผลลัพธ์ข้อมูลจะเหมือนเดิมทุกประการ แต่ deadlock จะกลับมาทันที — มี comment อธิบายเหตุผลคาไว้ในโค้ดแล้วทั้ง 2 จุด
+
+**ทำไมต้องมี retry ทั้งที่จัดลำดับแล้ว:** ลำดับล็อกครอบได้เฉพาะการชนที่เรามองเห็น แต่ InnoDB ยังจับ gap/next-key lock ตาม execution plan ที่เลือก ณ ตอนนั้นด้วย พอข้อมูลโตขึ้น คู่ที่ไม่ได้แตะแถวเดียวกันก็ยังชนกันได้ — และเวลา deadlock เกิด InnoDB roll back ทั้ง transaction ไม่มีเขียนค้างครึ่งๆ การรันซ้ำจึงเป็นคำตอบที่ถูกต้อง ไม่ใช่การกลบปัญหา
+
+**ข้อควรระวังถ้าจะเอา `withDeadlockRetry` ไปใช้ที่อื่น:** ครอบได้เฉพาะงานที่รันซ้ำได้ ทุกอย่างต้องอยู่ใน transaction — ของที่มีผลข้างนอก (อัปโหลดไฟล์, `logAudit`, `revalidatePath`) ต้องอยู่นอกวงเล็บ
+
+### ทดสอบด้วยการรันจริง (ไม่ใช่แค่ build ผ่าน)
+
+`npx tsc --noEmit` → 0 error แล้วรันจริงผ่าน UI ด้วยบัญชี `houston16@example.net`: กด "รับงาน" → "บันทึกและปิดงาน" (ล้างแอร์) บนใบงาน #4 / แอร์ #9 ผลใน DB ถูกครบทั้ง 4 ขั้น — ใบงานเป็น `completed`, `maintenance_logs` แถวใหม่ผูก `work_order_id=4` ถูกต้อง, สถานะแอร์เป็น `normal`, และ `maintenance_schedules` ขยับเป็น `last_performed_at=2026-08-18` / `next_due_date=2026-11-18` (รอบ 3 เดือน) ไม่มี error ทั้ง console และฝั่งเซิร์ฟเวอร์
+
+*หมายเหตุข้อมูลทดสอบ:* ใบงาน #4 ถูกปิดจริงจากการทดสอบนี้ (มี `maintenance_logs` id 615 เพิ่มมา 1 แถว) ไม่ได้ย้อนกลับเพราะเป็นข้อมูล seed และการย้อนจะทำให้ 4 ตารางไม่สอดคล้องกันเอง
+
+### 🚨 เรื่องที่สำคัญกว่า deadlock: อาการ "MySQL ค้างจนต้องรีสตาร์ท" ไม่ได้เกิดจาก deadlock
+
+ระหว่างทดสอบทำซ้ำอาการที่เคยเจอตอนทดสอบ S4 ได้ตรงเป๊ะ และ **ยืนยันว่าคนละเรื่องกับ deadlock โดยสิ้นเชิง**
+
+**deadlock ไม่เคยทำให้ค้าง** — InnoDB ตรวจเจอวงจรแล้วฆ่าตัวใดตัวหนึ่งทันทีภายใน ~1 วินาที คืน error 1213 ออกมา
+
+**ตัวที่ทำให้ค้างจริงคือ client ที่ถูกฆ่ากลางคัน transaction** (เช่นปิด dev server ตอนกำลังเขียน DB): thread ฝั่ง server จะค้างเปิด transaction ไว้พร้อมถือ row lock, สั่ง `KILL <id>` ขึ้นสถานะ `Killed` แต่ไม่ตายจริง, session อื่นค้างตามแม้แต่ query อ่านเฉยๆ, และ `mysqladmin shutdown` ก็ค้างรอ thread พวกนั้นอีกที
+
+**ทางแก้ทางเดียว:**
+```powershell
+Stop-Process -Name mysqld -Force
+Start-Process -FilePath "C:\xampp\mysql\bin\mysqld.exe" -ArgumentList '--defaults-file=C:\xampp\mysql\bin\my.ini' -WindowStyle Hidden
+```
+InnoDB crash recovery จะ roll back transaction ที่ค้างให้เองตอนสตาร์ท ข้อมูลไม่หาย (ตรวจ row count ทุกตารางหลังกู้แล้วครบเท่าเดิม)
+
+**หลักฐานว่าเคยเกิดมาก่อน:** ใน `C:\xampp\mysql\data\mysql_error.log` มีบรรทัด `Rolled back recovered transaction 15589` ของวันที่ 17 ส.ค. 19:50 ซึ่งคือรอบที่เจอตอนทดสอบ S4 พอดี
+
+**สรุปสำหรับคนทำงานต่อ:** ถ้าเจอ MySQL ค้าง อย่าไปไล่หา deadlock ในโค้ด — ให้ดูว่ามี dev server หรือ script ไหนถูกปิดกลางคันหรือเปล่า แล้ว force restart ตามคำสั่งข้างบน
+
+---
+
+## 🎨 ถึง Esther03u — พบ emoji ใน UI ผิดกฎ `AGENTS.md` (18 สิงหาคม 2026)
+
+เจอระหว่างทดสอบหน้าช่าง กฎห้ามใช้ emoji ใน UI เด็ดขาด ให้ใช้ `lucide-react` แทน — อยู่ในเลนของคุณ DoubleKill เลยไม่แตะให้
+
+| ไฟล์ | บรรทัด | ข้อความ |
+|---|---|---|
+| `src/components/tech/log-action-modal.tsx` | 131 | `✅ ใช้งานได้ปกติ` |
+| `src/components/tech/log-action-modal.tsx` | 132 | `⚠️ รออะไหล่/ใช้งานไม่ได้` |
+| `src/components/tech/log-action-modal.tsx` | 133 | `❄️ แอร์ไม่เย็น/รอตรวจสอบ` |
+| `src/components/tech/qr-scan-modal.tsx` | 108 | `✅ ปกติ` / `⚠️ มีปัญหา` |
+
+3 อันแรกอยู่ใน `<NativeSelectOption>` ซึ่งใส่ไอคอนข้างในไม่ได้ (option รับได้แต่ text) อาจต้องเปลี่ยนไปใช้ Select ของ shadcn/ReUI ที่ render เป็น div ได้ หรือตัด emoji ออกเฉยๆ แล้วสื่อสถานะด้วยสีข้อความแทน — ตัดสินใจได้ตามสะดวก
+
+---
+
 ## 🗄️ Database Sync — สำคัญมาก อ่านก่อน pull/push ทุกครั้ง
 
 โปรเจกต์นี้ใช้ MySQL local (XAMPP) แยกเครื่องกัน — **โค้ดที่ push ขึ้น Git ไม่ได้ทำให้ฐานข้อมูลของอีกฝั่งตรงกันอัตโนมัติ** ต้องใช้ Prisma Migration เป็นตัวกลางเสมอ

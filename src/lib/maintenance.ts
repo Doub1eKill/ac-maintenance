@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { withDeadlockRetry } from "@/lib/db-retry";
 import type { MaintenanceAction } from "@/generated/prisma/enums";
 
 // The timezone the institutions actually operate in. Timestamps (performedAt,
@@ -138,20 +139,33 @@ export async function syncOverdueMaintenanceWorkOrders() {
 
     const overdueIds = overdue.map((s) => s.airConditionerId);
 
-    await prisma.$transaction([
-      prisma.workOrder.createMany({
-        data: overdueIds.map((airConditionerId) => ({
-          airConditionerId,
-          status: "pending" as const,
-          priority: "low",
-          issueDescription: "ครบกำหนดล้างแอร์ตามรอบบำรุงรักษา (ระบบสร้างอัตโนมัติ)",
-        })),
-      }),
-      prisma.airConditioner.updateMany({
-        where: { id: { in: overdueIds }, status: "normal" },
-        data: { status: "needs_cleaning" },
-      }),
-    ]);
+    // The unit update comes first, and the order matters: inserting a work
+    // order makes InnoDB take a *shared* lock on the air_conditioners row its
+    // foreign key points at, and asking for the exclusive lock afterwards is
+    // an S->X upgrade. logMaintenanceAction reaches the same row the same way,
+    // so with both holding S and both wanting X, neither can proceed — a
+    // reproducible deadlock (error 1213) that rolled this check back whenever
+    // a technician happened to close a job on a unit in this batch. Taking X
+    // up front means there's no upgrade to contend over.
+    //
+    // Nothing about the result changes: the insert doesn't read unit status,
+    // and the update is guarded on status = "normal" either way.
+    await withDeadlockRetry("syncOverdueMaintenanceWorkOrders", () =>
+      prisma.$transaction([
+        prisma.airConditioner.updateMany({
+          where: { id: { in: overdueIds }, status: "normal" },
+          data: { status: "needs_cleaning" },
+        }),
+        prisma.workOrder.createMany({
+          data: overdueIds.map((airConditionerId) => ({
+            airConditionerId,
+            status: "pending" as const,
+            priority: "low",
+            issueDescription: "ครบกำหนดล้างแอร์ตามรอบบำรุงรักษา (ระบบสร้างอัตโนมัติ)",
+          })),
+        }),
+      ])
+    );
   } catch (error) {
     // Don't let a failed run be cached as a successful one, or a transient DB
     // error would suppress the check for the rest of the TTL window.

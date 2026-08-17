@@ -13,6 +13,7 @@ import {
 } from "@/lib/maintenance";
 import { MaintenanceAction } from "@/generated/prisma/client";
 import { getOrganisationName } from "@/lib/organisation";
+import { withDeadlockRetry } from "@/lib/db-retry";
 
 async function verifyTechnician() {
   const session = await auth();
@@ -237,7 +238,12 @@ export async function bulkClaimWorkOrdersAction(workOrderIds: string[]) {
   const claimedAt = new Date(Math.floor(Date.now() / 1000) * 1000);
 
   try {
-    const { claimedCount, claimedIds } = await prisma.$transaction(async (tx) => {
+    // Only work_orders rows are touched here, so there's no cross-table order
+    // to get wrong — but two techs bulk-claiming overlapping sets can still
+    // collide on the row locks if their id lists are ordered differently.
+    const { claimedCount, claimedIds } = await withDeadlockRetry(
+      "bulkClaimWorkOrdersAction",
+      () => prisma.$transaction(async (tx) => {
       // One guarded write for the whole batch instead of a round trip per id.
       // The status=pending guard is what makes this safe: a job another tech
       // grabbed a moment ago simply isn't matched, so it's skipped rather
@@ -258,7 +264,8 @@ export async function bulkClaimWorkOrdersAction(workOrderIds: string[]) {
       });
 
       return { claimedCount: count, claimedIds: rows.map((r) => r.id) };
-    });
+      })
+    );
 
     await logAuditMany(
       claimedIds.map((id) => ({
@@ -345,15 +352,36 @@ export async function logMaintenanceAction(formData: FormData) {
 
     const performedAt = new Date();
 
-    const { workOrderId: closedWorkOrderId, wasAutoCreated } = await prisma.$transaction(async (tx) => {
-      // 0. Walk-up work: no job was raised in advance, so one is opened and
+    const { workOrderId: closedWorkOrderId, wasAutoCreated } = await withDeadlockRetry(
+      "logMaintenanceAction",
+      () => prisma.$transaction(async (tx) => {
+      // The two parent rows this transaction ends up owning — the work order
+      // and the unit — are locked exclusively first, before the log rows that
+      // reference them are inserted. Insert first and InnoDB takes a shared
+      // lock on each parent for the foreign-key check, so the updates below
+      // become S->X upgrades; an admin cancelling the same job, or the overdue
+      // check touching the same unit, holds the matching lock and neither side
+      // can move. Both cases were reproducible deadlocks (error 1213) before
+      // this order was imposed. Locking X up front leaves the FK checks to
+      // find a lock this transaction already holds.
+
+      // 1. Walk-up work: no job was raised in advance, so one is opened and
       //    closed in the same breath. Every log row points at a work order,
       //    and the admin board shows the visit rather than silently missing
       //    it. Created inside the transaction so a later failure can't leave
-      //    a completed job with nothing recorded against it.
+      //    a completed job with nothing recorded against it. A row this
+      //    transaction just inserted is nobody else's to lock, so the
+      //    ordering above has nothing to say about this branch.
       let wId: bigint;
       if (workOrderId) {
         wId = BigInt(workOrderId);
+
+        // Closing the existing job — this is the exclusive lock that has to
+        // be taken before the log insert below.
+        await tx.workOrder.update({
+          where: { id: wId },
+          data: { status: "completed", completedAt: performedAt },
+        });
       } else {
         const created = await tx.workOrder.create({
           data: {
@@ -371,7 +399,13 @@ export async function logMaintenanceAction(formData: FormData) {
         wId = created.id;
       }
 
-      // 1. Create Multiple Maintenance Logs (one for each action checked)
+      // 2. Update Air Conditioner status — likewise before the insert.
+      await tx.airConditioner.update({
+        where: { id: acId },
+        data: { status: acStatus as any },
+      });
+
+      // 3. Create Multiple Maintenance Logs (one for each action checked)
       await tx.maintenanceLog.createMany({
         data: actionsArray.map((action) => ({
           airConditionerId: acId,
@@ -386,18 +420,6 @@ export async function logMaintenanceAction(formData: FormData) {
           afterPhotoUrl,
           performedAt,
         })),
-      });
-
-      // 2. Mark Work Order as completed
-      await tx.workOrder.update({
-        where: { id: wId },
-        data: { status: "completed", completedAt: performedAt },
-      });
-
-      // 3. Update Air Conditioner status
-      await tx.airConditioner.update({
-        where: { id: acId },
-        data: { status: acStatus as any },
       });
 
       // 4. Roll the maintenance schedule forward so the calendar reflects
@@ -426,7 +448,8 @@ export async function logMaintenanceAction(formData: FormData) {
       }
 
       return { workOrderId: wId, wasAutoCreated: !workOrderId };
-    });
+      })
+    );
 
     await logAudit({
       userId: techId,
