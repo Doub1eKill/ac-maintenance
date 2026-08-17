@@ -1,5 +1,27 @@
 # Project Handoff & Technical Summary
 
+## 🚨 พังอยู่ตอนนี้ — 2 เรื่อง ทำก่อนอย่างอื่น (ตรวจพบ 18 สิงหาคม 2026)
+
+ทั้งสองข้อ **backend เสร็จและถูกต้องแล้ว ขาดแค่ฝั่ง UI** — แต่ผลคือ flow หลักของระบบใช้งานไม่ได้จริง ไม่ใช่แค่ฟีเจอร์ที่ยังมาไม่ถึง จึงยกขึ้นมาไว้บนสุด รายละเอียดเต็มอยู่ในหัวข้อเดิมด้านล่าง (ลิงก์ไว้ในแต่ละข้อ)
+
+### 1. ช่างบันทึก "งานซ่อม" ไม่ได้เลย — พังมาตั้งแต่ 11 ส.ค.
+
+`logMaintenanceAction` บังคับว่าถ้าประเภทงานมี `repair` ต้องส่ง `repairDetail` มาด้วย ไม่งั้นตีกลับด้วยข้อความ *"กรุณาระบุรายละเอียดการซ่อม"* (`src/app/tech/actions.ts` ~บรรทัด 335) แต่ฟอร์มบันทึกงานใน `src/components/tech/log-action-modal.tsx` **ไม่มีช่องนี้เลย** — ตรวจ field ที่ฟอร์มส่งจริงแล้วมีแค่ `workOrderId`, `airConditionerId`, `acStatus`, `parts`, `notes`
+
+**ผลกระทบ:** ช่างติ๊ก "ซ่อมแอร์" แล้วกดบันทึก ขึ้น error ทุกครั้ง ไม่มีทางผ่าน — บันทึกได้เฉพาะงานล้างกับเติมน้ำยาเท่านั้น
+
+**แก้:** เพิ่ม `<textarea name="repairDetail">` แสดงเฉพาะตอนติ๊ก "ซ่อม" ป้าย "ซ่อมอะไรไปบ้าง" — สเปกเต็มอยู่ที่หัวข้อ *"งานรอบแก้ไขข้อมูล ข้อ 3"*
+
+⚠️ **อย่าสับสนกับช่อง `parts` ที่มีอยู่แล้ว** ("รายละเอียดอะไหล่/น้ำยาแอร์") — backend ไม่ได้อ่าน field ชื่อ `parts` เลย ชื่อต้องเป็น **`repairDetail`** เป๊ะๆ
+
+### 2. กระดานใบงานซ่อนใบงานอยู่ — เกิดขึ้นแล้ว ไม่ใช่ความเสี่ยงในอนาคต
+
+`WORK_ORDER_PAGE_SIZE = 50` แต่ตอนนี้มีใบงาน **53 ใบ** และ `work-order-board.tsx` ยังไม่ได้ต่อ `getWorkOrdersPage(page)` → **มี 3 ใบที่ไม่มีทางเปิดดูจากกระดานได้เลย** และจะเพิ่มขึ้นเรื่อยๆ ทุกครั้งที่ auto-check สร้างใบงานใหม่
+
+**แก้:** ต่อปุ่มเปลี่ยนหน้าเข้ากับ `getWorkOrdersPage(page)` — สเปกเต็มอยู่ที่ **P14** (backend เสร็จแล้ว UI ทำโครงรอไว้แล้วด้วย)
+
+---
+
 ## ⚠️ กฎสำคัญ: ห้ามแก้ Backend เอง
 
 **Esther03u (หรือใครก็ตามที่ทำฝั่ง UI/Frontend) ห้ามแก้โค้ด Backend เองโดยเด็ดขาด** ได้แก่ (ไม่จำกัดเพียง):
@@ -25,7 +47,7 @@
 | **ข้อมูลเหลือ 1 สถาบัน** | เก็บ university id ต่ำสุดไว้ ลบที่เหลือทิ้ง (เป็น seed จาก faker ทั้งหมด ไม่ใช่ข้อมูลจริง) |
 | **`session.user.universityId` หายไป** | ตัดออกจาก JWT/Session type แล้ว — โค้ดที่ยังอ้างถึงจะ compile ไม่ผ่าน |
 | **ย้ายเมนู Master Data** | `/super-admin/master-data` → **`/admin/master-data`** (F7 ทำไปพร้อมกัน เพื่อไม่ให้มีช่วงที่เพิ่มยี่ห้อแอร์ไม่ได้) |
-| **ชื่อหน่วยงาน** | เดิมอ่านจากตาราง ตอนนี้เป็นค่าคงที่ `ORGANISATION_NAME` ใน **`src/lib/organisation.ts`** — F5 จะเปลี่ยนเป็นอ่านจาก `SystemSettings` ทีหลัง |
+| **ชื่อหน่วยงาน** | เดิมอ่านจากตาราง `universities` — เคยเปลี่ยนเป็นค่าคงที่ `ORGANISATION_NAME` ชั่วคราว **แต่ตอนนี้ไม่ใช่แล้ว** (ดูหัวข้อ S4–S7): ค่าคงที่ถูกลบทิ้ง เปลี่ยนไปอ่านจาก `SystemSettings` ผ่าน `await getOrganisationName()` ใน `src/lib/organisation.ts` แทน |
 
 **⚠️ ต้องรัน `npx prisma migrate deploy` แล้ว `npx prisma generate` ทันทีหลัง pull** migration `20260811093000_remove_multi_tenancy` **ลบข้อมูลของสถาบันอื่นถาวร** (จำเป็น ไม่งั้น unique constraint ใหม่กับ enum จะพัง) — สำรองฐานข้อมูลก่อนถ้าเครื่องคุณมีข้อมูลที่อยากเก็บ
 
@@ -335,18 +357,18 @@ APP_URL=http://localhost:3000       # โดเมนที่ใช้สร้
 
 ## 🚀 Recent Implementations & Enhancements
 
-### 1. Financial & Executive Analytics Dashboard (`/admin`)
-- Implemented `financial-dashboard-view.tsx` with dynamic visual summary cards, HSL color themes, cost metrics, budget allocations, and visual distribution breakdowns.
-- Added server action integrations in `src/app/admin/actions.ts` to compute maintenance costs, labor expenses, replaced parts, and budget tracking.
+> **⚠️ อ่านก่อน — หัวข้อ 1–3 ด้านล่างเป็นบันทึกประวัติศาสตร์ ไม่ใช่สภาพปัจจุบัน** (ตรวจสอบและกำกับไว้เมื่อ 18 ส.ค. 2026) ทั้งสามข้อบรรยายของที่**ถูกลบไปแล้ว** อย่าใช้เป็นภาพสถาปัตยกรรมของระบบตอนนี้ — ให้ดูหัวข้อ F1 ด้านบนแทน
 
-### 2. Multi-Tenant Administration & RBAC (`/super-admin`, `/admin`, `/tech`)
-- Hardened role protection and tenant boundaries (`university_id` isolation).
-- Configured Next.js 16 `src/proxy.ts` combined with `src/lib/auth.config.ts` for route protection.
-- Handled status enforcement (`pending` / `suspended` blocked).
+### 1. ~~Financial & Executive Analytics Dashboard (`/admin`)~~ — ❌ ถูกถอดออกแล้ว (26 ก.ค. 2026)
+- ~~`financial-dashboard-view.tsx` พร้อม cost metrics / budget allocations~~ — ไฟล์ถูกลบทั้งชุดตามสเปก `docs/superpowers/specs/2026-07-26-remove-financial-system-design.md` ตรวจแล้ว 18 ส.ค. 2026: ไม่เหลือโค้ดที่อ้างถึง `financial` ในโปรเจกต์เลย ระบบไม่เก็บข้อมูลค่าใช้จ่ายใดๆ ทั้งสิ้น
+
+### 2. ~~Multi-Tenant Administration & RBAC (`/super-admin`, `/admin`, `/tech`)~~ — ❌ ถอด multi-tenant ออกแล้ว (11 ส.ค. 2026, F1)
+- ~~tenant boundaries (`university_id` isolation)~~ — **ไม่มีแล้ว** ตาราง `universities`, คอลัมน์ `university_id` ทุกตาราง, role `super_admin` และโฟลเดอร์ `/super-admin` ถูกลบหมด เหลือ RBAC 2 ระดับ (`org_admin` / `technician`) ทุกแถวในฐานข้อมูลเป็นขององค์กรเดียว ไม่ต้อง scope query อีกต่อไป
+- ✅ **ส่วนที่ยังจริงอยู่:** route protection ผ่าน `src/proxy.ts` + `src/lib/auth.config.ts` และการบล็อกสถานะ `pending`/`suspended`
 
 ### 3. Asset & Work Order Management
-- Enhanced `asset-manager.tsx`, `admin-dashboard-view.tsx`, and `super-admin-view.tsx` with responsive filtering, clean metric cards, and maintenance status tracking.
-- Optimized mobile experience in `tech-mobile-view.tsx` for field technicians.
+- Enhanced `asset-manager.tsx` และ `admin-dashboard-view.tsx` — responsive filtering, metric cards, maintenance status tracking *(~~`super-admin-view.tsx`~~ ถูกลบไปแล้วใน F1)*
+- Optimized mobile experience in `tech-mobile-view.tsx` for field technicians
 
 ### 4. UI/UX Refinements & Theming (July 2026)
 - **Dashboard Metrics:** Redesigned the Admin Dashboard (`admin-dashboard-view.tsx`) by unifying 4 separate metric cards into a single comprehensive "System Status Summary" widget.
@@ -399,22 +421,29 @@ APP_URL=http://localhost:3000       # โดเมนที่ใช้สร้
 
 ## 📁 Key File Structure & Architecture
 
+*(อัปเดตให้ตรงกับของจริงเมื่อ 18 ส.ค. 2026 — โฟลเดอร์ `super-admin/` ทั้งสองจุดถูกลบไปแล้วใน F1)*
+
 ```
 ac-maintenance/
 ├── src/
 │   ├── app/
-│   │   ├── admin/                # Admin Routes & Actions (org_admin)
-│   │   ├── super-admin/          # Platform Admin Routes & Actions (super_admin)
+│   │   ├── admin/                # Admin Routes & Actions (org_admin) + master-data/
 │   │   ├── tech/                 # Technician Mobile Interface & Actions (technician)
-│   │   ├── api/                  # REST & Action API Handlers
-│   │   └── proxy.ts              # Next.js 16 Proxy Convention for Auth Guard
+│   │   ├── qr/[id]/              # หน้า QR สาธารณะ (ไม่ต้อง login — ดู F6)
+│   │   ├── api/                  # REST handlers (เหลือ 3 จุด: auth, admin/maintenance-schedules, tech/units)
+│   │   └── ...                   # login, register, reset-password, pending-approval
+│   ├── proxy.ts                  # Next.js 16 Proxy Convention for Auth Guard (อยู่ที่ src/ ไม่ใช่ src/app/)
 │   ├── components/
-│   │   ├── admin/                # Admin & Financial Dashboard Components
-│   │   ├── super-admin/          # Super Admin Dashboard Components
+│   │   ├── admin/                # Admin Dashboard Components
 │   │   ├── tech/                 # Technician Mobile Components
+│   │   ├── shared/               # ใช้ร่วมกัน 2 ฝั่ง (เช่น maintenance-calendar.tsx)
+│   │   ├── layout/               # dashboard-layout.tsx, dashboard-loading.tsx
 │   │   └── ui/                   # Shared UI Primitives (incl. alert.tsx)
 │   └── lib/
 │       ├── auth.config.ts        # RBAC & Auth Session Helpers
+│       ├── maintenance.ts        # auto-check + helper วันที่ (businessDateToday ฯลฯ)
+│       ├── organisation.ts       # อ่านค่าจาก SystemSettings
+│       ├── db-retry.ts           # withDeadlockRetry() — ดูหัวข้อ lock-ordering
 │       └── prisma.ts             # Prisma 7 Database Instance with MariaDB Driver Adapter
 ├── prisma/
 │   └── schema.prisma             # Database Schema Definition
@@ -469,8 +498,8 @@ npm run build
 - [x] 9. `[Backend ✅ — assignToUserId เป็น optional อยู่แล้วใน createWorkOrderAction ไม่ต้องแก้ backend]` หน้าสร้างใบงานซ่อมบำรุง: เพิ่มลำดับการเลือกแบบ cascade — เลือกตึกก่อน แล้วเลือกห้อง จากนั้นตัวเลือกเครื่องปรับอากาศจะกรองให้เห็นเฉพาะเครื่องของห้องที่เลือกเท่านั้น และเพิ่มตัวเลือกช่างเริ่มต้นเป็น "ไม่ระบุช่าง" (สอดคล้องกับ `work_orders.claimed_by` ที่เป็น nullable อยู่แล้ว) — [เสร็จแล้ว (15 ส.ค. 2026): cascade select อาคาร→ห้อง→แอร์ อยู่ใน `create-work-order-modal.tsx` ใช้ข้อมูล `buildings` เดิมที่มีอยู่แล้ว ไม่ต้องแก้ backend เพิ่ม พร้อมแก้บั๊กเดิมที่ช่องช่างติด `required` ทั้งที่ป้ายบอกว่า "ไม่บังคับ" — เอา `required` ออกและเพิ่มตัวเลือก "ไม่ระบุช่าง" เป็นค่าเริ่มต้นแล้ว]
 
 ### Super Admin
-- [ ] 10. `[Backend ✅ — getSuperAdminData() คืน universityBreakdown[] แล้ว]` Dashboard: ทำกราฟแบบมีสี แสดงจำนวนแอร์ทั้งหมด จำนวนช่าง จำนวนที่เสีย จำนวนที่ล้างแล้ว จำนวนที่ซ่อมไปแล้ว แยกตามมหาวิทยาลัย โดยแต่ละมหาวิทยาลัยใช้ชุดสีที่ต่างกันในกราฟเดียวกัน
-- [ ] 11. **[บั๊ก — UI/Layout ล้วนๆ]** แก้ Dashboard component ที่ปัจจุบันติดตามไปแสดงทุกหน้า ให้อยู่เฉพาะหน้า Dashboard เท่านั้น → หาสาเหตุก่อนว่าเป็นเพราะผูกไว้ผิด layout/route group (เช็ค `src/app/layout.tsx` แล้วสะอาด ไม่ใช่ตรงนั้น)
+- [x] 10. **❌ ยกเลิก — ตกไปตั้งแต่ F1 (11 ส.ค. 2026)** ~~Dashboard: ทำกราฟแบบมีสี แสดงจำนวนแอร์/ช่าง/ที่เสีย/ที่ล้างแล้ว/ที่ซ่อมแล้ว แยกตามมหาวิทยาลัย~~ — ไม่มี Super Admin และไม่มีหลายมหาวิทยาลัยให้เทียบแล้ว `getSuperAdminData()` ถูกลบไปพร้อมโฟลเดอร์ `/super-admin` **ไม่ต้องทำ**
+- [x] 11. **[บั๊ก — UI/Layout ล้วนๆ] ปิดไปพร้อม P10 (15 ส.ค. 2026)** ~~แก้ Dashboard component ที่ติดตามไปแสดงทุกหน้า~~ — ยืนยันจากโค้ด 18 ส.ค.: ทุก panel อยู่หลังเงื่อนไข `activeTab === "..."` แล้วทั้ง `admin-dashboard-view.tsx` และ `tech-mobile-view.tsx` ส่วน `dashboard-layout.tsx` ไม่มีเนื้อหา dashboard อยู่เลย การแยก component ตาม P10 แก้ต้นเหตุไปในตัว
 - [x] 12. **[บั๊ก — แก้ครบแล้วทั้ง Backend+ข้อมูล]** ~~หน้าข้อมูลหลัก (master data) ไม่แสดงรุ่นแอร์ที่มีในระบบ~~ → root cause คือ `ac_brands`/`ac_models` ว่างเปล่า (query/UI ไม่ได้ผิด) — backfill แล้ว 5 ยี่ห้อ, 189 รุ่น ยืนยันแสดงผลถูกต้องแล้ว
 
 ---
@@ -487,7 +516,7 @@ npm run build
 >
 > ✅ **ไม่มีงาน backend ค้างแล้ว** — ที่เหลือทั้งหมดเป็นงาน UI
 >
-> **บริบท:** ตอนนี้ข้อมูลยังเล็ก (73 แอร์/มหาวิทยาลัย, 607 maintenance_logs) ทุกหน้าจึงยังเร็วอยู่
+> **บริบท:** ตอนนี้ข้อมูลยังเล็ก (นับเมื่อ 18 ส.ค. 2026: **73 แอร์, 225 maintenance_logs, 53 ใบงาน, 5 ผู้ใช้** — ตัวเลข "607 logs" ที่เคยเขียนไว้ตรงนี้เป็นยอดก่อน F1 ลบข้อมูลมหาวิทยาลัยอื่นทิ้ง) ทุกหน้าจึงยังเร็วอยู่
 > ข้อที่เหลือจะเริ่มรู้สึกตอนข้อมูลโต
 
 ### 🟢 กลุ่ม A — Backend/DB ล้วน (เสร็จแล้ว)
@@ -551,7 +580,9 @@ npm run build
 
 **ปัญหาเดิม:** ช่องปฏิทินแสดงแค่รหัสแอร์ ซึ่งยาวเกินความกว้างช่อง เลยถูกตัดเหลือ `RWWW-B660550-8-1944...` ทุกอัน — อ่านไม่รู้เรื่องและไม่บอกด้วยว่าเป็นงานประเภทไหน
 
-**แก้เป็น:** `งานซ่อม - RWWW-B660550-1-241631-01` / `งานล้าง - RWWW-B467711-...` (ประเภทขึ้นก่อน แล้วตามด้วยรหัสเครื่อง) หัวข้อในโมดัลก็เปลี่ยนเป็นชื่อประเภทงานด้วย ส่วนสีเดิม (แดง=เลยกำหนด / เหลือง=ใกล้ถึง / เทา=ยังไม่ถึง) คงไว้ทั้งหมด
+**แก้เป็น:** `งานซ่อม - B660550-1-241631-01` / `งานล้าง - B467711-...` (ประเภทขึ้นก่อน แล้วตามด้วยรหัสเครื่อง) หัวข้อในโมดัลก็เปลี่ยนเป็นชื่อประเภทงานด้วย ส่วนสีเดิม (แดง=เลยกำหนด / เหลือง=ใกล้ถึง / เทา=ยังไม่ถึง) คงไว้ทั้งหมด
+
+> *หมายเหตุ 18 ส.ค. 2026:* ตัวอย่างรหัสในหัวข้อนี้เดิมเขียนเป็น `RWWW-B660550-...` ซึ่งเป็นรูปแบบ **ก่อน F1** — แก้ให้ตรงกับรูปแบบปัจจุบัน `[BLDG]-[ROOM]-[NN]` แล้ว
 
 **ประเภทงานมาจากไหน:** ไม่มีที่ไหนเก็บ "ประเภทงาน" ของงานที่**ยังไม่เกิด**เลย — `maintenance_schedules` คือรอบล้างล้วนๆ ส่วน `work_orders` มีแค่ `status` (ไม่มี type) และ `maintenance_logs.action` เป็นงานที่ทำไปแล้ว
 
@@ -568,13 +599,11 @@ npm run build
 DoubleKill จะไม่แตะไฟล์เหล่านี้ ถ้าต้องการให้ backend เพิ่ม field/endpoint อะไรรองรับ เขียนคำขอไว้ในไฟล์นี้ได้เลย
 
 - [x] **P10.** แยก client component ก้อนยักษ์ — `admin-dashboard-view.tsx` **1,299 บรรทัด** / `tech-mobile-view.tsx` 992 บรรทัด ทั้งคู่เป็น `"use client"` และรับข้อมูล**ทั้งหมด**เป็น props → ข้อมูลถูก serialize ลง RSC payload ส่งข้ามเน็ตแล้ว hydrate ทั้งก้อน ส่วนที่ไม่ต้อง interactive ควรแยกเป็น Server Component — [เสร็จแล้ว (15 ส.ค. 2026): แยกทั้งสองไฟล์เป็นชิ้นย่อยตามแท็บ — `admin-dashboard-view.tsx` (1,391 → ~380 บรรทัด) แยกเป็น `overview-panel`/`work-order-board`/`user-approvals-panel`/`team-panel`/`create-work-order-modal`/`assign-work-order-modal`/`work-order-detail-dialog` + `types.ts`; `tech-mobile-view.tsx` (1,006 → ~330 บรรทัด) แยกเป็น `assets-panel`/`job-pool-panel`/`my-jobs-panel`/`completed-jobs-panel`/`qr-scan-modal`/`log-action-modal` + `types.ts` ยังคง render แบบ conditional ต่อแท็บเหมือนเดิม (ยังไม่ได้แปลงเป็น Server Component จริงเพราะต้องปรับ data flow จาก `page.tsx` เพิ่ม — ถ้าอยากได้ผลเต็มที่กว่านี้ค่อยคุยกันเป็นงานถัดไป) ระหว่างทางลบ dead code ที่เจอ (`filteredBuildings`/`expandedBuilding` ที่คำนวณไว้แต่ไม่เคยใช้) และ `npm run lint` ปัญหารวมลดจาก 78 → 46 ไม่มี error ใหม่]
-- [ ] **P11.** ใส่ `next/dynamic` — ตอนนี้**ไม่มีเลยสักจุด** ปฏิทิน/กราฟ recharts/modal โหลดมาพร้อมหน้าแรกทั้งหมดทั้งที่ผู้ใช้ยังไม่เห็น (chunk ใหญ่สุด 332KB)
-- [ ] **P12.** ปฏิทิน — ตอนนี้เกิด waterfall: SSR เสร็จ → hydrate → ค่อย `fetch` → ค่อย render และดึง schedule **ทั้ง 73 รายการ**ทุกครั้งทั้งที่แสดงทีละเดือน
-  - ✅ **Backend เสร็จแล้ว** `/api/admin/maintenance-schedules` กรองตาม `start`/`end` ได้จริงแล้ว
-    - `?start=2026-09-01&end=2026-09-30` → คืนเฉพาะที่ครบกำหนดในช่วงนั้น (ทดสอบแล้ว: 15 จาก 73 รายการ)
-    - **ไม่ส่ง param = คืนทั้งหมดเหมือนเดิม** ของเดิมไม่พัง / วันที่ผิดรูปแบบถูกเมินเฉยๆ ไม่ error
-  - เหลือฝั่ง UI: ส่งช่วงเดือนที่กำลังแสดงไปด้วย หรือส่งข้อมูลผ่าน props จาก SSR แทน `fetch` ก็ตัดรอบ waterfall ทิ้งได้เลย
-- [ ] **P13.** `<img>` → `next/image` — ทั้งโปรเจกต์**ไม่มี `next/image` เลยสักจุด** ใช้ `<img>` ดิบที่ `admin-dashboard-view.tsx` (~บรรทัด 1173) สำหรับรูปหลักฐานงานซ่อม (**P6 ฝั่ง backend เสร็จแล้ว** — รูปที่อัปโหลดใหม่ถูกย่อเหลือ 1600px แล้ว ทำ P13 คู่ด้วยจะได้ผลเต็มที่)
+- [x] **P11. เสร็จแล้ว** (ยืนยันจากโค้ด 18 ส.ค. 2026) ~~ใส่ `next/dynamic` — ตอนนี้ไม่มีเลยสักจุด~~ — ตอนนี้ใช้แล้วใน `admin-dashboard-view.tsx`, `overview-panel.tsx`, `tech-mobile-view.tsx`
+- [x] **P12. เสร็จแล้วทั้ง 2 ฝั่ง** (ยืนยันจากโค้ด 18 ส.ค. 2026) ~~ปฏิทินเกิด waterfall + ดึง schedule ทั้ง 73 รายการทุกครั้ง~~
+  - ✅ **Backend** `/api/admin/maintenance-schedules` กรองตาม `start`/`end` ได้จริง — `?start=2026-09-01&end=2026-09-30` คืนเฉพาะที่ครบกำหนดในช่วงนั้น (ทดสอบแล้ว: 15 จาก 73 รายการ) / **ไม่ส่ง param = คืนทั้งหมดเหมือนเดิม** ของเดิมไม่พัง / วันที่ผิดรูปแบบถูกเมินเฉยๆ ไม่ error
+  - ✅ **UI** `maintenance-calendar.tsx` (~บรรทัด 103) ส่ง `start`/`end` ตามกริดที่แสดงอยู่จริงแล้ว — ครอบวันหัว/ท้ายเดือนข้างเคียงที่กริดโชว์ด้วย งานของวันขอบเดือนจึงไม่หาย
+- [x] **P13. เสร็จแล้ว** (ยืนยันจากโค้ด 18 ส.ค. 2026) ~~`<img>` → `next/image` ทั้งโปรเจกต์ไม่มี `next/image` เลยสักจุด~~ — รูปหลักฐานงานซ่อมย้ายไปอยู่ `work-order-detail-dialog.tsx` ตอนแยกไฟล์ตาม P10 และใช้ `next/image` แล้ว `<img>` ดิบที่เหลือมีแค่ใน `components/examples/c-file-upload-4.tsx` ซึ่งเป็นไฟล์ตัวอย่างจาก ReUI registry ไม่เกี่ยวกับรูปหลักฐาน
 - [x] **P14. `[Backend ✅ เสร็จแล้ว 18 ส.ค. 2026 — `getWorkOrdersPage(page)` พร้อมเรียกแล้ว]`** Pagination จริงบนกระดานใบงาน
 
   **ทำตามร่างที่ Esther03u เขียนไว้ ปรับ 3 จุด:**
@@ -591,7 +620,13 @@ DoubleKill จะไม่แตะไฟล์เหล่านี้ ถ้�
   **ไม่ filter ฝั่ง server** ตามที่ตกลง — ค้นหา/กรองยังทำในหน้าที่โหลดมาแล้วฝั่ง client เหมือนเดิม
   - ✅ **Backend เสร็จแล้ว** `getOrgAdminData()` คืน `workOrderPage: { total, pageSize, loaded, hasMore }` ใช้ทำปุ่มหน้าถัดไปได้เลย
   - ✅ **แถมแก้บั๊กที่เจอระหว่างทาง:** ตัวเลข "รอดำเนินการ" เดิมนับ pending จากลิสต์ที่ถูก `take: 50` ตัดไว้แล้ว เลยแสดง **47 ทั้งที่จริงมี 48** — เปลี่ยนไปนับด้วย SQL `count()` แล้ว
-  - เหลือฝั่ง UI: ทำปุ่มเปลี่ยนหน้า (ตอนนี้ยังโหลดแค่หน้าแรก 50 รายการ)
+  - 🔴 **เหลือฝั่ง UI เรื่องเดียว — และตอนนี้เร่งด่วนแล้ว:** ต่อปุ่มเปลี่ยนหน้าเข้ากับ `getWorkOrdersPage(page)` **ใบงานเกิน 50 ใบไปแล้ว (53 ใบ) จึงมี 3 ใบที่ไม่มีทางเปิดดูจากกระดานได้เลย** — ดูหัวข้อ "🚨 พังอยู่ตอนนี้" บนสุดของไฟล์
+
+---
+
+  > 📜 **ตั้งแต่บรรทัดนี้ถึงท้ายหัวข้อ P14 เป็นบันทึกระหว่างทาง — ทำเสร็จหมดแล้วทุกข้อ เก็บไว้อ้างอิงเท่านั้น**
+  > ถ้าจะทำแค่ปุ่มเปลี่ยนหน้า ไม่ต้องอ่านส่วนนี้ — `getWorkOrdersPage(page)` มีอยู่จริงใน `src/app/admin/actions.ts` แล้ว เรียกได้เลย
+  > *(คำขอและร่างโค้ดด้านล่างเขียนตอนที่ backend ยังไม่เสร็จ — DoubleKill ทำตามร่างนี้แล้วเมื่อ 18 ส.ค. 2026 พร้อมแก้บั๊ก tiebreaker ที่ร่างเดิมมี)*
 
   **⚠️ อัปเดต 14 ส.ค. 2026 หลังลองต่อจริง:** `workOrderPage` บอกได้แค่ว่ามี `hasMore` แต่ **ไม่มีทางดึงรายการที่เกินหน้าแรก 50 รายการมาได้เลย** — `getOrgAdminData()` ไม่รับ page/cursor param ใดๆ และ query ใช้ `take: 50` ตายตัว (`src/app/admin/actions.ts:127`) ตอนนี้ปุ่มเปลี่ยนหน้าที่ทำได้จริงคือแค่พลิกดูภายใน 50 รายการที่โหลดมาแล้วเท่านั้น (ใช้ได้พอดีตราบใดที่ `total ≤ 50` เหมือนข้อมูล seed ปัจจุบัน แต่จะพังทันทีที่มีใบงานเกิน 50 ใบ)
 
@@ -740,7 +775,7 @@ DoubleKill จะไม่แตะไฟล์เหล่านี้ ถ้�
 
 หน้า "ตั้งค่าระบบ" (`src/components/admin/settings-panel.tsx`) สร้าง UI ครบ 4 การ์ดแล้ว ตามสเปก `docs/superpowers/specs/2026-08-16-org-admin-system-settings-page-design.md` การ์ด "จัดการยี่ห้อ/รุ่นแอร์" ทำงานได้จริง (reuse ของเดิม ไม่ต้องรอ) ส่วนอีก 3 การ์ดเป็น UI placeholder รอ backend:
 
-- [ ] **S4.** การ์ด "รอบซ่อมบำรุงเริ่มต้น" — กดบันทึกแล้วโชว์แค่ข้อความเตือน ยังไม่มีที่เก็บค่า
+- [ ] **S4.** การ์ด "รอบซ่อมบำรุงเริ่มต้น" — **Backend ✅ เสร็จแล้ว 17 ส.ค. 2026 (`updateDefaultFrequencyAction`) เหลือแค่ต่อปุ่มบันทึกฝั่ง UI** ที่ยังโชว์ `NotConnectedAlert` อยู่ ~~ยังไม่มีที่เก็บค่า~~ — ตาราง `SystemSettings` มีแล้ว
 
   **คำขอ:** สร้างตาราง `SystemSettings` ใหม่ (แถวเดียว/singleton, `id` ตายตัว = 1): `defaultFrequencyValue Int @default(6)`, `defaultFrequencyUnit String @default("months")`, `organisationName String?`, `organisationAddress String?`, `organisationPhone String?`, `updatedAt DateTime @updatedAt` (รวมกับ S5 ในตารางเดียวกัน) แล้วเพิ่ม Server Action `updateDefaultFrequencyAction(value: number, unit: string)` ใน `src/app/admin/actions.ts` — validate ด้วย Zod (`value > 0`, `unit` เป็นหนึ่งใน `"days" | "months" | "years"`) แล้ว upsert แถวเดียวนั้น พร้อม `logAudit`
 
@@ -748,17 +783,19 @@ DoubleKill จะไม่แตะไฟล์เหล่านี้ ถ้�
 
   ค่า "6 เดือน" hardcode ที่ผู้ใช้เห็นจริงๆ ตอนนี้อยู่ที่ **ฟอร์มแก้ไขรอบซ่อมบำรุง** ใน `src/components/admin/asset-manager.tsx` — เป็นค่า fallback ตอนเครื่องยังไม่เคยมีการตั้งรอบมาก่อน: `defaultValue={showPmSettings.maintenanceSchedule?.frequencyValue || 6}` (บรรทัด 461) และ `defaultValue={showPmSettings.maintenanceSchedule?.frequencyUnit || "months"}` (บรรทัด 467)
 
-  **มีเรื่องต้องตัดสินใจก่อนเริ่มเขียน:** จะให้ค่า default จาก `SystemSettings` มีผลยังไงกันแน่ — (ก) เปลี่ยนพฤติกรรมใหม่ ให้ตอนลงทะเบียนแอร์เพิ่มการสร้าง `MaintenanceSchedule` ให้อัตโนมัติเลยโดยอ่านค่าจาก `SystemSettings` (ตอนนี้เครื่องใหม่ไม่มี schedule จนกว่าจะมีคนมาตั้งเองผ่านฟอร์ม PM settings) หรือ (ข) ทำแบบ minimal change ตรงกับพฤติกรรมปัจจุบัน คือแค่เอาค่าจาก `SystemSettings` ไปแทนที่ hardcode `|| 6` / `|| "months"` สองจุดใน `asset-manager.tsx` ที่ว่า (schedule ยังถูกสร้างตอนกรอกฟอร์ม PM settings เหมือนเดิม ไม่ได้สร้างตอนลงทะเบียน) — ทั้งสองแบบยังคงคำสัญญา "มีผลกับเครื่องใหม่เท่านั้น" ไว้ได้เหมือนกัน แค่ implementation ต่างกัน รอ DoubleKill ตัดสินใจตอนเขียน backend
+  **~~มีเรื่องต้องตัดสินใจก่อนเริ่มเขียน~~ — ตัดสินใจแล้ว เลือก (ก) และทำเสร็จแล้ว (17 ส.ค. 2026):** ตอนลงทะเบียนแอร์ระบบสร้าง `MaintenanceSchedule` ให้อัตโนมัติในทรานแซกชันเดียวกัน โดยอ่านรอบจาก `SystemSettings` — ดูกฎวันครบกำหนดครั้งแรกในหัวข้อ "S4–S7 Backend เสร็จแล้ว" ที่ตัวเลือก (ข) ตกไปเพราะไม่ได้แก้ต้นเหตุ (เครื่องใหม่ยังหลุดจาก auto-check ถาวรอยู่ดี)
 
-- [ ] **S5.** การ์ด "ข้อมูลองค์กร" — กดบันทึกแล้วโชว์แค่ข้อความเตือนเหมือนกัน ชื่อหน่วยงานตอนนี้ยังเป็นค่าคงที่ `ORGANISATION_NAME` ใน `src/lib/organisation.ts` (ที่อยู่/เบอร์โทรไม่มีที่เก็บเลย)
+- [ ] **S5.** การ์ด "ข้อมูลองค์กร" — **Backend ✅ เสร็จแล้ว 17 ส.ค. 2026 เหลือแค่ต่อปุ่มบันทึกฝั่ง UI** (ที่ยังโชว์ `NotConnectedAlert` อยู่)
+
+  ~~ชื่อหน่วยงานตอนนี้ยังเป็นค่าคงที่ `ORGANISATION_NAME`~~ — **ไม่จริงแล้ว** ค่าคงที่ถูกลบทิ้ง ตอนนี้ชื่อ/ที่อยู่/เบอร์โทรเก็บใน `SystemSettings` ครบและอ่านผ่าน `getOrganisationInfo()` ได้แล้ว
 
   **คำขอ:** เพิ่ม Server Action `updateOrganisationInfoAction(name: string, address?: string, phone?: string)` ใน `src/app/admin/actions.ts` — upsert แถว `SystemSettings` เดียวกับ S4 พร้อม `logAudit` แล้วเปลี่ยน `src/lib/organisation.ts` จาก export ค่าคงที่ `ORGANISATION_NAME` เป็นฟังก์ชัน async `getOrganisationName()` ที่อ่านจาก `SystemSettings.organisationName` (fallback เป็นสตริงเดิม `"มหาวิทยาลัยราชภัฏภูเก็ต"` ถ้ายังไม่เคยตั้งค่า) แล้วอัปเดต 3 จุดที่เรียกใช้ค่าคงที่เดิมอยู่ (`src/app/tech/actions.ts`, `src/app/admin/actions.ts`, `src/app/pending-approval/page.tsx`) ให้เรียก `await getOrganisationName()` แทน
 
-- [ ] **S6.** ปุ่ม "รีเซ็ตรหัสผ่าน" ในหน้าทีมพานเนล (`team-panel.tsx`) — กดยืนยันแล้วโชว์แค่ข้อความเตือน ยังไม่ได้รีเซ็ตจริง
+- [ ] **S6.** ปุ่ม "รีเซ็ตรหัสผ่าน" ในหน้าทีมพานเนล (`team-panel.tsx`) — **Backend ✅ เสร็จแล้ว 17 ส.ค. 2026 (`adminResetUserPasswordAction`) เหลือแค่ต่อ `onConfirm` ฝั่ง UI** ที่ยังโชว์ข้อความเตือนอยู่
 
   **คำขอ:** เพิ่ม Server Action `adminResetUserPasswordAction(userId: string)` ใน `src/app/admin/actions.ts` — guard ด้วย `verifyOrgAdmin()` เดิม ตั้ง `password = NULL` ให้ user เป้าหมาย (ไม่ต้องสร้าง/ส่งรหัสผ่านใหม่ให้ admin เห็นเลย — schema ออกแบบไว้แล้วว่า `password = NULL` แปลว่า "ต้องตั้งรหัสใหม่ก่อนเข้าระบบ" และ `authorize()` จะบังคับ flow นี้ให้เอง) พร้อม `logAudit`
 
-- [ ] **S7.** การ์ด "ประวัติการใช้งานระบบ" — ตอนนี้เป็น empty-state เฉยๆ เพราะไม่มีฟังก์ชันอ่านข้อมูลเลย
+- [ ] **S7.** การ์ด "ประวัติการใช้งานระบบ" — **Backend ✅ เสร็จแล้ว 17 ส.ค. 2026 (`getAuditLogs({ page?, action? })` คืน `availableActions` มาทำ dropdown filter ได้ด้วย) เหลือแค่เปลี่ยน empty-state เป็นตารางจริงฝั่ง UI** ~~ไม่มีฟังก์ชันอ่านข้อมูลเลย~~
 
   **คำขอ:** เพิ่มฟังก์ชันอ่านข้อมูล เช่น `getAuditLogs({ page, actionFilter }?)` ใน `src/app/admin/actions.ts` (หรือไฟล์ใหม่ที่เหมาะสม) ดึง `system_audit_logs` เรียงจากล่าสุด ~200 รายการ join ชื่อผู้ทำ (`user.name`) มาด้วย — `src/lib/audit.ts` เขียนเข้าตารางนี้อยู่แล้วจากหลาย action (`CREATE_WORKORDER`, `ASSIGN_WORKORDER`, `CANCEL_WORKORDER`, `UPDATE_AIRCONDITIONER`, `UPDATE_MAINTENANCE_LOG`, `CLAIM_WORKORDER`, `COMPLETE_WORKORDER`) แต่ยังไม่มีใครอ่านกลับเลย
 
@@ -845,7 +882,7 @@ DoubleKill จะไม่แตะไฟล์เหล่านี้ ถ้�
 **ตัดสินใจแล้ว:** ช่องปฏิทินของวันที่มีงานเยอะ ให้แสดงเป็น **รายชื่อตึกพร้อมจำนวนงาน** แทนการเรียงทีละงาน กดชื่อตึก → เปิดดูรายละเอียดงานทั้งหมดของตึกนั้นในวันนั้น (2 ระดับ: วัน → ตึก → รายการงาน)
 
 - [x] **Backend เสร็จแล้ว (11 ส.ค. 2026)**
-- [ ] **Frontend รอ Esther03u** — ดูคำขอด้านล่าง
+- [x] **Frontend เสร็จแล้ว** — ยืนยันจากโค้ด 18 ส.ค. 2026: `maintenance-calendar.tsx` group ด้วย `buildingId`/`buildingName` แล้ว (มี composite key `buildingId::roomName` แยกห้องชื่อซ้ำข้ามตึกด้วย)
 
 **สิ่งที่ backend ทำแล้ว:** `/api/admin/maintenance-schedules` เพิ่ม 3 field ใหม่ต่อ 1 รายการ
 
@@ -879,7 +916,8 @@ const byBuilding = jobs.reduce<Record<string, { name: string; jobs: Job[] }>>((a
 ### F3. เพิ่มหน้า/ส่วนแสดงประวัติการดูแลรักษาของแอร์แต่ละตัว
 
 - [x] **Backend เสร็จแล้ว (11 ส.ค. 2026)**
-- [ ] **Frontend รอ Esther03u** — ดูคำขอด้านล่าง
+- [x] **Frontend เสร็จแล้ว** — ยืนยันจากโค้ด 18 ส.ค. 2026: `src/components/admin/ac-history-modal.tsx` เรียก `getAirConditionerHistory()` และแสดง `repairDetail` ("ซ่อมอะไรไปบ้าง") ด้วยแล้ว
+  - ⚠️ **ยังเหลือ:** ปุ่ม "แก้ไข" ในโมดัลนี้ที่ต่อกับ `updateMaintenanceLogAction` (ดูหัวข้อ "งานรอบแก้ไขข้อมูล ข้อ 2")
 
 **Server Action ใหม่: `getAirConditionerHistory(airConditionerId: string)`** (`src/app/admin/actions.ts`)
 
@@ -930,7 +968,7 @@ const MAINTENANCE_ACTION_LABEL: Record<string, string> = {
 ### F4. เพิ่มวันที่ติดตั้งแอร์ (`installedAt`) + default
 
 - [x] **Backend เสร็จแล้ว (11 ส.ค. 2026)** — `createAirConditionerAction` รับ `installedAt` จากฟอร์มแล้ว
-- [ ] **Frontend รอ Esther03u** — ดูคำขอด้านล่าง
+- [x] **Frontend เสร็จแล้ว** — ยืนยันจากโค้ด 18 ส.ค. 2026: `asset-manager.tsx` (~บรรทัด 424) มีช่อง `name="installedAt"` แล้ว
 
 **สิ่งที่ backend ทำแล้ว:**
 - `acSchema` รับ field ใหม่ชื่อ **`installedAt`** เป็น **optional** รูปแบบ **`YYYY-MM-DD`** (ตรงกับที่ `<input type="date">` ส่งมาพอดี ไม่ต้องแปลงอะไร)
@@ -1040,4 +1078,31 @@ const MAINTENANCE_ACTION_LABEL: Record<string, string> = {
 
 ---
 
-*Handoff document last updated: August 10, 2026.*
+---
+
+## 📋 สถานะรวม ณ 18 สิงหาคม 2026
+
+**Backend: ไม่มีงานค้าง** — ทุกคำขอจาก Esther03u (S1–S7, F1–F7, P1–P9, P14) ทำครบแล้ว เหลือแค่ 2 อย่างที่รอปัจจัยภายนอก:
+1. **SMTP** — โค้ดพร้อม รอเจ้าของโปรเจกต์ใส่ credential ใน `.env`
+2. **`avatarUrl` ใน schema** — รอเริ่ม F5 (รูปโปรไฟล์)
+
+**ฝั่ง UI (Esther03u) เหลือ 10 เรื่อง** เรียงตามความสำคัญ:
+
+| ลำดับ | งาน | ทำไมสำคัญ |
+|---|---|---|
+| 🔴 1 | ช่อง `repairDetail` ในฟอร์มบันทึกงาน | **บันทึกงานซ่อมไม่ได้เลยตอนนี้** |
+| 🔴 2 | ปุ่มเปลี่ยนหน้ากระดานใบงาน (P14) | **มีใบงาน 3 ใบที่เปิดดูไม่ได้** |
+| 🟠 3 | ปุ่มยกเลิกใบงาน (`cancelWorkOrderAction`) | แจ้งซ่อมผิดเครื่องแล้วแก้ไม่ได้เลย |
+| 🟠 4 | ฟอร์มแก้ข้อมูลแอร์ (`updateAirConditionerAction`) | ลงทะเบียนผิดแล้วแก้ไม่ได้ |
+| 🟠 5 | ปุ่มแก้ประวัติงาน (`updateMaintenanceLogAction`) | บันทึกผิดแล้วแก้ไม่ได้ |
+| 🟡 6 | S4 + S5 ปุ่มบันทึกในหน้าตั้งค่าระบบ | หน้าตั้งค่ายังเป็น placeholder |
+| 🟡 7 | S6 ปุ่มรีเซ็ตรหัสผ่านใน `team-panel.tsx` | ช่างลืมรหัสแล้วกู้ไม่ได้ถ้าเข้าอีเมลไม่ได้ |
+| 🟡 8 | S7 ตาราง audit log | ข้อมูลมีอยู่แล้วแต่ไม่มีใครอ่านได้ |
+| 🟢 9 | ลบ emoji 4 จุด (ผิดกฎ `AGENTS.md`) | — |
+| 🟢 10 | อ่าน `?ac=` จาก QR แล้วเปิดฟอร์มให้เลย | สะดวกขึ้น ไม่ต้องพิมพ์รหัสซ้ำ |
+
+**งานใหญ่ที่ยังไม่เริ่ม:** F5 ส่วนที่เหลือ — โปรไฟล์ฝั่งช่าง, รูปโปรไฟล์, ธีมมืด/สว่าง (`next-themes` ติดตั้งไว้แล้ว)
+
+---
+
+*Handoff document last updated: 18 สิงหาคม 2026 (ตรวจทานความถูกต้องทั้งไฟล์เทียบกับโค้ดจริง — ติ๊กงานที่เสร็จแล้วแต่ตกหล่น 7 ข้อ, ยกเลิกข้อ 10, แก้เนื้อหาล้าสมัย 8 จุด)*

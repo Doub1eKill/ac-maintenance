@@ -138,7 +138,7 @@ model AirConditioner {
   roomId      BigInt               @map("room_id") @db.UnsignedBigInt
   acBrandId   BigInt?              @map("ac_brand_id") @db.UnsignedBigInt
   acModelId   BigInt?              @map("ac_model_id") @db.UnsignedBigInt
-  acCode      String               @unique(map: "air_conditioners_ac_code_unique") @map("ac_code") @db.VarChar(255) // human-readable, globally unique: [UNI]-[BLDG]-[ROOM]-[NN]
+  acCode      String               @unique(map: "air_conditioners_ac_code_unique") @map("ac_code") @db.VarChar(255) // human-readable, globally unique: [BLDG]-[ROOM]-[NN] (the [UNI] segment went away with multi-tenancy)
   qrCode      String               @unique(map: "air_conditioners_qr_code_unique") @map("qr_code") @db.Char(36) // uuid embedded in the printed QR — never exposes the sequential ac_code
   brand       String?              @db.VarChar(255) // Fallback for "Other" custom brands
   model       String?              @db.VarChar(255) // Fallback for "Other" custom models
