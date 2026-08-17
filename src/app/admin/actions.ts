@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@/generated/prisma/client";
 import { auth } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import {
@@ -24,6 +25,132 @@ import { format, subDays } from "date-fns";
 // getOrgAdminData().workOrderPage.pageSize so it can render real paging
 // controls instead of silently showing only the newest page.
 const WORK_ORDER_PAGE_SIZE = 50;
+
+// The board's row shape, defined once. getOrgAdminData() serves the first page
+// with the rest of the dashboard and getWorkOrdersPage() serves the others, so
+// without this the two would each carry their own copy of the same select and
+// mapping — and a field added to one and forgotten in the other would show up
+// as rows that quietly change shape when you page past the first 50.
+const workOrderBoardSelect = {
+  id: true,
+  status: true,
+  priority: true,
+  issueDescription: true,
+  resolutionNotes: true,
+  images: true,
+  assignedAt: true,
+  claimedAt: true,
+  completedAt: true,
+  createdAt: true,
+  airConditionerId: true,
+  airConditioner: {
+    select: {
+      acCode: true,
+      brand: true,
+      btu: true,
+      // The unit's own condition, surfaced as `acStatus` below so the board
+      // can label a row repair vs. cleaning. Nothing stores a job type for a
+      // work order itself, so this is the same signal the technician view and
+      // the calendar already infer from.
+      status: true,
+      room: {
+        select: {
+          name: true,
+          building: { select: { name: true, abbreviation: true } },
+        },
+      },
+      acBrand: { select: { name: true } },
+    },
+  },
+  claimedByUser: { select: { name: true } },
+  reportedByUser: { select: { name: true } },
+  assignedToUser: { select: { name: true } },
+} as const;
+
+// Newest first, with id as a tiebreaker — and the tiebreaker is not optional.
+// 17 of the 52 work orders currently carry a NULL created_at, and rows that
+// compare equal have no defined order in SQL: the engine is free to return
+// them differently on each call. Under skip/take that means a row can appear
+// on two pages, or on none, depending on how the ties happened to land that
+// time. id is the primary key, so adding it makes the total order unique and
+// paging repeatable.
+const workOrderBoardOrderBy = [
+  { createdAt: "desc" },
+  { id: "desc" },
+] satisfies Prisma.WorkOrderOrderByWithRelationInput[];
+
+type WorkOrderBoardRow = Prisma.WorkOrderGetPayload<{ select: typeof workOrderBoardSelect }>;
+
+function toWorkOrderBoardRow(wo: WorkOrderBoardRow) {
+  return {
+    id: wo.id.toString(),
+    acCode: wo.airConditioner.acCode,
+    brand: wo.airConditioner.acBrand?.name || wo.airConditioner.brand || "ไม่ระบุ",
+    btu: wo.airConditioner.btu,
+    acStatus: wo.airConditioner.status,
+    location: `${wo.airConditioner.room.building.name} (${wo.airConditioner.room.building.abbreviation}) - ห้อง ${wo.airConditioner.room.name}`,
+    status: wo.status,
+    priority: wo.priority,
+    issueDescription: wo.issueDescription,
+    resolutionNotes: wo.resolutionNotes,
+    images: wo.images,
+    reportedByName: wo.reportedByUser?.name || null,
+    assignedToName: wo.assignedToUser?.name || null,
+    assignedAt: wo.assignedAt ? wo.assignedAt.toISOString() : null,
+    claimedByName: wo.claimedByUser?.name || null,
+    claimedAt: wo.claimedAt ? wo.claimedAt.toISOString() : null,
+    completedAt: wo.completedAt ? wo.completedAt.toISOString() : null,
+    createdAt: wo.createdAt ? wo.createdAt.toISOString() : null,
+    airConditionerId: wo.airConditionerId.toString(),
+  };
+}
+
+/**
+ * One page of the work order board.
+ *
+ * getOrgAdminData() returns the first page along with everything else the
+ * dashboard needs; this exists so the board can reach the rest. Previously it
+ * reported hasMore without offering any way to act on it, which held once the
+ * seeded data outgrew a single page.
+ *
+ * No filtering here on purpose: the board searches within the loaded page on
+ * the client, as it always has. Server-side search is a separate change.
+ */
+export async function getWorkOrdersPage(page: number) {
+  await verifyOrgAdmin();
+
+  const safePage = Math.max(1, Math.floor(page) || 1);
+
+  try {
+    const [rows, total] = await Promise.all([
+      prisma.workOrder.findMany({
+        select: workOrderBoardSelect,
+        orderBy: workOrderBoardOrderBy,
+        skip: (safePage - 1) * WORK_ORDER_PAGE_SIZE,
+        take: WORK_ORDER_PAGE_SIZE,
+      }),
+      prisma.workOrder.count(),
+    ]);
+
+    return {
+      workOrders: rows.map(toWorkOrderBoardRow),
+      page: safePage,
+      pageSize: WORK_ORDER_PAGE_SIZE,
+      total,
+      hasMore: safePage * WORK_ORDER_PAGE_SIZE < total,
+    };
+  } catch (error) {
+    console.error("Failed to load work orders page:", error);
+    return {
+      workOrders: [],
+      page: safePage,
+      pageSize: WORK_ORDER_PAGE_SIZE,
+      total: 0,
+      hasMore: false,
+      error: "ไม่สามารถโหลดใบงานหน้านี้ได้",
+    };
+  }
+}
 
 async function verifyOrgAdmin() {
   const session = await auth();
@@ -93,43 +220,10 @@ export async function getOrgAdminData() {
         },
         orderBy: { name: "asc" },
       }),
+      // Page one. getWorkOrdersPage() serves the rest from the same shape.
       prisma.workOrder.findMany({
-        select: {
-          id: true,
-          status: true,
-          priority: true,
-          issueDescription: true,
-          resolutionNotes: true,
-          images: true,
-          assignedAt: true,
-          claimedAt: true,
-          completedAt: true,
-          createdAt: true,
-          airConditionerId: true,
-          airConditioner: {
-            select: {
-              acCode: true,
-              brand: true,
-              btu: true,
-              // The unit's own condition, surfaced as `acStatus` below so the
-              // board can label a row repair vs. cleaning. Nothing stores a
-              // job type for a work order itself, so this is the same signal
-              // the technician view and the calendar already infer from.
-              status: true,
-              room: {
-                select: {
-                  name: true,
-                  building: { select: { name: true, abbreviation: true } },
-                },
-              },
-              acBrand: { select: { name: true } },
-            },
-          },
-          claimedByUser: { select: { name: true } },
-          reportedByUser: { select: { name: true } },
-          assignedToUser: { select: { name: true } },
-        },
-        orderBy: { createdAt: "desc" },
+        select: workOrderBoardSelect,
+        orderBy: workOrderBoardOrderBy,
         take: WORK_ORDER_PAGE_SIZE,
       }),
       prisma.user.findMany({
@@ -280,29 +374,7 @@ export async function getOrgAdminData() {
       };
     });
 
-    const workOrders = workOrdersRaw.map((wo) => ({
-      id: wo.id.toString(),
-      acCode: wo.airConditioner.acCode,
-      brand: wo.airConditioner.acBrand?.name || wo.airConditioner.brand || "ไม่ระบุ",
-      btu: wo.airConditioner.btu,
-      // Named apart from `status` below, which is the work order's own status
-      // (pending/claimed/...). "broken" -> repair job, anything else -> cleaning.
-      acStatus: wo.airConditioner.status,
-      location: `${wo.airConditioner.room.building.name} (${wo.airConditioner.room.building.abbreviation}) - ห้อง ${wo.airConditioner.room.name}`,
-      status: wo.status,
-      priority: wo.priority,
-      issueDescription: wo.issueDescription,
-      resolutionNotes: wo.resolutionNotes,
-      images: wo.images,
-      reportedByName: wo.reportedByUser?.name || null,
-      assignedToName: wo.assignedToUser?.name || null,
-      assignedAt: wo.assignedAt ? wo.assignedAt.toISOString() : null,
-      claimedByName: wo.claimedByUser?.name || null,
-      claimedAt: wo.claimedAt ? wo.claimedAt.toISOString() : null,
-      completedAt: wo.completedAt ? wo.completedAt.toISOString() : null,
-      createdAt: wo.createdAt ? wo.createdAt.toISOString() : null,
-      airConditionerId: wo.airConditionerId.toString(),
-    }));
+    const workOrders = workOrdersRaw.map(toWorkOrderBoardRow);
 
     const allUsers = allUsersRaw.map((u) => ({
       id: u.id.toString(),
