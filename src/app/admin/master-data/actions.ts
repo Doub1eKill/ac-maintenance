@@ -68,7 +68,7 @@ export async function createAcBrandAction(formData: FormData) {
     if (existing) return { error: "มียี่ห้อนี้อยู่ในระบบแล้ว" };
     
     await prisma.acBrand.create({ data: { name: parsed.data.name } });
-    revalidatePath("/admin/master-data");
+    revalidatePath("/admin");
     return { success: true };
   } catch (error) {
     console.error(error);
@@ -116,7 +116,7 @@ export async function createAcModelAction(formData: FormData) {
       }
     });
     
-    revalidatePath("/admin/master-data");
+    revalidatePath("/admin");
     return { success: true };
   } catch (error) {
     console.error(error);

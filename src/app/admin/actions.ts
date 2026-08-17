@@ -9,9 +9,14 @@ import {
   syncOverdueMaintenanceWorkOrders,
   businessDateToday,
   businessDateFrom,
+  addMaintenanceInterval,
   getMaintenanceHistory,
 } from "@/lib/maintenance";
-import { ORGANISATION_NAME } from "@/lib/organisation";
+import {
+  getDefaultMaintenanceFrequency,
+  getOrganisationInfo,
+  getOrganisationName,
+} from "@/lib/organisation";
 import { format, subDays } from "date-fns";
 
 // How many work orders the board loads at once. Not exported directly (a
@@ -44,6 +49,7 @@ export async function getOrgAdminData() {
       totalWorkOrders,
       pendingWorkOrders,
       currentUser,
+      organisationName,
     ] = await Promise.all([
       // This is the widest query on the page — every building, room and unit.
       // `include` pulled full rows plus full acBrand, acModel and
@@ -182,6 +188,8 @@ export async function getOrgAdminData() {
           },
         },
       }),
+      // Joins the same batch rather than adding a round trip of its own.
+      getOrganisationName(),
     ]);
 
     // Aggregate metrics
@@ -359,7 +367,7 @@ export async function getOrgAdminData() {
       dbError: null,
       // Still the university's name, just no longer a per-tenant lookup —
       // the field keeps its name so the UI reading it needs no change.
-      universityName: ORGANISATION_NAME,
+      universityName: organisationName,
       // Everything the profile card needs, in one place. Falls back to the
       // session values only if the row somehow can't be read.
       profile: {
@@ -396,7 +404,7 @@ export async function getOrgAdminData() {
     console.error("Org Admin Data query failed:", error);
     return {
       dbError: "ไม่สามารถเชื่อมต่อฐานข้อมูล MariaDB/MySQL ได้ (Connection Pool Timeout) - กรุณาตรวจสอบว่าเซิร์ฟเวอร์ MySQL บนพอร์ต 3307 เปิดใช้งานอยู่ และเรียกใช้ 'npx tsx prisma/seed.ts'",
-      universityName: ORGANISATION_NAME,
+      universityName: await getOrganisationName(),
       // Session-only fallback: the database is unreachable on this path, so
       // the card still renders with whatever the JWT carries.
       profile: {
@@ -749,6 +757,255 @@ export async function cancelWorkOrderAction(workOrderId: string, reason?: string
   }
 }
 
+const SETTINGS_ID = 1;
+
+const defaultFrequencySchema = z.object({
+  value: z.number().int().positive("รอบบำรุงรักษาต้องมากกว่า 0"),
+  unit: z.enum(["days", "months", "years"]),
+});
+
+/**
+ * Sets the maintenance cycle given to units registered from here on.
+ * Existing units keep the cycle they already have — this never rewrites them.
+ */
+export async function updateDefaultFrequencyAction(value: number, unit: string) {
+  const session = await verifyOrgAdmin();
+
+  const parsed = defaultFrequencySchema.safeParse({ value, unit });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message || "ข้อมูลไม่ถูกต้อง" };
+  }
+
+  try {
+    const before = await prisma.systemSettings.findUnique({
+      where: { id: SETTINGS_ID },
+      select: { defaultFrequencyValue: true, defaultFrequencyUnit: true },
+    });
+
+    // upsert rather than update: the row is created by migration, but this
+    // stays correct on a database where that somehow didn't happen.
+    await prisma.systemSettings.upsert({
+      where: { id: SETTINGS_ID },
+      update: { defaultFrequencyValue: parsed.data.value, defaultFrequencyUnit: parsed.data.unit },
+      create: {
+        id: SETTINGS_ID,
+        defaultFrequencyValue: parsed.data.value,
+        defaultFrequencyUnit: parsed.data.unit,
+      },
+    });
+
+    await logAudit({
+      userId: BigInt(session.user.id!),
+      action: "UPDATE_DEFAULT_FREQUENCY",
+      entityType: "systemSettings",
+      entityId: BigInt(SETTINGS_ID),
+      oldValues: before
+        ? { value: before.defaultFrequencyValue, unit: before.defaultFrequencyUnit }
+        : undefined,
+      newValues: { value: parsed.data.value, unit: parsed.data.unit },
+      ipAddress: "server_action",
+    });
+
+    revalidatePath("/admin");
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to update default frequency:", error);
+    return { error: "ไม่สามารถบันทึกรอบบำรุงรักษาเริ่มต้นได้" };
+  }
+}
+
+const organisationSchema = z.object({
+  name: z.string().trim().min(1, "กรุณาระบุชื่อหน่วยงาน").max(255, "ชื่อหน่วยงานยาวเกินไป"),
+  address: z.string().trim().max(255, "ที่อยู่ยาวเกินไป").optional(),
+  phone: z.string().trim().max(255, "เบอร์โทรศัพท์ยาวเกินไป").optional(),
+});
+
+/** Organisation details shown in the dashboard header and on public pages. */
+export async function updateOrganisationInfoAction(
+  name: string,
+  address?: string,
+  phone?: string
+) {
+  const session = await verifyOrgAdmin();
+
+  const parsed = organisationSchema.safeParse({ name, address, phone });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message || "ข้อมูลไม่ถูกต้อง" };
+  }
+
+  try {
+    const before = await getOrganisationInfo();
+
+    await prisma.systemSettings.upsert({
+      where: { id: SETTINGS_ID },
+      update: {
+        organisationName: parsed.data.name,
+        organisationAddress: parsed.data.address || null,
+        organisationPhone: parsed.data.phone || null,
+      },
+      create: {
+        id: SETTINGS_ID,
+        organisationName: parsed.data.name,
+        organisationAddress: parsed.data.address || null,
+        organisationPhone: parsed.data.phone || null,
+      },
+    });
+
+    await logAudit({
+      userId: BigInt(session.user.id!),
+      action: "UPDATE_ORGANISATION_INFO",
+      entityType: "systemSettings",
+      entityId: BigInt(SETTINGS_ID),
+      oldValues: before,
+      newValues: {
+        name: parsed.data.name,
+        address: parsed.data.address || null,
+        phone: parsed.data.phone || null,
+      },
+      ipAddress: "server_action",
+    });
+
+    // The name appears in the header of every dashboard, so both trees have
+    // to be rebuilt or the old one lingers until the next natural navigation.
+    revalidatePath("/admin");
+    revalidatePath("/tech");
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to update organisation info:", error);
+    return { error: "ไม่สามารถบันทึกข้อมูลหน่วยงานได้" };
+  }
+}
+
+/**
+ * Clears a user's password so they must set a new one before signing in —
+ * for the case where someone is locked out and can't use the emailed reset
+ * link (no access to the inbox, wrong address on file).
+ *
+ * No password is generated and shown to the admin: NULL already means "must
+ * reset" in this schema, and authorize() turns it into the
+ * PasswordResetRequired flow on the user's next attempt. That keeps the admin
+ * from having to read a working credential out loud to somebody.
+ */
+export async function adminResetUserPasswordAction(userId: string) {
+  const session = await verifyOrgAdmin();
+
+  let targetId: bigint;
+  try {
+    targetId = BigInt(userId);
+  } catch {
+    return { error: "ไม่พบผู้ใช้" };
+  }
+
+  // Doing this to yourself locks you out with no way back in from this
+  // screen; the profile page's own reset is the supported route.
+  if (targetId.toString() === session.user.id) {
+    return { error: "ไม่สามารถรีเซ็ตรหัสผ่านของตัวเองได้จากหน้านี้ กรุณาใช้เมนูจัดการโปรไฟล์" };
+  }
+
+  try {
+    const target = await prisma.user.findUnique({
+      where: { id: targetId },
+      select: { id: true, email: true, password: true },
+    });
+
+    if (!target) return { error: "ไม่พบผู้ใช้" };
+    if (target.password === null) {
+      return { error: "ผู้ใช้รายนี้ต้องตั้งรหัสผ่านใหม่อยู่แล้ว" };
+    }
+
+    await prisma.user.update({
+      where: { id: targetId },
+      data: { password: null },
+    });
+
+    await logAudit({
+      userId: BigInt(session.user.id!),
+      action: "RESET_USER_PASSWORD",
+      entityType: "user",
+      entityId: targetId,
+      newValues: { passwordCleared: true },
+      ipAddress: "server_action",
+    });
+
+    revalidatePath("/admin");
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to reset user password:", error);
+    return { error: "ไม่สามารถรีเซ็ตรหัสผ่านได้ กรุณาลองใหม่อีกครั้ง" };
+  }
+}
+
+const AUDIT_LOG_PAGE_SIZE = 50;
+
+/**
+ * Reads back the audit trail that logAudit has been writing all along and
+ * which nothing has ever displayed. Paged rather than capped, so a filtered
+ * search can reach beyond the newest page.
+ */
+export async function getAuditLogs(params?: { page?: number; action?: string }) {
+  await verifyOrgAdmin();
+
+  const page = Math.max(1, Math.floor(params?.page ?? 1));
+  const where = params?.action ? { action: params.action } : {};
+
+  try {
+    const [rows, total, actions] = await Promise.all([
+      prisma.systemAuditLog.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * AUDIT_LOG_PAGE_SIZE,
+        take: AUDIT_LOG_PAGE_SIZE,
+        select: {
+          id: true,
+          action: true,
+          entityType: true,
+          entityId: true,
+          oldValues: true,
+          newValues: true,
+          createdAt: true,
+          user: { select: { name: true } },
+        },
+      }),
+      prisma.systemAuditLog.count({ where }),
+      // Drives the filter dropdown from what has actually been recorded,
+      // rather than a hardcoded list that drifts as actions are added.
+      prisma.systemAuditLog.findMany({
+        distinct: ["action"],
+        select: { action: true },
+        orderBy: { action: "asc" },
+      }),
+    ]);
+
+    return {
+      logs: rows.map((row) => ({
+        id: row.id.toString(),
+        action: row.action,
+        entityType: row.entityType,
+        entityId: row.entityId.toString(),
+        oldValues: row.oldValues,
+        newValues: row.newValues,
+        createdAt: row.createdAt.toISOString(),
+        userName: row.user.name,
+      })),
+      page: {
+        current: page,
+        pageSize: AUDIT_LOG_PAGE_SIZE,
+        total,
+        hasMore: page * AUDIT_LOG_PAGE_SIZE < total,
+      },
+      availableActions: actions.map((a) => a.action),
+    };
+  } catch (error) {
+    console.error("Failed to load audit logs:", error);
+    return {
+      logs: [],
+      page: { current: 1, pageSize: AUDIT_LOG_PAGE_SIZE, total: 0, hasMore: false },
+      availableActions: [],
+      error: "ไม่สามารถโหลดประวัติการใช้งานระบบได้",
+    };
+  }
+}
+
 const buildingSchema = z.object({
   name: z.string().min(1, "กรุณาระบุชื่ออาคาร"),
   abbreviation: z.string().min(1, "กรุณาระบุตัวย่ออาคาร"),
@@ -935,13 +1192,59 @@ export async function createAirConditionerAction(formData: FormData) {
       dbData.model = data.customModel;
     }
     
-    await prisma.airConditioner.create({ data: dbData });
+    // A unit registered without a maintenance schedule is invisible to the
+    // overdue check — it would never be flagged for cleaning until somebody
+    // noticed and set a cycle by hand. Nothing created one before now; the
+    // 189 that exist came from a one-off backfill, so every unit added since
+    // has been in that blind spot. Created here, in the same transaction as
+    // the unit, using the default cycle from settings.
+    const { value: frequencyValue, unit: frequencyUnit } =
+      await getDefaultMaintenanceFrequency();
+
+    await prisma.$transaction(async (tx) => {
+      const ac = await tx.airConditioner.create({ data: dbData, select: { id: true } });
+
+      await tx.maintenanceSchedule.create({
+        data: {
+          airConditionerId: ac.id,
+          frequencyValue,
+          frequencyUnit,
+          nextDueDate: firstDueDateFor(installedAt, frequencyValue, frequencyUnit),
+          isActive: true,
+        },
+      });
+    });
+
     revalidatePath("/admin");
     return { success: true };
   } catch (error) {
     console.error(error);
     return { error: "เกิดข้อผิดพลาดในการลงทะเบียนแอร์" };
   }
+}
+
+// How far back an installation date can be before the unit is treated as due
+// straight away rather than being given a cycle counted from installation.
+const OVERDUE_ON_REGISTRATION_MONTHS = 6;
+
+/**
+ * When a unit's first cleaning falls due.
+ *
+ * Counting from the installation date is what makes a unit installed three
+ * months ago on a six-month cycle come due in three months rather than six.
+ * But units are often registered long after they were installed, and counting
+ * from a date years back would produce a due date equally far in the past —
+ * technically true, useless as a date. Past the cutoff the unit is simply due
+ * now: it plainly needs attention, and today is when it got it.
+ */
+function firstDueDateFor(installedAt: Date | null, value: number, unit: string): Date {
+  const today = businessDateToday();
+  if (!installedAt) return addMaintenanceInterval(today, value, unit);
+
+  const cutoff = addMaintenanceInterval(today, -OVERDUE_ON_REGISTRATION_MONTHS, "months");
+  if (installedAt < cutoff) return today;
+
+  return addMaintenanceInterval(installedAt, value, unit);
 }
 
 const updateAcSchema = z.object({
@@ -1252,14 +1555,17 @@ export async function saveMaintenanceScheduleAction(formData: FormData) {
     }
 
     // Calculate nextDueDate
-    let nextDueDate = new Date();
-    if (data.frequencyUnit === "days") {
-      nextDueDate.setDate(nextDueDate.getDate() + data.frequencyValue);
-    } else if (data.frequencyUnit === "months") {
-      nextDueDate.setMonth(nextDueDate.getMonth() + data.frequencyValue);
-    } else if (data.frequencyUnit === "years") {
-      nextDueDate.setFullYear(nextDueDate.getFullYear() + data.frequencyValue);
-    }
+    // Was `new Date()` plus local-time setters, which got this wrong three
+    // ways against a @db.Date column: the UTC date is still yesterday between
+    // midnight and 07:00 here, local setters read the wrong fields off a
+    // UTC-midnight anchor, and month arithmetic rolled 31 Jan + 1 month
+    // forward into March instead of clamping to the end of February. Both
+    // helpers exist for exactly this and were already used everywhere else.
+    const nextDueDate = addMaintenanceInterval(
+      businessDateToday(),
+      data.frequencyValue,
+      data.frequencyUnit
+    );
 
     const existingSchedule = await prisma.maintenanceSchedule.findFirst({
       where: { airConditionerId: BigInt(data.airConditionerId) }

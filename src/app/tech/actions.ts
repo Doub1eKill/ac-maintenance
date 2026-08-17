@@ -12,7 +12,7 @@ import {
   addMaintenanceInterval,
 } from "@/lib/maintenance";
 import { MaintenanceAction } from "@/generated/prisma/client";
-import { ORGANISATION_NAME } from "@/lib/organisation";
+import { getOrganisationName } from "@/lib/organisation";
 
 async function verifyTechnician() {
   const session = await auth();
@@ -86,7 +86,7 @@ export async function getTechnicianData() {
   try {
     await syncOverdueMaintenanceWorkOrders();
 
-    const [pendingOrdersRaw, myJobsRaw, completedJobsRaw, assetListResult] = await Promise.all([
+    const [pendingOrdersRaw, myJobsRaw, completedJobsRaw, assetListResult, organisationName] = await Promise.all([
       prisma.workOrder.findMany({
         where: { status: "pending" },
         include: {
@@ -137,6 +137,7 @@ export async function getTechnicianData() {
         take: 50,
       }),
       getTechnicianAssetList(),
+      getOrganisationName(),
     ]);
 
     const jobPool = pendingOrdersRaw.map((wo) => ({
@@ -184,7 +185,7 @@ export async function getTechnicianData() {
 
     return {
       dbError: null,
-      universityName: ORGANISATION_NAME,
+      universityName: organisationName,
       jobPool,
       myJobs,
       completedJobs,
@@ -196,7 +197,7 @@ export async function getTechnicianData() {
     console.error("Technician Data query failed:", error);
     return {
       dbError: "ไม่สามารถเชื่อมต่อฐานข้อมูล MariaDB/MySQL ได้ (Connection Pool Timeout) - กรุณาตรวจสอบว่าเซิร์ฟเวอร์ MySQL บนพอร์ต 3307 เปิดใช้งานอยู่ และเรียกใช้ 'npx tsx prisma/seed.ts'",
-      universityName: ORGANISATION_NAME,
+      universityName: await getOrganisationName(),
       jobPool: [],
       myJobs: [],
       completedJobs: [],

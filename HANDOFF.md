@@ -143,6 +143,65 @@ audit log แยกได้ว่าใบไหนระบบสร้าง�
 
 ---
 
+## ✅ S4–S7 Backend เสร็จแล้ว (17 สิงหาคม 2026) — รอ UI ต่อ
+
+**⚠️ ต้องรัน `npx prisma migrate deploy` + `npx prisma generate` หลัง pull** (migration `20260816120000_add_system_settings`)
+
+### ตารางใหม่ `SystemSettings` — แถวเดียว id = 1
+
+migration **สร้างแถวให้แล้ว** จึงไม่มีสถานะ "ยังไม่ตั้งค่า" ให้ต้องเช็ค — อ่านเมื่อไหร่ก็เจอแถวเสมอ
+
+| ฟังก์ชันอ่าน (`src/lib/organisation.ts`) | คืนอะไร |
+|---|---|
+| `getOrganisationName()` | ชื่อหน่วยงาน (ยังไม่ตั้ง → `"มหาวิทยาลัยราชภัฏภูเก็ต"`) |
+| `getOrganisationInfo()` | `{ name, address, phone }` |
+| `getDefaultMaintenanceFrequency()` | `{ value, unit }` (เริ่มต้น 6 เดือน) |
+
+**`ORGANISATION_NAME` ถูกลบแล้ว** — ถ้าโค้ดไหนยัง import อยู่จะ compile ไม่ผ่าน เปลี่ยนไปใช้ `await getOrganisationName()` แทน (แก้ให้ครบทั้ง 5 จุดแล้ว)
+
+### Server Actions ใหม่
+
+| Action | ทำอะไร |
+|---|---|
+| **S4** `updateDefaultFrequencyAction(value, unit)` | ตั้งรอบเริ่มต้น (`unit` = `days`/`months`/`years`, `value > 0`) |
+| **S5** `updateOrganisationInfoAction(name, address?, phone?)` | ตั้งข้อมูลหน่วยงาน — revalidate ทั้ง `/admin` และ `/tech` เพราะชื่อขึ้นหัวทั้งสองฝั่ง |
+| **S6** `adminResetUserPasswordAction(userId)` | ตั้ง `password = NULL` ไม่สร้างรหัสใหม่ให้ admin เห็น |
+| **S7** `getAuditLogs({ page?, action? })` | คืน `{ logs, page, availableActions }` — แบ่งหน้า 50 รายการ |
+
+ทุกตัวคืน `{ success }` หรือ `{ error }` ข้อความไทย และเขียน `logAudit` ให้แล้ว
+
+**S6 มี guard เพิ่ม:** admin **รีเซ็ตรหัสผ่านตัวเองจากหน้านี้ไม่ได้** (กันล็อกตัวเองออก) และถ้า user นั้น `password` เป็น NULL อยู่แล้วจะบอกว่าไม่ต้องทำซ้ำ
+
+**S7 คืน `availableActions` มาให้ด้วย** — เอาไปทำ dropdown filter ได้เลย ดึงจากค่าที่มีจริงในตาราง ไม่ใช่ลิสต์ hardcode ที่จะล้าสมัยเมื่อมี action ใหม่
+
+### แอร์ใหม่ได้รอบบำรุงรักษาอัตโนมัติแล้ว (ทางเลือก ก.)
+
+**เดิมเป็นช่องโหว่:** ไม่มีโค้ดจุดไหนสร้าง `MaintenanceSchedule` ตอนลงทะเบียนแอร์ (ที่มีครบ 73 เครื่องเพราะ backfill รอบเดียวเมื่อ 27 ก.ค.) แปลว่า**แอร์ที่เพิ่มหลังจากนั้นจะไม่มีรอบเลย และหลุดจากระบบ auto-check ถาวร**
+
+ตอนนี้ `createAirConditionerAction` สร้าง schedule ให้ใน transaction เดียวกับการสร้างแอร์ โดยใช้รอบจาก `SystemSettings`
+
+**กฎวันครบกำหนดครั้งแรก** (ตามที่เจ้าของโปรเจกต์ตัดสินใจ):
+
+| วันติดตั้ง | ครบกำหนดครั้งแรก |
+|---|---|
+| **เกิน 6 เดือน** | **= วันนี้** ขึ้นค้างทันที (เครื่องเก่าที่เพิ่งมาลงทะเบียน ควรได้รับการดูแลเลย) |
+| ไม่เกิน 6 เดือน | วันติดตั้ง + รอบ |
+| ไม่ระบุ | วันนี้ + รอบ |
+
+**🐛 แก้บั๊กเพิ่มระหว่างทาง:** `saveMaintenanceScheduleAction` คำนวณ `nextDueDate` ด้วย `new Date()` + setter แบบ local time ซึ่งผิด 3 อย่างกับคอลัมน์ `@db.Date` (บั๊กชุดเดียวกับ P16 ที่ตกค้างเป็นจุดที่ 3): วันคลาดช่วงเที่ยงคืน–7 โมง, อ่าน field ผิดโซนเวลา, และ 31 ม.ค. + 1 เดือน ได้ 3 มี.ค. แทน 28 ก.พ. — เปลี่ยนไปใช้ `businessDateToday()` + `addMaintenanceInterval()` แล้ว
+
+### เก็บกวาดตามที่ฝากไว้
+
+`revalidatePath("/admin/master-data")` → `/admin` แล้วทั้ง 2 จุด
+
+### 📌 เหลือฝั่ง UI
+
+1. `settings-panel.tsx` — ต่อปุ่มบันทึกการ์ด S4/S5 เข้ากับ action จริง แทน `NotConnectedAlert`
+2. `team-panel.tsx` — ต่อ `onConfirm` เข้ากับ `adminResetUserPasswordAction`
+3. `settings-panel.tsx` — การ์ด "ประวัติการใช้งานระบบ" เปลี่ยนจาก empty-state เป็นตารางจริงจาก `getAuditLogs()`
+
+---
+
 ## 🗄️ Database Sync — สำคัญมาก อ่านก่อน pull/push ทุกครั้ง
 
 โปรเจกต์นี้ใช้ MySQL local (XAMPP) แยกเครื่องกัน — **โค้ดที่ push ขึ้น Git ไม่ได้ทำให้ฐานข้อมูลของอีกฝั่งตรงกันอัตโนมัติ** ต้องใช้ Prisma Migration เป็นตัวกลางเสมอ

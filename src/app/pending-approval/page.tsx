@@ -2,7 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { AuthLayout } from "@/components/auth/auth-layout";
 import { Clock, Building2, AlertCircle, ArrowLeft, RefreshCw } from "lucide-react";
-import { ORGANISATION_NAME } from "@/lib/organisation";
+import { getOrganisationName } from "@/lib/organisation";
 
 export const metadata = {
   title: "รอการอนุมัติสิทธิ์ | AC Maintenance System",
@@ -17,6 +17,7 @@ export default async function PendingApprovalPage({ searchParams }: PendingAppro
   const resolvedParams = searchParams ? await searchParams : {};
   const emailRaw = resolvedParams.email;
   const email = typeof emailRaw === "string" ? emailRaw.toLowerCase().trim() : null;
+  const organisationName = await getOrganisationName();
 
   let userDetails = null;
   if (email) {
@@ -72,7 +73,7 @@ export default async function PendingApprovalPage({ searchParams }: PendingAppro
               <div className="pt-2 border-t border-slate-100">
                 <div className="flex items-start gap-2 text-slate-900 font-bold">
                   <Building2 className="h-4 w-4 text-slate-700 shrink-0 mt-0.5" />
-                  <span>{ORGANISATION_NAME}</span>
+                  <span>{organisationName}</span>
                 </div>
               </div>
             </div>

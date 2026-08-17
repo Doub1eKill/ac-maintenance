@@ -270,6 +270,31 @@ model MaintenanceSchedule {
   @@map("maintenance_schedules")
 }
 
+/// Settings that belong to the installation as a whole rather than to any
+/// row in it. Deliberately a single row, pinned to id = 1 and created by the
+/// migration that adds this table, so readers never have to handle "not
+/// configured yet" as a separate state — there is always exactly one row to
+/// read, and writers upsert against that id.
+model SystemSettings {
+  id Int @id @default(1)
+
+  // Applied to air conditioners registered from here on. Existing units keep
+  // whatever cycle they were given; changing this never rewrites them.
+  defaultFrequencyValue Int    @default(6) @map("default_frequency_value") @db.UnsignedInt
+  defaultFrequencyUnit  String @default("months") @map("default_frequency_unit") @db.VarChar(20)
+
+  // Replaces the ORGANISATION_NAME constant that stood in for the University
+  // row after F1 removed it. Nullable: unset means "fall back to the built-in
+  // name" rather than "display nothing".
+  organisationName    String? @map("organisation_name") @db.VarChar(255)
+  organisationAddress String? @map("organisation_address") @db.VarChar(255)
+  organisationPhone   String? @map("organisation_phone") @db.VarChar(255)
+
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  @@map("system_settings")
+}
+
 enum UserRole {
   // org_admin keeps its name despite there being only one organisation now —
   // renaming it would touch every role check, session type and seeded row for
