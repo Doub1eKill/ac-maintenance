@@ -210,14 +210,24 @@ export function DashboardLayout({
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuGroup>
-                    <DropdownMenuItem className="rounded-lg text-xs font-medium cursor-pointer">
-                      <User className="mr-2 h-4 w-4" />
-                      <span>โปรไฟล์ส่วนตัว</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="rounded-lg text-xs font-medium cursor-pointer">
-                      <Settings className="mr-2 h-4 w-4" />
-                      <span>ตั้งค่าระบบ</span>
-                    </DropdownMenuItem>
+                    {navItems.some((item) => item.id === "profile") && (
+                      <DropdownMenuItem
+                        onClick={() => setActiveTab("profile")}
+                        className="rounded-lg text-xs font-medium cursor-pointer"
+                      >
+                        <User className="mr-2 h-4 w-4" />
+                        <span>โปรไฟล์ส่วนตัว</span>
+                      </DropdownMenuItem>
+                    )}
+                    {navItems.some((item) => item.id === "settings") && (
+                      <DropdownMenuItem
+                        onClick={() => setActiveTab("settings")}
+                        className="rounded-lg text-xs font-medium cursor-pointer"
+                      >
+                        <Settings className="mr-2 h-4 w-4" />
+                        <span>ตั้งค่าระบบ</span>
+                      </DropdownMenuItem>
+                    )}
                   </DropdownMenuGroup>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem

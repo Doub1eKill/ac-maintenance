@@ -15,6 +15,7 @@ import {
   Calendar,
   Clock,
   Snowflake,
+  User,
 } from "lucide-react";
 import { AnimatedIcon } from "@/components/ui/animated-icon";
 import {
@@ -33,6 +34,7 @@ import { MyJobsPanel } from "@/components/tech/my-jobs-panel";
 import { CompletedJobsPanel } from "@/components/tech/completed-jobs-panel";
 import { QrScanModal } from "@/components/tech/qr-scan-modal";
 import { LogActionModal } from "@/components/tech/log-action-modal";
+import { ProfilePanel } from "@/components/shared/profile-panel";
 import type { TechJobItem, Building } from "@/components/tech/types";
 
 // Pulls in date-fns and its own markup — split out of the initial bundle
@@ -200,6 +202,11 @@ export function TechMobileView({
       label: "ปฏิทิน",
       icon: Calendar,
     },
+    {
+      id: "profile",
+      label: "โปรไฟล์ของฉัน",
+      icon: User,
+    },
   ];
 
   return (
@@ -239,6 +246,7 @@ export function TechMobileView({
              activeTab === "pool" ? "งานซ่อมบำรุงที่รอรับ" :
              activeTab === "my_jobs" ? "งานที่ฉันกำลังดำเนินการ" :
              activeTab === "calendar" ? "ปฏิทินซ่อมบำรุง" :
+             activeTab === "profile" ? "โปรไฟล์ของฉัน" :
              "ประวัติการทำงานของฉัน"}
           </h1>
         </div>
@@ -311,6 +319,15 @@ export function TechMobileView({
         <div className="animate-in fade-in">
           <MaintenanceCalendar />
         </div>
+      )}
+
+      {/* TAB 5: My Profile */}
+      {activeTab === "profile" && (
+        <ProfilePanel
+          profile={{ name: user.name ?? "", email: user.email ?? "", role: user.role, phone: null }}
+          universityName={universityName}
+          showPhone={false}
+        />
       )}
 
       {/* Modal: QR Code Scanner Simulator */}

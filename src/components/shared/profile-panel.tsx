@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useTransition, useActionState } from "react";
-import { User, Mail, Phone, Building2, KeyRound, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { useEffect, useState, useTransition, useActionState } from "react";
+import { useTheme } from "next-themes";
+import { User, Mail, Phone, Building2, KeyRound, AlertTriangle, CheckCircle2, Sun, Moon, Monitor } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { requestPasswordReset, type RequestResetState } from "@/app/request-password-reset/actions";
 import { updateProfileAction } from "@/app/admin/actions";
@@ -14,6 +15,13 @@ interface ProfilePanelProps {
     phone: string | null;
   };
   universityName: string;
+  // Technician data doesn't carry a phone number yet (backend request
+  // pending — see HANDOFF.md F5) — showing an empty field would let a
+  // save silently clear a real phone number the day the field does exist,
+  // since updateProfileAction treats an empty string as "clear it". Hiding
+  // the field entirely (and not sending phone at all, which the action
+  // treats as "leave it untouched") avoids that until the data is real.
+  showPhone?: boolean;
 }
 
 const ROLE_LABEL: Record<string, string> = {
@@ -21,7 +29,7 @@ const ROLE_LABEL: Record<string, string> = {
   technician: "ช่างซ่อมบำรุง",
 };
 
-export function ProfilePanel({ profile, universityName }: ProfilePanelProps) {
+export function ProfilePanel({ profile, universityName, showPhone = true }: ProfilePanelProps) {
   const [name, setName] = useState(profile.name);
   const [phone, setPhone] = useState(profile.phone ?? "");
   const [saveResult, setSaveResult] = useState<{ success?: boolean; error?: string } | null>(null);
@@ -38,7 +46,7 @@ export function ProfilePanel({ profile, universityName }: ProfilePanelProps) {
   const handleSave = () => {
     setSaveResult(null);
     startSaveTransition(async () => {
-      const result = await updateProfileAction(name, phone);
+      const result = showPhone ? await updateProfileAction(name, phone) : await updateProfileAction(name);
       setSaveResult(result);
     });
   };
@@ -79,22 +87,24 @@ export function ProfilePanel({ profile, universityName }: ProfilePanelProps) {
             />
           </div>
 
-          <div>
-            <label htmlFor="profile-phone" className="mb-1.5 block text-xs font-bold text-foreground">
-              เบอร์โทรศัพท์
-            </label>
-            <div className="relative">
-              <Phone className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <input
-                id="profile-phone"
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="081-234-5678"
-                className="w-full rounded-xl border border-border bg-muted pl-10 pr-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
-              />
+          {showPhone && (
+            <div>
+              <label htmlFor="profile-phone" className="mb-1.5 block text-xs font-bold text-foreground">
+                เบอร์โทรศัพท์
+              </label>
+              <div className="relative">
+                <Phone className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  id="profile-phone"
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="081-234-5678"
+                  className="w-full rounded-xl border border-border bg-muted pl-10 pr-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
+                />
+              </div>
             </div>
-          </div>
+          )}
 
           <div>
             <label htmlFor="profile-email" className="mb-1.5 block text-xs font-bold text-foreground">
@@ -136,7 +146,10 @@ export function ProfilePanel({ profile, universityName }: ProfilePanelProps) {
         </button>
       </div>
 
-      {/* Card 2: Account Security */}
+      {/* Card 2: Appearance */}
+      <ThemeCard />
+
+      {/* Card 3: Account Security */}
       <div className="biz-card p-6 space-y-4">
         <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
           <KeyRound className="h-4 w-4 text-primary" />
@@ -172,6 +185,57 @@ export function ProfilePanel({ profile, universityName }: ProfilePanelProps) {
             {isResetPending ? "กำลังส่งคำขอ..." : "ส่งลิงก์เปลี่ยนรหัสผ่าน"}
           </button>
         </form>
+      </div>
+    </div>
+  );
+}
+
+const THEME_OPTIONS = [
+  { value: "light", label: "สว่าง", icon: Sun },
+  { value: "dark", label: "มืด", icon: Moon },
+  { value: "system", label: "ตามระบบ", icon: Monitor },
+] as const;
+
+function ThemeCard() {
+  // next-themes only knows the real theme after mounting on the client —
+  // rendering the active option before that would read the server's guess
+  // (always "system") and flip a frame later, which shows up as every
+  // button briefly looking unselected/selected wrong on first paint.
+  const [mounted, setMounted] = useState(false);
+  const { theme, setTheme } = useTheme();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  return (
+    <div className="biz-card p-6 space-y-4">
+      <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+        <Sun className="h-4 w-4 text-primary" />
+        ธีมการแสดงผล
+      </h3>
+      <p className="text-xs text-muted-foreground">
+        เป็นการตั้งค่าส่วนตัว มีผลเฉพาะอุปกรณ์นี้ ไม่กระทบผู้ใช้งานคนอื่น
+      </p>
+      <div className="grid grid-cols-3 gap-2">
+        {THEME_OPTIONS.map(({ value, label, icon: Icon }) => {
+          const isActive = mounted && theme === value;
+          return (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setTheme(value)}
+              className={`flex flex-col items-center justify-center gap-1.5 rounded-xl border py-3 text-xs font-bold transition-colors ${
+                isActive
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border bg-muted text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

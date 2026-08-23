@@ -25,7 +25,7 @@ import {
 import dynamic from "next/dynamic";
 import { DashboardLayout, NavItem } from "@/components/layout/dashboard-layout";
 import { AssetManager } from "@/components/admin/asset-manager";
-import { ProfilePanel } from "@/components/admin/profile-panel";
+import { ProfilePanel } from "@/components/shared/profile-panel";
 import { SettingsPanel } from "@/components/admin/settings-panel";
 import { QrCodeManager } from "@/components/admin/qr-code-manager";
 import { OverviewPanel } from "@/components/admin/overview-panel";

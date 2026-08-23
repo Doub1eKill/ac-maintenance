@@ -25,6 +25,7 @@ export const metadata: Metadata = {
   description: "ระบบบริหารจัดการเครื่องปรับอากาศ และการแจ้งซ่อมบำรุงระดับมหาวิทยาลัย",
 };
 
+import { ThemeProvider } from "next-themes";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -36,11 +37,19 @@ export default function RootLayout({
   return (
     <html
       lang="th"
+      // suppressHydrationWarning: next-themes sets the class/style attribute
+      // on <html> before hydration via an inline script, which legitimately
+      // differs from the server-rendered markup for one frame — this is the
+      // documented way to silence that specific (harmless) mismatch warning
+      // without suppressing real ones, since it only applies to this element.
+      suppressHydrationWarning
       className={cn("h-full", "antialiased", notoSansThai.variable, geistSans.variable, geistMono.variable, "font-sans")}
     >
       <body className="min-h-full flex flex-col font-sans bg-background text-foreground">
-        <TooltipProvider delayDuration={0}>{children}</TooltipProvider>
-        <Toaster position="top-right" richColors closeButton />
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <TooltipProvider delayDuration={0}>{children}</TooltipProvider>
+          <Toaster position="top-right" richColors closeButton />
+        </ThemeProvider>
       </body>
     </html>
   );
