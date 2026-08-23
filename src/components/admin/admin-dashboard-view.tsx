@@ -35,7 +35,7 @@ import { TeamPanel } from "@/components/admin/team-panel";
 import { CreateWorkOrderModal } from "@/components/admin/create-work-order-modal";
 import { AssignWorkOrderModal } from "@/components/admin/assign-work-order-modal";
 import { WorkOrderDetailDialog } from "@/components/admin/work-order-detail-dialog";
-import type { WorkOrderItem, BuildingItem, PendingUser } from "@/components/admin/types";
+import type { WorkOrderItem, WorkOrderPageInfo, BuildingItem, PendingUser } from "@/components/admin/types";
 import type { UrgentMaintenanceAC } from "@/components/admin/upcoming-maintenance-table";
 import type { BrandType } from "@/app/admin/master-data/master-data-client";
 
@@ -81,6 +81,7 @@ interface AdminDashboardViewProps {
   weeklyActivity: Array<{ day: string; repairs: number }>;
   urgentUnits: UrgentMaintenanceAC[];
   workOrders: WorkOrderItem[];
+  workOrderPage: WorkOrderPageInfo;
   buildings: BuildingItem[];
   allAcUnits: Array<{ id: string; label: string }>;
   pendingUsers?: PendingUser[];
@@ -97,6 +98,7 @@ export function AdminDashboardView({
   metrics,
   weeklyActivity = [],
   workOrders,
+  workOrderPage,
   buildings,
   pendingUsers = [],
   allUsers = [],
@@ -292,6 +294,7 @@ export function AdminDashboardView({
       {activeTab === "kanban" && (
         <WorkOrderBoard
           workOrders={workOrders}
+          workOrderPage={workOrderPage}
           globalSearch={globalSearch}
           onOpenDetails={setSelectedWorkOrderDetails}
           onAssign={(workOrderId) => {

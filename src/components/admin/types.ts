@@ -49,6 +49,13 @@ export interface BuildingItem {
   rooms: RoomItem[];
 }
 
+export interface WorkOrderPageInfo {
+  total: number;
+  pageSize: number;
+  loaded: number;
+  hasMore: boolean;
+}
+
 export interface PendingUser {
   id: string;
   name: string;

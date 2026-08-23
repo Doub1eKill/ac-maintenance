@@ -25,6 +25,7 @@ export default async function AdminHomePage() {
     profile,
     metrics,
     workOrders,
+    workOrderPage,
     buildings,
     allAcUnits,
     pendingUsers,
@@ -47,6 +48,7 @@ export default async function AdminHomePage() {
       profile={profile}
       metrics={metrics}
       workOrders={workOrders}
+      workOrderPage={workOrderPage}
       buildings={buildings}
       allAcUnits={allAcUnits}
       pendingUsers={pendingUsers}

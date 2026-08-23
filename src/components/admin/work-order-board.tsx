@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { CheckCircle2, ClipboardList, Clock, MoreVertical, Wrench } from "lucide-react";
+import { useEffect, useState, useTransition } from "react";
+import { CheckCircle2, ClipboardList, Clock, Loader2, MoreVertical, Wrench } from "lucide-react";
 import {
   Pagination,
   PaginationContent,
@@ -10,16 +10,16 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import type { WorkOrderItem } from "@/components/admin/types";
+import { getWorkOrdersPage } from "@/app/admin/actions";
+import type { WorkOrderItem, WorkOrderPageInfo } from "@/components/admin/types";
 
 interface WorkOrderBoardProps {
   workOrders: WorkOrderItem[];
+  workOrderPage: WorkOrderPageInfo;
   globalSearch: string;
   onOpenDetails: (workOrder: WorkOrderItem) => void;
   onAssign: (workOrderId: string) => void;
 }
-
-const ITEMS_PER_PAGE = 10;
 
 function matchesSearch(wo: WorkOrderItem, search: string) {
   if (!search.trim()) return true;
@@ -49,19 +49,50 @@ function getWorkOrderRowClassName(wo: WorkOrderItem) {
   return `border-l-4 ${borderClass} ${tintClass} ${fadeClass}`.trim();
 }
 
-export function WorkOrderBoard({ workOrders, globalSearch, onOpenDetails, onAssign }: WorkOrderBoardProps) {
-  const [workOrdersPage, setWorkOrdersPage] = useState(1);
+export function WorkOrderBoard({ workOrders, workOrderPage, globalSearch, onOpenDetails, onAssign }: WorkOrderBoardProps) {
+  const [page, setPage] = useState(1);
+  // Page 1 always comes from the dashboard's own load (getOrgAdminData()) so
+  // it renders instantly; every other page is fetched on demand via
+  // getWorkOrdersPage() and cached here so flipping back doesn't refetch.
+  const [pagesLoaded, setPagesLoaded] = useState<Map<number, WorkOrderItem[]>>(() => new Map([[1, workOrders]]));
+  const [isLoadingPage, startPageTransition] = useTransition();
+  const [pageError, setPageError] = useState<string | null>(null);
+
+  // The dashboard revalidates and hands down a fresh `workOrders` array after
+  // any action that changes a work order (assign, claim, complete, create).
+  // Drop the cache and jump back to page 1 so the board never shows a stale
+  // status next to a freshly-mutated row on some other cached page.
+  useEffect(() => {
+    setPagesLoaded(new Map([[1, workOrders]]));
+    setPage(1);
+    setPageError(null);
+  }, [workOrders]);
 
   useEffect(() => {
-    setWorkOrdersPage(1);
+    setPage(1);
   }, [globalSearch]);
 
-  const filteredWorkOrders = workOrders.filter((wo) => matchesSearch(wo, globalSearch));
-  const totalWorkOrdersPages = Math.ceil(filteredWorkOrders.length / ITEMS_PER_PAGE);
-  const paginatedWorkOrders = filteredWorkOrders.slice(
-    (workOrdersPage - 1) * ITEMS_PER_PAGE,
-    workOrdersPage * ITEMS_PER_PAGE
-  );
+  const totalPages = Math.max(1, Math.ceil(workOrderPage.total / workOrderPage.pageSize));
+  const currentPageRows = pagesLoaded.get(page) ?? [];
+  const filteredWorkOrders = currentPageRows.filter((wo) => matchesSearch(wo, globalSearch));
+
+  function goToPage(target: number) {
+    const clamped = Math.max(1, Math.min(totalPages, target));
+    if (clamped === page) return;
+    setPage(clamped);
+
+    if (pagesLoaded.has(clamped)) return;
+
+    setPageError(null);
+    startPageTransition(async () => {
+      const result = await getWorkOrdersPage(clamped);
+      if ("error" in result && result.error) {
+        setPageError(result.error);
+        return;
+      }
+      setPagesLoaded((prev) => new Map(prev).set(clamped, result.workOrders));
+    });
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in">
@@ -70,7 +101,13 @@ export function WorkOrderBoard({ workOrders, globalSearch, onOpenDetails, onAssi
           <ClipboardList className="h-5 w-5 text-primary" /> ระบบจัดการงานซ่อมบำรุง
         </h2>
         <div className="text-sm text-muted-foreground font-medium">
-          พบใบงานทั้งหมด <span className="font-bold text-foreground">{filteredWorkOrders.length}</span> รายการ
+          ทั้งหมด <span className="font-bold text-foreground">{workOrderPage.total}</span> รายการ
+          {globalSearch.trim() && (
+            <>
+              {" "}
+              · พบ <span className="font-bold text-foreground">{filteredWorkOrders.length}</span> รายการในหน้านี้
+            </>
+          )}
         </div>
       </div>
 
@@ -88,14 +125,26 @@ export function WorkOrderBoard({ workOrders, globalSearch, onOpenDetails, onAssi
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {paginatedWorkOrders.length === 0 ? (
+              {isLoadingPage ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-10 text-center text-muted-foreground">
+                    <Loader2 className="inline h-4 w-4 animate-spin mr-2" /> กำลังโหลดหน้า {page}...
+                  </td>
+                </tr>
+              ) : pageError ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-8 text-center text-destructive">
+                    {pageError}
+                  </td>
+                </tr>
+              ) : filteredWorkOrders.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">
                     ไม่พบข้อมูลใบงาน
                   </td>
                 </tr>
               ) : (
-                paginatedWorkOrders.map((wo) => (
+                filteredWorkOrders.map((wo) => (
                   <tr
                     key={wo.id}
                     className={`hover:bg-muted transition-colors cursor-pointer ${getWorkOrderRowClassName(wo)}`}
@@ -173,25 +222,25 @@ export function WorkOrderBoard({ workOrders, globalSearch, onOpenDetails, onAssi
         </div>
 
         {/* Pagination Controls */}
-        {totalWorkOrdersPages > 1 && (
+        {totalPages > 1 && (
           <div className="px-6 py-4 border-t border-border bg-muted flex items-center justify-between">
             <div className="text-sm text-muted-foreground">
-              หน้า {workOrdersPage} จาก {totalWorkOrdersPages}
+              หน้า {page} จาก {totalPages}
             </div>
             <Pagination>
               <PaginationContent>
                 <PaginationItem>
                   <PaginationPrevious
-                    onClick={() => setWorkOrdersPage((p) => Math.max(1, p - 1))}
-                    className={workOrdersPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    onClick={() => goToPage(page - 1)}
+                    className={page === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
                   />
                 </PaginationItem>
 
-                {[...Array(totalWorkOrdersPages)].map((_, i) => (
+                {[...Array(totalPages)].map((_, i) => (
                   <PaginationItem key={i}>
                     <PaginationLink
-                      onClick={() => setWorkOrdersPage(i + 1)}
-                      isActive={workOrdersPage === i + 1}
+                      onClick={() => goToPage(i + 1)}
+                      isActive={page === i + 1}
                       className="cursor-pointer"
                     >
                       {i + 1}
@@ -201,8 +250,8 @@ export function WorkOrderBoard({ workOrders, globalSearch, onOpenDetails, onAssi
 
                 <PaginationItem>
                   <PaginationNext
-                    onClick={() => setWorkOrdersPage((p) => Math.min(totalWorkOrdersPages, p + 1))}
-                    className={workOrdersPage === totalWorkOrdersPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    onClick={() => goToPage(page + 1)}
+                    className={page === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
                   />
                 </PaginationItem>
               </PaginationContent>

@@ -21,6 +21,7 @@ export function LogActionModal({ job, isPending, onClose, onSubmit, onValidation
   const [selectedActions, setSelectedActions] = useState<string[]>([]);
   const [beforePhotos, setBeforePhotos] = useState<any[]>([]);
   const [afterPhotos, setAfterPhotos] = useState<any[]>([]);
+  const [repairDetail, setRepairDetail] = useState("");
 
   function toggleAction(action: string) {
     setSelectedActions((prev) =>
@@ -33,6 +34,11 @@ export function LogActionModal({ job, isPending, onClose, onSubmit, onValidation
 
     if (selectedActions.length === 0) {
       onValidationError("กรุณาเลือกประเภทการดำเนินการอย่างน้อย 1 รายการ");
+      return;
+    }
+
+    if (selectedActions.includes("repair") && !repairDetail.trim()) {
+      onValidationError("กรุณาระบุรายละเอียดการซ่อม");
       return;
     }
 
@@ -101,6 +107,22 @@ export function LogActionModal({ job, isPending, onClose, onSubmit, onValidation
               </div>
             </div>
           </div>
+
+          {selectedActions.includes("repair") && (
+            <div>
+              <label className="mb-1 block font-bold text-foreground">
+                ซ่อมอะไรไปบ้าง <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                name="repairDetail"
+                value={repairDetail}
+                onChange={(e) => setRepairDetail(e.target.value)}
+                rows={2}
+                placeholder="เช่น เปลี่ยนคาปาซิเตอร์ ล้างคอยล์เย็น..."
+                className="w-full rounded-xl border border-border bg-muted px-3.5 py-2 text-foreground focus:border-primary focus:outline-none"
+              />
+            </div>
+          )}
 
           <div>
             <label className="mb-2 block font-bold text-foreground">รูปภาพหลักฐาน (ก่อนทำ/หลังทำ)</label>
