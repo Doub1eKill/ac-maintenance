@@ -1058,6 +1058,16 @@ const MAINTENANCE_ACTION_LABEL: Record<string, string> = {
 
   **คำขอ:** เพิ่ม object `profile` ใน return ของ `getTechnicianData()` ชื่อ/shape เดียวกับของ `getOrgAdminData()` ทุกประการ: `profile: { name: string; email: string; role: UserRole; phone: string | null }` (อ่านจาก `session.user.id` แถวเดียวกับที่ `verifyTechnician()` ใช้อยู่แล้ว) จะได้ย้าย `profile-panel.tsx` ไป `src/components/shared/` แล้วเรียกจากทั้ง 2 ฝั่งได้ทันทีแบบไม่ต้องเดา/ไม่เสี่ยงข้อมูลหาย
 
+- **รูปโปรไฟล์ (avatar)** — ยังไม่มีที่เก็บเลย **[Backend ❌ ยังไม่ทำ — คำขอใหม่ 23 ส.ค. 2026, Esther03u]**
+
+  **คำขอ:**
+  1. เพิ่ม `avatarUrl String?` ใน model `User` (`prisma/schema.prisma`) พร้อม migration
+  2. `saveUpload(file: File | null): Promise<string | null>` ตอนนี้เป็นฟังก์ชันภายในของ `src/app/tech/actions.ts` (บรรทัด ~37, ไม่ได้ `export`) มี resize/EXIF/sharp ครบแล้วตามที่ P6 ทำไว้ — ย้ายออกไปเป็นฟังก์ชันกลางใน `src/lib/` (เช่น `src/lib/upload.ts`) แล้ว `export` เพื่อให้ `src/app/admin/actions.ts` เรียกได้ด้วย ไม่ต้อง copy โค้ดซ้ำ
+  3. ขยาย `updateProfileAction` (`src/app/admin/actions.ts` บรรทัด ~575) จาก `updateProfileAction(name: string, phone?: string)` เป็นรับ `avatarFile?: File` เพิ่ม (หรือเปลี่ยนเป็นรับ `FormData` ทั้งก้อนถ้าสะดวกกว่า) เรียก `saveUpload()` แล้วอัปเดต `avatarUrl` ในทรานแซกชันเดียวกับ `name`/`phone` — ไม่ส่งไฟล์มา = ไม่แตะรูปเดิม (พฤติกรรมเดียวกับที่ `phone` ใช้อยู่ตอนนี้ ไม่ใช่ "เว้นว่าง = ลบ" แบบฟอร์มแก้ข้อมูลแอร์ เพราะฟอร์มนี้ไม่มีปุ่ม "ลบรูป" แยก)
+  4. เพิ่ม `avatarUrl` เข้าไปใน `profile` object ที่คืนจากทั้ง `getOrgAdminData()` และ `getTechnicianData()` (ข้อ 3. ด้านบน) เพื่อให้ `ProfilePanel` เอาไปแสดงแทน initials ได้
+
+  **ฝั่ง UI ที่ทำรอไว้แล้ว:** `ProfilePanel` (`src/components/shared/profile-panel.tsx`) ตอนนี้แสดง initials วงกลมแทนรูปเสมอ — พร้อมสลับไปใช้ `<Image src={profile.avatarUrl}>` (fallback เป็น initials เดิมถ้า `avatarUrl` เป็น `null`) ทันทีที่ field มาถึง ไม่ต้อง refactor โครงสร้างเพิ่ม
+
 **2) ตั้งค่าระบบ — เฉพาะ org_admin — ✅ ทำครบแล้วทั้งหมดผ่านรอบ S4–S7 (ดูหัวข้อด้านบน)**
 
 แผนเดิม 4 ข้อด้านล่างนี้ (เขียนไว้ตอนวางแผน F5 แรกๆ) กลายเป็นสเปกที่ S4–S7 เก็บงานไปหมดแล้ว เก็บไว้อ่านเพื่ออ้างอิงเหตุผล/ที่มาเท่านั้น ไม่ต้องทำอะไรเพิ่ม:
@@ -1085,10 +1095,10 @@ const MAINTENANCE_ACTION_LABEL: Record<string, string> = {
 
 ## 📋 สถานะรวม ณ 23 สิงหาคม 2026 (อัปเดตโดย Esther03u)
 
-**Backend: ไม่มีงานค้าง** — ทุกคำขอจาก Esther03u (S1–S7, F1–F7, P1–P9, P14) ทำครบแล้ว เหลือแค่ 2 อย่างที่รอปัจจัยภายนอก:
-1. **SMTP** — โค้ดพร้อม รอเจ้าของโปรเจกต์ใส่ credential ใน `.env`
-2. **`avatarUrl` ใน schema** — รอเริ่ม F5 (รูปโปรไฟล์)
-3. **`profile` ใน `getTechnicianData()`** — คำขอใหม่จาก Esther03u ระหว่างทำ F5 ดูรายละเอียดในหัวข้อ F5 ด้านล่าง (ยังไม่ทำ)
+**Backend: ค้าง 2 คำขอใหม่จากรอบ F5 (23 ส.ค. 2026)** — ทุกคำขอเก่า (S1–S7, F1–F7, P1–P9, P14) ทำครบแล้ว ที่เหลือคือ:
+1. **SMTP** — โค้ดพร้อม รอเจ้าของโปรเจกต์ใส่ credential ใน `.env` (ไม่ใช่งานเขียนโค้ด)
+2. **`profile` ใน `getTechnicianData()`** — บล็อกไม่ให้ช่างแก้เบอร์โทรตัวเองได้ ดูรายละเอียด/คำขอเต็มในหัวข้อ F5 ด้านล่าง
+3. **`avatarUrl` ใน `User` schema + ขยาย `updateProfileAction`** — บล็อกฟีเจอร์รูปโปรไฟล์ทั้งหมด (ยังไม่เริ่ม UI ฝั่งนี้เลย) ดูรายละเอียด/คำขอเต็มในหัวข้อ F5 ด้านล่าง
 
 **ฝั่ง UI (Esther03u) — ครบ 10/10 ข้อจากรอบตรวจ 18 ส.ค. แล้ว** ✅
 
@@ -1107,7 +1117,7 @@ const MAINTENANCE_ACTION_LABEL: Record<string, string> = {
 
 ข้อ 3-10 ยืนยันด้วย `npx tsc --noEmit` + `npm run build` ผ่านสะอาดทั้งคู่ทุกรอบ (เบราว์เซอร์ในเซสชันนี้ render ไม่ได้จริงตลอดทั้งเซสชัน ตั้งแต่ตอนแก้ข้อ 1-2 — ดูโค้ดแทน) ข้อ 6/7 เจอช่องโหว่ข้อมูลแบบเดียวกับที่เจอตอนทำ F5 (ฟอร์มไม่มีค่าเดิมมาพรีฟิล เสี่ยงบันทึกด้วยค่าว่างไปลบข้อมูลจริงทิ้ง) แก้ด้วยการให้ `page.tsx` เรียก `getOrganisationInfo()`/`getDefaultMaintenanceFrequency()` จาก `src/lib/organisation.ts` ตรงๆ (อ่านอย่างเดียว ไม่ใช่ Server Action จึงเรียกจาก Server Component ได้โดยไม่ผิดกฎห้ามแก้ backend) ดูรายละเอียดที่ S4/S5 ด้านบน
 
-**F5 — อัปเดต 23 ส.ค. 2026:** เริ่มแล้ว ทำเสร็จ 2/3 ส่วน — ธีมมืด/สว่าง ✅, โปรไฟล์ช่าง (ชื่อ+รีเซ็ตรหัสผ่าน) ✅ **เหลือ:** เบอร์โทรฝั่งช่าง (บล็อกที่คำขอ backend `profile` ใน `getTechnicianData()` ด้านบน) และรูปโปรไฟล์ (บล็อกที่ `avatarUrl` ใน schema — ยังไม่เคยเขียนคำขอเป็นทางการ ถ้าจะเริ่มต้องขอ field นี้ก่อน)
+**F5 — อัปเดต 23 ส.ค. 2026:** เริ่มแล้ว ทำเสร็จ 2/4 ส่วน — ธีมมืด/สว่าง ✅, โปรไฟล์ช่าง (ชื่อ+รีเซ็ตรหัสผ่าน) ✅ **เหลือ (บล็อกที่ backend ทั้งคู่ คำขอเขียนไว้แล้ว รอ DoubleKill):** เบอร์โทรฝั่งช่าง (`profile` ใน `getTechnicianData()`) และรูปโปรไฟล์ (`avatarUrl` ใน `User` schema + ขยาย `updateProfileAction`)
 
 ---
 
