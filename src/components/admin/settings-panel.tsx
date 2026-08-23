@@ -1,46 +1,58 @@
 "use client";
 
-import { useState } from "react";
-import { Clock, Building2, History, Wind, AlertTriangle } from "lucide-react";
+import { useEffect, useState, useTransition } from "react";
+import { toast } from "sonner";
+import { Clock, Building2, History, Wind, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { MasterDataClient, type BrandType } from "@/app/admin/master-data/master-data-client";
+import {
+  updateDefaultFrequencyAction,
+  updateOrganisationInfoAction,
+  getAuditLogs,
+} from "@/app/admin/actions";
 
 interface SettingsPanelProps {
   brands: BrandType[];
-  universityName: string;
+  organisationInfo: { name: string; address: string | null; phone: string | null };
+  defaultFrequency: { value: number; unit: string };
 }
 
-// Shared by every card whose "save" action has no backend to persist to
-// yet — see docs/superpowers/specs/2026-08-16-org-admin-system-settings-page-design.md
-// Section 0. The corresponding backend request is logged in HANDOFF.md (S4/S5/S6).
-function NotConnectedAlert() {
-  return (
-    <Alert className="border-warning/30 bg-warning/10">
-      <AlertTriangle className="text-warning" />
-      <AlertTitle>ยังไม่เชื่อมต่อกับระบบหลังบ้าน</AlertTitle>
-      <AlertDescription>
-        มีการฝากคำขอไว้ให้ทีม Backend แล้ว การเปลี่ยนแปลงนี้ยังไม่ถูกบันทึก
-      </AlertDescription>
-    </Alert>
-  );
-}
-
-export function SettingsPanel({ brands, universityName }: SettingsPanelProps) {
+export function SettingsPanel({ brands, organisationInfo, defaultFrequency }: SettingsPanelProps) {
   return (
     <div className="space-y-6 max-w-4xl animate-in fade-in">
-      <DefaultFrequencyCard />
-      <OrganisationInfoCard universityName={universityName} />
+      <DefaultFrequencyCard defaultFrequency={defaultFrequency} />
+      <OrganisationInfoCard organisationInfo={organisationInfo} />
       <MasterDataCard brands={brands} />
       <AuditLogCard />
     </div>
   );
 }
 
-function DefaultFrequencyCard() {
-  const [value, setValue] = useState("6");
-  const [unit, setUnit] = useState("months");
-  const [showNotice, setShowNotice] = useState(false);
+function DefaultFrequencyCard({ defaultFrequency }: { defaultFrequency: { value: number; unit: string } }) {
+  const [value, setValue] = useState(String(defaultFrequency.value));
+  const [unit, setUnit] = useState(defaultFrequency.unit);
+  const [isSaving, startSaveTransition] = useTransition();
+
+  function handleSave() {
+    const numericValue = parseInt(value, 10);
+    if (!numericValue || numericValue <= 0) {
+      toast.error("รอบบำรุงรักษาต้องมากกว่า 0");
+      return;
+    }
+    startSaveTransition(async () => {
+      const res = await updateDefaultFrequencyAction(numericValue, unit);
+      if (res.error) toast.error(res.error);
+      else toast.success("บันทึกรอบซ่อมบำรุงเริ่มต้นสำเร็จ");
+    });
+  }
 
   return (
     <div className="biz-card p-6 space-y-4">
@@ -78,24 +90,39 @@ function DefaultFrequencyCard() {
         </div>
       </div>
 
-      {showNotice && <NotConnectedAlert />}
-
       <button
         type="button"
-        onClick={() => setShowNotice(true)}
-        className="w-full sm:w-auto rounded-xl bg-foreground px-5 py-2.5 text-sm font-bold text-white hover:bg-primary/90 transition-colors"
+        onClick={handleSave}
+        disabled={isSaving}
+        className="w-full sm:w-auto rounded-xl bg-foreground px-5 py-2.5 text-sm font-bold text-white hover:bg-primary/90 transition-colors disabled:opacity-50"
       >
-        บันทึก
+        {isSaving ? "กำลังบันทึก..." : "บันทึก"}
       </button>
     </div>
   );
 }
 
-function OrganisationInfoCard({ universityName }: { universityName: string }) {
-  const [name, setName] = useState(universityName);
-  const [address, setAddress] = useState("");
-  const [phone, setPhone] = useState("");
-  const [showNotice, setShowNotice] = useState(false);
+function OrganisationInfoCard({
+  organisationInfo,
+}: {
+  organisationInfo: { name: string; address: string | null; phone: string | null };
+}) {
+  const [name, setName] = useState(organisationInfo.name);
+  const [address, setAddress] = useState(organisationInfo.address ?? "");
+  const [phone, setPhone] = useState(organisationInfo.phone ?? "");
+  const [isSaving, startSaveTransition] = useTransition();
+
+  function handleSave() {
+    if (!name.trim()) {
+      toast.error("กรุณาระบุชื่อหน่วยงาน");
+      return;
+    }
+    startSaveTransition(async () => {
+      const res = await updateOrganisationInfoAction(name, address, phone);
+      if (res.error) toast.error(res.error);
+      else toast.success("บันทึกข้อมูลองค์กรสำเร็จ");
+    });
+  }
 
   return (
     <div className="biz-card p-6 space-y-4">
@@ -145,14 +172,13 @@ function OrganisationInfoCard({ universityName }: { universityName: string }) {
         </div>
       </div>
 
-      {showNotice && <NotConnectedAlert />}
-
       <button
         type="button"
-        onClick={() => setShowNotice(true)}
-        className="w-full sm:w-auto rounded-xl bg-foreground px-5 py-2.5 text-sm font-bold text-white hover:bg-primary/90 transition-colors"
+        onClick={handleSave}
+        disabled={isSaving}
+        className="w-full sm:w-auto rounded-xl bg-foreground px-5 py-2.5 text-sm font-bold text-white hover:bg-primary/90 transition-colors disabled:opacity-50"
       >
-        บันทึก
+        {isSaving ? "กำลังบันทึก..." : "บันทึก"}
       </button>
     </div>
   );
@@ -177,19 +203,159 @@ function MasterDataCard({ brands }: { brands: BrandType[] }) {
   );
 }
 
+interface AuditLogEntry {
+  id: string;
+  action: string;
+  entityType: string;
+  entityId: string;
+  oldValues: unknown;
+  newValues: unknown;
+  createdAt: string;
+  userName: string;
+}
+
 function AuditLogCard() {
+  const [logs, setLogs] = useState<AuditLogEntry[]>([]);
+  const [availableActions, setAvailableActions] = useState<string[]>([]);
+  const [actionFilter, setActionFilter] = useState("");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Changing the filter also resets the page in a separate effect below;
+  // both depend on actionFilter and would otherwise fire back-to-back, with
+  // this one kicking off a fetch for the (stale) old page before the page
+  // reset takes effect. The cancelled flag drops that stale response instead
+  // of letting it land after the page-1 fetch that follows it.
+  useEffect(() => {
+    let cancelled = false;
+    setIsLoading(true);
+    setError(null);
+
+    getAuditLogs({ page, action: actionFilter || undefined }).then((result) => {
+      if (cancelled) return;
+      setLogs(result.logs);
+      setAvailableActions((prev) => (result.availableActions.length ? result.availableActions : prev));
+      setTotalPages(Math.max(1, Math.ceil(result.page.total / result.page.pageSize)));
+      if (result.error) setError(result.error);
+      setIsLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [page, actionFilter]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [actionFilter]);
+
   return (
     <div className="biz-card p-6 space-y-4">
-      <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-        <History className="h-4 w-4 text-primary" />
-        ประวัติการใช้งานระบบ
-      </h3>
-      <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-border py-10 text-center">
-        <History className="h-6 w-6 text-muted-foreground" />
-        <p className="text-xs text-muted-foreground max-w-xs">
-          ประวัติการใช้งานระบบจะแสดงที่นี่ เมื่อ Backend เปิดให้ดึงข้อมูลจากตาราง audit log
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+          <History className="h-4 w-4 text-primary" />
+          ประวัติการใช้งานระบบ
+        </h3>
+        {availableActions.length > 0 && (
+          <NativeSelect
+            value={actionFilter}
+            onChange={(e) => setActionFilter(e.target.value)}
+            className="w-full sm:w-auto h-auto py-2 px-3 rounded-lg border-border text-xs font-bold text-foreground"
+          >
+            <NativeSelectOption value="">ทุกประเภท</NativeSelectOption>
+            {availableActions.map((a) => (
+              <NativeSelectOption key={a} value={a}>{a}</NativeSelectOption>
+            ))}
+          </NativeSelect>
+        )}
       </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" /> กำลังโหลดข้อมูล...
+        </div>
+      ) : error ? (
+        <Alert variant="destructive">
+          <AlertTitle>โหลดข้อมูลไม่สำเร็จ</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      ) : logs.length === 0 ? (
+        <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-border py-10 text-center">
+          <History className="h-6 w-6 text-muted-foreground" />
+          <p className="text-xs text-muted-foreground max-w-xs">ไม่พบประวัติการใช้งานระบบ</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {logs.map((log) => (
+            <div key={log.id} className="rounded-xl border border-border overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setExpandedId(expandedId === log.id ? null : log.id)}
+                className="w-full flex items-center justify-between gap-3 px-3.5 py-2.5 text-left hover:bg-muted transition-colors"
+              >
+                <div className="min-w-0">
+                  <div className="text-xs font-bold text-foreground truncate">{log.action}</div>
+                  <div className="text-[11px] text-muted-foreground">
+                    {log.userName} • {log.entityType} #{log.entityId} • {new Date(log.createdAt).toLocaleString("th-TH")}
+                  </div>
+                </div>
+                {expandedId === log.id ? (
+                  <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                )}
+              </button>
+              {expandedId === log.id && (
+                <div className="px-3.5 pb-3 pt-1 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] bg-muted">
+                  <div>
+                    <div className="font-bold text-muted-foreground mb-1">ค่าเดิม</div>
+                    <pre className="whitespace-pre-wrap break-words rounded-lg border border-border bg-white p-2 text-foreground">
+                      {log.oldValues ? JSON.stringify(log.oldValues, null, 2) : "-"}
+                    </pre>
+                  </div>
+                  <div>
+                    <div className="font-bold text-muted-foreground mb-1">ค่าใหม่</div>
+                    <pre className="whitespace-pre-wrap break-words rounded-lg border border-border bg-white p-2 text-foreground">
+                      {log.newValues ? JSON.stringify(log.newValues, null, 2) : "-"}
+                    </pre>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!isLoading && !error && totalPages > 1 && (
+        <div className="pt-2">
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  href="#"
+                  onClick={(e) => { e.preventDefault(); setPage((p) => Math.max(1, p - 1)); }}
+                  className={page === 1 ? "pointer-events-none opacity-50" : ""}
+                />
+              </PaginationItem>
+              <PaginationItem>
+                <span className="text-xs font-medium text-muted-foreground px-4">
+                  หน้า {page} จาก {totalPages}
+                </span>
+              </PaginationItem>
+              <PaginationItem>
+                <PaginationNext
+                  href="#"
+                  onClick={(e) => { e.preventDefault(); setPage((p) => Math.min(totalPages, p + 1)); }}
+                  className={page === totalPages ? "pointer-events-none opacity-50" : ""}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
     </div>
   );
 }

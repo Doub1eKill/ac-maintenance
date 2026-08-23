@@ -88,6 +88,8 @@ interface AdminDashboardViewProps {
   allUsers?: PendingUser[];
   brands: any[];
   masterDataBrands: BrandType[];
+  organisationInfo: { name: string; address: string | null; phone: string | null };
+  defaultFrequency: { value: number; unit: string };
 }
 
 export function AdminDashboardView({
@@ -105,6 +107,8 @@ export function AdminDashboardView({
   brands = [],
   masterDataBrands = [],
   urgentUnits = [],
+  organisationInfo,
+  defaultFrequency,
 }: AdminDashboardViewProps) {
   const [activeTab, setActiveTab] = useState<string>("overview");
   const [isPending, startTransition] = useTransition();
@@ -363,7 +367,11 @@ export function AdminDashboardView({
 
       {/* Settings View */}
       {activeTab === "settings" && (
-        <SettingsPanel brands={masterDataBrands} universityName={universityName} />
+        <SettingsPanel
+          brands={masterDataBrands}
+          organisationInfo={organisationInfo}
+          defaultFrequency={defaultFrequency}
+        />
       )}
 
       {/* Modal: Create Work Order */}

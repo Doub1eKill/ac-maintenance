@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { getOrgAdminData } from "./actions";
 import { getAcMasterData } from "./master-data/actions";
+import { getOrganisationInfo, getDefaultMaintenanceFrequency } from "@/lib/organisation";
 import { AdminDashboardView } from "@/components/admin/admin-dashboard-view";
 
 export const metadata = {
@@ -35,6 +36,10 @@ export default async function AdminHomePage() {
     urgentUnits,
   } = await getOrgAdminData();
   const { brands: masterDataBrands } = await getAcMasterData();
+  const [organisationInfo, defaultFrequency] = await Promise.all([
+    getOrganisationInfo(),
+    getDefaultMaintenanceFrequency(),
+  ]);
 
   return (
     <AdminDashboardView
@@ -57,6 +62,8 @@ export default async function AdminHomePage() {
       masterDataBrands={masterDataBrands}
       weeklyActivity={weeklyActivity}
       urgentUnits={urgentUnits}
+      organisationInfo={organisationInfo}
+      defaultFrequency={defaultFrequency}
     />
   );
 }

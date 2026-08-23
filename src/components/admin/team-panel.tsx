@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Users, AlertTriangle } from "lucide-react";
+import { useEffect, useState, useTransition } from "react";
+import { toast } from "sonner";
+import { Users } from "lucide-react";
 import {
   Pagination,
   PaginationContent,
@@ -9,8 +10,8 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { ConfirmActionDialog } from "@/components/ui/thai-alert-dialogs";
+import { adminResetUserPasswordAction } from "@/app/admin/actions";
 import type { PendingUser } from "@/components/admin/types";
 
 interface TeamPanelProps {
@@ -25,7 +26,21 @@ const ITEMS_PER_PAGE = 10;
 export function TeamPanel({ allUsers, globalSearch, isPending, onUserStatus }: TeamPanelProps) {
   const [teamPage, setTeamPage] = useState(1);
   const [resetTarget, setResetTarget] = useState<PendingUser | null>(null);
-  const [showResetNotice, setShowResetNotice] = useState(false);
+  const [isResetting, startResetTransition] = useTransition();
+
+  function handleConfirmReset() {
+    if (!resetTarget) return;
+    const targetId = resetTarget.id;
+    startResetTransition(async () => {
+      const res = await adminResetUserPasswordAction(targetId);
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success("รีเซ็ตรหัสผ่านสำเร็จ ผู้ใช้ต้องตั้งรหัสผ่านใหม่ก่อนเข้าใช้งานครั้งถัดไป");
+      setResetTarget(null);
+    });
+  }
 
   useEffect(() => {
     setTeamPage(1);
@@ -48,16 +63,6 @@ export function TeamPanel({ allUsers, globalSearch, isPending, onUserStatus }: T
           <span>ทำเนียบเจ้าหน้าที่และช่างซ่อมบำรุง ({allUsers.length})</span>
         </h2>
       </div>
-
-      {showResetNotice && (
-        <Alert className="border-warning/30 bg-warning/10">
-          <AlertTriangle className="text-warning" />
-          <AlertTitle>ยังไม่เชื่อมต่อกับระบบหลังบ้าน</AlertTitle>
-          <AlertDescription>
-            มีการฝากคำขอไว้ให้ทีม Backend แล้ว รหัสผ่านของผู้ใช้นี้ยังไม่ถูกรีเซ็ต
-          </AlertDescription>
-        </Alert>
-      )}
 
       <div className="overflow-x-auto">
         <table className="w-full text-left text-xs text-foreground">
@@ -157,10 +162,8 @@ export function TeamPanel({ allUsers, globalSearch, isPending, onUserStatus }: T
             : ""
         }
         confirmText="รีเซ็ตรหัสผ่าน"
-        onConfirm={() => {
-          setResetTarget(null);
-          setShowResetNotice(true);
-        }}
+        onConfirm={handleConfirmReset}
+        isProcessing={isResetting}
       />
     </div>
   );

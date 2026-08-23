@@ -779,9 +779,9 @@ DoubleKill จะไม่แตะไฟล์เหล่านี้ ถ้�
 
 ### Org Admin System Settings Page (16 สิงหาคม 2026)
 
-หน้า "ตั้งค่าระบบ" (`src/components/admin/settings-panel.tsx`) สร้าง UI ครบ 4 การ์ดแล้ว ตามสเปก `docs/superpowers/specs/2026-08-16-org-admin-system-settings-page-design.md` การ์ด "จัดการยี่ห้อ/รุ่นแอร์" ทำงานได้จริง (reuse ของเดิม ไม่ต้องรอ) ส่วนอีก 3 การ์ดเป็น UI placeholder รอ backend:
+หน้า "ตั้งค่าระบบ" (`src/components/admin/settings-panel.tsx`) มี 4 การ์ดครบตามสเปก `docs/superpowers/specs/2026-08-16-org-admin-system-settings-page-design.md` **ทั้ง 4 การ์ดทำงานได้จริงหมดแล้ว (23 ส.ค. 2026)** — ประวัติการต่อ backend ของแต่ละการ์ดเก็บไว้ด้านล่างเพื่ออ้างอิง:
 
-- [ ] **S4.** การ์ด "รอบซ่อมบำรุงเริ่มต้น" — **Backend ✅ เสร็จแล้ว 17 ส.ค. 2026 (`updateDefaultFrequencyAction`) เหลือแค่ต่อปุ่มบันทึกฝั่ง UI** ที่ยังโชว์ `NotConnectedAlert` อยู่ ~~ยังไม่มีที่เก็บค่า~~ — ตาราง `SystemSettings` มีแล้ว
+- [x] **S4.** การ์ด "รอบซ่อมบำรุงเริ่มต้น" — **UI เสร็จแล้ว ✅ (23 ส.ค. 2026, Esther03u)** ต่อปุ่ม "บันทึก" เข้ากับ `updateDefaultFrequencyAction` จริงแล้ว — **หมายเหตุสำคัญ:** ฟอร์มเดิม (ที่ยังเป็น placeholder) hardcode ค่าเริ่มต้น `"6"`/`"months"` ไว้ในโค้ด ซึ่งจะไม่ตรงกับค่าจริงถ้าเคยมีการตั้งค่าไว้ก่อนแล้ว — แก้โดยให้ `src/app/admin/page.tsx` เรียก `getDefaultMaintenanceFrequency()` จาก `src/lib/organisation.ts` ตรงๆ (เป็นฟังก์ชันอ่านอย่างเดียว ไม่ใช่ Server Action ในไฟล์ actions.ts จึงเรียกจาก Server Component ได้โดยไม่ผิดกฎ) แล้วส่งเป็น prop `defaultFrequency` ผ่าน `admin-dashboard-view.tsx` ลงไปพรีฟิลฟอร์มด้วยค่าจริงเสมอ
 
   **คำขอ:** สร้างตาราง `SystemSettings` ใหม่ (แถวเดียว/singleton, `id` ตายตัว = 1): `defaultFrequencyValue Int @default(6)`, `defaultFrequencyUnit String @default("months")`, `organisationName String?`, `organisationAddress String?`, `organisationPhone String?`, `updatedAt DateTime @updatedAt` (รวมกับ S5 ในตารางเดียวกัน) แล้วเพิ่ม Server Action `updateDefaultFrequencyAction(value: number, unit: string)` ใน `src/app/admin/actions.ts` — validate ด้วย Zod (`value > 0`, `unit` เป็นหนึ่งใน `"days" | "months" | "years"`) แล้ว upsert แถวเดียวนั้น พร้อม `logAudit`
 
@@ -791,26 +791,23 @@ DoubleKill จะไม่แตะไฟล์เหล่านี้ ถ้�
 
   **~~มีเรื่องต้องตัดสินใจก่อนเริ่มเขียน~~ — ตัดสินใจแล้ว เลือก (ก) และทำเสร็จแล้ว (17 ส.ค. 2026):** ตอนลงทะเบียนแอร์ระบบสร้าง `MaintenanceSchedule` ให้อัตโนมัติในทรานแซกชันเดียวกัน โดยอ่านรอบจาก `SystemSettings` — ดูกฎวันครบกำหนดครั้งแรกในหัวข้อ "S4–S7 Backend เสร็จแล้ว" ที่ตัวเลือก (ข) ตกไปเพราะไม่ได้แก้ต้นเหตุ (เครื่องใหม่ยังหลุดจาก auto-check ถาวรอยู่ดี)
 
-- [ ] **S5.** การ์ด "ข้อมูลองค์กร" — **Backend ✅ เสร็จแล้ว 17 ส.ค. 2026 เหลือแค่ต่อปุ่มบันทึกฝั่ง UI** (ที่ยังโชว์ `NotConnectedAlert` อยู่)
+- [x] **S5.** การ์ด "ข้อมูลองค์กร" — **UI เสร็จแล้ว ✅ (23 ส.ค. 2026, Esther03u)** ต่อปุ่ม "บันทึก" เข้ากับ `updateOrganisationInfoAction` จริงแล้ว — เหตุผลเดียวกับ S4: `ที่อยู่`/`เบอร์โทร` เดิม default เป็นค่าว่างเสมอในโค้ด ถ้าไม่ดึงค่าจริงมาพรีฟิล กดบันทึกโดยไม่แตะช่องเหล่านี้จะไปลบข้อมูลที่เคยตั้งไว้ทิ้ง (`updateOrganisationInfoAction` ตีความค่าว่าง = ล้างค่า) แก้ด้วยวิธีเดียวกับ S4: `page.tsx` เรียก `getOrganisationInfo()` ตรงๆ ส่งเป็น prop `organisationInfo` ลงมา
 
   ~~ชื่อหน่วยงานตอนนี้ยังเป็นค่าคงที่ `ORGANISATION_NAME`~~ — **ไม่จริงแล้ว** ค่าคงที่ถูกลบทิ้ง ตอนนี้ชื่อ/ที่อยู่/เบอร์โทรเก็บใน `SystemSettings` ครบและอ่านผ่าน `getOrganisationInfo()` ได้แล้ว
 
   **คำขอ:** เพิ่ม Server Action `updateOrganisationInfoAction(name: string, address?: string, phone?: string)` ใน `src/app/admin/actions.ts` — upsert แถว `SystemSettings` เดียวกับ S4 พร้อม `logAudit` แล้วเปลี่ยน `src/lib/organisation.ts` จาก export ค่าคงที่ `ORGANISATION_NAME` เป็นฟังก์ชัน async `getOrganisationName()` ที่อ่านจาก `SystemSettings.organisationName` (fallback เป็นสตริงเดิม `"มหาวิทยาลัยราชภัฏภูเก็ต"` ถ้ายังไม่เคยตั้งค่า) แล้วอัปเดต 3 จุดที่เรียกใช้ค่าคงที่เดิมอยู่ (`src/app/tech/actions.ts`, `src/app/admin/actions.ts`, `src/app/pending-approval/page.tsx`) ให้เรียก `await getOrganisationName()` แทน
 
-- [ ] **S6.** ปุ่ม "รีเซ็ตรหัสผ่าน" ในหน้าทีมพานเนล (`team-panel.tsx`) — **Backend ✅ เสร็จแล้ว 17 ส.ค. 2026 (`adminResetUserPasswordAction`) เหลือแค่ต่อ `onConfirm` ฝั่ง UI** ที่ยังโชว์ข้อความเตือนอยู่
+- [x] **S6.** ปุ่ม "รีเซ็ตรหัสผ่าน" ในหน้าทีมพานเนล (`team-panel.tsx`) — **UI เสร็จแล้ว ✅ (23 ส.ค. 2026, Esther03u)** ต่อ `onConfirm` ของ `ConfirmActionDialog` เข้ากับ `adminResetUserPasswordAction` จริงแล้ว เรียกจากในไฟล์นี้เอง (ไม่ได้ยกไปไว้ที่ `admin-dashboard-view.tsx` เหมือนปุ่มอื่นเพื่อไม่ต้อง prop-thread เพิ่ม — แพทเทิร์นเดียวกับที่ `work-order-board.tsx`/`ac-history-modal.tsx` เรียก action ตรงจากไฟล์ตัวเอง) error จาก guard "รีเซ็ตตัวเองไม่ได้" ของ backend ขึ้น toast ตรงๆ
 
   **คำขอ:** เพิ่ม Server Action `adminResetUserPasswordAction(userId: string)` ใน `src/app/admin/actions.ts` — guard ด้วย `verifyOrgAdmin()` เดิม ตั้ง `password = NULL` ให้ user เป้าหมาย (ไม่ต้องสร้าง/ส่งรหัสผ่านใหม่ให้ admin เห็นเลย — schema ออกแบบไว้แล้วว่า `password = NULL` แปลว่า "ต้องตั้งรหัสใหม่ก่อนเข้าระบบ" และ `authorize()` จะบังคับ flow นี้ให้เอง) พร้อม `logAudit`
 
-- [ ] **S7.** การ์ด "ประวัติการใช้งานระบบ" — **Backend ✅ เสร็จแล้ว 17 ส.ค. 2026 (`getAuditLogs({ page?, action? })` คืน `availableActions` มาทำ dropdown filter ได้ด้วย) เหลือแค่เปลี่ยน empty-state เป็นตารางจริงฝั่ง UI** ~~ไม่มีฟังก์ชันอ่านข้อมูลเลย~~
+- [x] **S7.** การ์ด "ประวัติการใช้งานระบบ" — **UI เสร็จแล้ว ✅ (23 ส.ค. 2026, Esther03u)** เปลี่ยนจาก empty-state เป็นตารางจริงที่ดึงจาก `getAuditLogs({page, action})` — filter dropdown ใช้ `availableActions` ตามที่ backend ส่งมา, แต่ละแถวกดขยายดู `oldValues`/`newValues` เป็น JSON ได้, มี pagination จริง (`page.total`/`page.pageSize`) ระวังจุดหนึ่งที่แก้ไปด้วยระหว่างทาง: เปลี่ยน filter กับเปลี่ยนหน้าเป็น 2 `useEffect` แยกกันที่ต่าง depend บน `actionFilter` ทำให้เกิด race (fetch หน้าเก่าค้างมาทับ fetch หน้าใหม่ที่ถูกต้อง) แก้ด้วย cancelled flag แบบเดียวกับที่ `ac-history-modal.tsx` ใช้อยู่แล้ว
 
   **คำขอ:** เพิ่มฟังก์ชันอ่านข้อมูล เช่น `getAuditLogs({ page, actionFilter }?)` ใน `src/app/admin/actions.ts` (หรือไฟล์ใหม่ที่เหมาะสม) ดึง `system_audit_logs` เรียงจากล่าสุด ~200 รายการ join ชื่อผู้ทำ (`user.name`) มาด้วย — `src/lib/audit.ts` เขียนเข้าตารางนี้อยู่แล้วจากหลาย action (`CREATE_WORKORDER`, `ASSIGN_WORKORDER`, `CANCEL_WORKORDER`, `UPDATE_AIRCONDITIONER`, `UPDATE_MAINTENANCE_LOG`, `CLAIM_WORKORDER`, `COMPLETE_WORKORDER`) แต่ยังไม่มีใครอ่านกลับเลย
 
   *(เสริม ไม่เร่งด่วน)* `src/app/admin/master-data/actions.ts` เรียก `revalidatePath("/admin/master-data")` ใน `createAcBrandAction`/`createAcModelAction` อยู่ 2 จุด — route นั้นถูกลบไปแล้ว (ย้าย UI มาไว้ในแท็บ "ตั้งค่าระบบ" ที่ `/admin` แทน) ฝั่ง UI ชดเชยด้วย `router.refresh()` ใน `master-data-client.tsx` ไปแล้วจึงไม่กระทบการใช้งานปัจจุบัน แต่ถ้าสะดวกตอนแตะไฟล์นี้ครั้งหน้า เปลี่ยนเป็น `revalidatePath("/admin")` จะตรงกับ route จริงมากกว่า
 
-**สิ่งที่ต้องทำฝั่ง UI เพื่อให้ครบวงจร เมื่อ backend เสร็จ** (backend พร้อมแล้ว DoubleKill ไม่แตะไฟล์ UI ตามกฎ):
-1. `settings-panel.tsx` — เปลี่ยนปุ่ม "บันทึก" ทั้ง 2 การ์ด (S4, S5) ให้เรียก action จริงแทนการโชว์ `NotConnectedAlert`
-2. `team-panel.tsx` — เปลี่ยน `onConfirm` ของ `ConfirmActionDialog` ให้เรียก `adminResetUserPasswordAction` จริง
-3. `settings-panel.tsx` — เปลี่ยนการ์ด "ประวัติการใช้งานระบบ" จาก empty-state เป็นตารางแสดงผลจริงจาก `getAuditLogs()`
+**✅ ทั้ง 3 ข้อทำครบแล้ว (23 ส.ค. 2026)** — ดูรายละเอียดที่ S4/S5/S6/S7 ด้านบน
 
 ---
 
@@ -1099,22 +1096,22 @@ const MAINTENANCE_ACTION_LABEL: Record<string, string> = {
 2. **`avatarUrl` ใน schema** — รอเริ่ม F5 (รูปโปรไฟล์)
 3. **`profile` ใน `getTechnicianData()`** — คำขอใหม่จาก Esther03u ระหว่างทำ F5 ดูรายละเอียดในหัวข้อ F5 ด้านล่าง (ยังไม่ทำ)
 
-**ฝั่ง UI (Esther03u) — ทำไปแล้ว 5/10 ข้อจากรอบตรวจ 18 ส.ค. เหลือ 5 ข้อ** เรียงตามความสำคัญ:
+**ฝั่ง UI (Esther03u) — ทำไปแล้ว 8/10 ข้อจากรอบตรวจ 18 ส.ค. เหลือ 2 ข้อ** เรียงตามความสำคัญ:
 
 | ลำดับ | งาน | สถานะ |
 |---|---|---|
 | ~~🔴 1~~ | ช่อง `repairDetail` ในฟอร์มบันทึกงาน | ✅ **เสร็จแล้ว** (23 ส.ค., คอมมิต `f789ad4`) |
 | ~~🔴 2~~ | ปุ่มเปลี่ยนหน้ากระดานใบงาน (P14) | ✅ **เสร็จแล้ว** (23 ส.ค., คอมมิต `f789ad4`) |
-| ~~🟠 3~~ | ปุ่มยกเลิกใบงาน (`cancelWorkOrderAction`) | ✅ **เสร็จแล้ว** (23 ส.ค.) |
-| ~~🟠 4~~ | ฟอร์มแก้ข้อมูลแอร์ (`updateAirConditionerAction`) | ✅ **เสร็จแล้ว** (23 ส.ค.) |
-| ~~🟠 5~~ | ปุ่มแก้ประวัติงาน (`updateMaintenanceLogAction`) | ✅ **เสร็จแล้ว** (23 ส.ค.) |
-| 🟡 6 | S4 + S5 ปุ่มบันทึกในหน้าตั้งค่าระบบ | ยังไม่ทำ — หน้าตั้งค่ายังเป็น placeholder |
-| 🟡 7 | S6 ปุ่มรีเซ็ตรหัสผ่านใน `team-panel.tsx` | ยังไม่ทำ — ช่างลืมรหัสแล้วกู้ไม่ได้ถ้าเข้าอีเมลไม่ได้ |
-| 🟡 8 | S7 ตาราง audit log | ยังไม่ทำ — ข้อมูลมีอยู่แล้วแต่ไม่มีใครอ่านได้ |
+| ~~🟠 3~~ | ปุ่มยกเลิกใบงาน (`cancelWorkOrderAction`) | ✅ **เสร็จแล้ว** (23 ส.ค., คอมมิต `e9e1f40`) |
+| ~~🟠 4~~ | ฟอร์มแก้ข้อมูลแอร์ (`updateAirConditionerAction`) | ✅ **เสร็จแล้ว** (23 ส.ค., คอมมิต `e9e1f40`) |
+| ~~🟠 5~~ | ปุ่มแก้ประวัติงาน (`updateMaintenanceLogAction`) | ✅ **เสร็จแล้ว** (23 ส.ค., คอมมิต `e9e1f40`) |
+| ~~🟡 6~~ | S4 + S5 ปุ่มบันทึกในหน้าตั้งค่าระบบ | ✅ **เสร็จแล้ว** (23 ส.ค.) |
+| ~~🟡 7~~ | S6 ปุ่มรีเซ็ตรหัสผ่านใน `team-panel.tsx` | ✅ **เสร็จแล้ว** (23 ส.ค.) |
+| ~~🟡 8~~ | S7 ตาราง audit log | ✅ **เสร็จแล้ว** (23 ส.ค.) |
 | 🟢 9 | ลบ emoji 4 จุด (ผิดกฎ `AGENTS.md`) | ยังไม่ทำ |
 | 🟢 10 | อ่าน `?ac=` จาก QR แล้วเปิดฟอร์มให้เลย | ยังไม่ทำ — สะดวกขึ้น ไม่ต้องพิมพ์รหัสซ้ำ |
 
-ข้อ 3-5 ยืนยันด้วย `npx tsc --noEmit` + `npm run build` ผ่านสะอาดทั้งคู่ (เบราว์เซอร์ในเซสชันนี้ render ไม่ได้จริงเหมือนตอนแก้ข้อ 1-2 — ดูโค้ดแทน)
+ข้อ 3-8 ยืนยันด้วย `npx tsc --noEmit` + `npm run build` ผ่านสะอาดทั้งคู่ทุกรอบ (เบราว์เซอร์ในเซสชันนี้ render ไม่ได้จริงเหมือนตอนแก้ข้อ 1-2 — ดูโค้ดแทน) ข้อ 6/7 เจอช่องโหว่ข้อมูลแบบเดียวกับที่เจอตอนทำ F5 (ฟอร์มไม่มีค่าเดิมมาพรีฟิล เสี่ยงบันทึกด้วยค่าว่างไปลบข้อมูลจริงทิ้ง) แก้ด้วยการให้ `page.tsx` เรียก `getOrganisationInfo()`/`getDefaultMaintenanceFrequency()` จาก `src/lib/organisation.ts` ตรงๆ (อ่านอย่างเดียว ไม่ใช่ Server Action จึงเรียกจาก Server Component ได้โดยไม่ผิดกฎห้ามแก้ backend) ดูรายละเอียดที่ S4/S5 ด้านบน
 
 **งานใหญ่ที่ยังไม่เริ่ม:** F5 ส่วนที่เหลือ — โปรไฟล์ฝั่งช่าง (บล็อกอยู่ที่คำขอ backend ข้อใหม่ด้านบน), รูปโปรไฟล์, ธีมมืด/สว่าง (`next-themes` ติดตั้งไว้แล้ว)
 
