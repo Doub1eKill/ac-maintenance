@@ -95,11 +95,24 @@ export function JobPoolPanel({ jobPool, searchQuery, selectedBuilding, isPending
           ) : (
             paginatedPool.map((job) => (
               <div key={job.id} className="biz-card p-5 space-y-4 hover:border-muted-foreground transition-all relative overflow-hidden">
-                {isUrgent(job.createdAt) && (
+                {job.priority === "critical" ? (
                   <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1 shadow-sm">
-                    <Clock className="w-3 h-3" /> ด่วน
+                    <AlertTriangle className="w-3 h-3" /> ด่วนที่สุด
                   </div>
-                )}
+                ) : job.priority === "high" ? (
+                  <div className="absolute top-0 right-0 bg-orange-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1 shadow-sm">
+                    <AlertTriangle className="w-3 h-3" /> ด่วน
+                  </div>
+                ) : isUrgent(job.createdAt) ? (
+                  // Priority takes the corner when set; this waiting-time flag
+                  // (unclaimed 3+ days) only shows up when there's no priority
+                  // to display, so the two concepts never compete for the same
+                  // badge. Worded "รอนาน" (not "ด่วน") so it can't be mistaken
+                  // for a priority signal.
+                  <div className="absolute top-0 right-0 bg-amber-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1 shadow-sm">
+                    <Clock className="w-3 h-3" /> รอนาน
+                  </div>
+                ) : null}
                 <div className="pr-8 space-y-1">
                   <div className="flex items-center gap-2">
                     <Checkbox
@@ -114,16 +127,6 @@ export function JobPoolPanel({ jobPool, searchQuery, selectedBuilding, isPending
                     <span className="rounded-md bg-secondary px-2 py-0.5 text-[10px] font-bold text-foreground">
                       {job.brand} {job.btu ? `(${job.btu} BTU)` : ""}
                     </span>
-                    {job.priority === "critical" && (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-800">
-                        <AlertTriangle className="h-3 w-3" /> ด่วนที่สุด
-                      </span>
-                    )}
-                    {job.priority === "high" && (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-orange-200 bg-orange-100 px-2 py-0.5 text-[10px] font-bold text-orange-800">
-                        <AlertTriangle className="h-3 w-3" /> ด่วน
-                      </span>
-                    )}
                   </div>
                 </div>
 

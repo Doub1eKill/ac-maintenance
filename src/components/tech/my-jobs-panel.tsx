@@ -44,9 +44,18 @@ export function MyJobsPanel({ myJobs, searchQuery, selectedBuilding, onSelectFor
           paginatedMyJobs.map((job) => (
             <div
               key={job.id}
-              className="biz-card p-5 space-y-4 hover:border-muted-foreground transition-all"
+              className="biz-card p-5 space-y-4 hover:border-muted-foreground transition-all relative overflow-hidden"
             >
-              <div className="flex items-center justify-between">
+              {job.priority === "critical" ? (
+                <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1 shadow-sm">
+                  <AlertTriangle className="w-3 h-3" /> ด่วนที่สุด
+                </div>
+              ) : job.priority === "high" ? (
+                <div className="absolute top-0 right-0 bg-orange-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1 shadow-sm">
+                  <AlertTriangle className="w-3 h-3" /> ด่วน
+                </div>
+              ) : null}
+              <div className="flex items-center justify-between pr-8">
                 <div className="space-y-1">
                   <div className="text-sm font-bold leading-snug text-foreground">
                     {job.location}
@@ -58,16 +67,6 @@ export function MyJobsPanel({ myJobs, searchQuery, selectedBuilding, onSelectFor
                     <span className="rounded-md px-2 py-0.5 text-[10px] font-bold bg-secondary text-foreground">
                       {job.brand}
                     </span>
-                    {job.priority === "critical" && (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-800">
-                        <AlertTriangle className="h-3 w-3" /> ด่วนที่สุด
-                      </span>
-                    )}
-                    {job.priority === "high" && (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-orange-200 bg-orange-100 px-2 py-0.5 text-[10px] font-bold text-orange-800">
-                        <AlertTriangle className="h-3 w-3" /> ด่วน
-                      </span>
-                    )}
                   </div>
                 </div>
                 <MoreVertical className="h-4 w-4 text-muted-foreground" />
