@@ -33,11 +33,10 @@ function matchesSearch(wo: WorkOrderItem, search: string) {
 }
 
 function getWorkOrderRowClassName(wo: WorkOrderItem) {
-  const borderClass =
-    wo.status === "pending" ? "border-l-warning" :
-    wo.status === "claimed" ? "border-l-primary" :
-    wo.status === "completed" ? "border-l-success" :
-    "border-l-transparent";
+  // No status color separately here — the "สถานะ" column already carries a
+  // labeled badge (icon + text) for that, and a second, unlabeled colored
+  // strip repeating the same information read as unexplained decoration
+  // rather than a second signal.
 
   // Low-opacity token tints rather than literal bg-red-50/bg-orange-50 —
   // those stay near-white regardless of theme, which reads fine against
@@ -50,7 +49,7 @@ function getWorkOrderRowClassName(wo: WorkOrderItem) {
 
   const fadeClass = wo.status === "completed" ? "opacity-60" : "";
 
-  return `border-l-4 ${borderClass} ${tintClass} ${fadeClass}`.trim();
+  return `${tintClass} ${fadeClass}`.trim();
 }
 
 export function WorkOrderBoard({ workOrders, workOrderPage, globalSearch, onOpenDetails, onAssign }: WorkOrderBoardProps) {

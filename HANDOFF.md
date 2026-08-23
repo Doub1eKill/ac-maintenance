@@ -42,6 +42,16 @@
 
 **บทเรียนสำหรับตรวจรอบต่อไปถ้าเจอแบบนี้อีก:** ต้อง grep หาสี hardcode **ทุกสีในตระกูล Tailwind** ไม่ใช่แค่ white/slate/gray — โดยเฉพาะเฉด `-50`/`-100` (สว่างมาก ปัญหาจะไม่โผล่จนกว่าจะลองธีมมืดจริง) และต้องแยกให้ออกว่าเป็น "hardcode คู่กันเอง" (ปลอดภัย) หรือ "hardcode ผสมโทเคน" (บั๊ก) เสมอ ก่อนตัดสินใจแก้
 
+### รอบที่ 3 — ปรับดีไซน์ตามฟีดแบ็ก (23 ส.ค. 2026): ตัดแถบสีสถานะด้านซ้ายของกระดานใบงานทิ้ง
+
+ผู้ใช้ส่งสกรีนช็อตกระดานใบงานมาอีกรอบ คราวนี้ไม่ใช่บั๊ก — วงสีแดงที่วาดไว้ในภาพบังเอิญพาดผ่านตัวอักษร ทำให้ดูเหมือนตัวหนังสือถูกตัด (ตรวจ DOM จริงแล้วยืนยันว่าข้อความครบทุกตัวอักษร ไม่มีอะไรหาย) — **แต่ระหว่างตรวจก็เจอปัญหาการออกแบบจริงที่ผู้ใช้ตั้งใจถามถึง:** แถบสีทึบด้านซ้ายของแต่ละแถว (`border-l-4` ไล่สีตาม `wo.status`: เหลือง=รอดำเนินการ, ฟ้า=กำลังทำ, เขียว=เสร็จสิ้น) **ซ้ำความหมายกับคอลัมน์ "สถานะ"** ที่มีป้าย badge ทั้งไอคอนและข้อความอยู่แล้วในตารางเดียวกัน — สื่อข้อมูลเดียวกันสองครั้งโดยแถบสีไม่มีคำอธิบายกำกับเลย ผู้ใช้จึงงงว่าคืออะไร
+
+**ตัดสินใจร่วมกับผู้ใช้ (ถามก่อนแก้ตามที่ขอ ไม่เดาเอง):** เสนอ 3 ทาง — (ก) ลบแถบสีทิ้ง (ข) เก็บไว้แต่เพิ่ม legend อธิบาย (ค) เปลี่ยนแถบสีให้สื่อความหมายอื่นแทน (เช่นความสำคัญ) — ผู้ใช้เลือก **(ก) ลบทิ้ง** เพราะซ้ำซ้อนไม่จำเป็น
+
+**แก้:** `work-order-board.tsx` → `getWorkOrderRowClassName()` ตัด `borderClass`/`border-l-4` ออกทั้งหมด เหลือแค่ `tintClass` (สี priority จากรอบที่ 2) และ `fadeClass` (จาง 60% เมื่อ `completed`) คอลัมน์ "สถานะ" เดิมที่มี badge ไอคอน+ข้อความยังอยู่ครบ เป็นแหล่งข้อมูลสถานะเดียวของตาราง
+
+**ทดสอบจริงในเบราว์เซอร์:** ตารางไม่มีแถบสีซ้ายแล้ว แถวยังจางสีพื้นตาม priority ปกติ (ยืนยัน `tsc`+`build` ผ่านสะอาด) ระหว่างทดสอบเจอ error `borderClass is not defined` ใน console ครั้งแรก — เป็น **stale HMR cache ของ dev server เดิม** ไม่ใช่บั๊กจริง (production build ผ่านสะอาดตั้งแต่รอบแรก, restart dev server + เปิดแท็บใหม่แล้ว error หายไปทันที ยืนยันด้วย `grep borderClass` ในซอร์สโค้ดว่าไม่มีอะไรเหลือค้าง)
+
 **ไฟล์ที่แก้ทั้งหมด:** `globals.css` (เพิ่ม `.force-light`), `auth-layout.tsx`, `asset-manager.tsx`, `qr-code-manager.tsx`, `overview-panel.tsx`, `admin-dashboard-view.tsx`, `tech-mobile-view.tsx`, `ac-history-modal.tsx`, `create-work-order-modal.tsx`, `settings-panel.tsx`, `assign-work-order-modal.tsx`, `work-order-board.tsx`, `work-order-detail-dialog.tsx`, `log-action-modal.tsx`, `qr-scan-modal.tsx`, `maintenance-calendar.tsx`, `profile-panel.tsx` (shared), `my-jobs-panel.tsx`, `job-pool-panel.tsx`, `team-panel.tsx`, `user-approvals-panel.tsx`, `assets-panel.tsx`, `completed-jobs-panel.tsx`
 
 ---
