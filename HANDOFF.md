@@ -28,6 +28,20 @@
 
 **ทดสอบแล้วจริงในเบราว์เซอร์ (เปิดธีมมืดจริง ไม่ใช่แค่อ่านโค้ด):** ตรวจ computed style ของปุ่ม "แก้ไข"/"QR Code"/"ดูประวัติ" ในหน้าสินทรัพย์ — ก่อนแก้จะได้ `background: oklch(1 0 0)` (ขาวล้วน) คู่กับ `color: oklch(0.714...)` (เทาอ่อน) หลังแก้ได้ `background: oklch(0.214...)` (พื้นการ์ดมืดตามธีม) คู่กับ `color` เดิม — คอนทราสต์กลับมาถูกต้อง เช็คปุ่ม "บันทึกอาคาร" (เดิม `bg-foreground text-white`) หลังแก้ได้ `background: oklch(0.922...)` คู่ `color: oklch(0.214...)` — อ่านออกชัดเจน หน้า login เช็คแล้วว่ายังคงพื้นขาวตัวอักษรเข้มเหมือนเดิมทุกประการแม้ `<html>` จะมี `.dark` อยู่ก็ตาม (พิสูจน์ว่า `.force-light` ทำงานถูกต้อง)
 
+### รอบที่ 2 — เจอเพิ่มจากสกรีนช็อตของผู้ใช้ (23 ส.ค. 2026): แถบสีความสำคัญในกระดานใบงาน
+
+หลังแก้รอบแรกแล้ว ผู้ใช้ส่งสกรีนช็อตกระดานใบงานที่ยังมีแถวหนึ่ง "ดูเหมือนซ้อนทับ/ตัวอักษรจาง" มาให้ดู — ตรวจสอบใน DOM จริงก่อนสรุปว่าเป็นบั๊กแบบไหน: **นับ `<tr>` ทั้งหมดเทียบ acCode พบว่ารหัสแอร์ซ้ำกัน 2 คู่จริง (`EDU-202-01`, `EDU-201-02`) แต่เป็นข้อมูลถูกต้อง** (เครื่องเดียวกันมีใบงานคนละใบ คนละสถานะ/ความสำคัญกันจริง ไม่ใช่บั๊ก) — สิ่งที่ผิดจริงคือแถวที่ priority `critical`/`high` มีพื้นหลังจางผิดปกติ
+
+**ต้นเหตุ:** `work-order-board.tsx` → `getWorkOrderRowClassName()` ใช้ `bg-red-50/60` (priority critical) และ `bg-orange-50/40` (priority high) เป็นสี tint ของแถว — ค่าสีตายตัว (ไม่ใช่โทเคน) จึงเป็นบั๊กแบบเดียวกับรอบแรกเป๊ะๆ (พื้นเกือบขาวค้าง + ตัวอักษรแถวเป็น `text-foreground`/`text-muted-foreground` ที่สลับเป็นสีอ่อนในธีมมืด) แต่ **grep รอบแรกจับไม่เจอ** เพราะรอบแรกเช็คแค่ `bg-white`/`bg-slate-*`/`bg-gray-*` ไม่ได้ครอบคลุมเฉด `-50`/`-100` ของสีอื่นๆ (red, orange, amber, sky, emerald ฯลฯ)
+
+**ตรวจสอบเพิ่มเติม:** grep หา `bg-(สีอะไรก็ได้)-50|100` ทั่ว `src/components` แล้วไล่แยกเป็น 2 กลุ่ม — คู่ที่ hardcode ทั้ง bg และ text ด้วยกัน (เช่น `bg-red-100 text-red-800` ใน badge "ด่วนที่สุด" หลายไฟล์) **ปลอดภัย ไม่แก้** เพราะ self-consistent ไม่ผสมกับโทเคน ส่วน `work-order-board.tsx` เป็นจุดเดียวที่ hardcode แค่ bg โดยไม่มี text คู่กัน (ตัวอักษรแถวมาจากที่อื่น ใช้โทเคน) — เป็นจุดเดียวที่ต้องแก้จริง
+
+**แก้:** `bg-red-50/60` → `bg-destructive/10`, `bg-orange-50/40` → `bg-warning/10` (โทเคนสีที่ **ไม่เปลี่ยนค่าระหว่างธีม** อยู่แล้ว — `--destructive`/`--warning` ในไฟล์ CSS นี้เป็นสีสดเกือบเท่ากันทั้ง light/dark จึงใช้แบบลดความทึบ 10% ได้ผลลัพธ์ที่อ่อนพอเป็น tint แต่ยังมีคอนทราสต์กับตัวอักษรในทั้งสองธีม)
+
+**ทดสอบจริงในเบราว์เซอร์:** เปิดธีมมืด ไปที่กระดานใบงาน สกรีนช็อตแถว priority critical ก่อนแก้เห็นพื้นสีชมพูอ่อนเกือบขาวกลืนกับตัวอักษร หลังแก้เห็นพื้นแดงเข้มจางๆ ตัดกับตัวอักษรขาวชัดเจน เช็คแถว priority high (สีเหลือง/ส้ม) เช่นกัน ผ่านทั้งคู่ ไม่มี error ใน console
+
+**บทเรียนสำหรับตรวจรอบต่อไปถ้าเจอแบบนี้อีก:** ต้อง grep หาสี hardcode **ทุกสีในตระกูล Tailwind** ไม่ใช่แค่ white/slate/gray — โดยเฉพาะเฉด `-50`/`-100` (สว่างมาก ปัญหาจะไม่โผล่จนกว่าจะลองธีมมืดจริง) และต้องแยกให้ออกว่าเป็น "hardcode คู่กันเอง" (ปลอดภัย) หรือ "hardcode ผสมโทเคน" (บั๊ก) เสมอ ก่อนตัดสินใจแก้
+
 **ไฟล์ที่แก้ทั้งหมด:** `globals.css` (เพิ่ม `.force-light`), `auth-layout.tsx`, `asset-manager.tsx`, `qr-code-manager.tsx`, `overview-panel.tsx`, `admin-dashboard-view.tsx`, `tech-mobile-view.tsx`, `ac-history-modal.tsx`, `create-work-order-modal.tsx`, `settings-panel.tsx`, `assign-work-order-modal.tsx`, `work-order-board.tsx`, `work-order-detail-dialog.tsx`, `log-action-modal.tsx`, `qr-scan-modal.tsx`, `maintenance-calendar.tsx`, `profile-panel.tsx` (shared), `my-jobs-panel.tsx`, `job-pool-panel.tsx`, `team-panel.tsx`, `user-approvals-panel.tsx`, `assets-panel.tsx`, `completed-jobs-panel.tsx`
 
 ---

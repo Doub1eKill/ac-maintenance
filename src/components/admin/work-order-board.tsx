@@ -39,9 +39,13 @@ function getWorkOrderRowClassName(wo: WorkOrderItem) {
     wo.status === "completed" ? "border-l-success" :
     "border-l-transparent";
 
+  // Low-opacity token tints rather than literal bg-red-50/bg-orange-50 —
+  // those stay near-white regardless of theme, which reads fine against
+  // light-mode's white table but washes the token-colored text out (or
+  // just looks like a stray light patch) once the row itself goes dark.
   const tintClass =
-    wo.priority === "critical" ? "bg-red-50/60" :
-    wo.priority === "high" ? "bg-orange-50/40" :
+    wo.priority === "critical" ? "bg-destructive/10" :
+    wo.priority === "high" ? "bg-warning/10" :
     "";
 
   const fadeClass = wo.status === "completed" ? "opacity-60" : "";
