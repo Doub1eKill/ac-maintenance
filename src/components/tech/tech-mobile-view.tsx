@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
-import { claimWorkOrderAction, bulkClaimWorkOrdersAction, logMaintenanceAction } from "@/app/tech/actions";
+import { claimWorkOrderAction, bulkClaimWorkOrdersAction, logMaintenanceAction, scanQrCodeAction } from "@/app/tech/actions";
 import type { TechnicianAssetUnit, TechnicianAssetSummary } from "@/lib/maintenance";
 import {
   Wrench,
@@ -77,6 +78,8 @@ export function TechMobileView({
 }: TechMobileViewProps) {
   const [activeTab, setActiveTab] = useState<string>("pool");
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   // Search Filter State
   const [searchQuery, setSearchQuery] = useState("");
@@ -87,6 +90,42 @@ export function TechMobileView({
 
   // Action Logger Modal State
   const [selectedJobForLog, setSelectedJobForLog] = useState<TechJobItem | null>(null);
+
+  // Scanning the QR sticker on the unit itself links here with ?ac=<acCode>
+  // (see the QR page's "บันทึกงานซ่อมบำรุง" button) so the technician can go
+  // straight to the log form instead of retyping the code through the
+  // in-app scanner. pendingJobId becomes the workOrderId if one is already
+  // open; otherwise the field is left blank and logMaintenanceAction creates
+  // one automatically.
+  useEffect(() => {
+    const acCode = searchParams.get("ac");
+    if (!acCode) return;
+
+    // Strip the query param right away so refreshing the page or navigating
+    // back doesn't re-trigger the scan.
+    router.replace("/tech");
+
+    scanQrCodeAction(acCode).then((res) => {
+      if ("error" in res) {
+        toast.error(res.error);
+        return;
+      }
+      setSelectedJobForLog({
+        id: res.pendingJobId ?? "",
+        acCode: res.acDetails.acCode,
+        brand: res.acDetails.brand,
+        btu: res.acDetails.btu,
+        status: res.acDetails.status,
+        location: res.acDetails.location,
+        airConditionerId: res.acDetails.id,
+      });
+    });
+    // Deliberately runs once for the ?ac= param present on initial load —
+    // searchParams/router are stable-enough refs here and re-running this
+    // after router.replace() strips the query string would just no-op, but
+    // omitting them keeps the intent (run once on arrival) unambiguous.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function handleClaim(workOrderId: string) {
     startTransition(async () => {

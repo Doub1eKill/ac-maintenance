@@ -150,9 +150,9 @@ export function LogActionModal({ job, isPending, onClose, onSubmit, onValidation
             <div>
               <label className="mb-1 block font-bold text-foreground">สถานะแอร์หลังซ่อม <span className="text-red-500">*</span></label>
               <NativeSelect name="acStatus" className="w-full h-auto py-2.5 px-3 rounded-xl border-border bg-muted text-xs font-bold text-foreground" required defaultValue="normal">
-                <NativeSelectOption value="normal">✅ ใช้งานได้ปกติ</NativeSelectOption>
-                <NativeSelectOption value="broken">⚠️ รออะไหล่/ใช้งานไม่ได้</NativeSelectOption>
-                <NativeSelectOption value="needs_cleaning">❄️ แอร์ไม่เย็น/รอตรวจสอบ</NativeSelectOption>
+                <NativeSelectOption value="normal">ใช้งานได้ปกติ</NativeSelectOption>
+                <NativeSelectOption value="broken">รออะไหล่/ใช้งานไม่ได้</NativeSelectOption>
+                <NativeSelectOption value="needs_cleaning">แอร์ไม่เย็น/รอตรวจสอบ</NativeSelectOption>
               </NativeSelect>
             </div>
             <div>

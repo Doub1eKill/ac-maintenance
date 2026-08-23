@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
-import { QrCode, X } from "lucide-react";
+import { QrCode, X, CheckCircle2, AlertTriangle } from "lucide-react";
 import { scanQrCodeAction } from "@/app/tech/actions";
 
 interface QrScanModalProps {
@@ -105,7 +105,13 @@ export function QrScanModal({ open, isPending, onClose, onClaim, onPlaceholderCr
               <div className="border-t border-border pt-3 flex flex-col gap-1 text-xs">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">สถานะล่าสุด:</span>
-                  <span className="font-bold">{qrResult.acDetails.status === 'normal' ? '✅ ปกติ' : '⚠️ มีปัญหา'}</span>
+                  <span className={`font-bold inline-flex items-center gap-1 ${qrResult.acDetails.status === 'normal' ? 'text-success-foreground' : 'text-warning-foreground'}`}>
+                    {qrResult.acDetails.status === 'normal' ? (
+                      <><CheckCircle2 className="h-3.5 w-3.5" /> ปกติ</>
+                    ) : (
+                      <><AlertTriangle className="h-3.5 w-3.5" /> มีปัญหา</>
+                    )}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">ซ่อมบำรุงล่าสุด:</span>
