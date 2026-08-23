@@ -52,7 +52,7 @@ export function MyJobsPanel({ myJobs, searchQuery, selectedBuilding, onSelectFor
                     {job.location}
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs font-bold text-muted-foreground">
+                    <span className={`font-mono text-xs font-bold ${idx === 0 ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
                       {job.acCode}
                     </span>
                     <span className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${idx === 0 ? "bg-slate-800 text-muted-foreground" : "bg-secondary text-foreground"}`}>
@@ -70,13 +70,13 @@ export function MyJobsPanel({ myJobs, searchQuery, selectedBuilding, onSelectFor
                     )}
                   </div>
                 </div>
-                <MoreVertical className={`h-4 w-4 ${idx === 0 ? "text-muted-foreground" : "text-muted-foreground"}`} />
+                <MoreVertical className={`h-4 w-4 ${idx === 0 ? "text-primary-foreground/70" : "text-muted-foreground"}`} />
               </div>
 
-              <div className={`pt-2 flex items-center justify-between text-xs border-t ${idx === 0 ? "border-slate-800 text-muted-foreground" : "border-border text-muted-foreground"}`}>
+              <div className={`pt-2 flex items-center justify-between text-xs border-t ${idx === 0 ? "border-primary-foreground/20" : "border-border"}`}>
                 <div className="flex flex-col">
                   <span className="text-[11px] font-bold text-sky-400">กำลังดำเนินการ</span>
-                  <span className={`text-[10px] mt-1 ${idx === 0 ? "text-muted-foreground" : "text-muted-foreground"}`}>
+                  <span className={`text-[10px] mt-1 ${idx === 0 ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
                     {job.claimedAt ? `รับงานเมื่อ: ${format(new Date(job.claimedAt), "dd/MM HH:mm")}` : ""}
                   </span>
                 </div>
