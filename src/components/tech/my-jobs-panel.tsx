@@ -41,21 +41,21 @@ export function MyJobsPanel({ myJobs, searchQuery, selectedBuilding, onSelectFor
             คุณไม่มีงานที่กำลังดำเนินการ
           </div>
         ) : (
-          paginatedMyJobs.map((job, idx) => (
+          paginatedMyJobs.map((job) => (
             <div
               key={job.id}
-              className={idx === 0 ? "biz-card-dark p-5 space-y-4 shadow-md" : "biz-card p-5 space-y-4 hover:border-muted-foreground transition-all"}
+              className="biz-card p-5 space-y-4 hover:border-muted-foreground transition-all"
             >
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
-                  <div className={`text-sm font-bold leading-snug ${idx === 0 ? "text-primary-foreground" : "text-foreground"}`}>
+                  <div className="text-sm font-bold leading-snug text-foreground">
                     {job.location}
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className={`font-mono text-xs font-bold ${idx === 0 ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
+                    <span className="font-mono text-xs font-bold text-muted-foreground">
                       {job.acCode}
                     </span>
-                    <span className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${idx === 0 ? "bg-slate-800 text-muted-foreground" : "bg-secondary text-foreground"}`}>
+                    <span className="rounded-md px-2 py-0.5 text-[10px] font-bold bg-secondary text-foreground">
                       {job.brand}
                     </span>
                     {job.priority === "critical" && (
@@ -70,19 +70,19 @@ export function MyJobsPanel({ myJobs, searchQuery, selectedBuilding, onSelectFor
                     )}
                   </div>
                 </div>
-                <MoreVertical className={`h-4 w-4 ${idx === 0 ? "text-primary-foreground/70" : "text-muted-foreground"}`} />
+                <MoreVertical className="h-4 w-4 text-muted-foreground" />
               </div>
 
-              <div className={`pt-2 flex items-center justify-between text-xs border-t ${idx === 0 ? "border-primary-foreground/20" : "border-border"}`}>
+              <div className="pt-2 flex items-center justify-between text-xs border-t border-border">
                 <div className="flex flex-col">
                   <span className="text-[11px] font-bold text-sky-400">กำลังดำเนินการ</span>
-                  <span className={`text-[10px] mt-1 ${idx === 0 ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
+                  <span className="text-[10px] mt-1 text-muted-foreground">
                     {job.claimedAt ? `รับงานเมื่อ: ${format(new Date(job.claimedAt), "dd/MM HH:mm")}` : ""}
                   </span>
                 </div>
                 <button
                   onClick={() => onSelectForLog(job)}
-                  className={`rounded-xl px-4 py-2 text-xs font-bold transition-all shadow-sm active:scale-95 ${idx === 0 ? "bg-card text-foreground hover:bg-secondary" : "bg-primary text-primary-foreground hover:bg-primary/90"}`}
+                  className="rounded-xl px-4 py-2 text-xs font-bold transition-all shadow-sm active:scale-95 bg-primary text-primary-foreground hover:bg-primary/90"
                 >
                   บันทึกและปิดงาน
                 </button>
