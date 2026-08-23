@@ -62,7 +62,7 @@ export function WorkOrderDetailDialog({ workOrder, isPending, onClose, onCancelW
         {workOrder && (
           <div className="flex flex-col h-full bg-muted">
             {/* Header */}
-            <div className="bg-white px-6 py-5 border-b border-border sticky top-0 z-10">
+            <div className="bg-card px-6 py-5 border-b border-border sticky top-0 z-10">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
@@ -109,7 +109,7 @@ export function WorkOrderDetailDialog({ workOrder, isPending, onClose, onCancelW
               {/* Left Column: Asset & Issue Details */}
               <div className="md:col-span-2 space-y-6">
                 {/* Issue Section */}
-                <div className="bg-white rounded-xl border border-border p-5 shadow-sm">
+                <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
                   <h3 className="text-sm font-bold text-foreground flex items-center gap-2 mb-4">
                     <AlertTriangle className="h-4 w-4 text-warning" />
                     รายละเอียดปัญหา (Issue Description)
@@ -121,7 +121,7 @@ export function WorkOrderDetailDialog({ workOrder, isPending, onClose, onCancelW
 
                 {/* Resolution Section (If completed) */}
                 {workOrder.status === "completed" && (
-                  <div className="bg-white rounded-xl border border-border p-5 shadow-sm">
+                  <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
                     <h3 className="text-sm font-bold text-foreground flex items-center gap-2 mb-4">
                       <CheckCircle2 className="h-4 w-4 text-success" />
                       บันทึกการซ่อม (Resolution Notes)
@@ -133,7 +133,7 @@ export function WorkOrderDetailDialog({ workOrder, isPending, onClose, onCancelW
                 )}
 
                 {/* Media / Images Section */}
-                <div className="bg-white rounded-xl border border-border p-5 shadow-sm">
+                <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
                   <h3 className="text-sm font-bold text-foreground flex items-center gap-2 mb-4">
                     <MessageSquare className="h-4 w-4 text-muted-foreground" />
                     รูปภาพประกอบ (Media/Evidence)
@@ -176,7 +176,7 @@ export function WorkOrderDetailDialog({ workOrder, isPending, onClose, onCancelW
 
                 {/* Cancel Work Order */}
                 {canCancel && onCancelWorkOrder && (
-                  <div className="bg-white rounded-xl border border-border p-5 shadow-sm">
+                  <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
                     {!showCancelForm ? (
                       <button
                         type="button"
@@ -225,7 +225,7 @@ export function WorkOrderDetailDialog({ workOrder, isPending, onClose, onCancelW
                 )}
 
                 {/* Asset Info */}
-                <div className="bg-white rounded-xl border border-border p-5 shadow-sm">
+                <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
                   <h3 className="text-sm font-bold text-foreground flex items-center gap-2 mb-4 pb-3 border-b border-border">
                     <Snowflake className="h-4 w-4 text-primary" />
                     ข้อมูลเครื่องปรับอากาศ
@@ -249,7 +249,7 @@ export function WorkOrderDetailDialog({ workOrder, isPending, onClose, onCancelW
                 </div>
 
                 {/* Audit Trail Timeline */}
-                <div className="bg-white rounded-xl border border-border p-5 shadow-sm">
+                <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
                   <h3 className="text-sm font-bold text-foreground flex items-center gap-2 mb-5 pb-3 border-b border-border">
                     <Clock className="h-4 w-4 text-primary" />
                     ประวัติการดำเนินการ (Audit Trail)
@@ -259,7 +259,7 @@ export function WorkOrderDetailDialog({ workOrder, isPending, onClose, onCancelW
 
                     {/* Created */}
                     <div className="relative">
-                      <div className="absolute -left-[30px] p-1 bg-white rounded-full">
+                      <div className="absolute -left-[30px] p-1 bg-card rounded-full">
                         <div className="w-2.5 h-2.5 bg-muted-foreground rounded-full ring-4 ring-slate-50" />
                       </div>
                       <div className="text-xs font-bold text-foreground">แจ้งเรื่อง</div>
@@ -276,7 +276,7 @@ export function WorkOrderDetailDialog({ workOrder, isPending, onClose, onCancelW
                     {/* Assigned */}
                     {workOrder.assignedToName && (
                       <div className="relative">
-                        <div className="absolute -left-[30px] p-1 bg-white rounded-full">
+                        <div className="absolute -left-[30px] p-1 bg-card rounded-full">
                           <div className="w-2.5 h-2.5 bg-primary rounded-full ring-4 ring-primary/10" />
                         </div>
                         <div className="text-xs font-bold text-foreground">มอบหมายงาน</div>
@@ -292,7 +292,7 @@ export function WorkOrderDetailDialog({ workOrder, isPending, onClose, onCancelW
                     {/* Claimed/Started */}
                     {workOrder.claimedAt && (
                       <div className="relative">
-                        <div className="absolute -left-[30px] p-1 bg-white rounded-full">
+                        <div className="absolute -left-[30px] p-1 bg-card rounded-full">
                           <div className="w-2.5 h-2.5 bg-primary rounded-full ring-4 ring-sky-50" />
                         </div>
                         <div className="text-xs font-bold text-foreground">เริ่มดำเนินการซ่อม</div>
@@ -308,7 +308,7 @@ export function WorkOrderDetailDialog({ workOrder, isPending, onClose, onCancelW
                     {/* Completed */}
                     {workOrder.completedAt && (
                       <div className="relative">
-                        <div className="absolute -left-[30px] p-1 bg-white rounded-full">
+                        <div className="absolute -left-[30px] p-1 bg-card rounded-full">
                           <div className="w-2.5 h-2.5 bg-success rounded-full ring-4 ring-success/10" />
                         </div>
                         <div className="text-xs font-bold text-success-foreground">เสร็จสิ้นสมบูรณ์</div>

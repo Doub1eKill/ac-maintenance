@@ -109,7 +109,7 @@ export function AcHistoryModal({ airConditionerId, onClose }: AcHistoryModalProp
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-xs p-4">
-      <div className="w-full max-w-lg rounded-2xl border border-border bg-white p-5 sm:p-6 shadow-xl space-y-4 animate-in fade-in max-h-[90vh] overflow-y-auto">
+      <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-xl space-y-4 animate-in fade-in max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between border-b border-border pb-3">
           <h3 className="text-base font-bold text-foreground flex items-center gap-2">
             <Clock className="h-4 w-4 text-primary" />
@@ -180,7 +180,7 @@ export function AcHistoryModal({ airConditionerId, onClose }: AcHistoryModalProp
                             value={editRepairDetail}
                             onChange={(e) => setEditRepairDetail(e.target.value)}
                             rows={2}
-                            className="w-full rounded-lg border border-border bg-white px-2.5 py-2 text-xs text-foreground focus:border-primary focus:outline-none"
+                            className="w-full rounded-lg border border-border bg-card px-2.5 py-2 text-xs text-foreground focus:border-primary focus:outline-none"
                           />
                         </div>
                       )}
@@ -190,7 +190,7 @@ export function AcHistoryModal({ airConditionerId, onClose }: AcHistoryModalProp
                           value={editNotes}
                           onChange={(e) => setEditNotes(e.target.value)}
                           rows={2}
-                          className="w-full rounded-lg border border-border bg-white px-2.5 py-2 text-xs text-foreground focus:border-primary focus:outline-none"
+                          className="w-full rounded-lg border border-border bg-card px-2.5 py-2 text-xs text-foreground focus:border-primary focus:outline-none"
                         />
                       </div>
                       <div className="flex gap-2 pt-1">
@@ -198,7 +198,7 @@ export function AcHistoryModal({ airConditionerId, onClose }: AcHistoryModalProp
                           type="button"
                           onClick={() => setEditingLogId(null)}
                           disabled={isSaving}
-                          className="flex-1 rounded-lg border border-border bg-white py-1.5 text-[11px] font-bold text-foreground hover:bg-secondary disabled:opacity-50"
+                          className="flex-1 rounded-lg border border-border bg-card py-1.5 text-[11px] font-bold text-foreground hover:bg-secondary disabled:opacity-50"
                         >
                           ยกเลิก
                         </button>
@@ -206,7 +206,7 @@ export function AcHistoryModal({ airConditionerId, onClose }: AcHistoryModalProp
                           type="button"
                           onClick={() => handleSaveEdit(log.id)}
                           disabled={isSaving}
-                          className="flex-1 rounded-lg bg-foreground py-1.5 text-[11px] font-bold text-white hover:bg-primary/90 disabled:opacity-50"
+                          className="flex-1 rounded-lg bg-primary py-1.5 text-[11px] font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                         >
                           {isSaving ? "กำลังบันทึก..." : "บันทึก"}
                         </button>

@@ -156,6 +156,43 @@ body {
   animation: laserSweep 2s ease-in-out infinite;
 }
 
+/*
+ * Pins every token back to its :root (light) value, regardless of an
+ * ancestor's .dark class. For pre-auth pages (login, register,
+ * pending-approval, reset-password, request-password-reset — all via
+ * AuthLayout) and the public QR page: these were built entirely with
+ * hardcoded slate/sky/emerald utility classes, never with the token
+ * utilities below (bg-background, text-foreground, etc), so there was
+ * never a real "dark variant" of their design to switch to. Once the theme toggle could
+ * actually turn .dark on, the one token they DO sit on top of
+ * (bg-background on the outer layout) started flipping dark while their
+ * own hardcoded near-black text did not — dark-on-dark, unreadable.
+ * Scoping them back to light preserves the design as shipped instead of
+ * silently reskinning pages nobody asked to theme. Custom properties
+ * cascade normally, so redeclaring them here on a descendant overrides
+ * .dark's ancestor declaration for this subtree specifically.
+ */
+.force-light {
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.147 0.004 49.3);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.147 0.004 49.3);
+  --primary: oklch(0.214 0.009 43.1);
+  --primary-foreground: oklch(0.986 0.002 67.8);
+  --secondary: oklch(0.96 0.002 17.2);
+  --secondary-foreground: oklch(0.214 0.009 43.1);
+  --muted: oklch(0.96 0.002 17.2);
+  --muted-foreground: oklch(0.547 0.021 43.1);
+  --accent: oklch(0.96 0.002 17.2);
+  --accent-foreground: oklch(0.214 0.009 43.1);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0.005 34.3);
+  --input: oklch(0.922 0.005 34.3);
+  --ring: oklch(0.714 0.014 41.2);
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.147 0.004 49.3);
+}
+
 .dark {
   --background: oklch(0.147 0.004 49.3);
   --foreground: oklch(0.986 0.002 67.8);

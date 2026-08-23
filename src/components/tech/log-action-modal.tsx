@@ -67,7 +67,7 @@ export function LogActionModal({ job, isPending, onClose, onSubmit, onValidation
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-foreground/40 backdrop-blur-xs p-0 sm:p-4">
-      <div className="w-full max-w-md max-h-[95vh] overflow-y-auto rounded-t-3xl sm:rounded-2xl border border-border bg-white p-6 pb-10 sm:pb-6 shadow-2xl space-y-4 animate-in slide-in-from-bottom-full sm:slide-in-from-bottom-0 sm:fade-in">
+      <div className="w-full max-w-md max-h-[95vh] overflow-y-auto rounded-t-3xl sm:rounded-2xl border border-border bg-card p-6 pb-10 sm:pb-6 shadow-2xl space-y-4 animate-in slide-in-from-bottom-full sm:slide-in-from-bottom-0 sm:fade-in">
         <div className="flex items-center justify-between border-b border-border pb-3">
           <h3 className="text-sm font-bold text-foreground">บันทึกประวัติการซ่อม ({job.acCode})</h3>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
@@ -84,7 +84,7 @@ export function LogActionModal({ job, isPending, onClose, onSubmit, onValidation
             <div className="grid grid-cols-3 gap-2">
               <div
                 onClick={() => toggleAction("cleaning")}
-                className={`flex flex-col items-center justify-center rounded-xl border p-3 text-center cursor-pointer transition-colors ${selectedActions.includes("cleaning") ? "border-slate-950 bg-secondary ring-1 ring-slate-950" : "border-border bg-muted hover:border-slate-400"}`}
+                className={`flex flex-col items-center justify-center rounded-xl border p-3 text-center cursor-pointer transition-colors ${selectedActions.includes("cleaning") ? "border-foreground bg-secondary ring-1 ring-foreground" : "border-border bg-muted hover:border-muted-foreground"}`}
               >
                 <Sparkles className="h-4 w-4 text-foreground mb-1" />
                 <span className="font-bold text-foreground">ล้างแอร์</span>
@@ -92,7 +92,7 @@ export function LogActionModal({ job, isPending, onClose, onSubmit, onValidation
 
               <div
                 onClick={() => toggleAction("repair")}
-                className={`flex flex-col items-center justify-center rounded-xl border p-3 text-center cursor-pointer transition-colors ${selectedActions.includes("repair") ? "border-slate-950 bg-secondary ring-1 ring-slate-950" : "border-border bg-muted hover:border-slate-400"}`}
+                className={`flex flex-col items-center justify-center rounded-xl border p-3 text-center cursor-pointer transition-colors ${selectedActions.includes("repair") ? "border-foreground bg-secondary ring-1 ring-foreground" : "border-border bg-muted hover:border-muted-foreground"}`}
               >
                 <Wrench className="h-4 w-4 text-foreground mb-1" />
                 <span className="font-bold text-foreground">ซ่อมแอร์</span>
@@ -100,7 +100,7 @@ export function LogActionModal({ job, isPending, onClose, onSubmit, onValidation
 
               <div
                 onClick={() => toggleAction("refill_refrigerant")}
-                className={`flex flex-col items-center justify-center rounded-xl border p-3 text-center cursor-pointer transition-colors ${selectedActions.includes("refill_refrigerant") ? "border-slate-950 bg-secondary ring-1 ring-slate-950" : "border-border bg-muted hover:border-slate-400"}`}
+                className={`flex flex-col items-center justify-center rounded-xl border p-3 text-center cursor-pointer transition-colors ${selectedActions.includes("refill_refrigerant") ? "border-foreground bg-secondary ring-1 ring-foreground" : "border-border bg-muted hover:border-muted-foreground"}`}
               >
                 <Droplets className="h-4 w-4 text-foreground mb-1" />
                 <span className="font-bold text-foreground">เติมน้ำยาแอร์</span>
@@ -187,7 +187,7 @@ export function LogActionModal({ job, isPending, onClose, onSubmit, onValidation
             <button
               type="submit"
               disabled={isPending}
-              className="w-1/2 rounded-xl bg-foreground py-2.5 font-bold text-white hover:bg-primary/90 disabled:opacity-50"
+              className="w-1/2 rounded-xl bg-primary py-2.5 font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             >
               {isPending ? "กำลังบันทึก..." : "บันทึกและเสร็จสิ้น"}
             </button>

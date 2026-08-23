@@ -75,7 +75,7 @@ export function TeamPanel({ allUsers, globalSearch, isPending, onUserStatus }: T
               <th className="py-3 px-4 text-right rounded-r-xl">จัดการ</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-border">
             {paginatedTeam.map((u) => (
               <tr key={u.id} className="hover:bg-muted transition-colors">
                 <td className="py-3.5 px-4 font-bold text-foreground">{u.name}</td>

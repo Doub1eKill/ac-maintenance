@@ -188,7 +188,7 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
 
   const renderHeader = () => {
     return (
-      <div className="flex items-center justify-between py-3 px-6 border-b border-border bg-white rounded-t-2xl shrink-0">
+      <div className="flex items-center justify-between py-3 px-6 border-b border-border bg-card rounded-t-2xl shrink-0">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-primary/10 text-primary rounded-lg border border-primary/20">
             <CalendarIcon className="h-5 w-5" />
@@ -203,19 +203,19 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
         <div className="flex items-center gap-2 bg-muted p-1 rounded-xl border border-border">
           <button 
             onClick={prevMonth}
-            className="p-1.5 hover:bg-white rounded-lg text-muted-foreground hover:text-foreground transition-colors hover:shadow-sm"
+            className="p-1.5 hover:bg-card rounded-lg text-muted-foreground hover:text-foreground transition-colors hover:shadow-sm"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
           <button 
             onClick={() => setCurrentMonth(new Date())}
-            className="px-3 py-1.5 text-xs font-bold text-foreground hover:bg-white rounded-lg transition-colors hover:shadow-sm"
+            className="px-3 py-1.5 text-xs font-bold text-foreground hover:bg-card rounded-lg transition-colors hover:shadow-sm"
           >
             วันนี้
           </button>
           <button 
             onClick={nextMonth}
-            className="p-1.5 hover:bg-white rounded-lg text-muted-foreground hover:text-foreground transition-colors hover:shadow-sm"
+            className="p-1.5 hover:bg-card rounded-lg text-muted-foreground hover:text-foreground transition-colors hover:shadow-sm"
           >
             <ChevronRight className="h-4 w-4" />
           </button>
@@ -265,7 +265,7 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
             key={day.toString()}
             onClick={() => setSelectedDay(cloneDay)}
             className={`h-full flex flex-col border-b border-r border-border p-2 transition-all cursor-pointer ${
-              !isCurrentMonth ? "bg-muted/50 text-muted-foreground" : "bg-white hover:bg-muted"
+              !isCurrentMonth ? "bg-muted/50 text-muted-foreground" : "bg-card hover:bg-muted"
             }`}
           >
             <div className="flex justify-between items-start shrink-0">
@@ -274,7 +274,7 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
                 aria-label={format(cloneDay, "d MMMM yyyy", { locale: th })}
                 className={`text-xs font-bold flex h-6 w-6 items-center justify-center rounded-full cursor-pointer transition-colors ${
                   isTodayDate
-                    ? "bg-primary text-white shadow-md hover:bg-primary/90"
+                    ? "bg-primary text-primary-foreground shadow-md hover:bg-primary/90"
                     : "text-foreground hover:bg-primary/10"
                 }`}
               >
@@ -364,7 +364,7 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-xs p-4">
-        <div className="w-full max-w-sm rounded-2xl border border-border bg-white shadow-xl animate-in fade-in zoom-in-95">
+        <div className="w-full max-w-sm rounded-2xl border border-border bg-card shadow-xl animate-in fade-in zoom-in-95">
           <div className="p-5 border-b border-border flex items-start justify-between">
             <div className="space-y-1">
               <h3 className="text-base font-bold text-foreground flex items-center gap-2">
@@ -412,7 +412,7 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
                   onCreateWorkOrder(selectedEvent.airConditionerId);
                   setSelectedEvent(null);
                 }}
-                className="w-full flex items-center justify-center gap-2 bg-foreground text-white font-bold text-xs py-2.5 rounded-xl hover:bg-primary/90 transition-colors"
+                className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground font-bold text-xs py-2.5 rounded-xl hover:bg-primary/90 transition-colors"
               >
                 <Wrench className="h-3.5 w-3.5" />
                 สร้างใบงานซ่อมบำรุงตอนนี้
@@ -429,7 +429,7 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-xs p-4">
-        <div className="w-full max-w-sm rounded-2xl border border-border bg-white shadow-xl animate-in fade-in zoom-in-95 max-h-[80vh] flex flex-col">
+        <div className="w-full max-w-sm rounded-2xl border border-border bg-card shadow-xl animate-in fade-in zoom-in-95 max-h-[80vh] flex flex-col">
           <div className="p-5 border-b border-border flex items-start justify-between shrink-0">
             <div className="space-y-1">
               <h3 className="text-base font-bold text-foreground flex items-center gap-2">
@@ -566,9 +566,9 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
   };
 
   return (
-    <div className="biz-card relative animate-in fade-in shadow-sm rounded-2xl overflow-hidden bg-white border border-border flex flex-col h-[600px]">
+    <div className="biz-card relative animate-in fade-in shadow-sm rounded-2xl overflow-hidden bg-card border border-border flex flex-col h-[600px]">
       {isLoading && (
-        <div className="absolute inset-0 z-10 bg-white/50 backdrop-blur-sm flex items-center justify-center">
+        <div className="absolute inset-0 z-10 bg-card/50 backdrop-blur-sm flex items-center justify-center">
           <AnimatedIcon icon={Clock} size={24} animation="spin" className="text-primary" />
         </div>
       )}

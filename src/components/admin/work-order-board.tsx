@@ -111,7 +111,7 @@ export function WorkOrderBoard({ workOrders, workOrderPage, globalSearch, onOpen
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+      <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="bg-muted border-b border-border text-muted-foreground font-semibold">
@@ -124,7 +124,7 @@ export function WorkOrderBoard({ workOrders, workOrderPage, globalSearch, onOpen
                 <th className="px-6 py-4 whitespace-nowrap text-right">จัดการ</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-border">
               {isLoadingPage ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-10 text-center text-muted-foreground">

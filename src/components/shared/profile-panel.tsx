@@ -140,7 +140,7 @@ export function ProfilePanel({ profile, universityName, showPhone = true }: Prof
           type="button"
           onClick={handleSave}
           disabled={isSaving}
-          className="w-full sm:w-auto rounded-xl bg-foreground px-5 py-2.5 text-sm font-bold text-white hover:bg-primary/90 disabled:opacity-50 transition-colors"
+          className="w-full sm:w-auto rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
         >
           {isSaving ? "กำลังบันทึก..." : "บันทึกการเปลี่ยนแปลง"}
         </button>
@@ -180,7 +180,7 @@ export function ProfilePanel({ profile, universityName, showPhone = true }: Prof
           <button
             type="submit"
             disabled={isResetPending || !profile.email}
-            className="w-full sm:w-auto rounded-xl border border-border bg-white px-5 py-2.5 text-sm font-bold text-foreground hover:bg-secondary disabled:opacity-50 transition-colors"
+            className="w-full sm:w-auto rounded-xl border border-border bg-card px-5 py-2.5 text-sm font-bold text-foreground hover:bg-secondary disabled:opacity-50 transition-colors"
           >
             {isResetPending ? "กำลังส่งคำขอ..." : "ส่งลิงก์เปลี่ยนรหัสผ่าน"}
           </button>

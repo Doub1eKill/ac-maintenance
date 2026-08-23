@@ -10,7 +10,7 @@ interface AuthLayoutProps {
 
 export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
   return (
-    <div className="flex min-h-screen w-full flex-col lg:flex-row bg-background text-foreground font-sans antialiased selection:bg-slate-900 selection:text-white">
+    <div className="force-light flex min-h-screen w-full flex-col lg:flex-row bg-background text-foreground font-sans antialiased selection:bg-slate-900 selection:text-white">
       {/* Left Showcase Panel (BizLink Executive Warm Minimalist Style) */}
       <div className="relative hidden lg:flex lg:w-5/12 flex-col justify-between overflow-hidden bg-muted p-12 border-r border-border">
         {/* Brand Header */}

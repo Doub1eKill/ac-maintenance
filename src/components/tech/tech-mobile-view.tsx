@@ -44,7 +44,7 @@ const MaintenanceCalendar = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-64 items-center justify-center rounded-2xl border border-border bg-white">
+      <div className="flex h-64 items-center justify-center rounded-2xl border border-border bg-card">
         <AnimatedIcon icon={Clock} size={24} animation="spin" className="text-primary" />
       </div>
     ),
@@ -255,7 +255,7 @@ export function TechMobileView({
           <NativeSelect
             value={selectedBuilding}
             onChange={(e) => setSelectedBuilding(e.target.value)}
-            className="w-full h-auto py-2 px-3 sm:w-auto rounded-xl border-border bg-white text-xs font-bold text-foreground shadow-sm"
+            className="w-full h-auto py-2 px-3 sm:w-auto rounded-xl border-border bg-card text-xs font-bold text-foreground shadow-sm"
           >
             <NativeSelectOption value="all">ทุกอาคาร</NativeSelectOption>
             {buildings.map(b => (
@@ -265,9 +265,9 @@ export function TechMobileView({
 
           <button
             onClick={() => setShowQrModal(true)}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-foreground px-4 py-2.5 text-xs font-bold text-white hover:bg-primary/90 transition-all shadow-md shrink-0"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-all shadow-md shrink-0"
           >
-            <QrCode className="h-4 w-4 text-white" />
+            <QrCode className="h-4 w-4 text-primary-foreground" />
             <span className="hidden sm:inline">สแกน QR Code</span>
           </button>
         </div>

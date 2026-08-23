@@ -79,7 +79,7 @@ export function JobPoolPanel({ jobPool, searchQuery, selectedBuilding, isPending
                   if (success) setSelectedPoolIds([]);
                 }}
                 disabled={isPending}
-                className="rounded-xl bg-foreground px-4 py-1.5 text-xs font-bold text-white hover:bg-primary/90 transition-all shadow-sm active:scale-95 disabled:opacity-50"
+                className="rounded-xl bg-primary px-4 py-1.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-all shadow-sm active:scale-95 disabled:opacity-50"
               >
                 รับงานที่เลือก ({selectedPoolIds.length})
               </button>
@@ -94,7 +94,7 @@ export function JobPoolPanel({ jobPool, searchQuery, selectedBuilding, isPending
             </div>
           ) : (
             paginatedPool.map((job) => (
-              <div key={job.id} className="biz-card p-5 space-y-4 hover:border-slate-400 transition-all relative overflow-hidden">
+              <div key={job.id} className="biz-card p-5 space-y-4 hover:border-muted-foreground transition-all relative overflow-hidden">
                 {isUrgent(job.createdAt) && (
                   <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1 shadow-sm">
                     <Clock className="w-3 h-3" /> ด่วน
@@ -137,7 +137,7 @@ export function JobPoolPanel({ jobPool, searchQuery, selectedBuilding, isPending
                   <button
                     onClick={() => onClaim(job.id)}
                     disabled={isPending}
-                    className="rounded-xl bg-foreground px-4 py-2 text-xs font-bold text-white hover:bg-primary/90 transition-all shadow-sm active:scale-95"
+                    className="rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-all shadow-sm active:scale-95"
                   >
                     รับงาน
                   </button>

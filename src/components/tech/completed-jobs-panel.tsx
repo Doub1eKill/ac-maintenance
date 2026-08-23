@@ -44,7 +44,7 @@ export function CompletedJobsPanel({ completedJobs, searchQuery, selectedBuildin
           </div>
         ) : (
           paginatedCompletedJobs.map((job) => (
-            <div key={job.id} className="biz-card p-5 space-y-4 hover:border-slate-400 transition-all bg-muted">
+            <div key={job.id} className="biz-card p-5 space-y-4 hover:border-muted-foreground transition-all bg-muted">
               <div className="flex items-center justify-between opacity-80">
                 <div className="space-y-1">
                   <div className="text-sm font-bold text-muted-foreground leading-snug">{job.location}</div>

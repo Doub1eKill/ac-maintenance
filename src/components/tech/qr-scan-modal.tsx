@@ -50,7 +50,7 @@ export function QrScanModal({ open, isPending, onClose, onClaim, onPlaceholderCr
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-foreground/40 backdrop-blur-xs p-0 sm:p-4">
-      <div className="w-full max-w-sm max-h-[90vh] overflow-y-auto rounded-t-3xl sm:rounded-2xl border border-border bg-white p-6 pb-10 sm:pb-6 shadow-2xl space-y-4 animate-in slide-in-from-bottom-full sm:slide-in-from-bottom-0 sm:fade-in">
+      <div className="w-full max-w-sm max-h-[90vh] overflow-y-auto rounded-t-3xl sm:rounded-2xl border border-border bg-card p-6 pb-10 sm:pb-6 shadow-2xl space-y-4 animate-in slide-in-from-bottom-full sm:slide-in-from-bottom-0 sm:fade-in">
         <div className="flex items-center justify-between border-b border-border pb-3">
           <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
             <QrCode className="h-4 w-4 text-foreground" />
@@ -82,7 +82,7 @@ export function QrScanModal({ open, isPending, onClose, onClaim, onPlaceholderCr
                 <button
                   onClick={handleSimulateQrScan}
                   disabled={isPending}
-                  className="rounded-xl bg-foreground px-4 py-2 text-xs font-bold text-white hover:bg-primary/90 shrink-0"
+                  className="rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:bg-primary/90 shrink-0"
                 >
                   ยืนยัน
                 </button>
@@ -148,7 +148,7 @@ export function QrScanModal({ open, isPending, onClose, onClaim, onPlaceholderCr
 
             <button
               onClick={() => setQrResult(null)}
-              className="w-full border border-border bg-white text-foreground text-xs font-bold px-3 py-2 rounded-lg hover:bg-muted"
+              className="w-full border border-border bg-card text-foreground text-xs font-bold px-3 py-2 rounded-lg hover:bg-muted"
             >
               สแกนเครื่องใหม่
             </button>

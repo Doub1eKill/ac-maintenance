@@ -239,7 +239,7 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
         </h2>
         <button
           onClick={() => setShowAddBuilding(true)}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-foreground px-3 py-1.5 text-xs font-bold text-white hover:bg-primary/90 transition-colors"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-colors"
         >
           <Plus className="h-3.5 w-3.5" /> เพิ่มอาคาร
         </button>
@@ -250,7 +250,7 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
           <div key={b.id} className="rounded-2xl border border-border bg-muted overflow-hidden">
             <div className="w-full flex items-center justify-between p-4 text-left hover:bg-secondary transition-colors cursor-pointer" onClick={() => setExpandedBuilding(expandedBuilding === b.id ? null : b.id)}>
               <div className="flex items-center gap-3">
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white font-mono text-xs font-bold">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-mono text-xs font-bold">
                   {b.abbreviation}
                 </span>
                 <div>
@@ -261,7 +261,7 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
               <div className="flex items-center gap-3">
                 <button
                   onClick={(e) => { e.stopPropagation(); setShowAddRoom({ buildingId: b.id }); }}
-                  className="inline-flex items-center gap-1 rounded-md bg-white border border-border px-2 py-1 text-[11px] font-bold text-foreground hover:bg-muted shadow-sm transition-colors"
+                  className="inline-flex items-center gap-1 rounded-md bg-card border border-border px-2 py-1 text-[11px] font-bold text-foreground hover:bg-muted shadow-sm transition-colors"
                 >
                   <Plus className="h-3 w-3" /> เพิ่มห้อง
                 </button>
@@ -272,7 +272,7 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
             </div>
 
             {expandedBuilding === b.id && (
-              <div className="border-t border-border bg-white p-4 space-y-3">
+              <div className="border-t border-border bg-card p-4 space-y-3">
                 {b.rooms.map((r) => (
                   <div key={r.id} className="rounded-xl border border-border p-3.5 space-y-2">
                     <div className="flex items-center justify-between text-xs font-bold text-foreground border-b border-border pb-2">
@@ -303,25 +303,25 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
                           <div className="grid grid-cols-2 gap-1.5 pt-2 border-t border-border">
                             <button
                               onClick={() => handleOpenEditAc(ac)}
-                              className="inline-flex items-center justify-center gap-1 rounded border border-border bg-white py-1.5 text-[10px] font-bold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors text-center"
+                              className="inline-flex items-center justify-center gap-1 rounded border border-border bg-card py-1.5 text-[10px] font-bold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors text-center"
                             >
                               <Pencil className="h-3 w-3" /> แก้ไข
                             </button>
                             <button
                               onClick={() => setShowPmSettings(ac)}
-                              className="rounded border border-border bg-white py-1.5 text-[10px] font-bold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors text-center"
+                              className="rounded border border-border bg-card py-1.5 text-[10px] font-bold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors text-center"
                             >
                               {ac.maintenanceSchedule ? `ล้างทุก ${ac.maintenanceSchedule.frequencyValue} ${ac.maintenanceSchedule.frequencyUnit === 'days' ? 'วัน' : ac.maintenanceSchedule.frequencyUnit === 'months' ? 'เดือน' : 'ปี'}` : 'ตั้งค่าล้างแอร์'}
                             </button>
                             <button
                               onClick={() => setShowQrCode(ac)}
-                              className="rounded border border-border bg-white py-1.5 text-[10px] font-bold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors text-center"
+                              className="rounded border border-border bg-card py-1.5 text-[10px] font-bold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors text-center"
                             >
                               QR Code
                             </button>
                             <button
                               onClick={() => setShowHistoryFor(ac.id)}
-                              className="inline-flex items-center justify-center gap-1 rounded border border-border bg-white py-1.5 text-[10px] font-bold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors text-center"
+                              className="inline-flex items-center justify-center gap-1 rounded border border-border bg-card py-1.5 text-[10px] font-bold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors text-center"
                             >
                               <Clock className="h-3 w-3" /> ดูประวัติ
                             </button>
@@ -368,7 +368,7 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
       {/* Add Building Modal */}
       {showAddBuilding && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-xs p-4">
-          <div className="w-full max-w-sm rounded-2xl border border-border bg-white p-5 sm:p-6 shadow-xl space-y-4 animate-in fade-in">
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-xl space-y-4 animate-in fade-in">
             <div className="flex items-center justify-between border-b border-border pb-3">
               <h3 className="text-base font-bold text-foreground">เพิ่มอาคารใหม่</h3>
               <button onClick={() => setShowAddBuilding(false)} className="text-muted-foreground hover:text-foreground">
@@ -384,7 +384,7 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
                 <label className="mb-1.5 block font-bold text-foreground">ตัวย่อ (สำหรับรหัสแอร์)</label>
                 <input name="abbreviation" required placeholder="เช่น SCI" className="w-full font-mono rounded-xl border border-border px-3.5 py-2.5 text-foreground focus:border-primary focus:outline-none" />
               </div>
-              <button type="submit" disabled={isPending} className="w-full rounded-xl bg-foreground py-2.5 font-bold text-white hover:bg-primary/90 disabled:opacity-50">
+              <button type="submit" disabled={isPending} className="w-full rounded-xl bg-primary py-2.5 font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
                 {isPending ? "กำลังบันทึก..." : "บันทึกอาคาร"}
               </button>
             </form>
@@ -395,7 +395,7 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
       {/* Add Room Modal */}
       {showAddRoom && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-xs p-4">
-          <div className="w-full max-w-sm rounded-2xl border border-border bg-white p-5 sm:p-6 shadow-xl space-y-4 animate-in fade-in">
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-xl space-y-4 animate-in fade-in">
             <div className="flex items-center justify-between border-b border-border pb-3">
               <h3 className="text-base font-bold text-foreground">เพิ่มห้อง</h3>
               <button onClick={() => setShowAddRoom(null)} className="text-muted-foreground hover:text-foreground">
@@ -411,7 +411,7 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
                 <label className="mb-1.5 block font-bold text-foreground">ชั้น (ไม่บังคับ)</label>
                 <input name="floor" type="number" placeholder="เช่น 2" className="w-full rounded-xl border border-border px-3.5 py-2.5 text-foreground focus:border-primary focus:outline-none" />
               </div>
-              <button type="submit" disabled={isPending} className="w-full rounded-xl bg-foreground py-2.5 font-bold text-white hover:bg-primary/90 disabled:opacity-50">
+              <button type="submit" disabled={isPending} className="w-full rounded-xl bg-primary py-2.5 font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
                 {isPending ? "กำลังบันทึก..." : "บันทึกห้อง"}
               </button>
             </form>
@@ -422,7 +422,7 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
       {/* Add AC Modal */}
       {showAddAc && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-xs p-4">
-          <div className="w-full max-w-md rounded-2xl border border-border bg-white p-5 sm:p-6 shadow-xl space-y-4 animate-in fade-in max-h-[90vh] overflow-y-auto">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-xl space-y-4 animate-in fade-in max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-border pb-3">
               <h3 className="text-base font-bold text-foreground">ลงทะเบียนเครื่องปรับอากาศ</h3>
               <button onClick={() => setShowAddAc(null)} className="text-muted-foreground hover:text-foreground">
@@ -432,10 +432,10 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
             <form onSubmit={handleAddAc} className="space-y-4 text-xs">
               
               <div className="flex gap-2 p-1 bg-secondary rounded-lg">
-                <button type="button" onClick={() => setAcBrandType("master")} className={`flex-1 py-1.5 rounded-md font-bold transition-all ${acBrandType === "master" ? "bg-white shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+                <button type="button" onClick={() => setAcBrandType("master")} className={`flex-1 py-1.5 rounded-md font-bold transition-all ${acBrandType === "master" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
                   เลือกรุ่นมาตรฐาน
                 </button>
-                <button type="button" onClick={() => setAcBrandType("other")} className={`flex-1 py-1.5 rounded-md font-bold transition-all ${acBrandType === "other" ? "bg-white shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+                <button type="button" onClick={() => setAcBrandType("other")} className={`flex-1 py-1.5 rounded-md font-bold transition-all ${acBrandType === "other" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
                   กำหนดเอง (อื่นๆ)
                 </button>
               </div>
@@ -494,7 +494,7 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
                 <p className="mt-1 text-[11px] text-muted-foreground">ไม่กรอก = ใช้วันที่วันนี้</p>
               </div>
 
-              <button type="submit" disabled={isPending} className="w-full rounded-xl bg-foreground py-2.5 font-bold text-white hover:bg-primary/90 disabled:opacity-50 mt-4">
+              <button type="submit" disabled={isPending} className="w-full rounded-xl bg-primary py-2.5 font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 mt-4">
                 {isPending ? "กำลังบันทึก..." : "ลงทะเบียนเครื่องปรับอากาศ"}
               </button>
             </form>
@@ -505,7 +505,7 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
       {/* Edit AC Modal */}
       {showEditAc && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-xs p-4">
-          <div className="w-full max-w-md rounded-2xl border border-border bg-white p-5 sm:p-6 shadow-xl space-y-4 animate-in fade-in max-h-[90vh] overflow-y-auto">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-xl space-y-4 animate-in fade-in max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-border pb-3">
               <h3 className="text-base font-bold text-foreground">แก้ไขข้อมูลเครื่องปรับอากาศ ({showEditAc.acCode})</h3>
               <button onClick={() => setShowEditAc(null)} className="text-muted-foreground hover:text-foreground">
@@ -515,10 +515,10 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
             <form onSubmit={handleUpdateAc} className="space-y-4 text-xs">
 
               <div className="flex gap-2 p-1 bg-secondary rounded-lg">
-                <button type="button" onClick={() => setEditAcBrandType("master")} className={`flex-1 py-1.5 rounded-md font-bold transition-all ${editAcBrandType === "master" ? "bg-white shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+                <button type="button" onClick={() => setEditAcBrandType("master")} className={`flex-1 py-1.5 rounded-md font-bold transition-all ${editAcBrandType === "master" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
                   เลือกรุ่นมาตรฐาน
                 </button>
-                <button type="button" onClick={() => setEditAcBrandType("other")} className={`flex-1 py-1.5 rounded-md font-bold transition-all ${editAcBrandType === "other" ? "bg-white shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+                <button type="button" onClick={() => setEditAcBrandType("other")} className={`flex-1 py-1.5 rounded-md font-bold transition-all ${editAcBrandType === "other" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
                   กำหนดเอง (อื่นๆ)
                 </button>
               </div>
@@ -595,7 +595,7 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
                 </p>
               </div>
 
-              <button type="submit" disabled={isPending || isLoadingEditAc || editAcLoadFailed} className="w-full rounded-xl bg-foreground py-2.5 font-bold text-white hover:bg-primary/90 disabled:opacity-50 mt-4">
+              <button type="submit" disabled={isPending || isLoadingEditAc || editAcLoadFailed} className="w-full rounded-xl bg-primary py-2.5 font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 mt-4">
                 {isPending ? "กำลังบันทึก..." : "บันทึกการแก้ไข"}
               </button>
             </form>
@@ -606,7 +606,7 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
       {/* PM Settings Modal */}
       {showPmSettings && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-xs p-4">
-          <div className="w-full max-w-sm rounded-2xl border border-border bg-white p-5 sm:p-6 shadow-xl space-y-4 animate-in fade-in">
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-xl space-y-4 animate-in fade-in">
             <div className="flex items-center justify-between border-b border-border pb-3">
               <h3 className="text-base font-bold text-foreground flex items-center gap-2">
                 <CalendarClock className="w-5 h-5 text-primary" />
@@ -639,7 +639,7 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
                   </NativeSelect>
                 </div>
               </div>
-              <button type="submit" disabled={isPending} className="w-full rounded-xl bg-foreground py-2.5 font-bold text-white hover:bg-primary/90 disabled:opacity-50 mt-2">
+              <button type="submit" disabled={isPending} className="w-full rounded-xl bg-primary py-2.5 font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 mt-2">
                 {isPending ? "กำลังบันทึก..." : "บันทึกการตั้งค่า"}
               </button>
             </form>
@@ -650,7 +650,7 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
       {/* QR Code Modal */}
       {showQrCode && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-xs p-4">
-          <div className="w-full max-w-sm rounded-3xl border border-border bg-white p-6 shadow-2xl space-y-6 animate-in fade-in zoom-in-95 relative">
+          <div className="w-full max-w-sm rounded-3xl border border-border bg-card p-6 shadow-2xl space-y-6 animate-in fade-in zoom-in-95 relative">
             <button onClick={() => setShowQrCode(null)} className="absolute right-4 top-4 text-muted-foreground hover:text-foreground bg-secondary p-1.5 rounded-full transition-colors">
               <X className="h-4 w-4" />
             </button>
@@ -664,8 +664,12 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
             </div>
 
             <div className="flex justify-center" id="qr-code-print-area">
-              <div className="bg-white p-4 rounded-2xl border-2 border-border shadow-sm flex flex-col items-center gap-3">
-                <QRCodeSVG 
+              {/* force-light: this box is what gets printed/scanned, so it stays
+                  a plain white card with dark text no matter the dashboard's
+                  active theme — a QR code and its label are meant to look the
+                  same on the sticker as they do here. */}
+              <div className="force-light bg-card p-4 rounded-2xl border-2 border-border shadow-sm flex flex-col items-center gap-3">
+                <QRCodeSVG
                   value={`${typeof window !== 'undefined' ? window.location.origin : ''}/qr/${showQrCode.qrCode}`}
                   size={180}
                   level="H"
@@ -707,7 +711,7 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
                 `);
                 printWindow.document.close();
               }}
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary py-3 font-bold text-white hover:bg-primary/90 transition-colors shadow-md shadow-slate-900/20"
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary py-3 font-bold text-primary-foreground hover:bg-primary/90 transition-colors shadow-md shadow-slate-900/20"
             >
               <Printer className="w-4 h-4" /> พิมพ์ (Print)
             </button>

@@ -65,7 +65,7 @@ export function CreateWorkOrderModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-xs p-4">
-      <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-border bg-white p-5 sm:p-6 shadow-xl space-y-4 animate-in fade-in">
+      <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-xl space-y-4 animate-in fade-in">
         <div className="flex items-center justify-between border-b border-border pb-3">
           <h3 className="text-base font-bold text-foreground">สร้างใบงานซ่อมบำรุง</h3>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
@@ -172,7 +172,7 @@ export function CreateWorkOrderModal({
             <button
               type="submit"
               disabled={isPending}
-              className="w-1/2 rounded-xl bg-foreground py-2.5 font-bold text-white hover:bg-primary/90 disabled:opacity-50"
+              className="w-1/2 rounded-xl bg-primary py-2.5 font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             >
               {isPending ? "กำลังสร้าง..." : "ยืนยันการสร้างใบงาน"}
             </button>

@@ -44,11 +44,11 @@ export function MyJobsPanel({ myJobs, searchQuery, selectedBuilding, onSelectFor
           paginatedMyJobs.map((job, idx) => (
             <div
               key={job.id}
-              className={idx === 0 ? "biz-card-dark p-5 space-y-4 shadow-md" : "biz-card p-5 space-y-4 hover:border-slate-400 transition-all"}
+              className={idx === 0 ? "biz-card-dark p-5 space-y-4 shadow-md" : "biz-card p-5 space-y-4 hover:border-muted-foreground transition-all"}
             >
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
-                  <div className={`text-sm font-bold leading-snug ${idx === 0 ? "text-white" : "text-foreground"}`}>
+                  <div className={`text-sm font-bold leading-snug ${idx === 0 ? "text-primary-foreground" : "text-foreground"}`}>
                     {job.location}
                   </div>
                   <div className="flex items-center gap-2">
@@ -82,7 +82,7 @@ export function MyJobsPanel({ myJobs, searchQuery, selectedBuilding, onSelectFor
                 </div>
                 <button
                   onClick={() => onSelectForLog(job)}
-                  className={`rounded-xl px-4 py-2 text-xs font-bold transition-all shadow-sm active:scale-95 ${idx === 0 ? "bg-white text-foreground hover:bg-secondary" : "bg-foreground text-white hover:bg-primary/90"}`}
+                  className={`rounded-xl px-4 py-2 text-xs font-bold transition-all shadow-sm active:scale-95 ${idx === 0 ? "bg-card text-foreground hover:bg-secondary" : "bg-primary text-primary-foreground hover:bg-primary/90"}`}
                 >
                   บันทึกและปิดงาน
                 </button>

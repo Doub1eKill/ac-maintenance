@@ -64,7 +64,7 @@ export function AssetsPanel({ assetList, assetSummary, searchQuery, selectedBuil
             </div>
           ) : (
             paginatedAssets.map((unit) => (
-              <div key={unit.id} className="biz-card p-5 space-y-4 hover:border-slate-400 transition-all relative overflow-hidden">
+              <div key={unit.id} className="biz-card p-5 space-y-4 hover:border-muted-foreground transition-all relative overflow-hidden">
                 {unit.isOverdue && (
                   <div
                     className={`absolute top-0 right-0 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1 shadow-sm ${

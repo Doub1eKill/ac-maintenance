@@ -49,7 +49,7 @@ const MaintenanceCalendar = dynamic(
 
 function ChunkLoadingFallback() {
   return (
-    <div className="flex h-64 items-center justify-center rounded-2xl border border-border bg-white">
+    <div className="flex h-64 items-center justify-center rounded-2xl border border-border bg-card">
       <AnimatedIcon icon={Clock} size={24} animation="spin" className="text-primary" />
     </div>
   );

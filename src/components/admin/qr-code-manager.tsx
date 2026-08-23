@@ -201,7 +201,7 @@ export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
             </button>
             <button 
               onClick={handleBatchPrint}
-              className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md shadow-primary/20 hover:bg-primary/90 transition-colors"
+              className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-xl text-sm font-bold shadow-md shadow-primary/20 hover:bg-primary/90 transition-colors"
             >
               <Printer className="w-4 h-4" /> พิมพ์ QR Code ({selectedAcs.length})
             </button>
@@ -235,7 +235,7 @@ export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
                 <th className="px-4 py-3 font-semibold text-center rounded-tr-xl">จัดการ</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-border">
               {paginatedAcs.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
@@ -340,7 +340,7 @@ export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
         {/* Single QR Code Modal Preview */}
         {showQrCode && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-xs p-4">
-            <div className="w-full max-w-sm rounded-3xl border border-border bg-white p-6 shadow-2xl space-y-6 animate-in fade-in zoom-in-95 relative">
+            <div className="w-full max-w-sm rounded-3xl border border-border bg-card p-6 shadow-2xl space-y-6 animate-in fade-in zoom-in-95 relative">
               <button
                 onClick={() => setShowQrCode(null)}
                 className="absolute right-4 top-4 text-muted-foreground hover:text-foreground bg-secondary p-1.5 rounded-full transition-colors"
@@ -357,7 +357,9 @@ export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
               </div>
 
               <div className="flex justify-center" id="single-qr-print-area">
-                <div className="bg-white p-4 rounded-2xl border-2 border-border shadow-sm flex flex-col items-center gap-3">
+                {/* force-light: printed/scanned artifact, stays a plain white
+                    card with dark text regardless of the dashboard's theme. */}
+                <div className="force-light bg-card p-4 rounded-2xl border-2 border-border shadow-sm flex flex-col items-center gap-3">
                   <QRCodeSVG
                     value={`${typeof window !== "undefined" ? window.location.origin : ""}/qr/${showQrCode.qrCode}`}
                     size={160}
@@ -402,7 +404,7 @@ export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
                   `);
                   printWindow.document.close();
                 }}
-                className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary py-3 font-bold text-white hover:bg-primary/90 transition-colors shadow-md shadow-slate-900/20"
+                className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary py-3 font-bold text-primary-foreground hover:bg-primary/90 transition-colors shadow-md shadow-slate-900/20"
               >
                 <Printer className="w-4 h-4" /> พิมพ์ (Print)
               </button>

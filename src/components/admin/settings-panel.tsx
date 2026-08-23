@@ -94,7 +94,7 @@ function DefaultFrequencyCard({ defaultFrequency }: { defaultFrequency: { value:
         type="button"
         onClick={handleSave}
         disabled={isSaving}
-        className="w-full sm:w-auto rounded-xl bg-foreground px-5 py-2.5 text-sm font-bold text-white hover:bg-primary/90 transition-colors disabled:opacity-50"
+        className="w-full sm:w-auto rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
       >
         {isSaving ? "กำลังบันทึก..." : "บันทึก"}
       </button>
@@ -176,7 +176,7 @@ function OrganisationInfoCard({
         type="button"
         onClick={handleSave}
         disabled={isSaving}
-        className="w-full sm:w-auto rounded-xl bg-foreground px-5 py-2.5 text-sm font-bold text-white hover:bg-primary/90 transition-colors disabled:opacity-50"
+        className="w-full sm:w-auto rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
       >
         {isSaving ? "กำลังบันทึก..." : "บันทึก"}
       </button>
@@ -312,13 +312,13 @@ function AuditLogCard() {
                 <div className="px-3.5 pb-3 pt-1 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] bg-muted">
                   <div>
                     <div className="font-bold text-muted-foreground mb-1">ค่าเดิม</div>
-                    <pre className="whitespace-pre-wrap break-words rounded-lg border border-border bg-white p-2 text-foreground">
+                    <pre className="whitespace-pre-wrap break-words rounded-lg border border-border bg-card p-2 text-foreground">
                       {log.oldValues ? JSON.stringify(log.oldValues, null, 2) : "-"}
                     </pre>
                   </div>
                   <div>
                     <div className="font-bold text-muted-foreground mb-1">ค่าใหม่</div>
-                    <pre className="whitespace-pre-wrap break-words rounded-lg border border-border bg-white p-2 text-foreground">
+                    <pre className="whitespace-pre-wrap break-words rounded-lg border border-border bg-card p-2 text-foreground">
                       {log.newValues ? JSON.stringify(log.newValues, null, 2) : "-"}
                     </pre>
                   </div>
