@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import {
   AlertTriangle,
+  Ban,
   CheckCircle2,
   Clock,
   ClipboardList,
@@ -21,7 +22,9 @@ import type { WorkOrderItem } from "@/components/admin/types";
 
 interface WorkOrderDetailDialogProps {
   workOrder: WorkOrderItem | null;
+  isPending?: boolean;
   onClose: () => void;
+  onCancelWorkOrder?: (workOrderId: string, reason: string) => void;
 }
 
 function normalizeWorkOrderImages(images: unknown): string[] {
@@ -40,12 +43,18 @@ function normalizeWorkOrderImages(images: unknown): string[] {
   return [];
 }
 
-export function WorkOrderDetailDialog({ workOrder, onClose }: WorkOrderDetailDialogProps) {
+export function WorkOrderDetailDialog({ workOrder, isPending, onClose, onCancelWorkOrder }: WorkOrderDetailDialogProps) {
   const [brokenEvidenceImages, setBrokenEvidenceImages] = useState<Record<string, boolean>>({});
+  const [showCancelForm, setShowCancelForm] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
 
   useEffect(() => {
     setBrokenEvidenceImages({});
+    setShowCancelForm(false);
+    setCancelReason("");
   }, [workOrder?.id]);
+
+  const canCancel = workOrder && (workOrder.status === "pending" || workOrder.status === "claimed");
 
   return (
     <Dialog open={!!workOrder} onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -164,6 +173,56 @@ export function WorkOrderDetailDialog({ workOrder, onClose }: WorkOrderDetailDia
 
               {/* Right Column: Audit Trail */}
               <div className="space-y-6">
+
+                {/* Cancel Work Order */}
+                {canCancel && onCancelWorkOrder && (
+                  <div className="bg-white rounded-xl border border-border p-5 shadow-sm">
+                    {!showCancelForm ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowCancelForm(true)}
+                        className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 py-2.5 text-xs font-bold text-red-700 hover:bg-red-100 transition-colors"
+                      >
+                        <Ban className="h-3.5 w-3.5" /> ยกเลิกใบงาน
+                      </button>
+                    ) : (
+                      <div className="space-y-3">
+                        <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                          <Ban className="h-4 w-4 text-red-600" />
+                          ยืนยันการยกเลิกใบงาน
+                        </h3>
+                        <p className="text-xs text-muted-foreground">
+                          ใช้สำหรับกรณีแจ้งซ่อมผิดเครื่องหรือแจ้งซ้ำ — สถานะเครื่องจะกลับเป็นปกติอัตโนมัติถ้าไม่มีใบงานอื่นค้างอยู่
+                        </p>
+                        <textarea
+                          value={cancelReason}
+                          onChange={(e) => setCancelReason(e.target.value)}
+                          rows={2}
+                          placeholder="เหตุผล (ไม่บังคับ)"
+                          className="w-full rounded-lg border border-border px-3 py-2 text-xs text-foreground focus:border-primary focus:outline-none"
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => { setShowCancelForm(false); setCancelReason(""); }}
+                            disabled={isPending}
+                            className="flex-1 rounded-lg border border-border py-2 text-xs font-bold text-foreground hover:bg-secondary disabled:opacity-50"
+                          >
+                            ไม่ยกเลิก
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onCancelWorkOrder(workOrder.id, cancelReason)}
+                            disabled={isPending}
+                            className="flex-1 rounded-lg bg-red-600 py-2 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-50"
+                          >
+                            {isPending ? "กำลังยกเลิก..." : "ยืนยันยกเลิก"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Asset Info */}
                 <div className="bg-white rounded-xl border border-border p-5 shadow-sm">

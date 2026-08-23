@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { createWorkOrderAction, updateUserStatusByOrgAdminAction, assignWorkOrderAction } from "@/app/admin/actions";
+import { createWorkOrderAction, updateUserStatusByOrgAdminAction, assignWorkOrderAction, cancelWorkOrderAction } from "@/app/admin/actions";
 import {
   Building2,
   Snowflake,
@@ -157,6 +157,22 @@ export function AdminDashboardView({
         toast.success("มอบหมายงานเรียบร้อยแล้ว");
         setShowAssignModal(false);
         setSelectedOrderToAssign(null);
+      }
+    });
+  }
+
+  function handleCancelWorkOrder(workOrderId: string, reason: string) {
+    startTransition(async () => {
+      const res = await cancelWorkOrderAction(workOrderId, reason);
+      if (res.error) {
+        toast.error(res.error);
+      } else {
+        toast.success(
+          res.statusReset
+            ? "ยกเลิกใบงานสำเร็จ สถานะเครื่องกลับเป็นปกติแล้ว"
+            : "ยกเลิกใบงานสำเร็จ"
+        );
+        setSelectedWorkOrderDetails(null);
       }
     });
   }
@@ -373,7 +389,9 @@ export function AdminDashboardView({
       {/* Work Order Detail Dialog (Audit Trail) */}
       <WorkOrderDetailDialog
         workOrder={selectedWorkOrderDetails}
+        isPending={isPending}
         onClose={() => setSelectedWorkOrderDetails(null)}
+        onCancelWorkOrder={handleCancelWorkOrder}
       />
     </DashboardLayout>
   );

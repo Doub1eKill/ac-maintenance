@@ -3,9 +3,16 @@
 import { useState, useTransition, useEffect } from "react";
 import { toast } from "sonner";
 import {
-  Building2, Plus, ChevronDown, ChevronUp, X, QrCode, CalendarClock, Printer, Clock
+  Building2, Plus, ChevronDown, ChevronUp, X, QrCode, CalendarClock, Printer, Clock, Pencil
 } from "lucide-react";
-import { createBuildingAction, createRoomAction, createAirConditionerAction, saveMaintenanceScheduleAction } from "@/app/admin/actions";
+import {
+  createBuildingAction,
+  createRoomAction,
+  createAirConditionerAction,
+  saveMaintenanceScheduleAction,
+  updateAirConditionerAction,
+  getAirConditionerHistory,
+} from "@/app/admin/actions";
 import { QRCodeSVG } from "qrcode.react";
 import { AcHistoryModal } from "@/components/admin/ac-history-modal";
 import {
@@ -77,10 +84,24 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
   const [showPmSettings, setShowPmSettings] = useState<ACUnit | null>(null);
   const [showQrCode, setShowQrCode] = useState<ACUnit | null>(null);
   const [showHistoryFor, setShowHistoryFor] = useState<string | null>(null);
+  const [showEditAc, setShowEditAc] = useState<ACUnit | null>(null);
 
   // AC Form state
   const [acBrandType, setAcBrandType] = useState<"master" | "other">("master");
   const [selectedBrandId, setSelectedBrandId] = useState<string>("");
+
+  // Edit AC form state — defaults to "other" (free text) because the unit
+  // list only carries the resolved brand/model strings, not the catalog
+  // acBrandId/acModelId to preselect the master dropdowns with. installedAt
+  // isn't in the list either, so it's fetched fresh when the modal opens —
+  // leaving it blank here would silently clear a real install date on save,
+  // since the update action treats an empty date as "clear it" (unlike
+  // registration, where empty means "today").
+  const [editAcBrandType, setEditAcBrandType] = useState<"master" | "other">("other");
+  const [editSelectedBrandId, setEditSelectedBrandId] = useState<string>("");
+  const [editAcInstalledAt, setEditAcInstalledAt] = useState<string>("");
+  const [isLoadingEditAc, setIsLoadingEditAc] = useState(false);
+  const [editAcLoadFailed, setEditAcLoadFailed] = useState(false);
 
   const [buildingsPage, setBuildingsPage] = useState(1);
   const BUILDINGS_PER_PAGE = 5;
@@ -153,6 +174,44 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
     });
   }
 
+  function handleOpenEditAc(ac: ACUnit) {
+    setShowEditAc(ac);
+    setEditAcBrandType("other");
+    setEditSelectedBrandId("");
+    setEditAcInstalledAt("");
+    setEditAcLoadFailed(false);
+    setIsLoadingEditAc(true);
+    getAirConditionerHistory(ac.id).then((result) => {
+      if ("error" in result) {
+        // Leaving the date blank here would silently clear a real install
+        // date on save (update treats "" as "clear it"), so block submission
+        // instead of guessing.
+        setEditAcLoadFailed(true);
+        toast.error("โหลดวันที่ติดตั้งเดิมไม่สำเร็จ ลองปิดแล้วเปิดใหม่อีกครั้ง");
+      } else {
+        setEditAcInstalledAt(result.unit.installedAt ? result.unit.installedAt.slice(0, 10) : "");
+      }
+      setIsLoadingEditAc(false);
+    });
+  }
+
+  async function handleUpdateAc(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!showEditAc) return;
+    const formData = new FormData(e.currentTarget);
+    formData.append("airConditionerId", showEditAc.id);
+    formData.append("brandType", editAcBrandType);
+
+    startTransition(async () => {
+      const res = await updateAirConditionerAction(formData);
+      if (res.error) toast.error(res.error);
+      else {
+        setShowEditAc(null);
+        toast.success("แก้ไขข้อมูลเครื่องปรับอากาศสำเร็จ");
+      }
+    });
+  }
+
   async function handleSavePmSettings(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
@@ -169,6 +228,7 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
   }
 
   const selectedBrand = brands.find(b => b.id === selectedBrandId);
+  const editSelectedBrand = brands.find(b => b.id === editSelectedBrandId);
 
   return (
     <div className="biz-card p-6 space-y-5 animate-in fade-in">
@@ -240,22 +300,28 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
                             </span>
                           </div>
                           
-                          <div className="flex items-center gap-2 pt-2 border-t border-border">
+                          <div className="grid grid-cols-2 gap-1.5 pt-2 border-t border-border">
+                            <button
+                              onClick={() => handleOpenEditAc(ac)}
+                              className="inline-flex items-center justify-center gap-1 rounded border border-border bg-white py-1.5 text-[10px] font-bold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors text-center"
+                            >
+                              <Pencil className="h-3 w-3" /> แก้ไข
+                            </button>
                             <button
                               onClick={() => setShowPmSettings(ac)}
-                              className="flex-1 rounded border border-border bg-white py-1.5 text-[10px] font-bold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors text-center"
+                              className="rounded border border-border bg-white py-1.5 text-[10px] font-bold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors text-center"
                             >
                               {ac.maintenanceSchedule ? `ล้างทุก ${ac.maintenanceSchedule.frequencyValue} ${ac.maintenanceSchedule.frequencyUnit === 'days' ? 'วัน' : ac.maintenanceSchedule.frequencyUnit === 'months' ? 'เดือน' : 'ปี'}` : 'ตั้งค่าล้างแอร์'}
                             </button>
                             <button
                               onClick={() => setShowQrCode(ac)}
-                              className="flex-1 rounded border border-border bg-white py-1.5 text-[10px] font-bold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors text-center"
+                              className="rounded border border-border bg-white py-1.5 text-[10px] font-bold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors text-center"
                             >
                               QR Code
                             </button>
                             <button
                               onClick={() => setShowHistoryFor(ac.id)}
-                              className="flex-1 inline-flex items-center justify-center gap-1 rounded border border-border bg-white py-1.5 text-[10px] font-bold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors text-center"
+                              className="inline-flex items-center justify-center gap-1 rounded border border-border bg-white py-1.5 text-[10px] font-bold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors text-center"
                             >
                               <Clock className="h-3 w-3" /> ดูประวัติ
                             </button>
@@ -430,6 +496,107 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
 
               <button type="submit" disabled={isPending} className="w-full rounded-xl bg-foreground py-2.5 font-bold text-white hover:bg-primary/90 disabled:opacity-50 mt-4">
                 {isPending ? "กำลังบันทึก..." : "ลงทะเบียนเครื่องปรับอากาศ"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit AC Modal */}
+      {showEditAc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-xs p-4">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-white p-5 sm:p-6 shadow-xl space-y-4 animate-in fade-in max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <h3 className="text-base font-bold text-foreground">แก้ไขข้อมูลเครื่องปรับอากาศ ({showEditAc.acCode})</h3>
+              <button onClick={() => setShowEditAc(null)} className="text-muted-foreground hover:text-foreground">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <form onSubmit={handleUpdateAc} className="space-y-4 text-xs">
+
+              <div className="flex gap-2 p-1 bg-secondary rounded-lg">
+                <button type="button" onClick={() => setEditAcBrandType("master")} className={`flex-1 py-1.5 rounded-md font-bold transition-all ${editAcBrandType === "master" ? "bg-white shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+                  เลือกรุ่นมาตรฐาน
+                </button>
+                <button type="button" onClick={() => setEditAcBrandType("other")} className={`flex-1 py-1.5 rounded-md font-bold transition-all ${editAcBrandType === "other" ? "bg-white shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+                  กำหนดเอง (อื่นๆ)
+                </button>
+              </div>
+
+              {editAcBrandType === "master" ? (
+                <>
+                  <div>
+                    <label className="mb-1.5 block font-bold text-foreground">ยี่ห้อ (Brand)</label>
+                    <NativeSelect value={editSelectedBrandId} onChange={(e) => setEditSelectedBrandId(e.target.value)} required className="w-full h-auto py-3 px-3.5 rounded-xl border-border text-xs text-foreground">
+                      <NativeSelectOption value="" disabled>-- เลือกยี่ห้อ --</NativeSelectOption>
+                      {brands.map(b => (
+                        <NativeSelectOption key={b.id} value={b.id}>
+                          {b.name}
+                        </NativeSelectOption>
+                      ))}
+                    </NativeSelect>
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block font-bold text-foreground">รุ่น (Model)</label>
+                    <NativeSelect name="acModelId" required disabled={!editSelectedBrandId} className="w-full h-auto py-3 px-3.5 rounded-xl border-border text-xs text-foreground disabled:opacity-50" defaultValue="">
+                      <NativeSelectOption value="" disabled>-- เลือกรุ่น --</NativeSelectOption>
+                      {editSelectedBrand?.models.map(m => (
+                        <NativeSelectOption key={m.id} value={m.id}>
+                          {m.name} {m.defaultBtu ? `(${m.defaultBtu} BTU)` : ""}
+                        </NativeSelectOption>
+                      ))}
+                    </NativeSelect>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className="mb-1.5 block font-bold text-foreground">ยี่ห้อแอร์ (พิมพ์เอง)</label>
+                    <input name="customBrand" required defaultValue={showEditAc.brand} placeholder="เช่น Daikin, Carrier" className="w-full rounded-xl border border-border px-3.5 py-2.5 text-foreground focus:border-primary focus:outline-none" />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block font-bold text-foreground">รุ่น (พิมพ์เอง - ไม่บังคับ)</label>
+                    <input name="customModel" defaultValue={showEditAc.model ?? ""} placeholder="เช่น Inverter X" className="w-full rounded-xl border border-border px-3.5 py-2.5 text-foreground focus:border-primary focus:outline-none" />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block font-bold text-foreground">ขนาด BTU (ไม่บังคับ)</label>
+                    <input name="btu" type="number" defaultValue={showEditAc.btu ?? ""} placeholder="เช่น 18000" className="w-full rounded-xl border border-border px-3.5 py-2.5 text-foreground focus:border-primary focus:outline-none" />
+                  </div>
+                </>
+              )}
+
+              <div>
+                <label className="mb-1.5 block font-bold text-foreground">สถานะเครื่อง</label>
+                <NativeSelect name="status" required defaultValue={showEditAc.status} className="w-full h-auto py-3 px-3.5 rounded-xl border-border text-xs text-foreground">
+                  <NativeSelectOption value="normal">ปกติ</NativeSelectOption>
+                  <NativeSelectOption value="broken">เสีย</NativeSelectOption>
+                  <NativeSelectOption value="needs_cleaning">รอล้าง</NativeSelectOption>
+                </NativeSelect>
+              </div>
+
+              <div>
+                <label className="mb-1.5 block font-bold text-foreground">
+                  วันที่ติดตั้ง (ไม่บังคับ)
+                </label>
+                <input
+                  name="installedAt"
+                  type="date"
+                  value={editAcInstalledAt}
+                  onChange={(e) => setEditAcInstalledAt(e.target.value)}
+                  disabled={isLoadingEditAc || editAcLoadFailed}
+                  className="w-full rounded-xl border border-border px-3.5 py-2.5 text-foreground focus:border-primary focus:outline-none disabled:opacity-50"
+                />
+                <p className={`mt-1 text-[11px] ${editAcLoadFailed ? "text-destructive font-bold" : "text-muted-foreground"}`}>
+                  {isLoadingEditAc
+                    ? "กำลังโหลดวันที่ติดตั้งเดิม..."
+                    : editAcLoadFailed
+                    ? "โหลดวันที่ติดตั้งเดิมไม่สำเร็จ ปิดหน้าต่างนี้แล้วเปิดใหม่ก่อนบันทึก"
+                    : "เว้นว่าง = ล้างค่าเป็นไม่ระบุ"}
+                </p>
+              </div>
+
+              <button type="submit" disabled={isPending || isLoadingEditAc || editAcLoadFailed} className="w-full rounded-xl bg-foreground py-2.5 font-bold text-white hover:bg-primary/90 disabled:opacity-50 mt-4">
+                {isPending ? "กำลังบันทึก..." : "บันทึกการแก้ไข"}
               </button>
             </form>
           </div>
