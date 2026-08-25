@@ -177,6 +177,35 @@ export async function syncOverdueMaintenanceWorkOrders() {
   }
 }
 
+// Ordering shared by the admin urgent list and the technician asset list. Both
+// show the same work from different angles, so they sort the same way: keep a
+// building together, put repairs before cleanings inside it, then oldest first.
+//
+// Note what this replaced on the technician side. That list used to float every
+// unit already due to the top regardless of date — the rule backlog item 1 asked
+// for. Sorting by building first necessarily gives that up: a unit that is due
+// in a building late in the alphabet now sits in the middle of the page. The
+// alternatives were weighed and this was chosen deliberately, so it is not an
+// oversight to "fix" by reinstating the old rule on top.
+export interface JobOrderKey {
+  buildingName: string;
+  jobType: MaintenanceJobType;
+  // Whichever date the list is about — when the fault was reported, or when the
+  // unit was last cleaned. null means it never happened, which sorts as oldest.
+  sortDate: string | null;
+}
+
+export function compareJobOrder(a: JobOrderKey, b: JobOrderKey): number {
+  const byBuilding = a.buildingName.localeCompare(b.buildingName, "th");
+  if (byBuilding !== 0) return byBuilding;
+
+  if (a.jobType !== b.jobType) return a.jobType === "repair" ? -1 : 1;
+
+  const aTime = a.sortDate ? new Date(a.sortDate).getTime() : 0;
+  const bTime = b.sortDate ? new Date(b.sortDate).getTime() : 0;
+  return aTime - bTime;
+}
+
 export interface MaintenanceHistoryEntry {
   id: string;
   action: MaintenanceAction;
@@ -238,6 +267,9 @@ export interface TechnicianAssetUnit {
   btu: number | null;
   status: string;
   location: string;
+  // Split out of `location`, which is assembled for display — sorting needs the
+  // building on its own, and a grouped layout would need it too.
+  buildingName: string;
   lastCleanedAt: string | null;
   isOverdue: boolean;
   pendingWorkOrder: {
@@ -305,6 +337,7 @@ export async function getTechnicianAssetList(): Promise<{
       btu: u.btu ?? u.acModel?.defaultBtu ?? null,
       status: u.status,
       location: `${u.room.building.name} - ห้อง ${u.room.name}`,
+      buildingName: u.room.building.name,
       lastCleanedAt: lastCleanedAt ? lastCleanedAt.toISOString() : null,
       isOverdue: !!pendingWorkOrder,
       pendingWorkOrder: pendingWorkOrder
@@ -319,14 +352,16 @@ export async function getTechnicianAssetList(): Promise<{
     };
   });
 
-  // Overdue units always float to the top regardless of staleness date;
-  // the rest sort stalest first (never-cleaned units sort as oldest).
-  shaped.sort((a, b) => {
-    if (a.isOverdue !== b.isOverdue) return a.isOverdue ? -1 : 1;
-    const aTime = a.lastCleanedAt ? new Date(a.lastCleanedAt).getTime() : 0;
-    const bTime = b.lastCleanedAt ? new Date(b.lastCleanedAt).getTime() : 0;
-    return aTime - bTime;
+  // Building, then repairs before cleanings, then longest since cleaning.
+  // See compareJobOrder for what this gave up and why.
+  const orderKey = (u: TechnicianAssetUnit): JobOrderKey => ({
+    buildingName: u.buildingName,
+    // A unit with no open job still belongs somewhere in the order; its own
+    // condition is the only thing left to place it by.
+    jobType: u.pendingWorkOrder?.type ?? (u.status === "broken" ? "repair" : "cleaning"),
+    sortDate: u.lastCleanedAt,
   });
+  shaped.sort((a, b) => compareJobOrder(orderKey(a), orderKey(b)));
 
   const summary: TechnicianAssetSummary = {
     total: shaped.length,

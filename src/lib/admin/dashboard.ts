@@ -6,7 +6,8 @@
 // to hold an implementation.
 
 import { prisma } from "@/lib/prisma";
-import { syncOverdueMaintenanceWorkOrders } from "@/lib/maintenance";
+import type { WorkOrderType as MaintenanceJobType } from "@/generated/prisma/enums";
+import { compareJobOrder, syncOverdueMaintenanceWorkOrders } from "@/lib/maintenance";
 import { getOrganisationName } from "@/lib/organisation";
 import { format, subDays } from "date-fns";
 import { verifyOrgAdmin } from "@/lib/auth-guards";
@@ -168,6 +169,8 @@ export async function getOrgAdminData() {
       model: string | null;
       btu: number | null;
       status: string;
+      buildingName: string;
+      type: MaintenanceJobType;
       workOrderId: string | null;
       priority: string | null;
       issueDescription: string | null;
@@ -194,6 +197,11 @@ export async function getOrgAdminData() {
               model: ac.acModel?.name || ac.model || null,
               btu: ac.btu,
               status: ac.status,
+              buildingName: b.name,
+              // What the open job was raised for. A unit flagged as needing
+              // attention without an open job still has to sort somewhere, and
+              // its own condition is all that is left to place it by.
+              type: pendingWo?.type ?? (ac.status === "broken" ? "repair" : "cleaning"),
               // The open job behind this unit, or null when it has none. The
               // urgent list ticks units but assignment happens on a job, so the
               // board needs this to know which rows it can actually send to
@@ -298,6 +306,15 @@ export async function getOrgAdminData() {
         activityDay.repairs += 1;
       }
     });
+
+    // Building, then repairs before cleanings, then oldest report first — the
+    // same order the technician asset list uses, via the same comparator.
+    urgentUnits.sort((a, b) =>
+      compareJobOrder(
+        { buildingName: a.buildingName, jobType: a.type, sortDate: a.reportedAt },
+        { buildingName: b.buildingName, jobType: b.type, sortDate: b.reportedAt }
+      )
+    );
 
     return {
       dbError: null,
