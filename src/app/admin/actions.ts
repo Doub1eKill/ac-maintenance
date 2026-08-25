@@ -19,6 +19,7 @@ import {
   getOrganisationName,
 } from "@/lib/organisation";
 import { withDeadlockRetry } from "@/lib/db-retry";
+import { saveUpload, deleteUpload } from "@/lib/upload";
 import { format, subDays } from "date-fns";
 
 // How many work orders the board loads at once. Not exported directly (a
@@ -276,6 +277,7 @@ export async function getOrgAdminData() {
           name: true,
           email: true,
           role: true,
+          avatarUrl: true,
           phones: {
             where: { isPrimary: true },
             select: { phoneNumber: true },
@@ -448,6 +450,10 @@ export async function getOrgAdminData() {
         email: currentUser?.email ?? session.user.email ?? "",
         role: currentUser?.role ?? session.user.role,
         phone: currentUser?.phones[0]?.phoneNumber ?? null,
+        // null means the account has never set a picture — the profile card
+        // renders the user's initials in that case, so this is displayable as
+        // it stands and needs no placeholder from here.
+        avatarUrl: currentUser?.avatarUrl ?? null,
       },
       metrics: {
         totalUnits,
@@ -485,6 +491,7 @@ export async function getOrgAdminData() {
         email: session.user.email ?? "",
         role: session.user.role,
         phone: null,
+        avatarUrl: null,
       },
       metrics: {
         totalUnits: 0,
@@ -560,19 +567,36 @@ const updateProfileSchema = z.object({
     .optional(),
 });
 
+// A profile picture is displayed at avatar size and downscaled to 1600px on
+// the way in, so anything past this is a camera original that would be thrown
+// away — rejected up front with a message rather than silently accepted.
+const MAX_AVATAR_BYTES = 8 * 1024 * 1024;
+
 /**
- * Updates the signed-in user's own name and primary phone number.
+ * Updates the signed-in user's own name, primary phone number and picture.
  *
  * Guarded on the session alone rather than through verifyOrgAdmin(): it only
  * ever writes to the caller's own row, so there's nothing a technician could
- * reach here that they shouldn't, and the technician profile page planned in
- * F5 can reuse this instead of a near-identical copy under tech/.
+ * reach here that they shouldn't, which is what lets the technician profile
+ * page reuse it instead of keeping a near-identical copy under tech/.
  *
  * `phone` distinguishes three cases: omitted leaves the number untouched, ""
  * clears it, and a value replaces it. The previous number is deleted, not
  * kept as a secondary — see the transaction below.
+ *
+ * `avatarFile` has only two cases, not three: a file replaces the picture,
+ * and anything else leaves it alone. There is deliberately no "clear it"
+ * input, because the form has no button that means it — the picture is
+ * changed by choosing a different one.
+ *
+ * Both extra parameters are optional and positional, so existing callers
+ * passing just `(name)` or `(name, phone)` keep working untouched.
  */
-export async function updateProfileAction(name: string, phone?: string) {
+export async function updateProfileAction(
+  name: string,
+  phone?: string,
+  avatarFile?: File | null
+) {
   const session = await auth();
   if (!session?.user?.id || session.user.status !== "active") {
     throw new Error("Unauthorized: sign-in required");
@@ -586,11 +610,47 @@ export async function updateProfileAction(name: string, phone?: string) {
   const userId = BigInt(session.user.id);
   const { name: newName, phone: newPhone } = parsed.data;
 
+  // Checked before anything is written, so a rejected file costs nothing.
+  const hasNewAvatar = !!avatarFile && avatarFile.size > 0;
+  if (hasNewAvatar) {
+    if (!avatarFile!.type?.startsWith("image/")) {
+      return { error: "รูปโปรไฟล์ต้องเป็นไฟล์รูปภาพเท่านั้น" };
+    }
+    if (avatarFile!.size > MAX_AVATAR_BYTES) {
+      return { error: "รูปโปรไฟล์ต้องมีขนาดไม่เกิน 8 MB" };
+    }
+  }
+
+  // Written to disk before the transaction opens, never inside it: this is a
+  // multi-megabyte write, and a transaction held open across it would keep its
+  // lock on the user row for the whole duration.
+  const newAvatarUrl = hasNewAvatar ? await saveUpload(avatarFile!) : null;
+  if (hasNewAvatar && !newAvatarUrl) {
+    return { error: "ไม่สามารถบันทึกรูปโปรไฟล์ได้ กรุณาลองใหม่อีกครั้ง" };
+  }
+
+  // The picture being replaced, captured inside the transaction so it is the
+  // value this update actually overwrote — read outside, a second save landing
+  // in between would have us delete the wrong file.
+  let replacedAvatarUrl: string | null = null;
+
   try {
     await prisma.$transaction(async (tx) => {
+      if (newAvatarUrl) {
+        const before = await tx.user.findUnique({
+          where: { id: userId },
+          select: { avatarUrl: true },
+        });
+        replacedAvatarUrl = before?.avatarUrl ?? null;
+      }
+
       await tx.user.update({
         where: { id: userId },
-        data: { name: newName },
+        // Omitting the key entirely rather than passing null is what makes
+        // "no file sent" mean "leave the existing picture alone".
+        data: newAvatarUrl
+          ? { name: newName, avatarUrl: newAvatarUrl }
+          : { name: newName },
       });
 
       if (newPhone === undefined) return;
@@ -624,10 +684,19 @@ export async function updateProfileAction(name: string, phone?: string) {
       }
     });
 
+    // Only now that the row is committed. Had the transaction rolled back, the
+    // old picture would still be the current one and must survive.
+    if (newAvatarUrl && replacedAvatarUrl && replacedAvatarUrl !== newAvatarUrl) {
+      await deleteUpload(replacedAvatarUrl);
+    }
+
     revalidatePath(session.user.role === "technician" ? "/tech" : "/admin");
     return { success: true };
   } catch (error) {
     console.error("Failed to update own profile:", error);
+    // The row was never updated, so the file just written is referenced by
+    // nothing. Leaving it would strand a few megabytes per failed attempt.
+    if (newAvatarUrl) await deleteUpload(newAvatarUrl);
     return { error: "ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่อีกครั้ง" };
   }
 }

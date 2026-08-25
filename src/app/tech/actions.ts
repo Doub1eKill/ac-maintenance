@@ -14,6 +14,7 @@ import {
 import { MaintenanceAction } from "@/generated/prisma/client";
 import { getOrganisationName } from "@/lib/organisation";
 import { withDeadlockRetry } from "@/lib/db-retry";
+import { saveUpload } from "@/lib/upload";
 
 async function verifyTechnician() {
   const session = await auth();
@@ -21,59 +22,6 @@ async function verifyTechnician() {
     throw new Error("Unauthorized: Technician access required");
   }
   return session;
-}
-
-import { promises as fs } from "fs";
-import path from "path";
-
-// Evidence photos come straight off a technician's phone camera, which means
-// 3-5 MB files at 4000px+ — far more than the UI ever displays, and paid for
-// twice: once on the tech's mobile upload, again on every admin who views the
-// work order. Downscale and re-encode before writing to disk.
-const MAX_IMAGE_DIMENSION = 1600;
-const IMAGE_QUALITY = 80;
-
-// Helper function to save uploaded file
-async function saveUpload(file: File | null): Promise<string | null> {
-  if (!file || file.size === 0) return null;
-
-  try {
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
-    const uploadDir = path.join(process.cwd(), "public/uploads");
-    await fs.mkdir(uploadDir, { recursive: true });
-
-    if (file.type?.startsWith("image/")) {
-      try {
-        const { default: sharp } = await import("sharp");
-        const processed = await sharp(buffer)
-          // withoutEnlargement: a photo already smaller than the cap is left
-          // at its own size rather than being upscaled into a bigger file.
-          .rotate() // honour EXIF orientation before stripping metadata
-          .resize(MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION, {
-            fit: "inside",
-            withoutEnlargement: true,
-          })
-          .jpeg({ quality: IMAGE_QUALITY, mozjpeg: true })
-          .toBuffer();
-
-        const filename = `${Date.now()}-${safeName.replace(/\.[^.]+$/, "")}.jpg`;
-        await fs.writeFile(path.join(uploadDir, filename), processed);
-        return `/uploads/${filename}`;
-      } catch (imageError) {
-        // Corrupt/unsupported image, or sharp unavailable on this platform —
-        // fall through and store the original rather than losing the evidence.
-        console.error("Image processing failed, storing original:", imageError);
-      }
-    }
-
-    const filename = `${Date.now()}-${safeName}`;
-    await fs.writeFile(path.join(uploadDir, filename), buffer);
-    return `/uploads/${filename}`;
-  } catch (error) {
-    console.error("Failed to save file:", error);
-    return null;
-  }
 }
 
 function formatAcLocation(room: { name: string; floor: number | null; building: { name: string; abbreviation: string } }) {
@@ -87,7 +35,7 @@ export async function getTechnicianData() {
   try {
     await syncOverdueMaintenanceWorkOrders();
 
-    const [pendingOrdersRaw, myJobsRaw, completedJobsRaw, assetListResult, organisationName] = await Promise.all([
+    const [pendingOrdersRaw, myJobsRaw, completedJobsRaw, assetListResult, organisationName, currentUser] = await Promise.all([
       prisma.workOrder.findMany({
         where: { status: "pending" },
         include: {
@@ -139,6 +87,26 @@ export async function getTechnicianData() {
       }),
       getTechnicianAssetList(),
       getOrganisationName(),
+      // The signed-in technician's own profile, read from the database rather
+      // than taken from the session, for the same reason getOrgAdminData()
+      // does it: the session is a JWT minted at sign-in, so a name changed
+      // through updateProfileAction would keep showing the old value until the
+      // next login. Runs alongside the queries above rather than after them,
+      // so the profile costs no extra round trip.
+      prisma.user.findUnique({
+        where: { id: techId },
+        select: {
+          name: true,
+          email: true,
+          role: true,
+          avatarUrl: true,
+          phones: {
+            where: { isPrimary: true },
+            select: { phoneNumber: true },
+            take: 1,
+          },
+        },
+      }),
     ]);
 
     const jobPool = pendingOrdersRaw.map((wo) => ({
@@ -187,6 +155,17 @@ export async function getTechnicianData() {
     return {
       dbError: null,
       universityName: organisationName,
+      // Same shape as getOrgAdminData().profile, deliberately — ProfilePanel is
+      // shared between the two dashboards, so anything that differs here would
+      // have to be special-cased there. Falls back to the session only if the
+      // row somehow can't be read.
+      profile: {
+        name: currentUser?.name ?? session.user.name ?? "",
+        email: currentUser?.email ?? session.user.email ?? "",
+        role: currentUser?.role ?? session.user.role,
+        phone: currentUser?.phones[0]?.phoneNumber ?? null,
+        avatarUrl: currentUser?.avatarUrl ?? null,
+      },
       jobPool,
       myJobs,
       completedJobs,
@@ -199,6 +178,17 @@ export async function getTechnicianData() {
     return {
       dbError: "ไม่สามารถเชื่อมต่อฐานข้อมูล MariaDB/MySQL ได้ (Connection Pool Timeout) - กรุณาตรวจสอบว่าเซิร์ฟเวอร์ MySQL บนพอร์ต 3307 เปิดใช้งานอยู่ และเรียกใช้ 'npx tsx prisma/seed.ts'",
       universityName: await getOrganisationName(),
+      // Session-only fallback: the database is unreachable on this path, so the
+      // profile card still renders with whatever the JWT carries. Without this
+      // the shared ProfilePanel would receive undefined and crash the whole
+      // technician page on a DB outage, while the admin one degrades cleanly.
+      profile: {
+        name: session.user.name ?? "",
+        email: session.user.email ?? "",
+        role: session.user.role,
+        phone: null,
+        avatarUrl: null,
+      },
       jobPool: [],
       myJobs: [],
       completedJobs: [],

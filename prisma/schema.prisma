@@ -69,6 +69,10 @@ model User {
   // PHP-specific bcrypt config along), so NULL means one thing consistently:
   // this account cannot sign in via Credentials until a new password is set.
   password        String?    @db.VarChar(255)
+  // Path under /uploads to the profile picture, written by saveUpload(). NULL
+  // means the account has never set one — the UI falls back to the user's
+  // initials, so this is a real state rather than missing data.
+  avatarUrl       String?    @map("avatar_url") @db.VarChar(255)
   rememberToken   String?    @map("remember_token") @db.VarChar(100)
   createdAt       DateTime?  @map("created_at") @db.Timestamp(0)
   updatedAt       DateTime?  @map("updated_at") @db.Timestamp(0)
