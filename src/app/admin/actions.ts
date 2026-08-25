@@ -46,6 +46,12 @@ export async function assignWorkOrderAction(
   return workOrders.assignWorkOrderAction(...args);
 }
 
+export async function bulkAssignWorkOrdersAction(
+  ...args: Parameters<typeof workOrders.bulkAssignWorkOrdersAction>
+) {
+  return workOrders.bulkAssignWorkOrdersAction(...args);
+}
+
 export async function cancelWorkOrderAction(
   ...args: Parameters<typeof workOrders.cancelWorkOrderAction>
 ) {

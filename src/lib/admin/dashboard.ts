@@ -168,6 +168,7 @@ export async function getOrgAdminData() {
       model: string | null;
       btu: number | null;
       status: string;
+      workOrderId: string | null;
       priority: string | null;
       issueDescription: string | null;
       reportedAt: string | null;
@@ -193,6 +194,11 @@ export async function getOrgAdminData() {
               model: ac.acModel?.name || ac.model || null,
               btu: ac.btu,
               status: ac.status,
+              // The open job behind this unit, or null when it has none. The
+              // urgent list ticks units but assignment happens on a job, so the
+              // board needs this to know which rows it can actually send to
+              // bulkAssignWorkOrdersAction.
+              workOrderId: pendingWo?.id.toString() ?? null,
               priority: pendingWo?.priority ?? null,
               issueDescription: pendingWo?.issueDescription ?? null,
               reportedAt: pendingWo?.createdAt ? pendingWo.createdAt.toISOString() : null,

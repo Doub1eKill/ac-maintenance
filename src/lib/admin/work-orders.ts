@@ -1,7 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { logAudit } from "@/lib/audit";
+import { logAudit, logAuditMany } from "@/lib/audit";
 import { withDeadlockRetry } from "@/lib/db-retry";
 import { verifyOrgAdmin } from "@/lib/auth-guards";
 import {
@@ -195,6 +195,114 @@ export async function assignWorkOrderAction(workOrderId: string, assignToUserId:
   } catch (error) {
     console.error("Failed to assign work order:", error);
     return { error: "ไม่สามารถมอบหมายงานได้ กรุณาลองใหม่อีกครั้ง" };
+  }
+}
+
+/**
+ * Assigns several work orders to one technician in a single call.
+ *
+ * The urgent list on the dashboard ticks *units*, but a technician is assigned
+ * to a *job*, so the board sends the work order behind each ticked unit —
+ * urgentUnits[].workOrderId, null when the unit has no open job. Units without
+ * one are left out rather than having a job invented for them: opening a work
+ * order means deciding whether it is a repair or a cleaning, and inferring that
+ * is exactly what recording the type on the order was meant to stop. An admin
+ * who wants a job for that unit raises one explicitly, where the choice is
+ * made rather than guessed.
+ *
+ * Orders that are no longer pending are skipped the same way. The status guard
+ * on the update is what makes that safe: a job another admin assigned, or a
+ * technician claimed, a moment ago simply isn't matched, so `count` is exactly
+ * how many this call won and nothing is assigned twice.
+ *
+ * Returns how many were assigned and how many were skipped, so the board can
+ * say what actually happened instead of implying every tick took effect.
+ */
+export async function bulkAssignWorkOrdersAction(
+  workOrderIds: string[],
+  assignToUserId: string
+) {
+  const session = await verifyOrgAdmin();
+
+  if (!Array.isArray(workOrderIds) || workOrderIds.length === 0) {
+    return { error: "กรุณาเลือกใบงานอย่างน้อย 1 รายการ" };
+  }
+
+  let ids: bigint[];
+  let techId: bigint;
+  try {
+    ids = workOrderIds.map((id) => BigInt(id));
+    techId = BigInt(assignToUserId);
+  } catch {
+    return { error: "ข้อมูลไม่ถูกต้อง" };
+  }
+
+  // Checked once for the whole batch rather than per row: the answer is the
+  // same for every order, and a suspended account should fail the call outright
+  // instead of quietly assigning nothing.
+  const tech = await prisma.user.findUnique({
+    where: { id: techId },
+    select: { role: true, status: true },
+  });
+
+  if (!tech || tech.role !== "technician" || tech.status !== "active") {
+    return { error: "ไม่พบข้อมูลช่างเทคนิค หรือช่างเทคนิคไม่ได้อยู่ในสถานะที่พร้อมรับงาน" };
+  }
+
+  // Second-aligned deliberately: work_orders.claimed_at is Timestamp(0), so a
+  // Date carrying milliseconds is truncated on write and would no longer equal
+  // this value when the assigned rows are read back below.
+  const claimedAt = new Date(Math.floor(Date.now() / 1000) * 1000);
+
+  try {
+    const { assignedCount, assignedIds } = await withDeadlockRetry(
+      "bulkAssignWorkOrdersAction",
+      () =>
+        prisma.$transaction(async (tx) => {
+          // One guarded write for the whole batch instead of a round trip per
+          // id — the same reason P4 rewrote bulk claiming.
+          const { count } = await tx.workOrder.updateMany({
+            where: { id: { in: ids }, status: "pending" },
+            data: { status: "claimed", claimedBy: techId, claimedAt },
+          });
+
+          if (count === 0) return { assignedCount: 0, assignedIds: [] as bigint[] };
+
+          // Read back which of the requested ids this call is now holding, to
+          // attribute the audit rows. Scoped by claimedBy + claimedAt so an
+          // earlier batch assigned to the same technician isn't picked up.
+          const rows = await tx.workOrder.findMany({
+            where: { id: { in: ids }, status: "claimed", claimedBy: techId, claimedAt },
+            select: { id: true },
+          });
+
+          return { assignedCount: count, assignedIds: rows.map((r) => r.id) };
+        })
+    );
+
+    await logAuditMany(
+      assignedIds.map((id) => ({
+        userId: BigInt(session.user.id!),
+        action: "ASSIGN_WORKORDER",
+        entityType: "workOrder",
+        entityId: id,
+        newValues: { status: "claimed", claimedBy: techId.toString(), bulk: true },
+        ipAddress: "server_action",
+      }))
+    );
+
+    revalidatePath("/admin");
+    // The technician's own job list changes too, not just the admin board.
+    revalidatePath("/tech");
+
+    return {
+      success: true,
+      assignedCount,
+      skippedCount: ids.length - assignedCount,
+    };
+  } catch (error) {
+    console.error("Failed to bulk assign work orders:", error);
+    return { error: "ไม่สามารถมอบหมายงานหลายรายการได้ กรุณาลองใหม่อีกครั้ง" };
   }
 }
 
