@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { withDeadlockRetry } from "@/lib/db-retry";
-import type { MaintenanceAction } from "@/generated/prisma/enums";
+import type { MaintenanceAction, WorkOrderType as MaintenanceJobType } from "@/generated/prisma/enums";
 
 // The timezone the institutions actually operate in. Timestamps (performedAt,
 // claimedAt) are stored as UTC instants and render correctly wherever they're
@@ -160,6 +160,9 @@ export async function syncOverdueMaintenanceWorkOrders() {
           data: overdueIds.map((airConditionerId) => ({
             airConditionerId,
             status: "pending" as const,
+            // Not a judgement call: this path exists only to schedule the
+            // cleaning a MaintenanceSchedule has come due for.
+            type: "cleaning" as const,
             priority: "low",
             issueDescription: "ครบกำหนดล้างแอร์ตามรอบบำรุงรักษา (ระบบสร้างอัตโนมัติ)",
           })),
@@ -239,6 +242,7 @@ export interface TechnicianAssetUnit {
   isOverdue: boolean;
   pendingWorkOrder: {
     id: string;
+    type: MaintenanceJobType;
     priority: string | null;
     issueDescription: string | null;
     createdAt: string | null;
@@ -285,7 +289,7 @@ export async function getTechnicianAssetList(): Promise<{
       workOrders: {
         where: { status: "pending" },
         take: 1,
-        select: { id: true, createdAt: true, priority: true, issueDescription: true },
+        select: { id: true, type: true, createdAt: true, priority: true, issueDescription: true },
       },
     },
   });
@@ -306,6 +310,7 @@ export async function getTechnicianAssetList(): Promise<{
       pendingWorkOrder: pendingWorkOrder
         ? {
             id: pendingWorkOrder.id.toString(),
+            type: pendingWorkOrder.type,
             priority: pendingWorkOrder.priority,
             issueDescription: pendingWorkOrder.issueDescription,
             createdAt: pendingWorkOrder.createdAt ? pendingWorkOrder.createdAt.toISOString() : null,

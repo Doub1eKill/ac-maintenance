@@ -184,6 +184,7 @@ async function main() {
     data: {
       airConditionerId: acs[1].id, // needs_cleaning
       status: "pending",
+      type: "repair", // water dripping — a fault, not a scheduled clean
       priority: "high",
       issueDescription: "แอร์มีน้ำหยดลงมาที่โต๊ะนักศึกษา รบกวนช่างเข้ามาดูด่วนครับ",
       reportedById: orgAdmin.id,
@@ -196,6 +197,7 @@ async function main() {
     data: {
       airConditionerId: acs[6].id, // broken
       status: "claimed",
+      type: "repair",
       priority: "critical",
       issueDescription: "แอร์เปิดไม่ติดเลย ไฟกระพริบที่ปุ่ม Timer ตลอดเวลา",
       reportedById: orgAdmin.id,
@@ -211,6 +213,7 @@ async function main() {
     data: {
       airConditionerId: acs[4].id,
       status: "completed",
+      type: "cleaning", // the description below is a scheduled clean
       priority: "low",
       issueDescription: "แจ้งล้างแอร์ประจำรอบ (ห้องประชุม EDU-201 ตัวที่ 2)",
       reportedById: orgAdmin.id,

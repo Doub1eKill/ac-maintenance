@@ -62,6 +62,12 @@ const createWorkOrderSchema = z.object({
   airConditionerId: z.string().min(1, "กรุณาเลือกเครื่องปรับอากาศ"),
   assignToUserId: z.string().optional(),
   priority: z.enum(["low", "high", "critical"]).default("low"),
+  // Optional, and defaulting to a repair, because the form does not offer this
+  // choice yet and a required field the UI never sends would simply stop
+  // admins raising work orders at all. Repair is the honest default rather
+  // than a placeholder: this path has always marked the unit as broken, so a
+  // fault report is what it already was.
+  type: z.enum(["repair", "cleaning"]).default("repair"),
 });
 
 export async function createWorkOrderAction(formData: FormData) {
@@ -71,6 +77,7 @@ export async function createWorkOrderAction(formData: FormData) {
     airConditionerId: formData.get("airConditionerId"),
     assignToUserId: formData.get("assignToUserId") || undefined,
     priority: formData.get("priority") || undefined,
+    type: formData.get("type") || undefined,
   };
 
   const parsed = createWorkOrderSchema.safeParse(raw);
@@ -87,6 +94,7 @@ export async function createWorkOrderAction(formData: FormData) {
       data: {
         airConditionerId: acId,
         status: assignTo ? "claimed" : "pending",
+        type: parsed.data.type,
         priority: parsed.data.priority,
         claimedBy: assignTo,
         claimedAt: assignTo ? new Date() : null,
@@ -98,14 +106,17 @@ export async function createWorkOrderAction(formData: FormData) {
       action: "CREATE_WORKORDER",
       entityType: "workOrder",
       entityId: workOrder.id,
-      newValues: { status: "pending", airConditionerId: acId.toString(), priority: parsed.data.priority },
+      newValues: { status: "pending", type: parsed.data.type, airConditionerId: acId.toString(), priority: parsed.data.priority },
       ipAddress: "server_action",
     });
 
-    // Update AC status to broken/needs_cleaning if it was normal
+    // Mark the unit to match the job that was just raised. This used to set
+    // "broken" unconditionally, which was fine while every order through here
+    // was a fault report — but now that the order records its own type, a
+    // cleaning job that left the unit flagged as broken would contradict it.
     await prisma.airConditioner.update({
       where: { id: acId },
-      data: { status: "broken" },
+      data: { status: parsed.data.type === "repair" ? "broken" : "needs_cleaning" },
     });
 
     revalidatePath("/admin");

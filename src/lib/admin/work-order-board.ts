@@ -23,6 +23,7 @@ export const WORK_ORDER_PAGE_SIZE = 50;
 export const workOrderBoardSelect = {
   id: true,
   status: true,
+  type: true,
   priority: true,
   issueDescription: true,
   resolutionNotes: true,
@@ -79,6 +80,10 @@ export function toWorkOrderBoardRow(wo: WorkOrderBoardRow) {
     acStatus: wo.airConditioner.status,
     location: `${wo.airConditioner.room.building.name} (${wo.airConditioner.room.building.abbreviation}) - ห้อง ${wo.airConditioner.room.name}`,
     status: wo.status,
+    // The job this order was raised for, as recorded when it was opened. Kept
+    // separate from acStatus below, which is the unit's condition right now
+    // and used to stand in for this.
+    type: wo.type,
     priority: wo.priority,
     issueDescription: wo.issueDescription,
     resolutionNotes: wo.resolutionNotes,

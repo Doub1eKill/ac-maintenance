@@ -377,6 +377,10 @@ export async function logMaintenanceAction(formData: FormData) {
           data: {
             airConditionerId: acId,
             status: "completed",
+            // The job is opened and closed in the same breath, so what the
+            // technician just recorded is the best possible description of what
+            // it was for — no inference needed.
+            type: actionsArray.includes("repair") ? "repair" : "cleaning",
             priority: "low",
             issueDescription: "ช่างเข้าปฏิบัติงานหน้างานโดยไม่มีใบงานล่วงหน้า (ระบบสร้างอัตโนมัติ)",
             reportedById: techId,
