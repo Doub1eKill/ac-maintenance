@@ -215,6 +215,89 @@ Cannot update a component (`LogActionModal`) while rendering a different compone
 
 ---
 
+## 🧱 แยก `admin/actions.ts` (1,748 บรรทัด) เป็นโมดูลย่อย (25 สิงหาคม 2026, DoubleKill)
+
+**⚠️ ฝั่ง UI ไม่ต้องแก้อะไรเลยแม้แต่บรรทัดเดียว** — ทุก action ยัง import จาก `@/app/admin/actions` ได้เหมือนเดิมทั้ง 18 ตัว ชื่อเดิม พาธเดิม พฤติกรรมเดิม
+
+### โครงสร้างใหม่
+
+| ไฟล์ | บรรทัด | มีอะไร |
+|---|---|---|
+| `src/app/admin/actions.ts` | **135** | จุดเดียวที่เป็น `"use server"` — ประกาศ action ทั้ง 18 ตัวที่ UI เรียกได้ |
+| `src/lib/admin/dashboard.ts` | 370 | `getOrgAdminData()` |
+| `src/lib/admin/work-orders.ts` | 262 | ใบงาน: `getWorkOrdersPage`, สร้าง/จ่าย/ยกเลิก |
+| `src/lib/admin/settings.ts` | 444 | ผู้ใช้, โปรไฟล์, ตั้งค่าระบบ (S4–S7) |
+| `src/lib/admin/assets.ts` | 602 | อาคาร/ห้อง/แอร์, ประวัติ, แก้ log, รอบ PM |
+| `src/lib/admin/work-order-board.ts` | 95 | select/orderBy/mapper ของกระดานใบงานที่ใช้ร่วมกัน |
+| `src/lib/auth-guards.ts` | 14 | `verifyOrgAdmin()` |
+
+### ทำไมถึงต้องเป็นรูปแบบนี้ (ไม่ใช่ re-export ตรงๆ)
+
+ลองวิธีที่ตรงไปตรงมาที่สุดก่อน คือแยกเป็นหลายไฟล์ `"use server"` แล้วให้ `actions.ts` `export { ... } from "./..."` — **Next ปฏิเสธตอน build**:
+
+```
+Error: Only async functions are allowed to be exported in a "use server" file.
+```
+
+คอมไพเลอร์พิสูจน์ไม่ได้ว่าสิ่งที่ re-export เป็น async function จริง จึงตีตกทั้งหมด
+
+ทางออกคือ **implementation ย้ายไปเป็นโมดูลธรรมดาใน `src/lib/admin/`** (ไม่มี `"use server"`) แล้ว `actions.ts` เป็นไฟล์เดียวที่เปิดเผยออกไป โดยห่อบางๆ:
+
+```ts
+export async function cancelWorkOrderAction(
+  ...args: Parameters<typeof workOrders.cancelWorkOrderAction>
+) {
+  return workOrders.cancelWorkOrderAction(...args);
+}
+```
+
+ใช้ `Parameters<typeof ...>` เพื่อให้ **signature อยู่ที่เดียว** — แก้ที่ implementation แล้ว wrapper ตามให้เอง ไม่มีทางหลุดจากกัน
+
+**ผลพลอยได้ที่สำคัญ:** ตอนนี้มีที่เดียวในโปรเจกต์ที่บอกได้ว่า "อะไรบ้างที่ client เรียกได้" คือไฟล์ `actions.ts` 135 บรรทัด อ่านจบใน 1 นาที เดิมต้องไล่หา `export async function` ใน 1,748 บรรทัด
+
+### ทดสอบด้วยการรันจริง — ไล่ครบทุกรูปแบบ argument
+
+wrapper แบบ rest param เป็นจุดเสี่ยงที่สุดของงานนี้ เลยไล่ทดสอบตามชนิดของ argument ไม่ใช่แค่ตามฟีเจอร์:
+
+| รูปแบบ | action ที่ทดสอบ | ผล |
+|---|---|---|
+| ไม่มี argument | `getOrgAdminData()` | ✅ แดชบอร์ดโหลดครบ |
+| scalar 1 ตัว | `getWorkOrdersPage(page)` | ✅ หน้า 1 = 50, หน้า 2 = 5 แถว |
+| scalar 2 ตัว | `updateDefaultFrequencyAction(value, unit)` | ✅ เขียน DB + audit log |
+| **FormData** | `updateAirConditionerAction(formData)` | ✅ BTU 9000 → 13500 เข้า DB จริง + audit log |
+| optional param | `updateProfileAction(name, phone?)` | ✅ ชื่อเปลี่ยน เบอร์ไม่หาย |
+
+`npx tsc --noEmit` 0 error, `npm run build` ผ่าน, console ฝั่ง server ไม่มี error และคืนค่าข้อมูลทดสอบกลับหมดแล้ว
+
+**จำนวน lint ทั้งโปรเจกต์เท่าเดิม (52)** — การแยกไฟล์ไม่ได้สร้างปัญหาใหม่ ที่ยังค้างอยู่ 2 จุดใน `assets.ts` (`let dbData: any`) เป็นของเดิมที่ยกมาทั้งก้อน ตั้งใจไม่แตะในคอมมิตที่เป็น refactor ล้วน
+
+### ถ้าจะเพิ่ม action ใหม่หลังจากนี้
+
+1. เขียน implementation ใน `src/lib/admin/<หมวด>.ts`
+2. เพิ่ม wrapper ใน `src/app/admin/actions.ts`
+
+**ข้ามข้อ 2 = UI เรียกไม่ได้** เพราะโมดูลใน `src/lib/admin/` ไม่ใช่ `"use server"` client จึง import ตรงไม่ได้ (ตั้งใจให้เป็นแบบนั้น — จะได้ไม่มี action หลุดออกไปโดยไม่ผ่านการประกาศที่เดียว)
+
+---
+
+## 🧹 ถึง Esther03u — ไฟล์ UI ที่ยังไม่มีใครใช้ ตรวจซ้ำแล้วเมื่อ 25 ส.ค. 2026
+
+เคยถามไว้ตั้งแต่ 11 ส.ค. แต่ยังไม่ได้คำตอบ ตรวจใหม่ทั้งโปรเจกต์แล้ว **ยังไม่มีไฟล์ไหนใน `src/` import ทั้ง 5 รายการนี้เลยสักที่** รบกวนยืนยันทีละข้อว่าจะลบหรือเก็บ แล้วเขียนตอบไว้ในไฟล์นี้ได้เลย (ทั้งหมดอยู่ในเลนของคุณ DoubleKill จึงไม่ลบเอง)
+
+| ไฟล์ | สถานะตอนนี้ | ความเห็น |
+|---|---|---|
+| `components/layout/nav-header.tsx` | ไม่มีใคร import | **น่าจะลบได้แน่นอนที่สุด** — ถูกแทนที่ด้วย `dashboard-layout.tsx` ที่มี header ในตัวแล้ว และทุกหน้าใช้ตัวใหม่หมด |
+| `components/examples/c-pagination-3.tsx` | ไม่มีใคร import | **เหตุผลที่เคยขอให้เก็บหมดไปแล้ว** — เก็บไว้เป็นต้นแบบทำ P14 ซึ่งคุณทำเสร็จไปเมื่อ 23 ส.ค. และตอนนี้ `ui/pagination.tsx` ถูกใช้จริงใน 11 ไฟล์แล้ว |
+| `components/ui/option-wheel.tsx` + `option-wheel.css` | ไม่มีใคร import | ไม่ใช่ของมาตรฐาน registry ถ้าลบแล้วอยากได้คืนต้องดึงจาก git |
+| `components/ui/label.tsx` | ไม่มีใคร import | เพิ่มกลับได้ด้วย `npx shadcn add label` |
+| `components/ui/toggle.tsx` | ไม่มีใคร import | เพิ่มกลับได้ด้วย `npx shadcn add toggle` |
+
+**เปลี่ยนจากรอบก่อน:** `ui/sonner.tsx` **มีคนใช้แล้ว 1 ไฟล์** (เดิม 0) — การตัดสินใจเก็บไว้ตอนนั้นถูกแล้ว ตัดออกจากรายการนี้ ส่วน `thai-alert-dialogs.tsx` และ `examples/c-file-upload-4.tsx` ก็ถูกใช้อยู่จริงอย่างละ 1 ไฟล์ ไม่ต้องพิจารณา
+
+*วิธีตรวจซ้ำเองถ้าอยากยืนยัน:* `grep -rl "components/ui/label\"" src` — ถ้าไม่คืนอะไรเลยแปลว่าไม่มีใครใช้จริง (ระวังอย่า grep แค่คำว่า `label` เฉยๆ เพราะไปตรงกับ prop และตัวแปรทั่วไปเยอะมาก จะได้ผลลวง)
+
+---
+
 ## ⚠️ กฎสำคัญ: ห้ามแก้ Backend เอง
 
 **Esther03u (หรือใครก็ตามที่ทำฝั่ง UI/Frontend) ห้ามแก้โค้ด Backend เองโดยเด็ดขาด** ได้แก่ (ไม่จำกัดเพียง):
@@ -612,13 +695,13 @@ APP_URL=http://localhost:3000       # โดเมนที่ใช้สร้
 
 ## 📁 Key File Structure & Architecture
 
-*(อัปเดตให้ตรงกับของจริงเมื่อ 18 ส.ค. 2026 — โฟลเดอร์ `super-admin/` ทั้งสองจุดถูกลบไปแล้วใน F1)*
+*(อัปเดตให้ตรงกับของจริงเมื่อ 25 ส.ค. 2026 — หลังแยก `admin/actions.ts` ออกเป็น `src/lib/admin/`)*
 
 ```
 ac-maintenance/
 ├── src/
 │   ├── app/
-│   │   ├── admin/                # Admin Routes & Actions (org_admin) + master-data/
+│   │   ├── admin/                # Route + actions.ts (จุดเดียวที่เป็น "use server" ฝั่ง admin) + master-data/
 │   │   ├── tech/                 # Technician Mobile Interface & Actions (technician)
 │   │   ├── qr/[id]/              # หน้า QR สาธารณะ (ไม่ต้อง login — ดู F6)
 │   │   ├── api/                  # REST handlers (เหลือ 3 จุด: auth, admin/maintenance-schedules, tech/units)
@@ -627,19 +710,31 @@ ac-maintenance/
 │   ├── components/
 │   │   ├── admin/                # Admin Dashboard Components
 │   │   ├── tech/                 # Technician Mobile Components
-│   │   ├── shared/               # ใช้ร่วมกัน 2 ฝั่ง (เช่น maintenance-calendar.tsx)
+│   │   ├── shared/               # ใช้ร่วมกัน 2 ฝั่ง (maintenance-calendar.tsx, profile-panel.tsx)
 │   │   ├── layout/               # dashboard-layout.tsx, dashboard-loading.tsx
 │   │   └── ui/                   # Shared UI Primitives (incl. alert.tsx)
 │   └── lib/
-│       ├── auth.config.ts        # RBAC & Auth Session Helpers
+│       ├── admin/                # ← ตรรกะฝั่ง admin แยกตามหมวด (ไม่ใช่ "use server")
+│       │   ├── dashboard.ts      #   getOrgAdminData()
+│       │   ├── work-orders.ts    #   ใบงาน: getWorkOrdersPage / สร้าง / จ่าย / ยกเลิก
+│       │   ├── settings.ts       #   ผู้ใช้ / โปรไฟล์ / ตั้งค่าระบบ (S4–S7)
+│       │   ├── assets.ts         #   อาคาร / ห้อง / แอร์ / ประวัติ / รอบ PM
+│       │   └── work-order-board.ts #  select+mapper ของกระดานใบงานที่ใช้ร่วมกัน
+│       ├── auth.ts / auth.config.ts  # NextAuth + RBAC
+│       ├── auth-guards.ts        # verifyOrgAdmin()
 │       ├── maintenance.ts        # auto-check + helper วันที่ (businessDateToday ฯลฯ)
+│       ├── upload.ts             # saveUpload() / deleteUpload()
 │       ├── organisation.ts       # อ่านค่าจาก SystemSettings
 │       ├── db-retry.ts           # withDeadlockRetry() — ดูหัวข้อ lock-ordering
+│       ├── mail.ts / audit.ts / reset-token.ts / utils.ts
 │       └── prisma.ts             # Prisma 7 Database Instance with MariaDB Driver Adapter
 ├── prisma/
-│   └── schema.prisma             # Database Schema Definition
+│   ├── schema.prisma             # Database Schema Definition (12 model)
+│   └── migrations/               # 8 ไฟล์
 └── HANDOFF.md                    # Handoff Documentation
 ```
+
+**กฎที่ยังเหมือนเดิม:** ทุกอย่างใน `src/lib/**` และ `**/actions.ts` เป็นของ DoubleKill / `src/components/**` เป็นของ Esther03u
 
 ---
 
@@ -1317,4 +1412,4 @@ const MAINTENANCE_ACTION_LABEL: Record<string, string> = {
 
 ---
 
-*Handoff document last updated: 25 สิงหาคม 2026 (DoubleKill — ปิดคำขอ backend 2 ข้อจากรอบ F5, แก้ bodySizeLimit, และไล่ทดสอบจริงงาน UI ที่ Esther03u ทำเมื่อ 23 ส.ค. ครบทั้ง 10 ข้อ)*
+*Handoff document last updated: 25 สิงหาคม 2026 (DoubleKill — ปิดคำขอ backend 2 ข้อจากรอบ F5, แก้ bodySizeLimit, ไล่ทดสอบงาน UI ของ Esther03u ครบ 10 ข้อ, และแยก admin/actions.ts เป็น src/lib/admin/)*
