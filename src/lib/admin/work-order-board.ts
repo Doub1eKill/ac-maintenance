@@ -98,3 +98,41 @@ export function toWorkOrderBoardRow(wo: WorkOrderBoardRow) {
     airConditionerId: wo.airConditionerId.toString(),
   };
 }
+
+// Matches the board's search box against the database instead of against
+// whatever rows happen to be loaded.
+//
+// The client used to filter the current page only, which was fine while the
+// board loaded one page and stopped. Once real paging arrived, searching from
+// page 2 for a unit listed on page 1 reported \"not found\" — the row existed,
+// it simply was not in the array being filtered. Nothing about that failure
+// tells the user they are looking at a page rather than the whole table.
+//
+// The four fields are the ones the client matched: unit code, brand, location
+// and the technician holding the job. `location` is assembled for display from
+// the building and room, so there is no column to match it against — the
+// building name, its abbreviation and the room name are each matched instead,
+// which covers what anyone would actually type.
+//
+// No `mode: 'insensitive'`: these columns are utf8mb4_unicode_ci, so MySQL
+// already compares them without regard to case. Prisma only honours that flag
+// on PostgreSQL anyway.
+export function workOrderSearchWhere(search: string): Prisma.WorkOrderWhereInput | undefined {
+  const q = search.trim();
+  if (!q) return undefined;
+
+  return {
+    OR: [
+      { airConditioner: { acCode: { contains: q } } },
+      // Brand lives in the catalogue when the unit was registered from it, and
+      // in a free-text column when it was typed in as \"other\" — the board
+      // displays whichever exists, so both have to be searchable.
+      { airConditioner: { acBrand: { name: { contains: q } } } },
+      { airConditioner: { brand: { contains: q } } },
+      { airConditioner: { room: { name: { contains: q } } } },
+      { airConditioner: { room: { building: { name: { contains: q } } } } },
+      { airConditioner: { room: { building: { abbreviation: { contains: q } } } } },
+      { claimedByUser: { name: { contains: q } } },
+    ],
+  };
+}

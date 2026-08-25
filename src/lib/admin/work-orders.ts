@@ -9,33 +9,48 @@ import {
   workOrderBoardSelect,
   workOrderBoardOrderBy,
   toWorkOrderBoardRow,
+  workOrderSearchWhere,
 } from "@/lib/admin/work-order-board";
 
 /**
- * One page of the work order board.
+ * One page of the work order board, optionally narrowed by a search term.
  *
- * getOrgAdminData() returns the first page along with everything else the
- * dashboard needs; this exists so the board can reach the rest. Previously it
- * reported hasMore without offering any way to act on it, which held once the
- * seeded data outgrew a single page.
+ * getOrgAdminData() returns the unfiltered first page along with everything
+ * else the dashboard needs, so the board renders instantly; this serves every
+ * other page, and every page once a search is active.
  *
- * No filtering here on purpose: the board searches within the loaded page on
- * the client, as it always has. Server-side search is a separate change.
+ * Search runs here rather than on the client now. Filtering the loaded page
+ * was fine while the board loaded one page and stopped, but with real paging
+ * it meant searching from page 2 for a row listed on page 1 reported \"not
+ * found\" — and nothing on screen distinguishes that from the record genuinely
+ * not existing.
+ *
+ * `total` and `hasMore` are counted against the same filter, so the pager
+ * describes the result set the user is actually looking at rather than the
+ * whole table.
  */
-export async function getWorkOrdersPage(page: number) {
+export async function getWorkOrdersPage(
+  page: number,
+  // Optional and positional so the existing getWorkOrdersPage(page) calls keep
+  // working untouched.
+  options?: { search?: string }
+) {
   await verifyOrgAdmin();
 
   const safePage = Math.max(1, Math.floor(page) || 1);
+  const search = options?.search?.trim() ?? "";
+  const where = workOrderSearchWhere(search);
 
   try {
     const [rows, total] = await Promise.all([
       prisma.workOrder.findMany({
+        where,
         select: workOrderBoardSelect,
         orderBy: workOrderBoardOrderBy,
         skip: (safePage - 1) * WORK_ORDER_PAGE_SIZE,
         take: WORK_ORDER_PAGE_SIZE,
       }),
-      prisma.workOrder.count(),
+      prisma.workOrder.count({ where }),
     ]);
 
     return {
@@ -44,6 +59,10 @@ export async function getWorkOrdersPage(page: number) {
       pageSize: WORK_ORDER_PAGE_SIZE,
       total,
       hasMore: safePage * WORK_ORDER_PAGE_SIZE < total,
+      // Echoed back so the board can tell whether the rows it just received
+      // answer the term currently in the box, or a slower earlier request that
+      // landed late.
+      search,
     };
   } catch (error) {
     console.error("Failed to load work orders page:", error);
@@ -53,6 +72,7 @@ export async function getWorkOrdersPage(page: number) {
       pageSize: WORK_ORDER_PAGE_SIZE,
       total: 0,
       hasMore: false,
+      search,
       error: "ไม่สามารถโหลดใบงานหน้านี้ได้",
     };
   }
