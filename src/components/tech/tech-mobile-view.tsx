@@ -35,6 +35,7 @@ import { CompletedJobsPanel } from "@/components/tech/completed-jobs-panel";
 import { QrScanModal } from "@/components/tech/qr-scan-modal";
 import { LogActionModal } from "@/components/tech/log-action-modal";
 import { ProfilePanel } from "@/components/shared/profile-panel";
+import { AcHistoryModal } from "@/components/admin/ac-history-modal";
 import type { TechJobItem, Building } from "@/components/tech/types";
 
 // Pulls in date-fns and its own markup — split out of the initial bundle
@@ -53,6 +54,7 @@ const MaintenanceCalendar = dynamic(
 
 interface TechMobileViewProps {
   user: {
+    id?: string;
     name?: string | null;
     email?: string | null;
     role?: string | null;
@@ -92,6 +94,10 @@ export function TechMobileView({
 
   // Action Logger Modal State
   const [selectedJobForLog, setSelectedJobForLog] = useState<TechJobItem | null>(null);
+
+  // History Modal State — opened from a card in the "ประวัติ" tab so a
+  // technician can correct a log they recorded wrong. Same modal admin uses.
+  const [historyAcId, setHistoryAcId] = useState<string | null>(null);
 
   // Scanning the QR sticker on the unit itself links here with ?ac=<acCode>
   // (see the QR page's "บันทึกงานซ่อมบำรุง" button) so the technician can go
@@ -311,6 +317,7 @@ export function TechMobileView({
           completedJobs={completedJobs}
           searchQuery={searchQuery}
           selectedBuilding={selectedBuilding}
+          onViewHistory={setHistoryAcId}
         />
       )}
 
@@ -351,6 +358,15 @@ export function TechMobileView({
         onSubmit={handleLogActionSubmit}
         onValidationError={(message) => toast.error(message)}
       />
+
+      {/* Modal: Maintenance History (view + edit own logs) */}
+      {historyAcId && (
+        <AcHistoryModal
+          airConditionerId={historyAcId}
+          currentUserId={user.id}
+          onClose={() => setHistoryAcId(null)}
+        />
+      )}
     </DashboardLayout>
   );
 }

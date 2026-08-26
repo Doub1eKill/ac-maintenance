@@ -722,6 +722,7 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
       {showHistoryFor && (
         <AcHistoryModal
           airConditionerId={showHistoryFor}
+          isAdmin
           onClose={() => setShowHistoryFor(null)}
         />
       )}

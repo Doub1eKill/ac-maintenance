@@ -9,20 +9,27 @@ import type { PendingUser } from "@/components/admin/types";
 
 interface AssignWorkOrderModalProps {
   open: boolean;
+  // Set when this is the bulk toolbar flow, so the title/button can say how
+  // many work orders are about to move rather than implying just one.
+  count?: number;
   activeTechnicians: PendingUser[];
   isPending: boolean;
   onClose: () => void;
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
 }
 
-export function AssignWorkOrderModal({ open, activeTechnicians, isPending, onClose, onSubmit }: AssignWorkOrderModalProps) {
+export function AssignWorkOrderModal({ open, count, activeTechnicians, isPending, onClose, onSubmit }: AssignWorkOrderModalProps) {
   if (!open) return null;
+
+  const isBulk = !!count && count > 1;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-xs p-4">
       <div className="w-full max-w-md rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-xl space-y-4 animate-in fade-in">
         <div className="flex items-center justify-between border-b border-border pb-3">
-          <h3 className="text-base font-bold text-foreground">มอบหมายงานให้ช่างเทคนิค</h3>
+          <h3 className="text-base font-bold text-foreground">
+            {isBulk ? `มอบหมาย ${count} ใบงานให้ช่างเทคนิค` : "มอบหมายงานให้ช่างเทคนิค"}
+          </h3>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X className="h-5 w-5" />
           </button>
@@ -58,7 +65,7 @@ export function AssignWorkOrderModal({ open, activeTechnicians, isPending, onClo
               disabled={isPending}
               className="w-1/2 rounded-xl bg-primary py-2.5 font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             >
-              {isPending ? "กำลังบันทึก..." : "ยืนยันการมอบหมาย"}
+              {isPending ? "กำลังบันทึก..." : isBulk ? `ยืนยันมอบหมาย ${count} ใบงาน` : "ยืนยันการมอบหมาย"}
             </button>
           </div>
         </form>

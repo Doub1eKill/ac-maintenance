@@ -24,6 +24,7 @@ export default async function TechHomePage() {
   return (
     <TechMobileView
       user={{
+        id: session.user.id,
         name: session.user.name,
         email: session.user.email,
         role: session.user.role,

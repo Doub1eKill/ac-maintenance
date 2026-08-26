@@ -17,11 +17,12 @@ interface CompletedJobsPanelProps {
   completedJobs: TechJobItem[];
   searchQuery: string;
   selectedBuilding: string;
+  onViewHistory?: (airConditionerId: string) => void;
 }
 
 const ITEMS_PER_PAGE = 10;
 
-export function CompletedJobsPanel({ completedJobs, searchQuery, selectedBuilding }: CompletedJobsPanelProps) {
+export function CompletedJobsPanel({ completedJobs, searchQuery, selectedBuilding, onViewHistory }: CompletedJobsPanelProps) {
   const [completedJobsPage, setCompletedJobsPage] = useState(1);
 
   useEffect(() => {
@@ -44,7 +45,11 @@ export function CompletedJobsPanel({ completedJobs, searchQuery, selectedBuildin
           </div>
         ) : (
           paginatedCompletedJobs.map((job) => (
-            <div key={job.id} className="biz-card p-5 space-y-4 hover:border-muted-foreground transition-all bg-muted">
+            <div
+              key={job.id}
+              onClick={() => job.airConditionerId && onViewHistory?.(job.airConditionerId)}
+              className="biz-card p-5 space-y-4 hover:border-muted-foreground transition-all bg-muted cursor-pointer"
+            >
               <div className="flex items-center justify-between opacity-80">
                 <div className="space-y-1">
                   <div className="text-sm font-bold text-muted-foreground leading-snug">{job.location}</div>

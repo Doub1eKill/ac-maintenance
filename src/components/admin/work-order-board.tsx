@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
-import { CheckCircle2, ClipboardList, Clock, Loader2, MoreVertical, Wrench } from "lucide-react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { Ban, CheckCircle2, ClipboardList, Clock, Loader2, Sparkles, Wrench } from "lucide-react";
 import {
   Pagination,
   PaginationContent,
@@ -21,15 +21,11 @@ interface WorkOrderBoardProps {
   onAssign: (workOrderId: string) => void;
 }
 
-function matchesSearch(wo: WorkOrderItem, search: string) {
-  if (!search.trim()) return true;
-  const s = search.toLowerCase();
-  return (
-    wo.acCode.toLowerCase().includes(s) ||
-    wo.brand.toLowerCase().includes(s) ||
-    wo.location.toLowerCase().includes(s) ||
-    (!!wo.claimedByName && wo.claimedByName.toLowerCase().includes(s))
-  );
+// Cache key combining page and search term — a search term change needs its
+// own set of pages, so keying by page alone would show one term's rows under
+// another's number.
+function pageCacheKey(page: number, search: string) {
+  return `${search}::${page}`;
 }
 
 function getWorkOrderRowClassName(wo: WorkOrderItem) {
@@ -54,47 +50,85 @@ function getWorkOrderRowClassName(wo: WorkOrderItem) {
 
 export function WorkOrderBoard({ workOrders, workOrderPage, globalSearch, onOpenDetails, onAssign }: WorkOrderBoardProps) {
   const [page, setPage] = useState(1);
-  // Page 1 always comes from the dashboard's own load (getOrgAdminData()) so
-  // it renders instantly; every other page is fetched on demand via
-  // getWorkOrdersPage() and cached here so flipping back doesn't refetch.
-  const [pagesLoaded, setPagesLoaded] = useState<Map<number, WorkOrderItem[]>>(() => new Map([[1, workOrders]]));
+  // Debounced so typing doesn't fire a query per keystroke — the board only
+  // searches once the user pauses for 300ms.
+  const [debouncedSearch, setDebouncedSearch] = useState(globalSearch.trim());
+  // Empty search + page 1 always comes from the dashboard's own load
+  // (getOrgAdminData()) so it renders instantly; every other page/search
+  // combination is fetched on demand via getWorkOrdersPage() and cached here,
+  // keyed by both so switching back to a term already searched doesn't refetch.
+  const [pagesLoaded, setPagesLoaded] = useState<Map<string, WorkOrderItem[]>>(new Map());
+  // total/hasMore for the active search — null means "not searching", so the
+  // board falls back to workOrderPage (the unfiltered count from the parent).
+  const [searchPageInfo, setSearchPageInfo] = useState<{ total: number; hasMore: boolean } | null>(null);
   const [isLoadingPage, startPageTransition] = useTransition();
   const [pageError, setPageError] = useState<string | null>(null);
+  // Guards against an older, slower request overwriting the total/error left
+  // by a newer one that already resolved — keyed rather than boolean because
+  // page and search can each change independently.
+  const latestRequestKeyRef = useRef<string | null>(null);
 
   // The dashboard revalidates and hands down a fresh `workOrders` array after
   // any action that changes a work order (assign, claim, complete, create).
   // Drop the cache and jump back to page 1 so the board never shows a stale
-  // status next to a freshly-mutated row on some other cached page.
+  // status next to a freshly-mutated row on some other cached page — the
+  // fetch effect below re-requests whatever page/search is current once the
+  // cache is empty.
   useEffect(() => {
-    setPagesLoaded(new Map([[1, workOrders]]));
+    setPagesLoaded(new Map());
+    setSearchPageInfo(null);
     setPage(1);
     setPageError(null);
   }, [workOrders]);
 
   useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(globalSearch.trim()), 300);
+    return () => clearTimeout(t);
+  }, [globalSearch]);
+
+  useEffect(() => {
     setPage(1);
   }, [globalSearch]);
 
-  const totalPages = Math.max(1, Math.ceil(workOrderPage.total / workOrderPage.pageSize));
-  const currentPageRows = pagesLoaded.get(page) ?? [];
-  const filteredWorkOrders = currentPageRows.filter((wo) => matchesSearch(wo, globalSearch));
+  useEffect(() => {
+    const key = pageCacheKey(page, debouncedSearch);
+    latestRequestKeyRef.current = key;
 
-  function goToPage(target: number) {
-    const clamped = Math.max(1, Math.min(totalPages, target));
-    if (clamped === page) return;
-    setPage(clamped);
+    // The dashboard's own first page covers this combination already.
+    if (debouncedSearch === "" && page === 1) {
+      setPageError(null);
+      return;
+    }
 
-    if (pagesLoaded.has(clamped)) return;
+    if (pagesLoaded.has(key)) return;
 
     setPageError(null);
     startPageTransition(async () => {
-      const result = await getWorkOrdersPage(clamped);
+      const result = await getWorkOrdersPage(page, { search: debouncedSearch });
+      // A newer page or search request landed and already updated the view —
+      // this response answers a question nobody's asking anymore.
+      if (latestRequestKeyRef.current !== key) return;
+
       if ("error" in result && result.error) {
         setPageError(result.error);
         return;
       }
-      setPagesLoaded((prev) => new Map(prev).set(clamped, result.workOrders));
+      setPagesLoaded((prev) => new Map(prev).set(key, result.workOrders));
+      setSearchPageInfo({ total: result.total, hasMore: result.hasMore });
     });
+  }, [page, debouncedSearch, pagesLoaded]);
+
+  const currentPageRows =
+    debouncedSearch === "" && page === 1
+      ? workOrders
+      : pagesLoaded.get(pageCacheKey(page, debouncedSearch)) ?? [];
+
+  const effectiveTotal = debouncedSearch === "" ? workOrderPage.total : searchPageInfo?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(effectiveTotal / workOrderPage.pageSize));
+
+  function goToPage(target: number) {
+    const clamped = Math.max(1, Math.min(totalPages, target));
+    setPage(clamped);
   }
 
   return (
@@ -104,13 +138,7 @@ export function WorkOrderBoard({ workOrders, workOrderPage, globalSearch, onOpen
           <ClipboardList className="h-5 w-5 text-primary" /> ระบบจัดการงานซ่อมบำรุง
         </h2>
         <div className="text-sm text-muted-foreground font-medium">
-          ทั้งหมด <span className="font-bold text-foreground">{workOrderPage.total}</span> รายการ
-          {globalSearch.trim() && (
-            <>
-              {" "}
-              · พบ <span className="font-bold text-foreground">{filteredWorkOrders.length}</span> รายการในหน้านี้
-            </>
-          )}
+          ทั้งหมด <span className="font-bold text-foreground">{effectiveTotal}</span> รายการ
         </div>
       </div>
 
@@ -121,6 +149,7 @@ export function WorkOrderBoard({ workOrders, workOrderPage, globalSearch, onOpen
               <tr>
                 <th className="px-6 py-4 whitespace-nowrap">รหัสแอร์</th>
                 <th className="px-6 py-4 whitespace-nowrap">สถานที่ตั้ง / ยี่ห้อ</th>
+                <th className="px-6 py-4 whitespace-nowrap">ประเภทงาน</th>
                 <th className="px-6 py-4 whitespace-nowrap">วันที่แจ้ง</th>
                 <th className="px-6 py-4 whitespace-nowrap">ผู้รับผิดชอบ</th>
                 <th className="px-6 py-4 whitespace-nowrap text-center">สถานะ</th>
@@ -130,24 +159,24 @@ export function WorkOrderBoard({ workOrders, workOrderPage, globalSearch, onOpen
             <tbody className="divide-y divide-border">
               {isLoadingPage ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-10 text-center text-muted-foreground">
+                  <td colSpan={7} className="px-6 py-10 text-center text-muted-foreground">
                     <Loader2 className="inline h-4 w-4 animate-spin mr-2" /> กำลังโหลดหน้า {page}...
                   </td>
                 </tr>
               ) : pageError ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-destructive">
+                  <td colSpan={7} className="px-6 py-8 text-center text-destructive">
                     {pageError}
                   </td>
                 </tr>
-              ) : filteredWorkOrders.length === 0 ? (
+              ) : currentPageRows.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">
+                  <td colSpan={7} className="px-6 py-8 text-center text-muted-foreground">
                     ไม่พบข้อมูลใบงาน
                   </td>
                 </tr>
               ) : (
-                filteredWorkOrders.map((wo) => (
+                currentPageRows.map((wo) => (
                   <tr
                     key={wo.id}
                     className={`hover:bg-muted transition-colors cursor-pointer ${getWorkOrderRowClassName(wo)}`}
@@ -161,6 +190,19 @@ export function WorkOrderBoard({ workOrders, workOrderPage, globalSearch, onOpen
                       <div className="text-xs text-muted-foreground">
                         {wo.brand} {wo.btu ? `(${wo.btu} BTU)` : ""}
                       </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {wo.type === "repair" ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-destructive/10 text-destructive border border-destructive/20">
+                          <Wrench className="h-3 w-3" />
+                          งานซ่อม
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-sky-500/10 text-sky-600 border border-sky-500/20">
+                          <Sparkles className="h-3 w-3" />
+                          งานล้างแอร์
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-muted-foreground">
                       {wo.createdAt ? new Date(wo.createdAt).toLocaleDateString("th-TH") : "-"}
@@ -196,6 +238,12 @@ export function WorkOrderBoard({ workOrders, workOrderPage, globalSearch, onOpen
                           เสร็จสิ้น
                         </span>
                       )}
+                      {wo.status === "cancelled" && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-muted text-muted-foreground border border-border">
+                          <Ban className="h-3 w-3" />
+                          ยกเลิกแล้ว
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
                       {wo.status === "pending" ? (
@@ -211,9 +259,9 @@ export function WorkOrderBoard({ workOrders, workOrderPage, globalSearch, onOpen
                       ) : (
                         <button
                           onClick={(e) => { e.stopPropagation(); onOpenDetails(wo); }}
-                          className="inline-flex items-center justify-center p-1.5 text-muted-foreground hover:text-muted-foreground rounded-lg hover:bg-secondary transition-colors"
+                          className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-bold text-foreground bg-secondary border border-border rounded-lg hover:bg-secondary/80 transition-colors"
                         >
-                          <MoreVertical className="w-4 h-4" />
+                          ดูรายละเอียด
                         </button>
                       )}
                     </td>

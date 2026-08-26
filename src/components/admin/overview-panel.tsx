@@ -40,7 +40,7 @@ interface OverviewPanelProps {
   workOrders: WorkOrderItem[];
   onViewDetails: (acCode: string) => void;
   onCreateWorkOrder: (acId: string) => void;
-  onAssignWorkOrder: (workOrderId: string) => void;
+  onBulkAssignWorkOrder: (workOrderIds: string[]) => void;
 }
 
 export function OverviewPanel({
@@ -51,7 +51,7 @@ export function OverviewPanel({
   workOrders,
   onViewDetails,
   onCreateWorkOrder,
-  onAssignWorkOrder,
+  onBulkAssignWorkOrder,
 }: OverviewPanelProps) {
   const combinedMaintenanceRows = useMemo((): MaintenanceRow[] => {
     const urgentIds = new Set(urgentUnits.map((u) => u.id));
@@ -123,7 +123,7 @@ export function OverviewPanel({
             data={combinedMaintenanceRows}
             onViewDetails={onViewDetails}
             onCreateWorkOrder={onCreateWorkOrder}
-            onAssignWorkOrder={onAssignWorkOrder}
+            onBulkAssignWorkOrder={onBulkAssignWorkOrder}
           />
         </div>
 

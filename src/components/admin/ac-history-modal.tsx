@@ -9,6 +9,12 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 interface AcHistoryModalProps {
   airConditionerId: string;
   onClose: () => void;
+  // Org admins can edit every entry; everyone else (technicians) only the
+  // ones they recorded themselves — updateMaintenanceLogAction enforces this
+  // server-side regardless, but showing "แก้ไข" on a log a technician can't
+  // actually save would just be a button that always errors.
+  currentUserId?: string;
+  isAdmin?: boolean;
 }
 
 interface HistoryUnit {
@@ -39,7 +45,7 @@ const ACTION_LABEL: Record<HistoryEntry["action"], string> = {
   refill_refrigerant: "เติมน้ำยาแอร์",
 };
 
-export function AcHistoryModal({ airConditionerId, onClose }: AcHistoryModalProps) {
+export function AcHistoryModal({ airConditionerId, onClose, currentUserId, isAdmin = false }: AcHistoryModalProps) {
   const [unit, setUnit] = useState<HistoryUnit | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -219,13 +225,15 @@ export function AcHistoryModal({ airConditionerId, onClose }: AcHistoryModalProp
                           <Wrench className="h-3.5 w-3.5 text-muted-foreground" />
                           {ACTION_LABEL[log.action]}
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => handleStartEdit(log)}
-                          className="inline-flex items-center gap-1 text-[10px] font-bold text-muted-foreground hover:text-foreground shrink-0"
-                        >
-                          <Pencil className="h-3 w-3" /> แก้ไข
-                        </button>
+                        {(isAdmin || log.technicianId === currentUserId) && (
+                          <button
+                            type="button"
+                            onClick={() => handleStartEdit(log)}
+                            className="inline-flex items-center gap-1 text-[10px] font-bold text-muted-foreground hover:text-foreground shrink-0"
+                          >
+                            <Pencil className="h-3 w-3" /> แก้ไข
+                          </button>
+                        )}
                       </div>
                       <div className="text-[11px] text-muted-foreground mb-2">
                         {new Date(log.performedAt).toLocaleString("th-TH")} • โดย {log.technicianName}

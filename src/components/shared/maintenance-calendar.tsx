@@ -55,10 +55,6 @@ interface Schedule {
   jobType: "repair" | "cleaning";
 }
 
-// Beyond this many jobs, a day cell lists buildings instead of individual
-// jobs — otherwise the cell overflows into an unreadable scroll of pills.
-const DAY_GROUP_THRESHOLD = 4;
-
 const JOB_TYPE_LABEL: Record<Schedule["jobType"], string> = {
   repair: "งานซ่อม",
   cleaning: "งานล้าง",
@@ -288,61 +284,32 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
             </div>
 
             <div className="mt-1 flex flex-col gap-1 overflow-y-auto flex-1 min-h-0 no-scrollbar">
-              {dayEvents.length > DAY_GROUP_THRESHOLD ? (
-                // Too many to list one-by-one in a day cell — group by
-                // building instead, drilling down to the job list on click.
-                Object.values(
-                  dayEvents.reduce<Record<string, { name: string; jobs: Schedule[] }>>((acc, job) => {
-                    (acc[job.buildingId] ??= { name: job.buildingName, jobs: [] }).jobs.push(job);
-                    return acc;
-                  }, {})
-                ).map((group) => (
-                  <div
-                    key={group.name}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedDayBuilding({ date: cloneDay, buildingName: group.name, jobs: group.jobs });
-                    }}
-                    className="cursor-pointer border px-1.5 py-1 rounded-md text-[10px] font-semibold flex items-center justify-between truncate transition-colors bg-primary/10 text-primary border-primary/20 hover:bg-primary/20"
-                  >
-                    <span className="truncate flex items-center gap-1" title={`${group.name} (${group.jobs.length} งาน)`}>
-                      <Building2 className="h-3 w-3 shrink-0" />
-                      {group.name} ({group.jobs.length})
-                    </span>
-                    <ChevronRight className="h-3 w-3 shrink-0 ml-1" />
-                  </div>
-                ))
-              ) : (
-                dayEvents.map((event) => {
-                  const status = getEventStatus(new Date(event.nextDueDate));
-                  let badgeClass = "bg-primary/10 text-primary border-primary/20 hover:bg-primary/20";
-                  if (status === "overdue") badgeClass = "bg-red-50 text-red-700 border-red-100 hover:bg-red-100";
-                  if (status === "warning") badgeClass = "bg-warning/10 text-warning-foreground border-warning/20 hover:bg-warning/20";
-
-                  return (
-                    <div
-                      key={event.id}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedEvent(event);
-                      }}
-                      className={`cursor-pointer border px-1.5 py-1 rounded-md text-[10px] font-semibold flex items-center justify-between truncate transition-colors ${badgeClass}`}
-                    >
-                      {/* Type first so it reads at a glance, then the unit code —
-                          a tech needs to know both what the job is and which
-                          machine. Narrow cells truncate the tail, so the full
-                          text is on the title attribute too. */}
-                      <span
-                        className="truncate"
-                        title={`${JOB_TYPE_LABEL[event.jobType]} - ${event.acCode}`}
-                      >
-                        {JOB_TYPE_LABEL[event.jobType]} - {event.acCode}
-                      </span>
-                      {status === "overdue" && <AlertTriangle className="h-3 w-3 shrink-0 ml-1" />}
-                    </div>
-                  );
-                })
-              )}
+              {/* Always grouped by building rather than only past some count
+                  — a day with a single job still shows as one building pill,
+                  which drills down to that job the same way a busier day
+                  does, so the cell layout never depends on the seed data
+                  underneath it. */}
+              {Object.values(
+                dayEvents.reduce<Record<string, { name: string; jobs: Schedule[] }>>((acc, job) => {
+                  (acc[job.buildingId] ??= { name: job.buildingName, jobs: [] }).jobs.push(job);
+                  return acc;
+                }, {})
+              ).map((group) => (
+                <div
+                  key={group.name}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedDayBuilding({ date: cloneDay, buildingName: group.name, jobs: group.jobs });
+                  }}
+                  className="cursor-pointer border px-1.5 py-1 rounded-md text-[10px] font-semibold flex items-center justify-between truncate transition-colors bg-primary/10 text-primary border-primary/20 hover:bg-primary/20"
+                >
+                  <span className="truncate flex items-center gap-1" title={`${group.name} (${group.jobs.length} งาน)`}>
+                    <Building2 className="h-3 w-3 shrink-0" />
+                    {group.name} ({group.jobs.length})
+                  </span>
+                  <ChevronRight className="h-3 w-3 shrink-0 ml-1" />
+                </div>
+              ))}
             </div>
           </div>
         );

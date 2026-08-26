@@ -5,6 +5,7 @@ export interface WorkOrderItem {
   btu: number | null;
   location: string;
   status: string;
+  type: "repair" | "cleaning";
   priority: string | null;
   issueDescription: string | null;
   resolutionNotes: string | null;

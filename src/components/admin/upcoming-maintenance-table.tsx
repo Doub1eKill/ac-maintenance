@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { toast } from "sonner";
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -29,12 +30,9 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ArrowUpDown, CalendarRange, ChevronDown, MoreHorizontal } from "lucide-react";
+import { ArrowUpDown, CalendarRange, ChevronDown, Copy, UserPlus } from "lucide-react";
 
 export interface UpcomingMaintenanceAC {
   id: string;
@@ -77,11 +75,15 @@ export const columns: ColumnDef<MaintenanceRow>[] = [
       />
     ),
     cell: ({ row }) => (
-      <Checkbox
-        checked={row.getIsSelected()}
-        onCheckedChange={(value) => row.toggleSelected(!!value)}
-        aria-label="Select row"
-      />
+      // Stops the row's own onClick (opens the detail view) from firing when
+      // the checkbox itself is what got clicked.
+      <div onClick={(e) => e.stopPropagation()}>
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          aria-label="Select row"
+        />
+      </div>
     ),
     enableSorting: false,
     enableHiding: false,
@@ -167,35 +169,44 @@ export const columns: ColumnDef<MaintenanceRow>[] = [
   {
     id: "actions",
     enableHiding: false,
+    // No more "..." menu: copying a code and viewing details are frequent
+    // enough to earn a direct control, and viewing details doubles as the
+    // row's own click target. Assigning a technician moved out of this
+    // per-row column entirely — it now works on whatever rows are ticked, via
+    // the toolbar button below the table.
     cell: ({ row, table }) => {
       const item = row.original;
       const meta = table.options.meta as any;
 
       return (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0">
-              <span className="sr-only">Open menu</span>
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>จัดการ</DropdownMenuLabel>
-            <DropdownMenuItem
-              onClick={() => navigator.clipboard.writeText(item.acCode)}
+        <div className="flex items-center justify-end gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            title="คัดลอกรหัสแอร์"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigator.clipboard.writeText(item.acCode);
+              toast.success(`คัดลอกรหัส ${item.acCode} แล้ว`);
+            }}
+          >
+            <Copy className="h-3.5 w-3.5" />
+          </Button>
+          {item.kind === "upcoming" && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs px-2"
+              onClick={(e) => {
+                e.stopPropagation();
+                meta?.onCreateWorkOrder?.(item.id);
+              }}
             >
-              คัดลอกรหัสแอร์
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => meta?.onViewDetails?.(item.acCode)}>ดูรายละเอียดเครื่อง</DropdownMenuItem>
-            {item.kind === "urgent" && item.pendingWorkOrderId ? (
-              <DropdownMenuItem onClick={() => meta?.onAssignWorkOrder?.(item.pendingWorkOrderId!)}>มอบหมายช่าง</DropdownMenuItem>
-            ) : null}
-            {item.kind === "upcoming" ? (
-              <DropdownMenuItem onClick={() => meta?.onCreateWorkOrder?.(item.id)}>สร้างใบงานล้างแอร์</DropdownMenuItem>
-            ) : null}
-          </DropdownMenuContent>
-        </DropdownMenu>
+              สร้างใบงานล้างแอร์
+            </Button>
+          )}
+        </div>
       );
     },
   },
@@ -205,14 +216,22 @@ interface UpcomingMaintenanceTableProps {
   data: MaintenanceRow[];
   onViewDetails?: (acCode: string) => void;
   onCreateWorkOrder?: (acId: string) => void;
-  onAssignWorkOrder?: (workOrderId: string) => void;
+  onBulkAssignWorkOrder?: (workOrderIds: string[]) => void;
 }
 
-export function UpcomingMaintenanceTable({ data, onViewDetails, onCreateWorkOrder, onAssignWorkOrder }: UpcomingMaintenanceTableProps) {
+export function UpcomingMaintenanceTable({ data, onViewDetails, onCreateWorkOrder, onBulkAssignWorkOrder }: UpcomingMaintenanceTableProps) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = React.useState({});
+
+  // The dashboard revalidates and hands down a fresh `data` array after a
+  // bulk assignment (or any other mutation) goes through. Clear ticked rows
+  // when that happens — row selection is keyed by array index, so leaving it
+  // alone would tick whatever rows happen to now sit at those same positions.
+  React.useEffect(() => {
+    setRowSelection({});
+  }, [data]);
 
   const table = useReactTable({
     data,
@@ -228,7 +247,6 @@ export function UpcomingMaintenanceTable({ data, onViewDetails, onCreateWorkOrde
     meta: {
       onViewDetails,
       onCreateWorkOrder,
-      onAssignWorkOrder,
     },
     state: {
       sorting,
@@ -240,6 +258,15 @@ export function UpcomingMaintenanceTable({ data, onViewDetails, onCreateWorkOrde
       pagination: {
         pageSize: 5,
       },
+    }
+  });
+
+  const selectedRows = table.getFilteredSelectedRowModel().rows;
+  const assignableWorkOrderIds: string[] = [];
+  selectedRows.forEach((row) => {
+    const item = row.original;
+    if (item.kind === "urgent" && item.pendingWorkOrderId) {
+      assignableWorkOrderIds.push(item.pendingWorkOrderId);
     }
   });
 
@@ -317,7 +344,8 @@ export function UpcomingMaintenanceTable({ data, onViewDetails, onCreateWorkOrde
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
-                  className="h-12"
+                  className="h-12 cursor-pointer hover:bg-muted/50"
+                  onClick={() => onViewDetails?.(row.original.acCode)}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id} className="px-4 py-2 whitespace-normal">
@@ -338,9 +366,28 @@ export function UpcomingMaintenanceTable({ data, onViewDetails, onCreateWorkOrde
       </div>
 
       <div className="flex items-center justify-between pt-2">
-        <div className="text-xs text-muted-foreground">
-          เลือกแล้ว {table.getFilteredSelectedRowModel().rows.length} จาก{" "}
-          {table.getFilteredRowModel().rows.length} รายการ
+        <div className="flex items-center gap-3">
+          <div className="text-xs text-muted-foreground">
+            เลือกแล้ว {selectedRows.length} จาก{" "}
+            {table.getFilteredRowModel().rows.length} รายการ
+          </div>
+          {selectedRows.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs px-2 gap-1.5"
+              disabled={assignableWorkOrderIds.length === 0}
+              title={
+                assignableWorkOrderIds.length === 0
+                  ? "แถวที่เลือกไม่มีใบงานค้างอยู่"
+                  : undefined
+              }
+              onClick={() => onBulkAssignWorkOrder?.(assignableWorkOrderIds)}
+            >
+              <UserPlus className="h-3.5 w-3.5" />
+              มอบหมายช่าง ({assignableWorkOrderIds.length})
+            </Button>
+          )}
         </div>
         {table.getPageCount() > 1 && (
           <div className="flex items-center space-x-2">

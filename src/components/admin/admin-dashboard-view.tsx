@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { createWorkOrderAction, updateUserStatusByOrgAdminAction, assignWorkOrderAction, cancelWorkOrderAction } from "@/app/admin/actions";
+import { createWorkOrderAction, updateUserStatusByOrgAdminAction, assignWorkOrderAction, bulkAssignWorkOrdersAction, cancelWorkOrderAction } from "@/app/admin/actions";
 import {
   Building2,
   Snowflake,
@@ -115,7 +115,10 @@ export function AdminDashboardView({
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedAcForWorkOrder, setSelectedAcForWorkOrder] = useState<string | null>(null);
-  const [selectedOrderToAssign, setSelectedOrderToAssign] = useState<string | null>(null);
+  // A single id for the per-row "จ่ายงาน" flow, or an array for the bulk
+  // toolbar button on the urgent-units table — handleAssignSubmit branches on
+  // which one it's holding.
+  const [selectedOrderToAssign, setSelectedOrderToAssign] = useState<string | string[] | null>(null);
   const [globalSearch, setGlobalSearch] = useState("");
   const [selectedWorkOrderDetails, setSelectedWorkOrderDetails] = useState<WorkOrderItem | null>(null);
 
@@ -154,15 +157,39 @@ export function AdminDashboardView({
     }
 
     startTransition(async () => {
-      const res = await assignWorkOrderAction(selectedOrderToAssign, assignToUserId);
-      if (res.error) {
-        toast.error(res.error);
+      if (Array.isArray(selectedOrderToAssign)) {
+        const res = await bulkAssignWorkOrdersAction(selectedOrderToAssign, assignToUserId);
+        if (res.error) {
+          toast.error(res.error);
+          return;
+        }
+        // "สำเร็จ" alone would hide that some rows were skipped — a ticked
+        // unit's job can get claimed by someone else between the tick and the
+        // submit, and the admin needs to know that happened, not just that
+        // the call returned.
+        const skippedCount = res.skippedCount ?? 0;
+        toast.success(
+          skippedCount > 0
+            ? `มอบหมาย ${res.assignedCount} ใบ · ข้าม ${skippedCount} ใบ (ถูกรับไปแล้ว)`
+            : `มอบหมายงานเรียบร้อยแล้ว ${res.assignedCount} ใบ`
+        );
       } else {
+        const res = await assignWorkOrderAction(selectedOrderToAssign, assignToUserId);
+        if (res.error) {
+          toast.error(res.error);
+          return;
+        }
         toast.success("มอบหมายงานเรียบร้อยแล้ว");
-        setShowAssignModal(false);
-        setSelectedOrderToAssign(null);
       }
+      setShowAssignModal(false);
+      setSelectedOrderToAssign(null);
     });
+  }
+
+  function handleBulkAssignWorkOrder(workOrderIds: string[]) {
+    if (workOrderIds.length === 0) return;
+    setSelectedOrderToAssign(workOrderIds);
+    setShowAssignModal(true);
   }
 
   function handleCancelWorkOrder(workOrderId: string, reason: string) {
@@ -303,10 +330,7 @@ export function AdminDashboardView({
             setGlobalSearch(acCode);
           }}
           onCreateWorkOrder={handleOpenCalendarWorkOrder}
-          onAssignWorkOrder={(workOrderId) => {
-            setSelectedOrderToAssign(workOrderId);
-            setShowAssignModal(true);
-          }}
+          onBulkAssignWorkOrder={handleBulkAssignWorkOrder}
         />
       )}
 
@@ -388,6 +412,7 @@ export function AdminDashboardView({
       {/* Modal: Assign Work Order */}
       <AssignWorkOrderModal
         open={showAssignModal}
+        count={Array.isArray(selectedOrderToAssign) ? selectedOrderToAssign.length : undefined}
         activeTechnicians={activeTechnicians}
         isPending={isPending}
         onClose={() => setShowAssignModal(false)}
