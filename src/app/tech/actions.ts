@@ -109,6 +109,12 @@ export async function getTechnicianData() {
       }),
     ]);
 
+    // Building broken out alongside the combined `location` string on all
+    // three job lists, so the "group by building" UI can key on the building
+    // itself instead of substring-matching the formatted location (which is
+    // what filterJobs has to do today). `location` is unchanged, so every
+    // existing caller keeps working. The building rows are already loaded by
+    // the queries above, so this costs no extra round trip.
     const jobPool = pendingOrdersRaw.map((wo) => ({
       id: wo.id.toString(),
       acCode: wo.airConditioner.acCode,
@@ -117,6 +123,8 @@ export async function getTechnicianData() {
       status: wo.airConditioner.status,
       priority: wo.priority,
       location: formatAcLocation(wo.airConditioner.room),
+      buildingId: wo.airConditioner.room.building.id.toString(),
+      buildingName: wo.airConditioner.room.building.name,
       createdAt: wo.createdAt ? wo.createdAt.toISOString() : null,
     }));
 
@@ -129,6 +137,8 @@ export async function getTechnicianData() {
       status: wo.airConditioner.status,
       priority: wo.priority,
       location: formatAcLocation(wo.airConditioner.room),
+      buildingId: wo.airConditioner.room.building.id.toString(),
+      buildingName: wo.airConditioner.room.building.name,
       claimedAt: wo.claimedAt ? wo.claimedAt.toISOString() : null,
     }));
 
@@ -141,6 +151,8 @@ export async function getTechnicianData() {
       status: wo.airConditioner.status,
       priority: wo.priority,
       location: formatAcLocation(wo.airConditioner.room),
+      buildingId: wo.airConditioner.room.building.id.toString(),
+      buildingName: wo.airConditioner.room.building.name,
       completedAt: wo.completedAt ? wo.completedAt.toISOString() : null,
     }));
 

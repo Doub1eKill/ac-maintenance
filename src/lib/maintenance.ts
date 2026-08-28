@@ -268,8 +268,12 @@ export interface TechnicianAssetUnit {
   status: string;
   location: string;
   // Split out of `location`, which is assembled for display — sorting needs the
-  // building on its own, and a grouped layout would need it too.
+  // building on its own, and a grouped layout needs the room and floor too.
+  // `location` itself is unchanged, so existing callers are unaffected.
+  buildingId: string;
   buildingName: string;
+  roomName: string;
+  floor: number | null;
   lastCleanedAt: string | null;
   isOverdue: boolean;
   pendingWorkOrder: {
@@ -311,7 +315,7 @@ export async function getTechnicianAssetList(): Promise<{
       acBrand: { select: { name: true } },
       acModel: { select: { name: true, defaultBtu: true } },
       room: {
-        select: { name: true, floor: true, building: { select: { name: true } } },
+        select: { name: true, floor: true, building: { select: { id: true, name: true } } },
       },
       maintenanceLogs: {
         orderBy: { performedAt: "desc" },
@@ -337,7 +341,10 @@ export async function getTechnicianAssetList(): Promise<{
       btu: u.btu ?? u.acModel?.defaultBtu ?? null,
       status: u.status,
       location: `${u.room.building.name} - ห้อง ${u.room.name}`,
+      buildingId: u.room.building.id.toString(),
       buildingName: u.room.building.name,
+      roomName: u.room.name,
+      floor: u.room.floor,
       lastCleanedAt: lastCleanedAt ? lastCleanedAt.toISOString() : null,
       isOverdue: !!pendingWorkOrder,
       pendingWorkOrder: pendingWorkOrder
@@ -363,10 +370,18 @@ export async function getTechnicianAssetList(): Promise<{
   });
   shaped.sort((a, b) => compareJobOrder(orderKey(a), orderKey(b)));
 
+  // Counted from the work order's own `type`, not from the unit's status. The
+  // two disagree far more often than they look like they would: a unit can be
+  // `broken` and still have a *cleaning* job open, and a unit sitting at
+  // `normal` can have a job open as well. Counting by status therefore filed
+  // those cleaning jobs under "repair" and dropped the `normal` ones from both
+  // cards, so the totals never matched the number of open jobs and a
+  // per-building breakdown could never add up to these numbers. `type` has been
+  // on work_orders since 20260825160000 and is what the board already shows.
   const summary: TechnicianAssetSummary = {
     total: shaped.length,
-    cleaningJobs: shaped.filter((u) => u.pendingWorkOrder && u.status === "needs_cleaning").length,
-    repairJobs: shaped.filter((u) => u.pendingWorkOrder && u.status === "broken").length,
+    cleaningJobs: shaped.filter((u) => u.pendingWorkOrder?.type === "cleaning").length,
+    repairJobs: shaped.filter((u) => u.pendingWorkOrder?.type === "repair").length,
   };
 
   return { units: shaped, summary };
