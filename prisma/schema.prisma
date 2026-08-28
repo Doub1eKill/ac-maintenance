@@ -115,6 +115,11 @@ model AcBrand {
   name      String    @unique(map: "ac_brands_name_unique") @db.VarChar(255)
   createdAt DateTime? @map("created_at") @db.Timestamp(0)
   updatedAt DateTime? @map("updated_at") @db.Timestamp(0)
+  // Soft delete, same as air_conditioners.deleted_at: a unit that still uses a
+  // retired brand keeps showing its name and its history stays readable. Note
+  // the name stays in ac_brands_name_unique while it sits in the trash, so
+  // re-creating a deleted brand is a restore, not an insert.
+  deletedAt DateTime? @map("deleted_at") @db.Timestamp(0)
 
   models          AcModel[]
   airConditioners AirConditioner[]
@@ -129,6 +134,11 @@ model AcModel {
   defaultBtu Int?      @map("default_btu") @db.UnsignedInt
   createdAt  DateTime? @map("created_at") @db.Timestamp(0)
   updatedAt  DateTime? @map("updated_at") @db.Timestamp(0)
+  // Soft delete. Independent of the brand's own deleted_at: deleting a brand
+  // does not stamp its models, the selection queries just filter on both. That
+  // way restoring a brand brings back exactly the models that were still live
+  // when it was retired, instead of resurrecting ones deleted before it.
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamp(0)
 
   brand           AcBrand          @relation(fields: [brandId], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "ac_models_brand_id_foreign")
   airConditioners AirConditioner[]

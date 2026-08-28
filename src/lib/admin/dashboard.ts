@@ -107,11 +107,19 @@ export async function getOrgAdminData() {
         // Only performedAt is used (to bucket the weekly activity chart).
         select: { performedAt: true },
       }),
+      // Feeds the register-AC form's brand/model dropdowns, so retired entries
+      // are filtered out at both levels: a deleted brand disappears with its
+      // models, and a brand that is still live drops just the models that were
+      // retired under it. Display paths elsewhere read the brand off the unit
+      // itself and are deliberately left alone — a unit already on a retired
+      // model must keep showing its name.
       prisma.acBrand.findMany({
+        where: { deletedAt: null },
         select: {
           id: true,
           name: true,
           models: {
+            where: { deletedAt: null },
             select: { id: true, name: true, defaultBtu: true },
             orderBy: { name: 'asc' },
           },

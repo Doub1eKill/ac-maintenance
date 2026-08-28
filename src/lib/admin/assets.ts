@@ -181,8 +181,12 @@ export async function createAirConditionerAction(formData: FormData) {
     };
     
     if (data.brandType === "master") {
-      const model = await prisma.acModel.findUnique({
-        where: { id: BigInt(data.acModelId!) }
+      // findFirst rather than findUnique: a retired model — or one whose brand
+      // was retired — is still a row with that id, and accepting it here would
+      // put a new unit onto a model the catalogue no longer offers. It reads
+      // back as "not found", which is what it is as far as the form goes.
+      const model = await prisma.acModel.findFirst({
+        where: { id: BigInt(data.acModelId!), deletedAt: null, brand: { deletedAt: null } }
       });
       if (!model) return { error: "ไม่พบรุ่นแอร์ที่เลือก" };
       
@@ -319,8 +323,10 @@ export async function updateAirConditionerAction(formData: FormData) {
     const brandFields =
       data.brandType === "master"
         ? await (async () => {
-            const model = await prisma.acModel.findUnique({
-              where: { id: BigInt(data.acModelId!) },
+            // Retired models filtered out here too, for the reason given in
+            // createAirConditionerAction.
+            const model = await prisma.acModel.findFirst({
+              where: { id: BigInt(data.acModelId!), deletedAt: null, brand: { deletedAt: null } },
               select: { id: true, brandId: true },
             });
             if (!model) return null;
