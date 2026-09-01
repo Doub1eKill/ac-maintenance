@@ -15,6 +15,60 @@
 | **3** | **แบ่งตามอาคาร 5 หน้า** | ใหญ่สุด | รอ field | ✅ **แก้แล้ว 1 ก.ย.** |
 | **4** | ปุ่มลบ/กู้คืน + ถังขยะ ยี่ห้อ-รุ่นแอร์ | กลาง | รอ action | ✅ **แก้แล้ว 1 ก.ย. (เฟส 1)** |
 
+---
+
+# 📤 คำขอฝั่ง Backend ใหม่ — ถึง DoubleKill (1 ก.ย. 2026, Esther03u)
+
+## ข้อ 4 เฟส 2 — กระจายสัญลักษณ์ยี่ห้อ/รุ่นที่ถูกลบไปทุกเครื่องที่ใช้อยู่
+
+**สถานะ:** ตรวจโค้ดแล้ว ทุกจุดที่ต้องแก้เป็นไฟล์ backend ล้วน (`src/lib/**`, `src/app/**/actions.ts`, `src/app/api/**` และ query ตรงใน `src/app/qr/[id]/page.tsx`) ตามกฎที่ตกลงกันไว้ ฝั่ง UI แตะไม่ได้ **จึงขอเป็น backend request แทนที่จะทำเอง**
+
+**เป้าหมาย (ตัดสินไว้แล้วตั้งแต่ 28 ส.ค.):** ทุกเครื่องที่ยังใช้ยี่ห้อ/รุ่นที่ถูกลบ (soft delete) อยู่ ต้องมีสัญลักษณ์บอกให้รู้ ไม่ใช่แค่ตอนอยู่ในหน้า Master Data เท่านั้น
+
+### grep เจอครบตามที่ HANDOFF เดิมบอกไว้ — ยืนยันจุดที่ต้องแก้ทั้งหมด
+
+```
+src/lib/admin/assets.ts:423        (getAirConditionerHistory — โมดัลแก้ไข/ประวัติเครื่อง)
+src/lib/admin/dashboard.ts:204     (urgentUnits — การ์ด "รอซ่อมด่วน" หน้าภาพรวม + กระดานใบงาน)
+src/lib/admin/dashboard.ts:233     (buildings prop — ระบบสินทรัพย์ + จัดการ QR Code)
+src/lib/admin/work-order-board.ts:78  (WorkOrderItem — กระดานใบงาน)
+src/lib/maintenance.ts:339         (TechnicianAssetUnit — หน้าช่าง "แอร์ทั้งหมด")
+src/app/api/admin/maintenance-schedules/route.ts:90  (ปฏิทินซ่อมบำรุง)
+src/app/qr/[id]/page.tsx:101       (หน้า QR สแกนสาธารณะ ไม่ต้อง login)
+src/app/tech/actions.ts:121        (jobPool — หน้าช่าง "งานทั้งหมด")
+src/app/tech/actions.ts:134        (myJobs — หน้าช่าง "งานของฉัน")
+src/app/tech/actions.ts:148        (completedJobs — หน้าช่าง "ประวัติ")
+src/app/tech/actions.ts:519        (scanQrCodeAction — ผลสแกน QR ในแอป)
+```
+
+ทุกจุดใช้แพทเทิร์นเดียวกันหมด (`ac.acBrand?.name || ac.brand || "ไม่ระบุ"` หรือ `??` แทน `||` บางจุด) คืนแค่สตริงชื่อล้วน ไม่มีที่ให้บอกว่ายี่ห้อ/รุ่นนั้นอยู่ในถังขยะหรือเปล่า
+
+### field ที่ขอ — ตั้งชื่อตามแบบที่ `getAcTrashData()` ใช้อยู่แล้ว จะได้ไม่ต้องคิดชื่อใหม่
+
+เพิ่ม 2 field คู่กับทุกจุดที่ resolve ชื่อยี่ห้อ/รุ่นจาก `acBrand`/`acModel`:
+
+```typescript
+brandDeleted: boolean   // ac.acBrand?.deletedAt != null
+modelDeleted: boolean   // ac.acModel?.deletedAt != null
+```
+
+ทั้งสอง field คำนวณจาก `deletedAt` ของ relation ที่ query มาอยู่แล้วในทุกจุด (เพราะต้อง select `acBrand`/`acModel` เพื่อเอา `.name` อยู่แล้ว) แค่เพิ่ม `deletedAt: true` ใน `select` ของ `acBrand`/`acModel` แต่ละจุด แล้ว map ออกมาเป็น boolean — **ไม่ต้อง query เพิ่ม ไม่มี round trip เพิ่ม** เหมือนก้อน A ของงาน 28 ส.ค.
+
+**จุดที่ต้อง unit ไม่มี `acBrand`/`acModel` เลย (ใช้ยี่ห้อ/รุ่นแบบพิมพ์เองตอนลงทะเบียน ไม่ใช่จากรายการหลัก)** — ให้ `brandDeleted`/`modelDeleted` เป็น `false` ไปเลย เพราะไม่มียี่ห้อ/รุ่นในถังขยะให้ตรงกับข้อความอิสระอยู่แล้ว
+
+### ฝั่ง UI จะทำอะไรกับ field นี้ (เผื่อช่วยตัดสินใจตอนออกแบบ shape)
+
+แผนคือไอคอนเตือนเล็กๆ (`AlertTriangle` หรือ `Info`, ใช้โทน `text-warning`) ต่อท้ายชื่อยี่ห้อ/รุ่นตรงจุดที่มันโชว์อยู่แล้ว พร้อม `title` tooltip ทำนอง *"ยี่ห้อนี้ถูกลบออกจากรายการหลักแล้ว (เครื่องนี้ยังใช้งานได้ปกติ)"* — ไม่ใช่ badge ใหญ่ ไม่ใช่สีแดงเตือนภัย เพราะเครื่องยังทำงานปกติทุกอย่าง แค่แจ้งให้รู้เฉยๆ ว่ายี่ห้อ/รุ่นนี้เลิกอยู่ในรายการหลักแล้ว
+
+### ทำไมถึงใหญ่กว่าข้อ 1-4 รวมกัน (ทั้งสองฝั่ง)
+
+- **ฝั่ง backend:** 7 ไฟล์ 11 จุด (มากกว่า field เดี่ยวๆ ของข้อ 3 หลายเท่า)
+- **ฝั่ง UI (รอหลัง backend เสร็จ):** ต้องแก้ตรงกับจำนวนไฟล์ใกล้เคียงกัน เพราะทุกจุดที่ backend เพิ่ม field คือจุดที่ UI ต้องเพิ่มไอคอนด้วย — asset-manager.tsx, overview-panel.tsx (การ์ดรอซ่อมด่วน), work-order-board.tsx, assets-panel.tsx (ช่าง), maintenance-calendar.tsx, qr/[id]/page.tsx (หน้า public), job-pool/my-jobs/completed-jobs-panel.tsx (ช่าง)
+
+**ไม่บล็อกใคร** — ตามที่ตกลงไว้ 28 ส.ค. ว่าเลื่อนเฟส 2 ไว้ก่อน เพิ่ม request นี้ไว้เผื่อเป็นคิวถัดไป ไม่ได้เร่งให้ทำตอนนี้
+
+---
+
 ## ⚠️ อ่านก่อนเริ่ม — หลัง `git pull` ต้องทำ 3 อย่าง ไม่งั้นหน้า `/admin` จะพัง
 
 ```bash
