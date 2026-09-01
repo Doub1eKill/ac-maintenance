@@ -9,7 +9,8 @@ import {
   workOrderBoardSelect,
   workOrderBoardOrderBy,
   toWorkOrderBoardRow,
-  workOrderSearchWhere,
+  workOrderBoardWhere,
+  type WorkOrderBoardStatusFilter,
 } from "@/lib/admin/work-order-board";
 
 /**
@@ -33,13 +34,13 @@ export async function getWorkOrdersPage(
   page: number,
   // Optional and positional so the existing getWorkOrdersPage(page) calls keep
   // working untouched.
-  options?: { search?: string }
+  options?: { search?: string; status?: WorkOrderBoardStatusFilter; buildingId?: string }
 ) {
   await verifyOrgAdmin();
 
   const safePage = Math.max(1, Math.floor(page) || 1);
   const search = options?.search?.trim() ?? "";
-  const where = workOrderSearchWhere(search);
+  const where = workOrderBoardWhere({ search, status: options?.status, buildingId: options?.buildingId });
 
   try {
     const [rows, total] = await Promise.all([

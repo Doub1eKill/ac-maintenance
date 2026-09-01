@@ -11,21 +11,33 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { getWorkOrdersPage } from "@/app/admin/actions";
-import type { WorkOrderItem, WorkOrderPageInfo } from "@/components/admin/types";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import type { WorkOrderItem, WorkOrderPageInfo, BuildingItem } from "@/components/admin/types";
 
 interface WorkOrderBoardProps {
   workOrders: WorkOrderItem[];
   workOrderPage: WorkOrderPageInfo;
+  buildings: BuildingItem[];
   globalSearch: string;
   onOpenDetails: (workOrder: WorkOrderItem) => void;
   onAssign: (workOrderId: string) => void;
 }
 
-// Cache key combining page and search term — a search term change needs its
-// own set of pages, so keying by page alone would show one term's rows under
-// another's number.
-function pageCacheKey(page: number, search: string) {
-  return `${search}::${page}`;
+type StatusFilter = "" | "pending" | "claimed" | "completed" | "cancelled";
+
+const STATUS_FILTER_OPTIONS: Array<{ value: StatusFilter; label: string }> = [
+  { value: "", label: "ทุกสถานะ" },
+  { value: "pending", label: "รอดำเนินการ" },
+  { value: "claimed", label: "กำลังดำเนินการ" },
+  { value: "completed", label: "เสร็จสิ้น" },
+  { value: "cancelled", label: "ยกเลิกแล้ว" },
+];
+
+// Cache key combining page, search term and the two filters — any one of
+// them changing needs its own set of pages, so keying by page alone would
+// show one combination's rows under another's number.
+function pageCacheKey(page: number, search: string, status: StatusFilter, buildingId: string) {
+  return `${search}::${status}::${buildingId}::${page}`;
 }
 
 function getWorkOrderRowClassName(wo: WorkOrderItem) {
@@ -48,8 +60,10 @@ function getWorkOrderRowClassName(wo: WorkOrderItem) {
   return `${tintClass} ${fadeClass}`.trim();
 }
 
-export function WorkOrderBoard({ workOrders, workOrderPage, globalSearch, onOpenDetails, onAssign }: WorkOrderBoardProps) {
+export function WorkOrderBoard({ workOrders, workOrderPage, buildings, globalSearch, onOpenDetails, onAssign }: WorkOrderBoardProps) {
   const [page, setPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("");
+  const [buildingFilter, setBuildingFilter] = useState("");
   // Debounced so typing doesn't fire a query per keystroke — the board only
   // searches once the user pauses for 300ms.
   const [debouncedSearch, setDebouncedSearch] = useState(globalSearch.trim());
@@ -88,14 +102,19 @@ export function WorkOrderBoard({ workOrders, workOrderPage, globalSearch, onOpen
 
   useEffect(() => {
     setPage(1);
-  }, [globalSearch]);
+  }, [globalSearch, statusFilter, buildingFilter]);
+
+  // Whether any filter narrows the result away from the dashboard's own
+  // unfiltered first page — once true, page 1 has to be fetched like any
+  // other page instead of reusing the `workOrders` prop.
+  const isFiltered = debouncedSearch !== "" || statusFilter !== "" || buildingFilter !== "";
 
   useEffect(() => {
-    const key = pageCacheKey(page, debouncedSearch);
+    const key = pageCacheKey(page, debouncedSearch, statusFilter, buildingFilter);
     latestRequestKeyRef.current = key;
 
     // The dashboard's own first page covers this combination already.
-    if (debouncedSearch === "" && page === 1) {
+    if (!isFiltered && page === 1) {
       setPageError(null);
       return;
     }
@@ -104,7 +123,11 @@ export function WorkOrderBoard({ workOrders, workOrderPage, globalSearch, onOpen
 
     setPageError(null);
     startPageTransition(async () => {
-      const result = await getWorkOrdersPage(page, { search: debouncedSearch });
+      const result = await getWorkOrdersPage(page, {
+        search: debouncedSearch,
+        status: statusFilter || undefined,
+        buildingId: buildingFilter || undefined,
+      });
       // A newer page or search request landed and already updated the view —
       // this response answers a question nobody's asking anymore.
       if (latestRequestKeyRef.current !== key) return;
@@ -116,14 +139,14 @@ export function WorkOrderBoard({ workOrders, workOrderPage, globalSearch, onOpen
       setPagesLoaded((prev) => new Map(prev).set(key, result.workOrders));
       setSearchPageInfo({ total: result.total, hasMore: result.hasMore });
     });
-  }, [page, debouncedSearch, pagesLoaded]);
+  }, [page, debouncedSearch, statusFilter, buildingFilter, pagesLoaded, isFiltered]);
 
   const currentPageRows =
-    debouncedSearch === "" && page === 1
+    !isFiltered && page === 1
       ? workOrders
-      : pagesLoaded.get(pageCacheKey(page, debouncedSearch)) ?? [];
+      : pagesLoaded.get(pageCacheKey(page, debouncedSearch, statusFilter, buildingFilter)) ?? [];
 
-  const effectiveTotal = debouncedSearch === "" ? workOrderPage.total : searchPageInfo?.total ?? 0;
+  const effectiveTotal = !isFiltered ? workOrderPage.total : searchPageInfo?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(effectiveTotal / workOrderPage.pageSize));
 
   function goToPage(target: number) {
@@ -142,18 +165,48 @@ export function WorkOrderBoard({ workOrders, workOrderPage, globalSearch, onOpen
         </div>
       </div>
 
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="w-full sm:w-48">
+          <NativeSelect
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+            aria-label="กรองตามสถานะ"
+          >
+            {STATUS_FILTER_OPTIONS.map((opt) => (
+              <NativeSelectOption key={opt.value} value={opt.value}>
+                {opt.label}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+        </div>
+        <div className="w-full sm:w-56">
+          <NativeSelect
+            value={buildingFilter}
+            onChange={(e) => setBuildingFilter(e.target.value)}
+            aria-label="กรองตามอาคาร"
+          >
+            <NativeSelectOption value="">ทุกอาคาร</NativeSelectOption>
+            {buildings.map((b) => (
+              <NativeSelectOption key={b.id} value={b.id}>
+                {b.name} ({b.abbreviation})
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+        </div>
+      </div>
+
       <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="bg-muted border-b border-border text-muted-foreground font-semibold">
               <tr>
-                <th className="px-6 py-4 whitespace-nowrap">รหัสแอร์</th>
-                <th className="px-6 py-4 whitespace-nowrap">สถานที่ตั้ง / ยี่ห้อ</th>
-                <th className="px-6 py-4 whitespace-nowrap">ประเภทงาน</th>
-                <th className="px-6 py-4 whitespace-nowrap">วันที่แจ้ง</th>
-                <th className="px-6 py-4 whitespace-nowrap">ผู้รับผิดชอบ</th>
-                <th className="px-6 py-4 whitespace-nowrap text-center">สถานะ</th>
-                <th className="px-6 py-4 whitespace-nowrap text-right">จัดการ</th>
+                <th className="px-4 py-3 whitespace-nowrap">รหัสแอร์</th>
+                <th className="px-4 py-3">สถานที่ตั้ง / ยี่ห้อ</th>
+                <th className="px-4 py-3 whitespace-nowrap">ประเภทงาน</th>
+                <th className="px-4 py-3 whitespace-nowrap">วันที่แจ้ง</th>
+                <th className="px-4 py-3 whitespace-nowrap">ผู้รับผิดชอบ</th>
+                <th className="px-4 py-3 whitespace-nowrap text-center">สถานะ</th>
+                <th className="px-4 py-3 whitespace-nowrap text-right">จัดการ</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -182,16 +235,16 @@ export function WorkOrderBoard({ workOrders, workOrderPage, globalSearch, onOpen
                     className={`hover:bg-muted transition-colors cursor-pointer ${getWorkOrderRowClassName(wo)}`}
                     onClick={() => onOpenDetails(wo)}
                   >
-                    <td className="px-6 py-4 whitespace-nowrap font-mono font-bold text-base text-foreground">
+                    <td className="px-4 py-3 whitespace-nowrap font-mono font-bold text-base text-foreground">
                       {wo.acCode}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-3 max-w-[190px]">
                       <div className="font-medium text-foreground">{wo.location}</div>
                       <div className="text-xs text-muted-foreground">
                         {wo.brand} {wo.btu ? `(${wo.btu} BTU)` : ""}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-3 whitespace-nowrap">
                       {wo.type === "repair" ? (
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-destructive/10 text-destructive border border-destructive/20">
                           <Wrench className="h-3 w-3" />
@@ -204,13 +257,13 @@ export function WorkOrderBoard({ workOrders, workOrderPage, globalSearch, onOpen
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-muted-foreground">
+                    <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
                       {wo.createdAt ? new Date(wo.createdAt).toLocaleDateString("th-TH") : "-"}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-3 whitespace-nowrap">
                       {wo.claimedByName ? (
                         <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-accent flex items-center justify-center text-[10px] font-bold text-muted-foreground">
+                          <div className="w-6 h-6 rounded-full bg-accent flex items-center justify-center text-[10px] font-bold text-muted-foreground shrink-0">
                             {wo.claimedByName.charAt(0)}
                           </div>
                           <span className="font-medium text-foreground">{wo.claimedByName}</span>
@@ -219,7 +272,7 @@ export function WorkOrderBoard({ workOrders, workOrderPage, globalSearch, onOpen
                         <span className="text-muted-foreground italic">-</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                    <td className="px-4 py-3 whitespace-nowrap text-center">
                       {wo.status === "pending" && (
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-warning/20 text-warning-foreground border border-warning/30">
                           <Clock className="h-3 w-3" />
@@ -245,7 +298,7 @@ export function WorkOrderBoard({ workOrders, workOrderPage, globalSearch, onOpen
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                    <td className="px-4 py-3 whitespace-nowrap text-right">
                       {wo.status === "pending" ? (
                         <button
                           onClick={(e) => {

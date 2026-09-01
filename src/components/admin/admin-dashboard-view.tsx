@@ -350,6 +350,7 @@ export function AdminDashboardView({
         <WorkOrderBoard
           workOrders={workOrders}
           workOrderPage={workOrderPage}
+          buildings={buildings}
           globalSearch={globalSearch}
           onOpenDetails={setSelectedWorkOrderDetails}
           onAssign={(workOrderId) => {

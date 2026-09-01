@@ -136,3 +136,29 @@ export function workOrderSearchWhere(search: string): Prisma.WorkOrderWhereInput
     ],
   };
 }
+
+export type WorkOrderBoardStatusFilter = "pending" | "claimed" | "completed" | "cancelled";
+
+// Combines the search box with the board's status/building filters into one
+// where clause. Kept separate from workOrderSearchWhere so callers that only
+// need the search half (there are none left, but the split is cheap to keep)
+// aren't forced to reason about the other two.
+export function workOrderBoardWhere(params: {
+  search?: string;
+  status?: WorkOrderBoardStatusFilter;
+  buildingId?: string;
+}): Prisma.WorkOrderWhereInput | undefined {
+  const clauses: Prisma.WorkOrderWhereInput[] = [];
+
+  const searchWhere = workOrderSearchWhere(params.search ?? "");
+  if (searchWhere) clauses.push(searchWhere);
+
+  if (params.status) clauses.push({ status: params.status });
+
+  if (params.buildingId) {
+    clauses.push({ airConditioner: { room: { building: { id: BigInt(params.buildingId) } } } });
+  }
+
+  if (clauses.length === 0) return undefined;
+  return clauses.length === 1 ? clauses[0] : { AND: clauses };
+}
