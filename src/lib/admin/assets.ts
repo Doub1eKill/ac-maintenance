@@ -8,8 +8,15 @@ import { getDefaultMaintenanceFrequency } from "@/lib/organisation";
 import { verifyOrgAdmin } from "@/lib/auth-guards";
 
 const buildingSchema = z.object({
-  name: z.string().min(1, "กรุณาระบุชื่ออาคาร"),
-  abbreviation: z.string().min(1, "กรุณาระบุตัวย่ออาคาร"),
+  name: z
+    .string()
+    .trim()
+    .min(1, "กรุณาระบุชื่ออาคาร")
+    // A name that's only digits (e.g. "20") reads as an abbreviation, not a
+    // name -- once combined with the real abbreviation for display it comes
+    // out as a confusing "20 (20)" instead of a place someone can recognize.
+    .refine((v) => !/^\d+$/.test(v), 'ชื่ออาคารต้องไม่เป็นตัวเลขล้วน กรุณาระบุชื่อจริง เช่น "อาคารเรียนรวม"'),
+  abbreviation: z.string().trim().min(1, "กรุณาระบุตัวย่ออาคาร"),
 });
 
 export async function createBuildingAction(formData: FormData) {
