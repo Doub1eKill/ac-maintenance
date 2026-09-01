@@ -9,6 +9,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { ConfirmActionDialog } from "@/components/ui/thai-alert-dialogs";
 import type { PendingUser } from "@/components/admin/types";
 
 interface UserApprovalsPanelProps {
@@ -23,6 +24,13 @@ const ITEMS_PER_PAGE = 10;
 
 export function UserApprovalsPanel({ pendingUsers, globalSearch, universityName, isPending, onUserStatus }: UserApprovalsPanelProps) {
   const [approvalsPage, setApprovalsPage] = useState(1);
+  const [rejectTarget, setRejectTarget] = useState<PendingUser | null>(null);
+
+  function handleConfirmReject() {
+    if (!rejectTarget) return;
+    onUserStatus(rejectTarget.id, "suspended");
+    setRejectTarget(null);
+  }
 
   useEffect(() => {
     setApprovalsPage(1);
@@ -82,7 +90,7 @@ export function UserApprovalsPanel({ pendingUsers, globalSearch, universityName,
                       อนุมัติ
                     </button>
                     <button
-                      onClick={() => onUserStatus(u.id, "suspended")}
+                      onClick={() => setRejectTarget(u)}
                       disabled={isPending}
                       className="rounded-lg bg-red-600 px-3 py-1.5 font-bold text-white hover:bg-red-700 transition-colors disabled:opacity-50 inline-flex items-center gap-1"
                     >
@@ -123,6 +131,20 @@ export function UserApprovalsPanel({ pendingUsers, globalSearch, universityName,
           )}
         </div>
       )}
+
+      <ConfirmActionDialog
+        isOpen={rejectTarget !== null}
+        onOpenChange={(open) => !open && setRejectTarget(null)}
+        title="ยืนยันการปฏิเสธคำขอ"
+        description={
+          rejectTarget
+            ? `ต้องการปฏิเสธคำขอลงทะเบียนของ ${rejectTarget.name} หรือไม่? ผู้ใช้จะไม่สามารถเข้าสู่ระบบได้`
+            : ""
+        }
+        confirmText="ปฏิเสธคำขอ"
+        onConfirm={handleConfirmReject}
+        isProcessing={isPending}
+      />
     </div>
   );
 }

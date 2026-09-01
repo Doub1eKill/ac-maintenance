@@ -57,6 +57,7 @@ function ChunkLoadingFallback() {
 
 interface AdminDashboardViewProps {
   user: {
+    id?: string | null;
     name?: string | null;
     email?: string | null;
     role?: string | null;
@@ -376,6 +377,7 @@ export function AdminDashboardView({
           globalSearch={globalSearch}
           isPending={isPending}
           onUserStatus={handleUserStatus}
+          currentUserId={user.id}
         />
       )}
 

@@ -13,6 +13,10 @@ export async function updateUserStatusByOrgAdminAction(
 ) {
   const session = await verifyOrgAdmin();
 
+  if (newStatus === "suspended" && targetUserId === session.user.id) {
+    return { error: "ระงับสิทธิ์บัญชีตัวเองไม่ได้" };
+  }
+
   try {
     const targetUser = await prisma.user.findUnique({
       where: { id: BigInt(targetUserId) },

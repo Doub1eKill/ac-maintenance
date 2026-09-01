@@ -19,14 +19,22 @@ interface TeamPanelProps {
   globalSearch: string;
   isPending: boolean;
   onUserStatus: (userId: string, status: "active" | "suspended") => void;
+  currentUserId?: string | null;
 }
 
 const ITEMS_PER_PAGE = 10;
 
-export function TeamPanel({ allUsers, globalSearch, isPending, onUserStatus }: TeamPanelProps) {
+export function TeamPanel({ allUsers, globalSearch, isPending, onUserStatus, currentUserId }: TeamPanelProps) {
   const [teamPage, setTeamPage] = useState(1);
   const [resetTarget, setResetTarget] = useState<PendingUser | null>(null);
+  const [suspendTarget, setSuspendTarget] = useState<PendingUser | null>(null);
   const [isResetting, startResetTransition] = useTransition();
+
+  function handleConfirmSuspend() {
+    if (!suspendTarget) return;
+    onUserStatus(suspendTarget.id, "suspended");
+    setSuspendTarget(null);
+  }
 
   function handleConfirmReset() {
     if (!resetTarget) return;
@@ -97,8 +105,9 @@ export function TeamPanel({ allUsers, globalSearch, isPending, onUserStatus }: T
                 <td className="py-3.5 px-4 text-right space-x-2">
                   {u.status === "active" ? (
                     <button
-                      onClick={() => onUserStatus(u.id, "suspended")}
-                      disabled={isPending}
+                      onClick={() => setSuspendTarget(u)}
+                      disabled={isPending || u.id === currentUserId}
+                      title={u.id === currentUserId ? "ระงับสิทธิ์บัญชีตัวเองไม่ได้" : undefined}
                       className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-700 hover:bg-red-100 transition-colors disabled:opacity-40"
                     >
                       ระงับสิทธิ์
@@ -164,6 +173,20 @@ export function TeamPanel({ allUsers, globalSearch, isPending, onUserStatus }: T
         confirmText="รีเซ็ตรหัสผ่าน"
         onConfirm={handleConfirmReset}
         isProcessing={isResetting}
+      />
+
+      <ConfirmActionDialog
+        isOpen={suspendTarget !== null}
+        onOpenChange={(open) => !open && setSuspendTarget(null)}
+        title="ยืนยันการระงับสิทธิ์"
+        description={
+          suspendTarget
+            ? `ต้องการระงับสิทธิ์เข้าใช้งานของ ${suspendTarget.name} หรือไม่? ผู้ใช้จะไม่สามารถเข้าสู่ระบบได้จนกว่าจะเปิดใช้งานอีกครั้ง`
+            : ""
+        }
+        confirmText="ระงับสิทธิ์"
+        onConfirm={handleConfirmSuspend}
+        isProcessing={isPending}
       />
     </div>
   );
