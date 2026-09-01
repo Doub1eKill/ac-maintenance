@@ -237,7 +237,11 @@ model WorkOrder {
   claimedBy        BigInt?         @map("claimed_by") @db.UnsignedBigInt
   claimedAt        DateTime?       @map("claimed_at") @db.Timestamp(0) // separate from updatedAt, which gets overwritten again on completion
   completedAt      DateTime?       @map("completed_at") @db.Timestamp(0)
-  createdAt        DateTime?       @map("created_at") @db.Timestamp(0)
+  // Was nullable with no default, so every caller had to remember to set it
+  // themselves -- none did, leaving every existing row NULL and "วันที่แจ้ง"
+  // blank across the board and detail dialog. A DB-level default closes that
+  // off structurally instead of relying on each call site.
+  createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt        DateTime?       @map("updated_at") @db.Timestamp(0)
 
   // RESTRICT: semi-transactional table, never cascade.
