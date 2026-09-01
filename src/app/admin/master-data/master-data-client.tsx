@@ -2,8 +2,10 @@
 
 import { useState, useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { createAcBrandAction, createAcModelAction } from "./actions";
-import { Plus, Check, ChevronDown, ChevronRight, Wind } from "lucide-react";
+import { toast } from "sonner";
+import { createAcBrandAction, createAcModelAction, deleteAcBrandAction, deleteAcModelAction } from "./actions";
+import { Plus, Check, ChevronDown, ChevronRight, Wind, Trash2 } from "lucide-react";
+import { TrashModal } from "./trash-modal";
 
 export type ModelType = {
   id: string;
@@ -22,13 +24,22 @@ export type BrandType = {
 
 export function MasterDataClient({ initialBrands }: { initialBrands: BrandType[] }) {
   const [expandedBrand, setExpandedBrand] = useState<string | null>(null);
+  const [showTrash, setShowTrash] = useState(false);
 
   return (
     <div className="space-y-6">
       <AddBrandCard />
 
       <div className="space-y-4">
-        <h4 className="text-lg font-bold text-foreground">รายชื่อยี่ห้อและรุ่นแอร์</h4>
+        <div className="flex items-center justify-between gap-4">
+          <h4 className="text-lg font-bold text-foreground">รายชื่อยี่ห้อและรุ่นแอร์</h4>
+          <button
+            onClick={() => setShowTrash(true)}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-card px-3.5 py-2 text-xs font-bold text-foreground hover:bg-muted transition-colors"
+          >
+            <Trash2 className="h-3.5 w-3.5" /> ถังขยะ
+          </button>
+        </div>
         {initialBrands.length === 0 ? (
           <div className="text-center p-8 border border-dashed border-border rounded-xl text-muted-foreground bg-card">
             ยังไม่มีข้อมูลยี่ห้อแอร์ในระบบ
@@ -46,6 +57,8 @@ export function MasterDataClient({ initialBrands }: { initialBrands: BrandType[]
           </div>
         )}
       </div>
+
+      {showTrash && <TrashModal onClose={() => setShowTrash(false)} />}
     </div>
   );
 }
@@ -113,6 +126,8 @@ function BrandItem({ brand, isExpanded, onToggle }: { brand: BrandType, isExpand
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [confirmDeleteModelId, setConfirmDeleteModelId] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
   const handleAddModel = (e: React.FormEvent<HTMLFormElement>) => {
@@ -132,6 +147,32 @@ function BrandItem({ brand, isExpanded, onToggle }: { brand: BrandType, isExpand
     });
   };
 
+  function handleDeleteBrand() {
+    startTransition(async () => {
+      const result = await deleteAcBrandAction(brand.id);
+      setShowDeleteConfirm(false);
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        toast.success(`ย้ายยี่ห้อ "${brand.name}" ไปถังขยะแล้ว กู้คืนได้จากถังขยะ`);
+        router.refresh();
+      }
+    });
+  }
+
+  function handleDeleteModel(model: ModelType) {
+    startTransition(async () => {
+      const result = await deleteAcModelAction(model.id);
+      setConfirmDeleteModelId(null);
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        toast.success(`ย้ายรุ่น "${model.name}" ไปถังขยะแล้ว`);
+        router.refresh();
+      }
+    });
+  }
+
   return (
     <div className="biz-card overflow-hidden bg-card border border-border shadow-sm rounded-2xl transition-all duration-200">
       <div
@@ -149,18 +190,84 @@ function BrandItem({ brand, isExpanded, onToggle }: { brand: BrandType, isExpand
             </p>
           </div>
         </div>
-        <div className="text-muted-foreground">
-          {isExpanded ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+        <div className="flex items-center gap-1">
+          <button
+            onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm(true); }}
+            title="ลบยี่ห้อนี้ลงถังขยะ"
+            className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+          <div className="text-muted-foreground p-2">
+            {isExpanded ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+          </div>
         </div>
       </div>
+
+      {showDeleteConfirm && (
+        <div className="px-4 pb-4 pt-0 border-t border-border bg-destructive/5 flex items-center justify-between gap-3 py-3" onClick={(e) => e.stopPropagation()}>
+          <p className="text-xs font-bold text-destructive">
+            ย้าย &quot;{brand.name}&quot; ไปถังขยะ? (กู้คืนได้ภายหลัง)
+          </p>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setShowDeleteConfirm(false)}
+              disabled={isPending}
+              className="rounded-lg border border-border bg-card px-3 py-1.5 text-[11px] font-bold text-foreground hover:bg-muted transition-colors"
+            >
+              ยกเลิก
+            </button>
+            <button
+              onClick={handleDeleteBrand}
+              disabled={isPending}
+              className="rounded-lg bg-destructive px-3 py-1.5 text-[11px] font-bold text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50 transition-colors"
+            >
+              {isPending ? "กำลังลบ..." : "ยืนยันลบ"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {isExpanded && (
         <div className="px-4 pb-4 pt-0 border-t border-border bg-muted/50">
           <div className="mt-4 mb-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
             {brand.models.map(model => (
-              <div key={model.id} className="bg-card border border-border rounded-lg p-2.5 text-sm flex justify-between items-center">
-                <span className="font-bold text-foreground">{model.name}</span>
-                {model.defaultBtu && <span className="text-xs font-bold text-muted-foreground bg-muted px-2 py-0.5 rounded-md border border-border">{model.defaultBtu.toLocaleString()} BTU</span>}
+              <div key={model.id} className="bg-card border border-border rounded-lg p-2.5 text-sm">
+                {confirmDeleteModelId === model.id ? (
+                  <div className="space-y-2">
+                    <p className="text-[11px] font-bold text-destructive">ลบ &quot;{model.name}&quot; ลงถังขยะ?</p>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => setConfirmDeleteModelId(null)}
+                        disabled={isPending}
+                        className="flex-1 rounded-md border border-border bg-card px-2 py-1 text-[10px] font-bold text-foreground hover:bg-muted transition-colors"
+                      >
+                        ยกเลิก
+                      </button>
+                      <button
+                        onClick={() => handleDeleteModel(model)}
+                        disabled={isPending}
+                        className="flex-1 rounded-md bg-destructive px-2 py-1 text-[10px] font-bold text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50 transition-colors"
+                      >
+                        ยืนยัน
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-foreground">{model.name}</span>
+                    <div className="flex items-center gap-1.5">
+                      {model.defaultBtu && <span className="text-xs font-bold text-muted-foreground bg-muted px-2 py-0.5 rounded-md border border-border">{model.defaultBtu.toLocaleString()} BTU</span>}
+                      <button
+                        onClick={() => setConfirmDeleteModelId(model.id)}
+                        title="ลบรุ่นนี้ลงถังขยะ"
+                        className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
             {brand.models.length === 0 && (
