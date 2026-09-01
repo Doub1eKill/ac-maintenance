@@ -301,13 +301,17 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
                     e.stopPropagation();
                     setSelectedDayBuilding({ date: cloneDay, buildingName: group.name, jobs: group.jobs });
                   }}
-                  className="cursor-pointer border px-1.5 py-1 rounded-md text-[10px] font-semibold flex items-center justify-between truncate transition-colors bg-primary/10 text-primary border-primary/20 hover:bg-primary/20"
+                  className="cursor-pointer border px-1.5 py-1 rounded-md text-[10px] font-semibold flex items-start justify-between gap-1 transition-colors bg-primary/10 text-primary border-primary/20 hover:bg-primary/20"
                 >
-                  <span className="truncate flex items-center gap-1" title={`${group.name} (${group.jobs.length} งาน)`}>
-                    <Building2 className="h-3 w-3 shrink-0" />
-                    {group.name} ({group.jobs.length})
+                  {/* No truncate — building names that share a long common
+                      prefix (e.g. two "Administration Building ######" seed
+                      rows) become visually identical once cut with an
+                      ellipsis, so this wraps to a second line instead. */}
+                  <span className="min-w-0 flex items-start gap-1">
+                    <Building2 className="h-3 w-3 shrink-0 mt-px" />
+                    <span>{group.name} ({group.jobs.length})</span>
                   </span>
-                  <ChevronRight className="h-3 w-3 shrink-0 ml-1" />
+                  <ChevronRight className="h-3 w-3 shrink-0 ml-1 mt-px" />
                 </div>
               ))}
             </div>
