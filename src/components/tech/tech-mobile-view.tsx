@@ -125,6 +125,11 @@ export function TechMobileView({
         btu: res.acDetails.btu,
         status: res.acDetails.status,
         location: res.acDetails.location,
+        // scanQrCodeAction doesn't return building id/name — this synthetic
+        // job object only ever feeds the log-action modal, which doesn't
+        // group by building, so empty placeholders are harmless here.
+        buildingId: "",
+        buildingName: "",
         airConditionerId: res.acDetails.id,
       });
     });

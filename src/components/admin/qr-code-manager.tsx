@@ -2,14 +2,8 @@
 
 import { useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { QrCode, Printer, X, Search, ChevronRight, CheckSquare } from "lucide-react";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
+import { QrCode, Printer, X, CheckSquare } from "lucide-react";
+import { BuildingGroupList, groupByBuilding, type BuildingGroup } from "@/components/shared/building-groups";
 
 interface ACUnit {
   id: string;
@@ -43,6 +37,7 @@ interface BuildingItem {
 
 interface FlatACUnit extends ACUnit {
   location: string;
+  buildingId: string;
   buildingName: string;
   roomName: string;
 }
@@ -54,9 +49,7 @@ interface QrCodeManagerProps {
 
 export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
   const [showQrCode, setShowQrCode] = useState<FlatACUnit | null>(null);
-  const [page, setPage] = useState(1);
   const [selectedAcs, setSelectedAcs] = useState<string[]>([]);
-  const ITEMS_PER_PAGE = 15;
 
   // Flatten ACs
   const allAcs: FlatACUnit[] = buildings.flatMap((b) =>
@@ -64,6 +57,7 @@ export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
       r.acUnits.map((ac) => ({
         ...ac,
         location: `${b.name} - ห้อง ${r.name}`,
+        buildingId: b.id,
         buildingName: b.name,
         roomName: r.name,
       }))
@@ -83,22 +77,21 @@ export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
     );
   });
 
-  const totalPages = Math.ceil(filteredAcs.length / ITEMS_PER_PAGE);
-  const paginatedAcs = filteredAcs.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+  const groups = groupByBuilding(filteredAcs);
 
-  const toggleSelectAll = () => {
-    const paginatedIds = paginatedAcs.map(ac => ac.id);
-    const allSelected = paginatedIds.every(id => selectedAcs.includes(id));
-    
+  const toggleSelectAllInGroup = (group: BuildingGroup<FlatACUnit>) => {
+    const ids = group.items.map((ac) => ac.id);
+    const allSelected = ids.every((id) => selectedAcs.includes(id));
+
     if (allSelected) {
-      setSelectedAcs(prev => prev.filter(id => !paginatedIds.includes(id)));
+      setSelectedAcs((prev) => prev.filter((id) => !ids.includes(id)));
     } else {
-      setSelectedAcs(prev => Array.from(new Set([...prev, ...paginatedIds])));
+      setSelectedAcs((prev) => Array.from(new Set([...prev, ...ids])));
     }
   };
 
   const toggleSelect = (id: string) => {
-    setSelectedAcs(prev => 
+    setSelectedAcs(prev =>
       prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
     );
   };
@@ -107,14 +100,14 @@ export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
     const html = document.getElementById("batch-print-area")?.innerHTML;
-    
+
     printWindow.document.write(`
       <html>
         <head>
           <title>พิมพ์ QR Code (${selectedAcs.length} เครื่อง)</title>
           <style>
-            body { 
-              margin: 0; 
+            body {
+              margin: 0;
               padding: 0;
               font-family: sans-serif;
             }
@@ -193,13 +186,13 @@ export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <button 
+            <button
               onClick={() => setSelectedAcs([])}
               className="text-xs font-bold text-primary hover:text-primary px-3 py-2 rounded-lg hover:bg-primary/20 transition-colors"
             >
               ยกเลิกทั้งหมด
             </button>
-            <button 
+            <button
               onClick={handleBatchPrint}
               className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-xl text-sm font-bold shadow-md shadow-primary/20 hover:bg-primary/90 transition-colors"
             >
@@ -217,104 +210,84 @@ export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
           </h2>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm whitespace-nowrap">
-            <thead className="bg-muted text-muted-foreground font-bold border-b border-border">
-              <tr>
-                <th className="px-4 py-3 font-semibold rounded-tl-xl w-10 text-center">
-                  <input 
-                    type="checkbox" 
-                    className="w-4 h-4 rounded border-border text-primary focus:ring-ring cursor-pointer"
-                    checked={paginatedAcs.length > 0 && paginatedAcs.every(ac => selectedAcs.includes(ac.id))}
-                    onChange={toggleSelectAll}
-                  />
-                </th>
-                <th className="px-4 py-3 font-semibold">รหัสเครื่อง (AC Code)</th>
-                <th className="px-4 py-3 font-semibold">ยี่ห้อ / รุ่น</th>
-                <th className="px-4 py-3 font-semibold">สถานที่ตั้ง</th>
-                <th className="px-4 py-3 font-semibold text-center rounded-tr-xl">จัดการ</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {paginatedAcs.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
-                    ไม่พบข้อมูลเครื่องปรับอากาศ
-                  </td>
-                </tr>
-              ) : (
-                paginatedAcs.map((ac) => (
-                  <tr 
-                    key={ac.id} 
-                    className={`transition-colors cursor-pointer ${selectedAcs.includes(ac.id) ? 'bg-primary/10' : 'hover:bg-muted'}`}
-                    onClick={() => toggleSelect(ac.id)}
-                  >
-                    <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
-                      <input 
-                        type="checkbox" 
+        <BuildingGroupList
+          groups={groups}
+          getSubtitle={(g) => `${g.items.length} เครื่อง`}
+          emptyMessage="ไม่พบข้อมูลเครื่องปรับอากาศ"
+          resetKey={globalSearch}
+          renderExtra={(group) => (
+            <label
+              className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <input
+                type="checkbox"
+                className="w-3.5 h-3.5 rounded border-border text-primary focus:ring-ring cursor-pointer"
+                checked={group.items.length > 0 && group.items.every((ac) => selectedAcs.includes(ac.id))}
+                onChange={() => toggleSelectAllInGroup(group)}
+              />
+              เลือกทั้งอาคาร
+            </label>
+          )}
+          renderItems={(group) => (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm whitespace-nowrap">
+                <thead className="bg-muted text-muted-foreground font-bold border-b border-border">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold rounded-tl-xl w-10 text-center">
+                      <input
+                        type="checkbox"
                         className="w-4 h-4 rounded border-border text-primary focus:ring-ring cursor-pointer"
-                        checked={selectedAcs.includes(ac.id)}
-                        onChange={() => toggleSelect(ac.id)}
+                        checked={group.items.length > 0 && group.items.every((ac) => selectedAcs.includes(ac.id))}
+                        onChange={() => toggleSelectAllInGroup(group)}
                       />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="font-mono font-bold text-foreground">{ac.acCode}</div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-foreground">{ac.brand}</div>
-                      <div className="text-xs text-muted-foreground">{ac.model || "-"}</div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="text-foreground">{ac.location}</div>
-                    </td>
-                    <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        onClick={() => setShowQrCode(ac)}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-secondary px-3 py-1.5 text-xs font-bold text-foreground hover:bg-accent transition-colors"
-                      >
-                        <Printer className="h-3.5 w-3.5" /> ดูตัวอย่าง
-                      </button>
-                    </td>
+                    </th>
+                    <th className="px-4 py-3 font-semibold">รหัสเครื่อง (AC Code)</th>
+                    <th className="px-4 py-3 font-semibold">ยี่ห้อ / รุ่น</th>
+                    <th className="px-4 py-3 font-semibold">ห้อง</th>
+                    <th className="px-4 py-3 font-semibold text-center rounded-tr-xl">จัดการ</th>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {totalPages > 1 && (
-          <div className="py-4 border-t border-border mt-4">
-            <Pagination>
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setPage((p) => Math.max(1, p - 1));
-                    }}
-                    className={page === 1 ? "pointer-events-none opacity-50" : ""}
-                  />
-                </PaginationItem>
-                <PaginationItem>
-                  <span className="text-xs font-medium text-muted-foreground px-4">
-                    หน้า {page} จาก {totalPages}
-                  </span>
-                </PaginationItem>
-                <PaginationItem>
-                  <PaginationNext
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setPage((p) => Math.min(totalPages, p + 1));
-                    }}
-                    className={page === totalPages ? "pointer-events-none opacity-50" : ""}
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
-          </div>
-        )}
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {group.items.map((ac) => (
+                    <tr
+                      key={ac.id}
+                      className={`transition-colors cursor-pointer ${selectedAcs.includes(ac.id) ? 'bg-primary/10' : 'hover:bg-muted'}`}
+                      onClick={() => toggleSelect(ac.id)}
+                    >
+                      <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          className="w-4 h-4 rounded border-border text-primary focus:ring-ring cursor-pointer"
+                          checked={selectedAcs.includes(ac.id)}
+                          onChange={() => toggleSelect(ac.id)}
+                        />
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="font-mono font-bold text-foreground">{ac.acCode}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-foreground">{ac.brand}</div>
+                        <div className="text-xs text-muted-foreground">{ac.model || "-"}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="text-foreground">{ac.roomName}</div>
+                      </td>
+                      <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={() => setShowQrCode(ac)}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-secondary px-3 py-1.5 text-xs font-bold text-foreground hover:bg-accent transition-colors"
+                        >
+                          <Printer className="h-3.5 w-3.5" /> ดูตัวอย่าง
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        />
 
         {/* Hidden Container for Batch Print Data */}
         <div id="batch-print-area" className="hidden">

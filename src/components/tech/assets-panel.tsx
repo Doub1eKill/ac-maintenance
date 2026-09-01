@@ -1,15 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { Clock, Droplets, Snowflake, Wrench } from "lucide-react";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
+import { BuildingGroupList, groupByBuilding } from "@/components/shared/building-groups";
 import type { TechnicianAssetUnit, TechnicianAssetSummary } from "@/lib/maintenance";
 import { filterJobs } from "@/components/tech/types";
 
@@ -20,18 +13,9 @@ interface AssetsPanelProps {
   selectedBuilding: string;
 }
 
-const ITEMS_PER_PAGE = 10;
-
 export function AssetsPanel({ assetList, assetSummary, searchQuery, selectedBuilding }: AssetsPanelProps) {
-  const [assetsPage, setAssetsPage] = useState(1);
-
-  useEffect(() => {
-    setAssetsPage(1);
-  }, [searchQuery, selectedBuilding]);
-
   const filteredAssets = filterJobs(assetList, searchQuery, selectedBuilding);
-  const totalAssetsPages = Math.ceil(filteredAssets.length / ITEMS_PER_PAGE);
-  const paginatedAssets = filteredAssets.slice((assetsPage - 1) * ITEMS_PER_PAGE, assetsPage * ITEMS_PER_PAGE);
+  const groups = groupByBuilding(filteredAssets);
 
   return (
     <div className="animate-in fade-in">
@@ -57,74 +41,71 @@ export function AssetsPanel({ assetList, assetSummary, searchQuery, selectedBuil
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filteredAssets.length === 0 ? (
-            <div className="col-span-full py-12 text-center text-xs text-muted-foreground border border-dashed border-border rounded-2xl">
-              ไม่มีเครื่องปรับอากาศในระบบ
-            </div>
-          ) : (
-            paginatedAssets.map((unit) => (
-              <div key={unit.id} className="biz-card p-5 space-y-4 hover:border-muted-foreground transition-all relative overflow-hidden">
-                {unit.isOverdue && (
-                  <div
-                    className={`absolute top-0 right-0 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1 shadow-sm ${
-                      unit.status === "broken" ? "bg-red-500" : "bg-amber-500"
-                    }`}
-                  >
-                    <Clock className="w-3 h-3" /> {unit.status === "broken" ? "รอซ่อม" : "รอล้าง"}
-                  </div>
+        <BuildingGroupList
+          groups={groups}
+          getSubtitle={(g) => {
+            const floors = new Set(g.items.map((u) => u.floor ?? 0)).size;
+            const rooms = new Set(g.items.map((u) => u.roomName)).size;
+            return `${floors} ชั้น • ${rooms} ห้อง • ${g.items.length} แอร์`;
+          }}
+          emptyMessage="ไม่มีเครื่องปรับอากาศในระบบ"
+          resetKey={`${searchQuery}|${selectedBuilding}`}
+          renderExtra={(group) => {
+            const repairCount = group.items.filter((u) => u.pendingWorkOrder?.type === "repair").length;
+            const cleaningCount = group.items.filter((u) => u.pendingWorkOrder?.type === "cleaning").length;
+            if (repairCount === 0 && cleaningCount === 0) return null;
+            return (
+              <div className="hidden sm:flex items-center gap-1.5 text-[10px] font-bold">
+                {repairCount > 0 && (
+                  <span className="inline-flex items-center gap-1 rounded-md bg-destructive/10 text-destructive px-1.5 py-0.5">
+                    <Wrench className="h-3 w-3" /> {repairCount}
+                  </span>
                 )}
-                <div className="pr-8 space-y-1">
-                  <div className="text-sm font-bold text-foreground leading-snug">{unit.location}</div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs font-bold text-muted-foreground">{unit.acCode}</span>
-                    <span className="rounded-md bg-secondary px-2 py-0.5 text-[10px] font-bold text-foreground">
-                      {unit.brand} {unit.btu ? `(${unit.btu} BTU)` : ""}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="pt-2 flex items-center justify-between text-xs border-t border-border">
-                  <div className="flex flex-col">
-                    <span className="text-[11px] font-bold text-muted-foreground">ล้างล่าสุด</span>
-                    <span className="text-[10px] text-muted-foreground mt-1">
-                      {unit.lastCleanedAt ? format(new Date(unit.lastCleanedAt), "dd/MM/yyyy") : "ยังไม่เคยล้าง"}
-                    </span>
-                  </div>
-                </div>
+                {cleaningCount > 0 && (
+                  <span className="inline-flex items-center gap-1 rounded-md bg-warning/10 text-warning-foreground px-1.5 py-0.5">
+                    <Droplets className="h-3 w-3" /> {cleaningCount}
+                  </span>
+                )}
               </div>
-            ))
-          )}
-        </div>
-      </div>
+            );
+          }}
+          renderItems={(group) => (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {group.items.map((unit) => (
+                <div key={unit.id} className="biz-card p-5 space-y-4 hover:border-muted-foreground transition-all relative overflow-hidden">
+                  {unit.isOverdue && (
+                    <div
+                      className={`absolute top-0 right-0 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1 shadow-sm ${
+                        unit.status === "broken" ? "bg-red-500" : "bg-amber-500"
+                      }`}
+                    >
+                      <Clock className="w-3 h-3" /> {unit.status === "broken" ? "รอซ่อม" : "รอล้าง"}
+                    </div>
+                  )}
+                  <div className="pr-8 space-y-1">
+                    <div className="text-sm font-bold text-foreground leading-snug">{unit.location}</div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs font-bold text-muted-foreground">{unit.acCode}</span>
+                      <span className="rounded-md bg-secondary px-2 py-0.5 text-[10px] font-bold text-foreground">
+                        {unit.brand} {unit.btu ? `(${unit.btu} BTU)` : ""}
+                      </span>
+                    </div>
+                  </div>
 
-      {totalAssetsPages > 1 && (
-        <div className="py-4 mt-2">
-          <Pagination>
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  href="#"
-                  onClick={(e) => { e.preventDefault(); setAssetsPage((p) => Math.max(1, p - 1)); }}
-                  className={assetsPage === 1 ? "pointer-events-none opacity-50" : ""}
-                />
-              </PaginationItem>
-              <PaginationItem>
-                <span className="text-xs font-medium text-muted-foreground px-4">
-                  หน้า {assetsPage} จาก {totalAssetsPages}
-                </span>
-              </PaginationItem>
-              <PaginationItem>
-                <PaginationNext
-                  href="#"
-                  onClick={(e) => { e.preventDefault(); setAssetsPage((p) => Math.min(totalAssetsPages, p + 1)); }}
-                  className={assetsPage === totalAssetsPages ? "pointer-events-none opacity-50" : ""}
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        </div>
-      )}
+                  <div className="pt-2 flex items-center justify-between text-xs border-t border-border">
+                    <div className="flex flex-col">
+                      <span className="text-[11px] font-bold text-muted-foreground">ล้างล่าสุด</span>
+                      <span className="text-[10px] text-muted-foreground mt-1">
+                        {unit.lastCleanedAt ? format(new Date(unit.lastCleanedAt), "dd/MM/yyyy") : "ยังไม่เคยล้าง"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        />
+      </div>
     </div>
   );
 }

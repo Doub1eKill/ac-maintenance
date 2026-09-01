@@ -5,6 +5,8 @@ export interface TechJobItem {
   btu: number | null;
   status: string;
   location: string;
+  buildingId: string;
+  buildingName: string;
   priority?: string | null;
   createdAt?: string | null;
   claimedAt?: string | null;

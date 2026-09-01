@@ -1,15 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
+import { BuildingGroupList, groupByBuilding } from "@/components/shared/building-groups";
 import type { TechJobItem } from "@/components/tech/types";
 import { filterJobs } from "@/components/tech/types";
 
@@ -20,97 +13,59 @@ interface CompletedJobsPanelProps {
   onViewHistory?: (airConditionerId: string) => void;
 }
 
-const ITEMS_PER_PAGE = 10;
-
 export function CompletedJobsPanel({ completedJobs, searchQuery, selectedBuilding, onViewHistory }: CompletedJobsPanelProps) {
-  const [completedJobsPage, setCompletedJobsPage] = useState(1);
-
-  useEffect(() => {
-    setCompletedJobsPage(1);
-  }, [searchQuery, selectedBuilding]);
-
   const filteredCompletedJobs = filterJobs(completedJobs, searchQuery, selectedBuilding);
-  const totalCompletedJobsPages = Math.ceil(filteredCompletedJobs.length / ITEMS_PER_PAGE);
-  const paginatedCompletedJobs = filteredCompletedJobs.slice(
-    (completedJobsPage - 1) * ITEMS_PER_PAGE,
-    completedJobsPage * ITEMS_PER_PAGE
-  );
+  const groups = groupByBuilding(filteredCompletedJobs);
 
   return (
     <div className="animate-in fade-in">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {filteredCompletedJobs.length === 0 ? (
-          <div className="col-span-full py-12 text-center text-xs text-muted-foreground border border-dashed border-border rounded-2xl">
-            ไม่มีประวัติการทำงาน
-          </div>
-        ) : (
-          paginatedCompletedJobs.map((job) => (
-            <div
-              key={job.id}
-              onClick={() => job.airConditionerId && onViewHistory?.(job.airConditionerId)}
-              className="biz-card p-5 space-y-4 hover:border-muted-foreground transition-all bg-muted cursor-pointer"
-            >
-              <div className="flex items-center justify-between opacity-80">
-                <div className="space-y-1">
-                  <div className="text-sm font-bold text-muted-foreground leading-snug">{job.location}</div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs font-bold text-muted-foreground">{job.acCode}</span>
-                    <span className="rounded-md bg-accent px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
-                      {job.brand}
-                    </span>
-                    {job.priority === "critical" && (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-800">
-                        <AlertTriangle className="h-3 w-3" /> ด่วนที่สุด
+      <BuildingGroupList
+        groups={groups}
+        getSubtitle={(g) => `${g.items.length} งาน`}
+        emptyMessage="ไม่มีประวัติการทำงาน"
+        resetKey={`${searchQuery}|${selectedBuilding}`}
+        renderItems={(group) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {group.items.map((job) => (
+              <div
+                key={job.id}
+                onClick={() => job.airConditionerId && onViewHistory?.(job.airConditionerId)}
+                className="biz-card p-5 space-y-4 hover:border-muted-foreground transition-all bg-muted cursor-pointer"
+              >
+                <div className="flex items-center justify-between opacity-80">
+                  <div className="space-y-1">
+                    <div className="text-sm font-bold text-muted-foreground leading-snug">{job.location}</div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs font-bold text-muted-foreground">{job.acCode}</span>
+                      <span className="rounded-md bg-accent px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
+                        {job.brand}
                       </span>
-                    )}
-                    {job.priority === "high" && (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-orange-200 bg-orange-100 px-2 py-0.5 text-[10px] font-bold text-orange-800">
-                        <AlertTriangle className="h-3 w-3" /> ด่วน
-                      </span>
-                    )}
+                      {job.priority === "critical" && (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-800">
+                          <AlertTriangle className="h-3 w-3" /> ด่วนที่สุด
+                        </span>
+                      )}
+                      {job.priority === "high" && (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-orange-200 bg-orange-100 px-2 py-0.5 text-[10px] font-bold text-orange-800">
+                          <AlertTriangle className="h-3 w-3" /> ด่วน
+                        </span>
+                      )}
+                    </div>
                   </div>
+                  <CheckCircle2 className="h-5 w-5 text-success" />
                 </div>
-                <CheckCircle2 className="h-5 w-5 text-success" />
-              </div>
 
-              <div className="pt-2 flex items-center justify-between text-xs border-t border-border text-muted-foreground">
-                <span className="text-[11px] font-bold text-success">เสร็จสิ้นแล้ว</span>
-                <span className="text-[10px] font-semibold">
-                  {job.completedAt ? `เมื่อ: ${format(new Date(job.completedAt), "dd/MM/yyyy HH:mm")}` : ""}
-                </span>
+                <div className="pt-2 flex items-center justify-between text-xs border-t border-border text-muted-foreground">
+                  <span className="text-[11px] font-bold text-success">เสร็จสิ้นแล้ว</span>
+                  <span className="text-[10px] font-semibold">
+                    {job.completedAt ? `เมื่อ: ${format(new Date(job.completedAt), "dd/MM/yyyy HH:mm")}` : ""}
+                  </span>
+                </div>
               </div>
-            </div>
-          ))
+            ))}
+          </div>
         )}
-      </div>
-
-      {totalCompletedJobsPages > 1 && (
-        <div className="py-4 mt-2">
-          <Pagination>
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  href="#"
-                  onClick={(e) => { e.preventDefault(); setCompletedJobsPage((p) => Math.max(1, p - 1)); }}
-                  className={completedJobsPage === 1 ? "pointer-events-none opacity-50" : ""}
-                />
-              </PaginationItem>
-              <PaginationItem>
-                <span className="text-xs font-medium text-muted-foreground px-4">
-                  หน้า {completedJobsPage} จาก {totalCompletedJobsPages}
-                </span>
-              </PaginationItem>
-              <PaginationItem>
-                <PaginationNext
-                  href="#"
-                  onClick={(e) => { e.preventDefault(); setCompletedJobsPage((p) => Math.min(totalCompletedJobsPages, p + 1)); }}
-                  className={completedJobsPage === totalCompletedJobsPages ? "pointer-events-none opacity-50" : ""}
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        </div>
-      )}
+      />
     </div>
   );
 }
