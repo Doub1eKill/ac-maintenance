@@ -213,6 +213,16 @@ export function AdminDashboardView({
     setShowCreateModal(true);
   }
 
+  // Nav-driven tab switches clear the shared search box — each tab searches
+  // a different field, so a query left over from the previous tab tends to
+  // match nothing on the new one (see: assets tab going blank). The overview
+  // "ไปดูรายละเอียด" drill-down sets activeTab/globalSearch directly instead of
+  // going through this handler, so it isn't affected.
+  function handleTabChange(tab: string) {
+    setGlobalSearch("");
+    setActiveTab(tab);
+  }
+
   function handleUserStatus(userId: string, newStatus: "active" | "suspended") {
     startTransition(async () => {
       const res = await updateUserStatusByOrgAdminAction(userId, newStatus);
@@ -292,7 +302,7 @@ export function AdminDashboardView({
         universityName,
       }}
       activeTab={activeTab}
-      setActiveTab={setActiveTab}
+      setActiveTab={handleTabChange}
       navItems={adminNavItems}
       searchValue={globalSearch}
       onSearchChange={["overview", "approvals", "calendar", "profile", "settings"].includes(activeTab) ? undefined : setGlobalSearch}
@@ -371,7 +381,12 @@ export function AdminDashboardView({
 
       {/* Asset Hierarchy View */}
       {activeTab === "assets" && (
-        <AssetManager buildings={buildings} brands={brands} globalSearch={globalSearch} />
+        <AssetManager
+          buildings={buildings}
+          brands={brands}
+          globalSearch={globalSearch}
+          onClearSearch={() => setGlobalSearch("")}
+        />
       )}
 
       {/* Maintenance Calendar View */}

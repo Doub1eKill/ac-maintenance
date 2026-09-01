@@ -71,9 +71,10 @@ interface AssetManagerProps {
   buildings: BuildingItem[];
   brands: BrandItem[];
   globalSearch: string;
+  onClearSearch: () => void;
 }
 
-export function AssetManager({ buildings, brands, globalSearch }: AssetManagerProps) {
+export function AssetManager({ buildings, brands, globalSearch, onClearSearch }: AssetManagerProps) {
   const [isPending, startTransition] = useTransition();
   const [expandedBuilding, setExpandedBuilding] = useState<string | null>(buildings[0]?.id || null);
   
@@ -235,7 +236,7 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-border pb-4 gap-4">
         <h2 className="text-base font-bold text-foreground flex items-center gap-2">
           <Building2 className="h-5 w-5 text-foreground" />
-          <span>โครงสร้างสินทรัพย์ ({buildings.length} อาคาร)</span>
+          <span>โครงสร้างสินทรัพย์ ({filteredBuildings.length} อาคาร)</span>
         </h2>
         <button
           onClick={() => setShowAddBuilding(true)}
@@ -245,6 +246,23 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
         </button>
       </div>
 
+      {filteredBuildings.length === 0 ? (
+        <div className="py-12 text-center text-xs text-muted-foreground border border-dashed border-border rounded-2xl space-y-3">
+          {globalSearch.trim() ? (
+            <>
+              <p>ไม่พบอาคารที่ตรงกับ &quot;{globalSearch}&quot;</p>
+              <button
+                onClick={onClearSearch}
+                className="inline-flex items-center rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-bold text-foreground hover:bg-muted transition-colors"
+              >
+                ล้างคำค้นหา
+              </button>
+            </>
+          ) : (
+            <p>ยังไม่มีข้อมูลอาคารในระบบ</p>
+          )}
+        </div>
+      ) : (
       <div className="space-y-3">
         {paginatedBuildings.map((b) => (
           <div key={b.id} className="rounded-2xl border border-border bg-muted overflow-hidden">
@@ -336,6 +354,7 @@ export function AssetManager({ buildings, brands, globalSearch }: AssetManagerPr
           </div>
         ))}
       </div>
+      )}
 
       {totalBuildingsPages > 1 && (
         <div className="py-4 border-t border-border mt-4">
