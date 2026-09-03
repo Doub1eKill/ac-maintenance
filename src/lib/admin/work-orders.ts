@@ -40,9 +40,15 @@ export async function getWorkOrdersPage(
 
   const safePage = Math.max(1, Math.floor(page) || 1);
   const search = options?.search?.trim() ?? "";
-  const where = workOrderBoardWhere({ search, status: options?.status, buildingId: options?.buildingId });
 
   try {
+    // Built inside the try: workOrderBoardWhere parses buildingId into a BigInt,
+    // which throws on anything that isn't digits. The board only ever sends an
+    // id it was given or nothing at all, but this is a server action — anything
+    // that can reach it should come back as the error result every other
+    // failure here returns, not as an unhandled rejection.
+    const where = workOrderBoardWhere({ search, status: options?.status, buildingId: options?.buildingId });
+
     const [rows, total] = await Promise.all([
       prisma.workOrder.findMany({
         where,
