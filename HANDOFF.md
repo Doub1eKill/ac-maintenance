@@ -176,6 +176,100 @@ npx prisma migrate deploy && npx prisma generate
 
 ---
 
+# 🏗️ แผนรื้อโครงสร้างโค้ด (3 ก.ย. 2026) — **แผนเท่านั้น ยังไม่เริ่มทำสักบรรทัด**
+
+เจ้าของโปรเจกต์ให้วิเคราะห์โครงสร้างทั้งโปรเจกต์ (109 ไฟล์ ~18,700 บรรทัด) เพื่อแบ่งเป็นแต่ละหน้า แยก backend/frontend และ refactor · **ตัดสินใจว่าให้เขียนแผนไว้ก่อน ยังไม่ลงมือ** เพราะเฟส B ไปแตะไฟล์ชุดเดียวกับที่ Esther03u กำลังจะทำงานข้อ 4 เฟส 2 พอดี
+
+> 🔴 **ถึง Esther03u: อย่าเพิ่งเริ่มเฟส B จนกว่าจะตกลงจังหวะกัน** — งานข้อ 4 เฟส 2 ของคุณกับเฟส B ของแผนนี้แตะไฟล์ชุดเดียวกันเป๊ะ ทำพร้อมกันจะ conflict หนักกว่างานทั้งสองฝั่งรวมกัน · **ทำข้อ 4 เฟส 2 ให้จบก่อน แล้วค่อยรื้อ** เป็นลำดับที่ปลอดภัยที่สุด
+
+## ปัญหาที่พบ เรียงตามผลกระทบ
+
+### 🔴 P1 — ทั้งแอปมีแค่ 2 route แต่มี 15 หน้าอยู่ข้างใน
+
+`/admin` กับ `/tech` คือ route ทั้งหมดที่มีจริง ส่วน "หน้า" ต่างๆ สลับด้วย `useState` ใน `admin-dashboard-view.tsx:114` (`activeTab === "overview" && <OverviewPanel/>` ไล่ไปอีก 8 แท็บ)
+
+| ผลกระทบ | หลักฐานที่วัดได้ |
+|---|---|
+| โหลดข้อมูลทุกหน้าทุกครั้ง | `/admin` ยิง **9 query ดึง ~437 แถว** ทุกครั้งที่เปิด แม้เข้าไปดูแค่แท็บ "อนุมัติผู้ใช้" ที่ใช้จริง 5 แถว · ในนั้นมี `ac_models` **189 แถว** ที่ใช้เฉพาะแท็บตั้งค่า |
+| God Component | `admin-dashboard-view.tsx` 449 บรรทัด · state 8 ตัว · prop 17 ตัว · เป็นทั้ง router + state store + layout ในไฟล์เดียว |
+| แชร์ลิงก์หน้าใดหน้าหนึ่งไม่ได้ | ทุกหน้าคือ URL เดียวกัน · refresh แล้วเด้งกลับ overview · ปุ่ม back ของเบราว์เซอร์ใช้ไม่ได้ |
+| เพิ่มหน้าใหม่ต้องแก้ 3 ที่ | `page.tsx` (ดึงข้อมูล) + `dashboard-view.tsx` (เพิ่ม branch) + sidebar |
+
+**มีของพิสูจน์อยู่แล้วว่าทางที่ถูกใช้ได้จริงในโปรเจกต์นี้** — `MaintenanceCalendar` ไม่รับ data prop เลย มันเรียก `/api/admin/maintenance-schedules` ของตัวเอง จึงเป็นแท็บเดียวที่ไม่ถ่วงการโหลดของแท็บอื่น
+
+### 🟠 P2 — ฝั่ง tech ยังไม่ได้ทำตามแพทเทิร์นที่ฝั่ง admin วางไว้เอง
+
+25 ส.ค. แยก `admin/actions.ts` เป็น `src/lib/admin/**` + wrapper บางๆ ไปแล้ว (1,748 → 135 บรรทัด) แต่ `tech/actions.ts` **540 บรรทัด** ยังมี implementation เต็มอยู่ใน `"use server"` และ `getTechnicianData()` ตัวเดียวยาว **190 บรรทัด** · `master-data/actions.ts` **506 บรรทัด** ก็เป็นแบบเดียวกัน
+
+### 🟠 P3 — mapper 3 ตัวที่ต่างกันแค่ field เดียว (DRY)
+
+`jobPool` / `myJobs` / `completedJobs` มี 11 บรรทัดเหมือนกันเป๊ะ ต่างแค่บรรทัดสุดท้าย (`createdAt` / `claimedAt` / `completedAt`) และ `include` block ก่อนหน้าซ้ำ 3 ครั้งทุกตัวอักษร
+
+**หลักฐานว่าเป็นภาระจริง:** DoubleKill ต้องแก้ 3 ที่ซ้ำกันมาแล้ว 2 รอบติด — 28 ส.ค. เพิ่ม `buildingId`/`buildingName` และ 3 ก.ย. เพิ่ม `catalogueFlags` · **ถ้าลืมที่ใดที่หนึ่ง TypeScript ไม่ฟ้องเลย** เพราะเป็น object literal คนละตัว
+
+### 🟡 P4 — ไฟล์ backend ที่โตเกินหมวดของตัวเอง
+
+| ไฟล์ | บรรทัด | ปนกันกี่หมวด |
+|---|---|---|
+| `lib/admin/assets.ts` | 619 | **5** — อาคาร / ห้อง / แอร์ / ประวัติ+log / รอบ PM |
+| `app/admin/master-data/actions.ts` | 506 | 2 หมวด + implementation อยู่ผิดที่ (P2) |
+| `lib/admin/settings.ts` | 448 | **4** — สถานะผู้ใช้ / โปรไฟล์ / ตั้งค่าองค์กร / audit log |
+
+### 🟡 P5 — `formatAcLocation` มี 4 เวอร์ชันกระจายกันอยู่
+
+```
+tech/actions.ts        "{อาคาร} ({ตัวย่อ}) - ห้อง {ห้อง} (ชั้น {ชั้น})"
+work-order-board.ts    "{อาคาร} ({ตัวย่อ}) - ห้อง {ห้อง}"
+maintenance.ts         "{อาคาร} - ห้อง {ห้อง}"
+qr/[id] + assets.ts    "{อาคาร} - ห้อง {ห้อง}"    ← ประกอบสตริงซ้ำอีกที
+```
+
+เครื่องเดียวกันจึงแสดงที่อยู่ไม่เหมือนกัน แล้วแต่ว่าข้อมูลมาจาก endpoint ไหน
+
+---
+
+## เฟส A — backend ล้วน (DoubleKill · ไม่แตะ `src/components/**` เลย)
+
+**ทำได้โดยไม่ชนกับใคร** และควรทำก่อนเฟส B เพราะเฟส B จะเรียกใช้ของที่แตกไว้แล้ว
+
+```
+lib/admin/assets.ts (619)        →  buildings.ts · rooms.ts · air-conditioners.ts
+                                     maintenance-logs.ts · schedules.ts
+lib/admin/settings.ts (448)      →  users.ts · profile.ts · organisation-settings.ts · audit-log.ts
+app/admin/master-data/actions.ts →  lib/admin/master-data.ts + wrapper บางๆ
+app/tech/actions.ts (540)        →  lib/tech/dashboard.ts · jobs.ts · maintenance-log.ts · qr.ts
+                                     เหลือ actions.ts เป็น wrapper ตามแพทเทิร์นฝั่ง admin
+mapper 3 ตัว + include 3 ชุด     →  techJobInclude + toTechJobRow() อย่างละตัวเดียว
+formatAcLocation 4 แบบ           →  src/lib/location.ts ตัวเดียว
+```
+
+**ผลที่ได้:** เพิ่ม field ใน 3 รายการงานของช่างจะแก้ที่เดียวแทน 3 ที่ · ไฟล์ใหญ่สุดฝั่ง backend ลงจาก 619 เหลือ ~150 · ที่อยู่ของเครื่องแสดงเหมือนกันทุกหน้า
+
+**ไม่กระทบใคร:** ทุก action ยังชื่อเดิม เรียกจาก path เดิม (`@/app/admin/actions`, `@/app/tech/actions`) — เป็นการย้าย implementation อย่างเดียว UI ไม่ต้องแก้แม้แต่ import เดียว
+
+### ⚠️ กับดักที่ต้องระวังตอนทำเฟส A
+
+`"use server"` ห้าม re-export — `export { x } from "./y"` จะ build พัง (`Only async functions are allowed to be exported in a "use server" file`) ทั้งที่ tsc ผ่าน · ต้องใช้ wrapper บางๆ แบบที่ `admin/actions.ts` ทำอยู่ ดูหัวข้อ "แยก admin/actions.ts" ด้านล่างของไฟล์นี้
+
+## เฟส B — แตกเป็นหน้าจริง (ต้องแตะไฟล์ของ Esther03u)
+
+```
+/admin  →  /admin/overview · /work-orders · /approvals · /team
+           /assets · /calendar · /qr-codes · /profile · /settings
+/tech   →  /tech/jobs · /my-jobs · /history · /assets · /calendar · /profile
+```
+
+- แต่ละ `page.tsx` เป็น Server Component ที่โหลด**เฉพาะข้อมูลของหน้าตัวเอง** — แท็บอนุมัติผู้ใช้จะเหลือ 1 query 5 แถว จาก 9 query 437 แถว
+- `dashboard-view.tsx` เหลือแค่ layout + sidebar ไม่ต้องถือ `activeTab` และ prop 17 ตัวอีก
+- sidebar เปลี่ยนจาก `setActiveTab()` เป็น `<Link href>` จริง → แชร์ลิงก์/กด back/refresh ได้ตามปกติ
+- `globalSearch` ที่ตอนนี้แชร์ข้ามแท็บ (ต้นเหตุบั๊กข้อ 1 รอบ 27 ส.ค.) กลายเป็น `?q=` ของแต่ละหน้า หายไปเองโดยไม่ต้องเขียนเงื่อนไขล้างค่า
+
+**ไฟล์ที่ต้องแตะ:** `admin-dashboard-view.tsx`, `tech-mobile-view.tsx`, `dashboard-layout.tsx` และ panel ทุกตัวใน `components/admin/**` + `components/tech/**`
+
+**ลำดับที่ปลอดภัย:** ข้อ 4 เฟส 2 (UI) ให้จบก่อน → push → แล้วค่อยเริ่มเฟส B บนโค้ดที่นิ่งแล้ว
+
+---
+
 # ✅ ผลตัดสินใจ 5 เรื่อง (28 ส.ค. 2026 — เจ้าของโปรเจกต์เคาะเอง)
 
 | # | เรื่อง | เลือก | ผลที่ตามมา |
