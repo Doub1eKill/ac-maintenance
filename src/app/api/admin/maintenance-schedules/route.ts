@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { catalogueFlags } from "@/lib/catalogue-status";
+import { formatUnitLocation } from "@/lib/location";
 
 export async function GET(request: NextRequest) {
   try {
@@ -91,7 +92,8 @@ export async function GET(request: NextRequest) {
         acCode: s.airConditioner.acCode,
         brand: s.airConditioner.acBrand?.name ?? s.airConditioner.brand ?? "ไม่ระบุ",
         ...catalogueFlags(s.airConditioner),
-        location: `${s.airConditioner.room.building.name} - ${s.airConditioner.room.name}`,
+        // The only view that leaves out the "ห้อง" label — preserved as it was.
+        location: formatUnitLocation(s.airConditioner.room, { withRoomLabel: false }),
         // Building and room broken out alongside the combined `location`
         // string, so a day with too many jobs to list can be grouped by
         // building without the client having to split that string back apart.

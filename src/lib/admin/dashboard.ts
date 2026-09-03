@@ -10,6 +10,7 @@ import type { WorkOrderType as MaintenanceJobType } from "@/generated/prisma/enu
 import { compareJobOrder, syncOverdueMaintenanceWorkOrders } from "@/lib/maintenance";
 import { getOrganisationName } from "@/lib/organisation";
 import { catalogueFlags } from "@/lib/catalogue-status";
+import { formatUnitLocation } from "@/lib/location";
 import { format, subDays } from "date-fns";
 import { verifyOrgAdmin } from "@/lib/auth-guards";
 import {
@@ -201,7 +202,7 @@ export async function getOrgAdminData() {
             urgentUnits.push({
               id: ac.id.toString(),
               acCode: ac.acCode,
-              location: `${b.name} - ห้อง ${r.name}`,
+              location: formatUnitLocation({ name: r.name, building: { name: b.name } }),
               brand: ac.acBrand?.name || ac.brand || "ไม่ระบุ",
               model: ac.acModel?.name || ac.model || null,
               ...catalogueFlags(ac),

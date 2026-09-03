@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { withDeadlockRetry } from "@/lib/db-retry";
 import { catalogueFlags } from "@/lib/catalogue-status";
+import { formatUnitLocation } from "@/lib/location";
 import type { MaintenanceAction, WorkOrderType as MaintenanceJobType } from "@/generated/prisma/enums";
 
 // The timezone the institutions actually operate in. Timestamps (performedAt,
@@ -346,7 +347,7 @@ export async function getTechnicianAssetList(): Promise<{
       ...catalogueFlags(u),
       btu: u.btu ?? u.acModel?.defaultBtu ?? null,
       status: u.status,
-      location: `${u.room.building.name} - ห้อง ${u.room.name}`,
+      location: formatUnitLocation(u.room),
       buildingId: u.room.building.id.toString(),
       buildingName: u.room.building.name,
       roomName: u.room.name,

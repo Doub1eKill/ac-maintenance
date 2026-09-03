@@ -7,6 +7,7 @@ import { businessDateToday, businessDateFrom, addMaintenanceInterval, getMainten
 import { getDefaultMaintenanceFrequency } from "@/lib/organisation";
 import { verifyOrgAdmin } from "@/lib/auth-guards";
 import { catalogueFlags } from "@/lib/catalogue-status";
+import { formatUnitLocation } from "@/lib/location";
 
 const buildingSchema = z.object({
   name: z
@@ -435,7 +436,7 @@ export async function getAirConditionerHistory(airConditionerId: string) {
         ...catalogueFlags(ac),
         btu: ac.btu,
         status: ac.status,
-        location: `${ac.room.building.name} - ห้อง ${ac.room.name}`,
+        location: formatUnitLocation(ac.room),
         installedAt: ac.installedAt ? ac.installedAt.toISOString() : null,
       },
       history,

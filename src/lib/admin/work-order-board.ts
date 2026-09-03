@@ -9,6 +9,7 @@
 // functions.
 import type { Prisma } from "@/generated/prisma/client";
 import { catalogueFlags } from "@/lib/catalogue-status";
+import { formatUnitLocation } from "@/lib/location";
 
 // How many work orders the board loads at once. It lives here rather than in
 // a "use server" module because those may only export async functions — the
@@ -85,7 +86,7 @@ export function toWorkOrderBoardRow(wo: WorkOrderBoardRow) {
     ...catalogueFlags(wo.airConditioner),
     btu: wo.airConditioner.btu,
     acStatus: wo.airConditioner.status,
-    location: `${wo.airConditioner.room.building.name} (${wo.airConditioner.room.building.abbreviation}) - ห้อง ${wo.airConditioner.room.name}`,
+    location: formatUnitLocation(wo.airConditioner.room, { withAbbreviation: true }),
     status: wo.status,
     // The job this order was raised for, as recorded when it was opened. Kept
     // separate from acStatus below, which is the unit's condition right now
