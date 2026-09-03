@@ -16,6 +16,8 @@ import { getOrganisationName } from "@/lib/organisation";
 import { withDeadlockRetry } from "@/lib/db-retry";
 import { saveUpload } from "@/lib/upload";
 import { catalogueFlags } from "@/lib/catalogue-status";
+import { formatUnitLocation } from "@/lib/location";
+import { techJobInclude, toTechJobRow } from "@/lib/tech/job-rows";
 
 async function verifyTechnician() {
   const session = await auth();
@@ -23,10 +25,6 @@ async function verifyTechnician() {
     throw new Error("Unauthorized: Technician access required");
   }
   return session;
-}
-
-function formatAcLocation(room: { name: string; floor: number | null; building: { name: string; abbreviation: string } }) {
-  return `${room.building.name} (${room.building.abbreviation}) - ห้อง ${room.name} (ชั้น ${room.floor || 1})`;
 }
 
 export async function getTechnicianData() {
@@ -39,53 +37,17 @@ export async function getTechnicianData() {
     const [pendingOrdersRaw, myJobsRaw, completedJobsRaw, assetListResult, organisationName, currentUser] = await Promise.all([
       prisma.workOrder.findMany({
         where: { status: "pending" },
-        include: {
-          airConditioner: {
-            include: {
-              acBrand: true,
-              acModel: { select: { deletedAt: true } },
-              room: {
-                include: {
-                  building: true,
-                },
-              },
-            },
-          },
-        },
+        include: techJobInclude,
         orderBy: { createdAt: "desc" },
       }),
       prisma.workOrder.findMany({
         where: { claimedBy: techId, status: "claimed" },
-        include: {
-          airConditioner: {
-            include: {
-              acBrand: true,
-              acModel: { select: { deletedAt: true } },
-              room: {
-                include: {
-                  building: true,
-                },
-              },
-            },
-          },
-        },
+        include: techJobInclude,
         orderBy: { claimedAt: "desc" },
       }),
       prisma.workOrder.findMany({
         where: { claimedBy: techId, status: "completed" },
-        include: {
-          airConditioner: {
-            include: {
-              acBrand: true,
-              acModel: { select: { deletedAt: true } },
-              room: {
-                include: {
-                  building: true,
-                },
-              },
-            },
-          },
-        },
+        include: techJobInclude,
         orderBy: { completedAt: "desc" },
         take: 50,
       }),
@@ -114,52 +76,21 @@ export async function getTechnicianData() {
     ]);
 
     // Building broken out alongside the combined `location` string on all
-    // three job lists, so the "group by building" UI can key on the building
-    // itself instead of substring-matching the formatted location (which is
-    // what filterJobs has to do today). `location` is unchanged, so every
-    // existing caller keeps working. The building rows are already loaded by
-    // the queries above, so this costs no extra round trip.
+    // The three lists differ only in which date the card shows, so that is all
+    // each one adds. Everything else comes from toTechJobRow — see
+    // lib/tech/job-rows.ts for why these are no longer written out three times.
     const jobPool = pendingOrdersRaw.map((wo) => ({
-      id: wo.id.toString(),
-      acCode: wo.airConditioner.acCode,
-      brand: wo.airConditioner.acBrand?.name || wo.airConditioner.brand || "ไม่ระบุ",
-      ...catalogueFlags(wo.airConditioner),
-      btu: wo.airConditioner.btu,
-      status: wo.airConditioner.status,
-      priority: wo.priority,
-      location: formatAcLocation(wo.airConditioner.room),
-      buildingId: wo.airConditioner.room.building.id.toString(),
-      buildingName: wo.airConditioner.room.building.name,
+      ...toTechJobRow(wo),
       createdAt: wo.createdAt ? wo.createdAt.toISOString() : null,
     }));
 
     const myJobs = myJobsRaw.map((wo) => ({
-      id: wo.id.toString(),
-      acCode: wo.airConditioner.acCode,
-      brand: wo.airConditioner.acBrand?.name || wo.airConditioner.brand || "ไม่ระบุ",
-      ...catalogueFlags(wo.airConditioner),
-      btu: wo.airConditioner.btu,
-      airConditionerId: wo.airConditionerId.toString(),
-      status: wo.airConditioner.status,
-      priority: wo.priority,
-      location: formatAcLocation(wo.airConditioner.room),
-      buildingId: wo.airConditioner.room.building.id.toString(),
-      buildingName: wo.airConditioner.room.building.name,
+      ...toTechJobRow(wo),
       claimedAt: wo.claimedAt ? wo.claimedAt.toISOString() : null,
     }));
 
     const completedJobs = completedJobsRaw.map((wo) => ({
-      id: wo.id.toString(),
-      acCode: wo.airConditioner.acCode,
-      brand: wo.airConditioner.acBrand?.name || wo.airConditioner.brand || "ไม่ระบุ",
-      ...catalogueFlags(wo.airConditioner),
-      btu: wo.airConditioner.btu,
-      airConditionerId: wo.airConditionerId.toString(),
-      status: wo.airConditioner.status,
-      priority: wo.priority,
-      location: formatAcLocation(wo.airConditioner.room),
-      buildingId: wo.airConditioner.room.building.id.toString(),
-      buildingName: wo.airConditioner.room.building.name,
+      ...toTechJobRow(wo),
       completedAt: wo.completedAt ? wo.completedAt.toISOString() : null,
     }));
 
@@ -528,7 +459,7 @@ export async function scanQrCodeAction(acCode: string) {
         ...catalogueFlags(ac),
         btu: ac.btu,
         status: ac.status,
-        location: `${ac.room.building.name} - ห้อง ${ac.room.name}`,
+        location: formatUnitLocation(ac.room),
         lastMaintenance: lastLog ? lastLog.performedAt.toISOString() : null,
       },
       pendingJobId: pendingJob ? pendingJob.id.toString() : null,
