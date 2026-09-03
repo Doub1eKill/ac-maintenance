@@ -48,8 +48,14 @@ export default async function QRCodePage(props: { params: Promise<{ id: string }
       room: {
         select: { name: true, building: { select: { name: true } } },
       },
-      acBrand: { select: { name: true } },
-      acModel: { select: { name: true } },
+      // deleted_at comes along so this page can mark a retired brand or model
+      // like the other ten places do (backlog #4 phase 2). This is the only one
+      // of the eleven that queries Prisma directly from the page instead of
+      // going through a lib mapper, so there is no shape to add the flags to —
+      // the markup calls catalogueFlags(ac) itself, from @/lib/catalogue-status,
+      // rather than testing deletedAt inline and inventing a twelfth rule.
+      acBrand: { select: { name: true, deletedAt: true } },
+      acModel: { select: { name: true, deletedAt: true } },
       maintenanceSchedules: {
         where: { isActive: true },
         take: 1,

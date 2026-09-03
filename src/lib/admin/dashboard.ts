@@ -9,6 +9,7 @@ import { prisma } from "@/lib/prisma";
 import type { WorkOrderType as MaintenanceJobType } from "@/generated/prisma/enums";
 import { compareJobOrder, syncOverdueMaintenanceWorkOrders } from "@/lib/maintenance";
 import { getOrganisationName } from "@/lib/organisation";
+import { catalogueFlags } from "@/lib/catalogue-status";
 import { format, subDays } from "date-fns";
 import { verifyOrgAdmin } from "@/lib/auth-guards";
 import {
@@ -59,8 +60,8 @@ export async function getOrgAdminData() {
                   model: true,
                   btu: true,
                   status: true,
-                  acBrand: { select: { name: true } },
-                  acModel: { select: { name: true } },
+                  acBrand: { select: { name: true, deletedAt: true } },
+                  acModel: { select: { name: true, deletedAt: true } },
                   maintenanceSchedules: {
                     select: {
                       isActive: true,
@@ -203,6 +204,7 @@ export async function getOrgAdminData() {
               location: `${b.name} - ห้อง ${r.name}`,
               brand: ac.acBrand?.name || ac.brand || "ไม่ระบุ",
               model: ac.acModel?.name || ac.model || null,
+              ...catalogueFlags(ac),
               btu: ac.btu,
               status: ac.status,
               buildingName: b.name,
@@ -232,6 +234,7 @@ export async function getOrgAdminData() {
               acCode: ac.acCode,
               brand: ac.acBrand?.name || ac.brand || "ไม่ระบุ",
               model: ac.acModel?.name || ac.model || null,
+              ...catalogueFlags(ac),
               btu: ac.btu,
               status: ac.status,
               qrCode: ac.qrCode,

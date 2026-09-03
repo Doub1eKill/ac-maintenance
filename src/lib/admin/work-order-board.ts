@@ -8,6 +8,7 @@
 // and none of it can live in a "use server" file, which may export only async
 // functions.
 import type { Prisma } from "@/generated/prisma/client";
+import { catalogueFlags } from "@/lib/catalogue-status";
 
 // How many work orders the board loads at once. It lives here rather than in
 // a "use server" module because those may only export async functions — the
@@ -49,7 +50,12 @@ export const workOrderBoardSelect = {
           building: { select: { name: true, abbreviation: true } },
         },
       },
-      acBrand: { select: { name: true } },
+      acBrand: { select: { name: true, deletedAt: true } },
+      // The board displays the brand but not the model, and still asks for the
+      // model's deleted_at: every list that resolves a catalogue name carries
+      // both flags, so one shared component can mark a retired entry without
+      // first checking which of the two the caller happens to supply.
+      acModel: { select: { deletedAt: true } },
     },
   },
   claimedByUser: { select: { name: true } },
@@ -76,6 +82,7 @@ export function toWorkOrderBoardRow(wo: WorkOrderBoardRow) {
     id: wo.id.toString(),
     acCode: wo.airConditioner.acCode,
     brand: wo.airConditioner.acBrand?.name || wo.airConditioner.brand || "ไม่ระบุ",
+    ...catalogueFlags(wo.airConditioner),
     btu: wo.airConditioner.btu,
     acStatus: wo.airConditioner.status,
     location: `${wo.airConditioner.room.building.name} (${wo.airConditioner.room.building.abbreviation}) - ห้อง ${wo.airConditioner.room.name}`,

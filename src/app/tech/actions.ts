@@ -15,6 +15,7 @@ import { MaintenanceAction } from "@/generated/prisma/client";
 import { getOrganisationName } from "@/lib/organisation";
 import { withDeadlockRetry } from "@/lib/db-retry";
 import { saveUpload } from "@/lib/upload";
+import { catalogueFlags } from "@/lib/catalogue-status";
 
 async function verifyTechnician() {
   const session = await auth();
@@ -42,6 +43,7 @@ export async function getTechnicianData() {
           airConditioner: {
             include: {
               acBrand: true,
+              acModel: { select: { deletedAt: true } },
               room: {
                 include: {
                   building: true,
@@ -58,6 +60,7 @@ export async function getTechnicianData() {
           airConditioner: {
             include: {
               acBrand: true,
+              acModel: { select: { deletedAt: true } },
               room: {
                 include: {
                   building: true,
@@ -74,6 +77,7 @@ export async function getTechnicianData() {
           airConditioner: {
             include: {
               acBrand: true,
+              acModel: { select: { deletedAt: true } },
               room: {
                 include: {
                   building: true,
@@ -119,6 +123,7 @@ export async function getTechnicianData() {
       id: wo.id.toString(),
       acCode: wo.airConditioner.acCode,
       brand: wo.airConditioner.acBrand?.name || wo.airConditioner.brand || "ไม่ระบุ",
+      ...catalogueFlags(wo.airConditioner),
       btu: wo.airConditioner.btu,
       status: wo.airConditioner.status,
       priority: wo.priority,
@@ -132,6 +137,7 @@ export async function getTechnicianData() {
       id: wo.id.toString(),
       acCode: wo.airConditioner.acCode,
       brand: wo.airConditioner.acBrand?.name || wo.airConditioner.brand || "ไม่ระบุ",
+      ...catalogueFlags(wo.airConditioner),
       btu: wo.airConditioner.btu,
       airConditionerId: wo.airConditionerId.toString(),
       status: wo.airConditioner.status,
@@ -146,6 +152,7 @@ export async function getTechnicianData() {
       id: wo.id.toString(),
       acCode: wo.airConditioner.acCode,
       brand: wo.airConditioner.acBrand?.name || wo.airConditioner.brand || "ไม่ระบุ",
+      ...catalogueFlags(wo.airConditioner),
       btu: wo.airConditioner.btu,
       airConditionerId: wo.airConditionerId.toString(),
       status: wo.airConditioner.status,
@@ -490,6 +497,7 @@ export async function scanQrCodeAction(acCode: string) {
       where: { acCode },
       include: {
         acBrand: true,
+        acModel: { select: { deletedAt: true } },
         room: {
           include: { building: true },
         },
@@ -517,6 +525,7 @@ export async function scanQrCodeAction(acCode: string) {
         id: ac.id.toString(),
         acCode: ac.acCode,
         brand: ac.acBrand?.name || ac.brand || "ไม่ระบุ",
+        ...catalogueFlags(ac),
         btu: ac.btu,
         status: ac.status,
         location: `${ac.room.building.name} - ห้อง ${ac.room.name}`,

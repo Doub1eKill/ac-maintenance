@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { withDeadlockRetry } from "@/lib/db-retry";
+import { catalogueFlags } from "@/lib/catalogue-status";
 import type { MaintenanceAction, WorkOrderType as MaintenanceJobType } from "@/generated/prisma/enums";
 
 // The timezone the institutions actually operate in. Timestamps (performedAt,
@@ -274,6 +275,10 @@ export interface TechnicianAssetUnit {
   buildingName: string;
   roomName: string;
   floor: number | null;
+  // Whether the brand/model shown above has been retired from the catalogue.
+  // See catalogue-status.ts — the name still resolves either way.
+  brandDeleted: boolean;
+  modelDeleted: boolean;
   lastCleanedAt: string | null;
   isOverdue: boolean;
   pendingWorkOrder: {
@@ -312,8 +317,8 @@ export async function getTechnicianAssetList(): Promise<{
       model: true,
       btu: true,
       status: true,
-      acBrand: { select: { name: true } },
-      acModel: { select: { name: true, defaultBtu: true } },
+      acBrand: { select: { name: true, deletedAt: true } },
+      acModel: { select: { name: true, defaultBtu: true, deletedAt: true } },
       room: {
         select: { name: true, floor: true, building: { select: { id: true, name: true } } },
       },
@@ -338,6 +343,7 @@ export async function getTechnicianAssetList(): Promise<{
       acCode: u.acCode,
       brand: u.acBrand?.name ?? u.brand ?? "ไม่ระบุ",
       model: u.acModel?.name ?? u.model,
+      ...catalogueFlags(u),
       btu: u.btu ?? u.acModel?.defaultBtu ?? null,
       status: u.status,
       location: `${u.room.building.name} - ห้อง ${u.room.name}`,

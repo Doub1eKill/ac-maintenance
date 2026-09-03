@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
+import { catalogueFlags } from "@/lib/catalogue-status";
 
 export async function GET(request: NextRequest) {
   try {
@@ -58,7 +59,8 @@ export async function GET(request: NextRequest) {
                 building: { select: { id: true, name: true } },
               },
             },
-            acBrand: { select: { name: true } },
+            acBrand: { select: { name: true, deletedAt: true } },
+            acModel: { select: { deletedAt: true } },
             maintenanceLogs: {
               orderBy: { performedAt: 'desc' },
               take: 1,
@@ -88,6 +90,7 @@ export async function GET(request: NextRequest) {
         isActive: s.isActive,
         acCode: s.airConditioner.acCode,
         brand: s.airConditioner.acBrand?.name ?? s.airConditioner.brand ?? "ไม่ระบุ",
+        ...catalogueFlags(s.airConditioner),
         location: `${s.airConditioner.room.building.name} - ${s.airConditioner.room.name}`,
         // Building and room broken out alongside the combined `location`
         // string, so a day with too many jobs to list can be grouped by

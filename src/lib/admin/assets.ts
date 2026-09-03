@@ -6,6 +6,7 @@ import { logAudit } from "@/lib/audit";
 import { businessDateToday, businessDateFrom, addMaintenanceInterval, getMaintenanceHistory } from "@/lib/maintenance";
 import { getDefaultMaintenanceFrequency } from "@/lib/organisation";
 import { verifyOrgAdmin } from "@/lib/auth-guards";
+import { catalogueFlags } from "@/lib/catalogue-status";
 
 const buildingSchema = z.object({
   name: z
@@ -412,8 +413,8 @@ export async function getAirConditionerHistory(airConditionerId: string) {
           btu: true,
           status: true,
           installedAt: true,
-          acBrand: { select: { name: true } },
-          acModel: { select: { name: true } },
+          acBrand: { select: { name: true, deletedAt: true } },
+          acModel: { select: { name: true, deletedAt: true } },
           room: {
             select: { name: true, building: { select: { name: true } } },
           },
@@ -429,6 +430,7 @@ export async function getAirConditionerHistory(airConditionerId: string) {
         acCode: ac.acCode,
         brand: ac.acBrand?.name ?? ac.brand ?? "ไม่ระบุ",
         model: ac.acModel?.name ?? ac.model ?? null,
+        ...catalogueFlags(ac),
         btu: ac.btu,
         status: ac.status,
         location: `${ac.room.building.name} - ห้อง ${ac.room.name}`,
