@@ -239,8 +239,15 @@ model WorkOrder {
   completedAt      DateTime?       @map("completed_at") @db.Timestamp(0)
   // Was nullable with no default, so every caller had to remember to set it
   // themselves -- none did, leaving every existing row NULL and "วันที่แจ้ง"
-  // blank across the board and detail dialog. A DB-level default closes that
-  // off structurally instead of relying on each call site.
+  // blank across the board and detail dialog.
+  //
+  // @default(now()) is what actually fills this: Prisma stamps the value client
+  // side, in UTC, like every other timestamp here. The column also carries a
+  // DEFAULT CURRENT_TIMESTAMP in the database, which nothing reaches today and
+  // which is NOT equivalent -- MySQL's CURRENT_TIMESTAMP is the server's local
+  // time, seven hours off what this column is read as. A raw-SQL insert that
+  // omits the column would land in that trap; it needs UTC_TIMESTAMP().
+  // See 20260903140000_fix_work_order_created_at_backfill_timezone.
   createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt        DateTime?       @map("updated_at") @db.Timestamp(0)
 
