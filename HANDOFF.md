@@ -176,9 +176,9 @@ npx prisma migrate deploy && npx prisma generate
 
 ---
 
-# 🏗️ แผนรื้อโครงสร้างโค้ด (3 ก.ย. 2026) — **แผนเท่านั้น ยังไม่เริ่มทำสักบรรทัด**
+# 🏗️ รื้อโครงสร้างโค้ด — ✅ เฟส A เสร็จแล้ว (3 ก.ย. 2026) · ⏳ เฟส B ยังไม่เริ่ม
 
-เจ้าของโปรเจกต์ให้วิเคราะห์โครงสร้างทั้งโปรเจกต์ (109 ไฟล์ ~18,700 บรรทัด) เพื่อแบ่งเป็นแต่ละหน้า แยก backend/frontend และ refactor · **ตัดสินใจว่าให้เขียนแผนไว้ก่อน ยังไม่ลงมือ** เพราะเฟส B ไปแตะไฟล์ชุดเดียวกับที่ Esther03u กำลังจะทำงานข้อ 4 เฟส 2 พอดี
+เจ้าของโปรเจกต์ให้วิเคราะห์โครงสร้างทั้งโปรเจกต์ (109 ไฟล์ ~18,700 บรรทัด) เพื่อแบ่งเป็นแต่ละหน้า แยก backend/frontend และ refactor · **เฟส A (backend ล้วน) ทำเสร็จแล้ว 3 ก.ย.** ส่วน**เฟส B ยังไม่เริ่ม** เพราะไปแตะไฟล์ชุดเดียวกับที่ Esther03u กำลังจะทำงานข้อ 4 เฟส 2 พอดี
 
 > 🔴 **ถึง Esther03u: อย่าเพิ่งเริ่มเฟส B จนกว่าจะตกลงจังหวะกัน** — งานข้อ 4 เฟส 2 ของคุณกับเฟส B ของแผนนี้แตะไฟล์ชุดเดียวกันเป๊ะ ทำพร้อมกันจะ conflict หนักกว่างานทั้งสองฝั่งรวมกัน · **ทำข้อ 4 เฟส 2 ให้จบก่อน แล้วค่อยรื้อ** เป็นลำดับที่ปลอดภัยที่สุด
 
@@ -228,30 +228,61 @@ qr/[id] + assets.ts    "{อาคาร} - ห้อง {ห้อง}"    ← 
 
 ---
 
-## เฟส A — backend ล้วน (DoubleKill · ไม่แตะ `src/components/**` เลย)
+## ✅ เฟส A — backend ล้วน · เสร็จแล้ว 3 ก.ย. (6 commit)
 
-**ทำได้โดยไม่ชนกับใคร** และควรทำก่อนเฟส B เพราะเฟส B จะเรียกใช้ของที่แตกไว้แล้ว
+**ไม่แตะ `src/components/**` เลยแม้แต่ไฟล์เดียว** และ **ทุก action ยังชื่อเดิม อยู่ path เดิม** (`@/app/admin/actions`, `@/app/tech/actions`, `@/app/admin/master-data/actions`) — เป็นการย้าย implementation ล้วน **UI ไม่ต้องแก้แม้แต่ import เดียว**
+
+| ขั้น | commit | ผล |
+|---|---|---|
+| 1 | `8e64a0a` | `formatAcLocation` 4 แบบ 7 จุด → `src/lib/location.ts` ตัวเดียว |
+| 2 | `386ae4a` | mapper 3 ตัว + include 3 ชุด → `src/lib/tech/job-rows.ts` |
+| 3 | `b5ba2c9` | `app/tech/actions.ts` 471 → **55** บรรทัด + `src/lib/tech/**` |
+| 4 | `f3eeef5` | `master-data/actions.ts` 506 → **80** บรรทัด + `lib/admin/master-data.ts` |
+| 5-6 | `401501c` | `assets.ts` 619 → 5 ไฟล์ · `settings.ts` 448 → 4 ไฟล์ |
+
+### โครงสร้าง backend หลังเฟส A
 
 ```
-lib/admin/assets.ts (619)        →  buildings.ts · rooms.ts · air-conditioners.ts
-                                     maintenance-logs.ts · schedules.ts
-lib/admin/settings.ts (448)      →  users.ts · profile.ts · organisation-settings.ts · audit-log.ts
-app/admin/master-data/actions.ts →  lib/admin/master-data.ts + wrapper บางๆ
-app/tech/actions.ts (540)        →  lib/tech/dashboard.ts · jobs.ts · maintenance-log.ts · qr.ts
-                                     เหลือ actions.ts เป็น wrapper ตามแพทเทิร์นฝั่ง admin
-mapper 3 ตัว + include 3 ชุด     →  techJobInclude + toTechJobRow() อย่างละตัวเดียว
-formatAcLocation 4 แบบ           →  src/lib/location.ts ตัวเดียว
+src/lib/
+├── location.ts              ที่อยู่ของเครื่อง 4 รูปแบบ (เดิมกระจาย 7 จุด)
+├── catalogue-status.ts      ธงยี่ห้อ/รุ่นที่ถูกลบ
+├── admin/
+│   ├── dashboard.ts         getOrgAdminData()
+│   ├── work-orders.ts       ใบงาน
+│   ├── work-order-board.ts  select + mapper + where ของกระดาน
+│   ├── buildings.ts         อาคาร
+│   ├── rooms.ts             ห้อง
+│   ├── air-conditioners.ts  ลงทะเบียน/แก้ไขแอร์
+│   ├── maintenance-logs.ts  ประวัติ + แก้ไข log
+│   ├── schedules.ts         รอบ PM
+│   ├── master-data.ts       ยี่ห้อ/รุ่น + ถังขยะ
+│   ├── users.ts             อนุมัติ/ระงับ/รีเซ็ตรหัสผ่าน
+│   ├── profile.ts           โปรไฟล์ตัวเอง (ใช้ร่วมกับฝั่งช่าง)
+│   ├── organisation-settings.ts
+│   └── audit-log.ts
+└── tech/
+    ├── guards.ts · dashboard.ts · jobs.ts · maintenance-log.ts · qr.ts · job-rows.ts
 ```
 
-**ผลที่ได้:** เพิ่ม field ใน 3 รายการงานของช่างจะแก้ที่เดียวแทน 3 ที่ · ไฟล์ใหญ่สุดฝั่ง backend ลงจาก 619 เหลือ ~150 · ที่อยู่ของเครื่องแสดงเหมือนกันทุกหน้า
+**ไฟล์ใหญ่สุดฝั่ง backend ลงจาก 619 เหลือ 281 บรรทัด**
 
-**ไม่กระทบใคร:** ทุก action ยังชื่อเดิม เรียกจาก path เดิม (`@/app/admin/actions`, `@/app/tech/actions`) — เป็นการย้าย implementation อย่างเดียว UI ไม่ต้องแก้แม้แต่ import เดียว
+### 📌 กฎที่ยังใช้เหมือนเดิม (สำคัญกว่าเดิมด้วยซ้ำ เพราะตอนนี้มี 3 ไฟล์ที่เป็น wrapper)
 
-### ⚠️ กับดักที่ต้องระวังตอนทำเฟส A
+`"use server"` ห้าม re-export — `export { x } from "./y"` จะ build พัง (`Only async functions are allowed to be exported in a "use server" file`) **ทั้งที่ tsc ผ่าน** · เพิ่ม action ใหม่ต้องเขียน implementation ใน `src/lib/**` **แล้วเพิ่ม wrapper ในไฟล์ actions ด้วย** ข้ามข้อสองจะเรียกจาก UI ไม่ได้
 
-`"use server"` ห้าม re-export — `export { x } from "./y"` จะ build พัง (`Only async functions are allowed to be exported in a "use server" file`) ทั้งที่ tsc ผ่าน · ต้องใช้ wrapper บางๆ แบบที่ `admin/actions.ts` ทำอยู่ ดูหัวข้อ "แยก admin/actions.ts" ด้านล่างของไฟล์นี้
+### สิ่งที่เปลี่ยนพฤติกรรม (มีอย่างเดียว)
 
-## เฟส B — แตกเป็นหน้าจริง (ต้องแตะไฟล์ของ Esther03u)
+`jobPool` ได้ field `airConditionerId` เพิ่มมา (เดิมมีเฉพาะ `myJobs` / `completedJobs`) — optional ใน `TechJobItem` และการ์ดในกองงานไม่ได้อ่าน จึงไม่มีอะไรเปลี่ยนบนจอ แต่ทำให้ทั้ง 3 รายการ shape ตรงกันสนิท
+
+**ที่อยู่ของเครื่องยังพิมพ์เหมือนเดิมทุกตัวอักษร** — พิสูจน์ด้วยการรันสูตรเก่ากับใหม่บนห้องจริงทั้ง 32 ห้อง ครบทั้ง 4 รูปแบบ 32/32 เหมือนกัน
+
+### ⚠️ ที่ยังไม่ได้ทดสอบ
+
+ยังไม่ได้กดปุ่มทดสอบ action ฝั่ง**เขียน**จริงหลังย้าย (รับงาน / บันทึกงาน / สแกน QR / สร้าง-แก้แอร์ / ลบยี่ห้อ) — ยืนยันแล้วเฉพาะ `npm run build` ผ่าน (ตัวเดียวที่จับกฎ `"use server"` ได้), `tsc` ผ่าน, และเส้นทาง**อ่าน**ทั้งหมดผ่าน wrapper ตัวใหม่ (หน้า `/admin` 173 แถว · หน้า `/tech` 73 เครื่อง · `/api/tech/units`)
+
+**ใครเปิดเครื่องต่อ ช่วยกดทดสอบฝั่งเขียนสัก 2-3 ปุ่มด้วย** — โครงสร้าง wrapper แบบนี้ใช้กับ 19 action ฝั่ง admin มาตั้งแต่ 25 ส.ค. แล้วไม่มีปัญหา แต่ยังไม่ได้พิสูจน์ซ้ำหลังย้ายรอบนี้
+
+## ⏳ เฟส B — แตกเป็นหน้าจริง (ยังไม่เริ่ม · ต้องแตะไฟล์ของ Esther03u)
 
 ```
 /admin  →  /admin/overview · /work-orders · /approvals · /team
