@@ -168,15 +168,23 @@ npx prisma migrate deploy && npx prisma generate
 
 *ลำดับเดิมของ backlog (ข้อ 1 → 2 → 3 → 4) เก็บไว้ในหัวข้อ "ลำดับที่แนะนำตอนวางแผน (27 ส.ค.)" ด้านล่าง*
 
-### 📌 หมายเหตุเรื่องการแบ่งงาน
+### 🔴 กฎแบ่งงาน backend/frontend — ยกเลิกแล้ว (3 ก.ย. 2026)
 
-รอบ 1–2 ก.ย. มีการแก้ไฟล์ฝั่ง backend มาจากฝั่ง UI 6 ไฟล์ (`schema.prisma`, migration, `work-order-board.ts`, `work-orders.ts`, `assets.ts`, `settings.ts`) — DoubleKill ตรวจให้ครบแล้วและเจอบั๊ก timezone 1 ตัวที่หลุดไป (ดูหัวข้อ "ตรวจงาน backend ที่ Esther03u แก้มา")
+เจ้าของโปรเจกต์ยกเลิกกฎที่ว่า DoubleKill ทำเฉพาะ backend (`schema.prisma`, `**/actions.ts`, `src/app/api/**`, `src/lib/**`) และ Esther03u ทำเฉพาะ `src/components/**`
 
-ไม่ได้ห้าม แต่ถ้าแตะไฟล์ backend **ช่วยเขียนไว้ใน HANDOFF ด้วยว่าแตะอะไรไปบ้าง** จะได้ตรวจได้ตรงจุดและไม่ต้องไล่ diff ทั้งก้อน · ถ้าเป็นงานที่รอได้ เขียนเป็น request ไว้แบบข้อ 4 เฟส 2 จะเร็วกว่าสำหรับทั้งคู่
+**ต่อไปนี้ทั้งคู่แตะได้ทุกไฟล์** ไม่ต้องเขียน request ขอกันอีก · ส่วนที่ยังใช้ได้อยู่คือ **เขียนไว้ใน HANDOFF ว่าแตะอะไรไป** เพราะรอบ 1–2 ก.ย. มีบั๊ก timezone หลุดไปหนึ่งตัวและกว่าจะเจอต้องไล่ diff ทั้งก้อน (ดูหัวข้อ "ตรวจงาน backend ที่ Esther03u แก้มา")
 
 ---
 
-# 🏗️ รื้อโครงสร้างโค้ด — ✅ เฟส A เสร็จแล้ว (3 ก.ย. 2026) · ⏳ เฟส B ยังไม่เริ่ม
+# 🏗️ รื้อโครงสร้างโค้ด — ✅ เสร็จทั้งเฟส A และ B (3 ก.ย. 2026)
+
+> # 🔴🔴 ถึง Esther03u — อ่านก่อนแตะโค้ดอะไรทั้งสิ้น
+>
+> **1. กฎแบ่งงาน backend/frontend ถูกยกเลิกแล้ว** โดยเจ้าของโปรเจกต์ (3 ก.ย.) — ต่อไปนี้ทั้งคู่แตะได้ทุกไฟล์ ไม่ต้องเขียน request ขอกันอีก
+>
+> **2. `/admin` และ `/tech` ถูกแตกเป็น 15 route จริงแล้ว** และ **ลบ 2 ไฟล์ทิ้ง**: `admin-dashboard-view.tsx` กับ `tech-mobile-view.tsx`
+>
+> **ถ้าคุณแก้งานข้อ 4 เฟส 2 ค้างไว้ในเครื่อง อย่าเพิ่ง `git pull` แบบ merge เฉยๆ** — ดูหัวข้อ "คู่มือย้ายงานที่ค้างอยู่" ด้านล่าง งานของคุณส่วนใหญ่**ไม่เสีย** เพราะ panel ทุกตัวยังอยู่ที่เดิมและรับ props เหมือนเดิมเป๊ะ
 
 เจ้าของโปรเจกต์ให้วิเคราะห์โครงสร้างทั้งโปรเจกต์ (109 ไฟล์ ~18,700 บรรทัด) เพื่อแบ่งเป็นแต่ละหน้า แยก backend/frontend และ refactor · **เฟส A (backend ล้วน) ทำเสร็จแล้ว 3 ก.ย.** ส่วน**เฟส B ยังไม่เริ่ม** เพราะไปแตะไฟล์ชุดเดียวกับที่ Esther03u กำลังจะทำงานข้อ 4 เฟส 2 พอดี
 
@@ -282,7 +290,112 @@ src/lib/
 
 **ใครเปิดเครื่องต่อ ช่วยกดทดสอบฝั่งเขียนสัก 2-3 ปุ่มด้วย** — โครงสร้าง wrapper แบบนี้ใช้กับ 19 action ฝั่ง admin มาตั้งแต่ 25 ส.ค. แล้วไม่มีปัญหา แต่ยังไม่ได้พิสูจน์ซ้ำหลังย้ายรอบนี้
 
-## ⏳ เฟส B — แตกเป็นหน้าจริง (ยังไม่เริ่ม · ต้องแตะไฟล์ของ Esther03u)
+## ✅ เฟส B — แตกเป็นหน้าจริง · เสร็จแล้ว 3 ก.ย. (`12d1d22`, `625a152`)
+
+### แผนที่ route ใหม่
+
+```
+/admin              ภาพรวมระบบ            /tech              งานทั้งหมด (กองงาน)
+/admin/work-orders  กระดานใบงาน            /tech/my-jobs      งานของฉัน
+/admin/approvals    อนุมัติผู้ใช้งาน        /tech/history      ประวัติ
+/admin/team         เจ้าหน้าที่ & ช่าง      /tech/assets       แอร์ทั้งหมด
+/admin/assets       ระบบสินทรัพย์          /tech/calendar     ปฏิทิน
+/admin/calendar     ปฏิทินซ่อมบำรุง        /tech/profile      โปรไฟล์ของฉัน
+/admin/qr-codes     จัดการ QR Code
+/admin/profile      จัดการโปรไฟล์
+/admin/settings     ตั้งค่าระบบ
+```
+
+### ผลที่วัดได้จริง (ขนาด payload ที่ server ส่งจริง)
+
+| หน้า | ก่อน | หลัง |
+|---|---|---|
+| `/admin/approvals` | ทุกหน้าโหลดชุดเดียวกันหมด **9 query ~437 แถว** | **14 KB** |
+| `/admin/profile` | " | **14 KB** |
+| `/admin/calendar` | " | **14 KB** (ไม่อ่าน DB เลย) |
+| `/admin` (ภาพรวม) | " | 83 KB |
+| `/tech/my-jobs` | ทุกหน้าโหลด pool 44 + ของฉัน 6 + ประวัติ 6 + แอร์ 73 | **15 KB** |
+| `/tech/calendar` | " | **13 KB** (ไม่อ่าน DB เลย) |
+
+**สิ่งที่ได้เพิ่มมานอกจากความเร็ว:** แชร์ลิงก์เข้าหน้าใดหน้าหนึ่งได้ · refresh แล้วอยู่หน้าเดิม · ปุ่ม back ของเบราว์เซอร์ใช้ได้ · เพิ่มหน้าใหม่ = สร้างโฟลเดอร์เดียว ไม่ต้องไปแก้ 3 ที่
+
+### โครงสร้างใหม่ฝั่ง UI
+
+```
+src/app/admin/layout.tsx        guard + AdminShell (sidebar/header) ครอบทุกหน้า
+src/app/admin/error.tsx         แบนเนอร์ตอนโหลดข้อมูลไม่ได้ (แทน dbError เดิม)
+src/app/admin/<หน้า>/page.tsx   Server Component โหลดเฉพาะข้อมูลของตัวเอง
+src/app/admin/<หน้า>/*-client.tsx  ตัวห่อบางๆ ที่ดึง search/handler มาป้อน panel
+
+src/components/admin/admin-shell.tsx              sidebar + header + ปุ่มสร้างใบงาน
+src/components/admin/create-work-order-provider.tsx  โมดัลสร้างใบงาน (โหลดข้อมูลตอนเปิด)
+src/components/admin/use-admin-actions.ts         hook มอบหมาย/ยกเลิก/เปลี่ยนสถานะผู้ใช้
+src/components/layout/dashboard-search.tsx        ช่องค้นหาบน header (ล้างเองตอนเปลี่ยนหน้า)
+src/components/tech/tech-shell.tsx                shell ฝั่งช่าง + โมดัล 3 ตัว
+src/lib/admin/pages.ts · src/lib/tech/pages.ts    loader ต่อหน้า
+src/lib/admin/asset-tree.ts                       query + shape ของ อาคาร→ห้อง→แอร์
+```
+
+---
+
+# 📦 คู่มือย้ายงานที่ค้างอยู่ — ถึง Esther03u
+
+## ข่าวดี: panel ทุกตัวไม่ถูกแตะเลย
+
+`overview-panel` · `work-order-board` · `user-approvals-panel` · `team-panel` · `asset-manager` · `qr-code-manager` · `settings-panel` · `job-pool-panel` · `my-jobs-panel` · `completed-jobs-panel` · `assets-panel` · โมดัลทุกตัว · `maintenance-calendar`
+
+**ทั้งหมดยังอยู่ที่เดิม ชื่อเดิม รับ props ชุดเดิมเป๊ะ** — งานเพิ่มไอคอนข้อ 4 เฟส 2 ของคุณอยู่ในไฟล์พวกนี้ทั้งหมด จึง **merge ได้ตามปกติ ไม่ต้องเขียนใหม่**
+
+## ที่หายไปมี 2 ไฟล์
+
+| ไฟล์ที่ลบ | ของเดิมทำอะไร | ตอนนี้ไปอยู่ที่ไหน |
+|---|---|---|
+| `components/admin/admin-dashboard-view.tsx` | สลับแท็บ 9 อัน + ถือ state + เรียก action | แตกเป็น `app/admin/*/page.tsx` + `admin-shell.tsx` + `use-admin-actions.ts` |
+| `components/tech/tech-mobile-view.tsx` | สลับแท็บ 6 อัน + โมดัล 3 ตัว | แตกเป็น `app/tech/*/page.tsx` + `tech-shell.tsx` |
+
+**ถ้าคุณแก้ 2 ไฟล์นี้ไว้** git จะบอกว่า conflict แบบ "deleted by them" — ดู diff ของคุณว่าแก้อะไร แล้วเอาไปใส่ใน page/client ตัวใหม่ที่ตรงกัน ถ้าไม่ชัดว่าอันไหนตรงกันถามได้
+
+## ถ้าจะเพิ่มหน้าใหม่หลังจากนี้
+
+สร้าง `src/app/admin/<ชื่อ>/page.tsx` + เพิ่ม 1 บรรทัดใน `navItems` ของ `admin-shell.tsx` — จบ ไม่ต้องแตะที่อื่น
+
+## ถ้า panel ต้องใช้คำค้นจากช่อง search บน header
+
+```tsx
+"use client";
+import { useDashboardSearch } from "@/components/layout/dashboard-search";   // ฝั่ง admin
+import { useTechFilters } from "@/components/tech/tech-shell";               // ฝั่งช่าง
+```
+
+ช่องค้นหา**ล้างค่าเองเมื่อเปลี่ยนหน้า** ไม่ต้องเขียนเงื่อนไขล้างเองอีก (บั๊กข้อ 1 รอบ 27 ส.ค. หายไปเชิงโครงสร้างแล้ว)
+
+---
+
+## ⚠️ ที่ยังไม่ได้ทดสอบหลังรื้อ (สำคัญ)
+
+ยืนยันแล้ว: `npm run build` ผ่าน · `tsc` ผ่าน · **ทั้ง 15 route คืน 200 พร้อมข้อมูลถูกต้อง** (นับจาก payload จริง: กองงาน 44 · งานของฉัน 6 · ประวัติ 6 · แอร์ 73 · แถวสินทรัพย์ admin 173)
+
+**ยังไม่ได้กดปุ่มทดสอบฝั่งเขียนผ่านหน้าจอจริง** — Browser pane ที่ใช้ทดสอบถูกซ่อนอยู่ หน้าเว็บจึงมีขนาด 0×0 และ React ไม่ hydrate กดปุ่มไม่ได้เลย
+
+**ช่วยกดทดสอบให้หน่อยตอนเปิดเครื่อง** โดยเฉพาะ 6 อย่างนี้ที่ handler ถูกย้ายที่:
+1. กด "รับงาน" ในกองงาน → ต้องเด้งไป `/tech/my-jobs`
+2. บันทึกงานจาก "งานของฉัน"
+3. สแกน QR จากปุ่มบน header
+4. สร้างใบงานจากปุ่มบน header (โมดัลโหลดข้อมูลตอนเปิด — ครั้งแรกจะมีดีเลย์นิดหนึ่ง ปกติ)
+5. มอบหมายงานจากกระดานใบงาน และจากตารางรอซ่อมด่วนในหน้าภาพรวม
+6. อนุมัติ/ระงับผู้ใช้
+
+---
+
+## 🔴 เจอระหว่างทาง — รหัสผ่านถูกพิมพ์ลง log ของเซิร์ฟเวอร์
+
+ตอนล็อกอินทดสอบ เห็นใน terminal ของ dev server:
+
+```
+[AUTH LOG] rawCredentials: { csrfToken: '...', email: '...', password: 'TestPass123!', ... }
+```
+
+**รหัสผ่านจริงถูกพิมพ์เป็น plain text** ลง console ของเซิร์ฟเวอร์ทุกครั้งที่มีคนล็อกอิน มาจาก debug log ใน `src/lib/auth.ts` · ยังไม่แก้เพราะอยู่นอกขอบเขตงานรื้อโครงสร้างรอบนี้ **แต่ต้องเอาออกก่อน deploy จริงแน่นอน** ไม่งั้นรหัสผ่านผู้ใช้ทุกคนจะไปกองอยู่ใน log ของ production
 
 ```
 /admin  →  /admin/overview · /work-orders · /approvals · /team
