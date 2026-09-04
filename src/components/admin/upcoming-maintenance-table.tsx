@@ -57,6 +57,11 @@ export interface UrgentMaintenanceAC {
   priority: string | null;
   issueDescription: string | null;
   reportedAt: string | null;
+  // The open work order on this unit, straight from the server's own query over
+  // every pending job. `pendingWorkOrderId` below is the same value under the
+  // name the table reads; both are kept so the row stays assignable whichever
+  // one a caller reaches for.
+  workOrderId?: string | null;
   pendingWorkOrderId?: string | null;
   nextDueDate?: string | null;
 }

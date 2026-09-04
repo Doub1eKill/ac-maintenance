@@ -69,21 +69,42 @@ export function OverviewPanel({
 
     const urgentRows: MaintenanceRow[] = [...urgentUnits]
       .sort((a, b) => {
+        // Units that actually have an open job come first.
+        //
+        // Without this the list opened with the twelve units that are flagged
+        // as broken or due but have no work order raised on them. They sort to
+        // the very top because they have no report date, and `?? 0` reads a
+        // missing date as the beginning of time — so the rows nobody has
+        // ticketed yet outranked jobs reported in July, and the first thing an
+        // admin saw was the only rows the "มอบหมายช่าง" button cannot act on.
+        const aHasJob = a.workOrderId !== null;
+        const bHasJob = b.workOrderId !== null;
+        if (aHasJob !== bHasJob) return aHasJob ? -1 : 1;
+
         const rankDiff = priorityRank(a.priority) - priorityRank(b.priority);
         if (rankDiff !== 0) return rankDiff;
+
+        // Oldest report first, among rows that have one. The `?? 0` is now only
+        // reached by two rows that both lack a date, where it is a tie.
         const aTime = a.reportedAt ? new Date(a.reportedAt).getTime() : 0;
         const bTime = b.reportedAt ? new Date(b.reportedAt).getTime() : 0;
         return aTime - bTime;
       })
-      .map((u) => {
-        const pendingWo = workOrders.find((wo) => wo.airConditionerId === u.id && wo.status === "pending");
-        return {
-          kind: "urgent" as const,
-          ...u,
-          pendingWorkOrderId: pendingWo ? pendingWo.id : null,
-          nextDueDate: nextDueDateByAcId.get(u.id) ?? null,
-        };
-      });
+      .map((u) => ({
+        kind: "urgent" as const,
+        ...u,
+        // Taken from the unit itself, which the server fills in from a query
+        // over every open work order.
+        //
+        // This used to search the `workOrders` prop for a pending row on the
+        // same unit. That prop is the work order board's first page — fifty
+        // rows of every status, newest first — so it holds only a fraction of
+        // the open jobs, and matched none of the 38 urgent units that have one.
+        // The result was a "มอบหมายช่าง (0)" button that was disabled no matter
+        // what was ticked: the bulk assign on this table could never be used.
+        pendingWorkOrderId: u.workOrderId,
+        nextDueDate: nextDueDateByAcId.get(u.id) ?? null,
+      }));
 
     // Typed off MaintenanceRow rather than restating its fields: the inline
     // copy this replaces had to be edited in step with the interface, and was
