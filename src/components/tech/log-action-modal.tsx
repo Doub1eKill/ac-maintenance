@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { X, Sparkles, Wrench, Droplets } from "lucide-react";
-import { Pattern as FileUpload } from "@/components/examples/c-file-upload-4";
+import { PhotoUpload } from "@/components/tech/photo-upload";
 import {
   NativeSelect,
   NativeSelectOption,
@@ -129,16 +129,18 @@ export function LogActionModal({ job, isPending, onClose, onSubmit, onValidation
             <div className="flex flex-col gap-3">
               <div className="border border-border p-2 rounded-xl bg-muted">
                 <div className="text-[10px] font-bold text-muted-foreground mb-1">ภาพก่อนซ่อมบำรุง:</div>
-                <FileUpload
+                <PhotoUpload
                   maxFiles={1}
+                  multiple={false}
                   className="w-full"
                   onFilesChange={(files) => setBeforePhotos(files)}
                 />
               </div>
               <div className="border border-border p-2 rounded-xl bg-muted">
                 <div className="text-[10px] font-bold text-muted-foreground mb-1">ภาพหลังซ่อมบำรุง:</div>
-                <FileUpload
+                <PhotoUpload
                   maxFiles={1}
+                  multiple={false}
                   className="w-full"
                   onFilesChange={(files) => setAfterPhotos(files)}
                 />

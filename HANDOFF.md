@@ -457,6 +457,74 @@ const [expandedBuildingId, setExpandedBuildingId] = useState<string | null>(null
 
 ---
 
+# ✅ ทดสอบ 3 action ที่ค้างจากการรื้อเฟส A — ผ่านหมด (4 ก.ย. 2026, DoubleKill)
+
+สาม action นี้ถูกย้ายไฟล์ตอนรื้อโครงสร้างแต่ยังไม่เคยกดใช้จริง ตอนนี้กดครบแล้วบน dev server และ**ตรวจผลถึงระดับแถวในฐานข้อมูล** ไม่ใช่แค่ดูหน้าจอ · คืนค่า DB กลับเป็นเดิมครบทุกแถวหลังทดสอบ (work_orders 58 · maintenance_logs 230 · audit 29 · pending 44 / claimed 6 / completed 6 / cancelled 2 เท่าเดิมเป๊ะ)
+
+## 1. บันทึกงานจาก "งานของฉัน" (`logMaintenanceAction`) ✅
+
+ปิดใบงาน #11 (B467711-7-970896-02) ด้วย ล้างแอร์ + สถานะ "ใช้งานได้ปกติ" + บันทึกภาษาไทย ผลที่ได้ครบทุกจุด:
+
+| ตาราง | ผล |
+|---|---|
+| `work_orders` #11 | `claimed` → `completed` · `completed_at` = 2026-09-04 09:56:16 (UTC ถูกต้อง = 16:56 ไทย) |
+| `maintenance_logs` #621 | `action=cleaning` · `work_order_id=11` · `user_id=3` · บันทึกภาษาไทยไม่เพี้ยน |
+| `air_conditioners` #21 | `needs_cleaning` → `normal` |
+| `maintenance_schedules` | `last_performed_at` 2025-12-11 → **2026-09-04** · `next_due_date` 2026-03-11 → **2026-12-04** (บวก 3 เดือนถูกต้อง เป็น `@db.Date` ล้วน ไม่มีเวลาปน) |
+| `system_audit_logs` | เพิ่มแถว `COMPLETE_WORKORDER` |
+
+**ลำดับล็อกที่กลัวกันไว้ไม่มีปัญหา** — transaction ผ่านฉลุย ไม่มี deadlock · หน้าจอเด้งการ์ดออกจาก "งานของฉัน" ทันที (3 → 2 งาน) และ badge ข้างเมนูลด 6 → 5
+
+## 2. สแกน QR (`scanQrCodeAction`) ✅
+
+กรอก `B467711-7-970896-03` ในโมดัลสแกน (ปุ่มบน header) → คืนข้อมูลครบ: รหัส · ยี่ห้อ Daikin · ตำแหน่ง "Administration Building 293183 - ห้อง 7-970896" · สถานะ "มีปัญหา" · ล้างล่าสุด 10/11/2025 · แถบ "มีใบงานด่วนอยู่!" พร้อมปุ่มรับงาน
+เส้นทาง error ก็ทำงาน — กรอกรหัสมั่ว (`NOT-A-REAL-CODE`) ขึ้น toast แจ้งไม่พบเครื่อง ไม่ค้าง ไม่ throw
+
+## 3. สร้างใบงานจากปุ่มบน header (admin) ✅
+
+โมดัล cascade 3 ชั้นทำงานถูกต้อง: เลือกอาคาร → รายการห้องโผล่ 10 ห้อง → เลือกห้อง → รายการแอร์โผล่ 3 เครื่องพร้อม BTU
+สร้างใบงานล้าง priority `high` บนเครื่อง #21 → ได้แถว `work_orders` #124 (`pending`, `type=cleaning`, `priority=high`, `created_at` UTC ถูกต้อง) + audit `CREATE_WORKORDER` · badge "กระดานใบงาน" 44 → 45 และการ์ด "รอล้าง" 25 → 26 ทันที
+**ดีเลย์ตอนเปิดโมดัลครั้งแรกยังมีอยู่จริงตามที่บันทึกไว้** (โหลดรายชื่ออาคาร/ช่างตอนเปิด) แต่ไม่ถึงวินาที
+
+## ✅ 3 เรื่องที่เจอระหว่างทดสอบ — แก้แล้วทั้งหมด (4 ก.ย.)
+
+ทั้งสามเรื่องอยู่ในโมดัล "บันทึกประวัติการซ่อม" และมีต้นเหตุเดียวกัน: `log-action-modal.tsx` เรียก `Pattern` จาก **`@/components/examples/c-file-upload-4`** ซึ่งเป็นไฟล์ตัวอย่างของ ReUI มาใช้ตรงๆ
+
+| # | อาการ | แก้อย่างไร |
+|---|---|---|
+| 1 | **ช่องอัปโหลดมีรูปปลอมติดมา 3 รูปทุกครั้งที่เปิด** — ไฟล์ตัวอย่างฝัง `defaultImages` ที่ดึงจาก `picsum.photos` ช่างจึงเห็น "หลักฐานก่อน/หลังซ่อม" เป็นรูปสุ่มจากเน็ตที่ไม่ใช่ของตัวเอง ตัวนับขึ้น `Gallery (3/1)` เกินเพดาน 1 ไฟล์ของตัวเอง (รูปพวกนี้ไม่เคยถูกส่งขึ้นเซิร์ฟเวอร์ แต่หลอกตาเต็มๆ และถ้าออกเน็ตไม่ได้จะขึ้นรูปแตก) | ลบ `defaultImages` และ `initialFiles` ทิ้ง |
+| 2 | **console error ทุกครั้งที่เปิดโมดัล** — `Cannot update a component (LogActionModal) while rendering a different component (Pattern)` | ต้นเหตุอยู่ใน `use-file-upload.ts`: เรียก `onFilesChange` **จากข้างใน updater ของ `setState`** ทั้ง 3 จุด (`clearFiles` / `addFiles` / `removeFile`) ซึ่ง React รันช่วง render → กลายเป็น setState-in-render ของ component แม่ · ย้ายไปแจ้งจาก `useEffect` ที่ผูกกับ `state.files` แทน (ข้าม pass แรกตอน mount เพื่อให้ความหมายเหมือนเดิมคือแจ้งเฉพาะตอนเปลี่ยน) |
+| 3 | **ปุ่มในช่องอัปโหลด 9 ปุ่มไม่ได้ใส่ `type="button"`** จึงเป็น `submit` ตามค่าเริ่มต้นของ HTML ทั้งที่อยู่ในฟอร์มเดียวกับ "บันทึกและเสร็จสิ้น" (ตอนเจอ ทดสอบแล้วว่ายังไม่ทำให้ฟอร์ม submit จริง แต่เป็นระเบิดเวลา) | ใส่ `type="button"` ให้ทุกปุ่มในคอมโพเนนต์ · ตอนนี้ในฟอร์มเหลือปุ่ม `submit` แค่ปุ่มเดียวคือ "บันทึกและเสร็จสิ้น" (ตรวจจาก DOM จริงแล้ว) |
+
+**ย้ายไฟล์ด้วย:** `src/components/examples/c-file-upload-4.tsx` → **`src/components/tech/photo-upload.tsx`** (`Pattern` → `PhotoUpload`) เพราะไฟล์นี้ไม่ใช่ของตัวอย่างแล้ว มันคือช่องแนบรูปที่ช่างใช้จริง · มีคอมเมนต์บอกที่มาไว้หัวไฟล์ · **เหลือ `src/components/examples/` แค่ `c-pagination-3.tsx` ไฟล์เดียว** ซึ่งไม่มีใครเรียกใช้จริง (ตอบคำถามที่ค้างกับ Esther03u ไปได้ครึ่งหนึ่ง)
+
+โมดัลส่ง `multiple={false}` เพิ่มให้ตรงกับ `maxFiles={1}` ที่ตั้งไว้อยู่แล้ว — เลือกรูปใหม่ทับรูปเดิมได้เลย จากเดิมที่ขึ้น error ว่าเกิน 1 ไฟล์แล้วต้องกด "Clear all" ก่อน
+
+### ทดสอบหลังแก้ (กดใช้จริง ไม่ใช่แค่ build ผ่าน)
+
+- เปิด/ปิดโมดัลซ้ำ — **ช่องแนบรูปว่างเปล่าทั้งสองช่อง ไม่มี `Gallery (3/1)` แล้ว** และ **console ไม่มี error เลย** (ดักนับ `console.error` เองระหว่างเปิดปิด ได้ 0)
+- ตรวจ DOM ของฟอร์ม: ปุ่มทุกตัวมี `type` ชัดเจน มี `submit` ตัวเดียวคือปุ่มบันทึก
+- **ปิดใบงาน #11 ซ้ำอีกรอบหลังแก้ ผ่านครบเหมือนเดิม** — log เขียนถูก · แอร์กลับเป็น `normal` · ตารางล้างเลื่อนไป 2026-12-04
+- **ทดสอบแนบรูปจริงเป็นครั้งแรกของโปรเจกต์** — ยัดไฟล์ PNG เข้า input แล้วส่ง: ตัวนับขึ้น `Gallery (1/1) Total: 84Bytes` และ `maintenance_logs.before_photo_url` ได้ค่า `/uploads/1788517003749-before-test.jpg` (sharp แปลงเป็น jpg ให้) — **เส้นทางแนบรูปใช้งานได้จริง** ไม่ใช่แค่ปุ่มหลอก
+- คืนค่า DB และลบไฟล์ที่อัปโหลดทดสอบออกจาก `public/uploads/` แล้ว
+
+## ⚠️ mysqld: `Start-Process` ก็ไม่รอดแล้ว ต้องใช้ WMI
+
+HANDOFF เดิมบอกว่าให้สตาร์ท MariaDB ด้วย PowerShell ห้ามใช้ Bash · รอบนี้เจอว่า **`Start-Process` ผ่าน PowerShell ก็ตายด้วย** — process ขึ้นมาฟังพอร์ต 3306 ได้จริง แล้วถูกฆ่าทิ้งทันทีที่คำสั่งจบ (log ขาดกลางแบบไม่มีข้อความ shutdown) เพราะถูกผูกไว้กับ job object ของ shell ที่เรียก
+
+ทางที่ใช้ได้คือให้ WMI เป็นคนสร้าง process แทน จะหลุดออกจาก job object ของ shell:
+
+```powershell
+Remove-Item C:\xampp\mysql\data\mysql.pid -Force -ErrorAction SilentlyContinue
+Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{
+  CommandLine = '"C:\xampp\mysql\bin\mysqld.exe" --defaults-file=C:\xampp\mysql\bin\my.ini'
+}
+```
+
+และ **client ต้องต่อด้วย `-h 127.0.0.1 -P 3306`** — `mysql.exe` เปล่าๆ จะไปหา named pipe แล้วขึ้น `ERROR 2002 (10061)` ทั้งที่เซิร์ฟเวอร์รันอยู่
+
+---
+
 # 📦 คู่มือย้ายงานที่ค้างอยู่ — ถึง Esther03u
 
 ## ข่าวดี: panel ทุกตัวไม่ถูกแตะเลย

@@ -3,6 +3,7 @@
 import type React from "react"
 import {
   useCallback,
+  useEffect,
   useRef,
   useState,
   type ChangeEvent,
@@ -85,6 +86,27 @@ export const useFileUpload = (
 
   const inputRef = useRef<HTMLInputElement>(null)
 
+  // onFilesChange used to be called from inside the setState updaters below.
+  // React runs an updater during the render phase, so notifying a parent there
+  // is a setState-in-render — React logged "Cannot update a component while
+  // rendering a different component" on every file change. Notifying from an
+  // effect keeps the updaters pure and hands the parent a committed value.
+  const onFilesChangeRef = useRef(onFilesChange)
+  useEffect(() => {
+    onFilesChangeRef.current = onFilesChange
+  })
+
+  const hasNotifiedRef = useRef(false)
+  useEffect(() => {
+    // Skip the mount pass so the parent hears about changes only, the way it
+    // did when the callback lived in the updaters.
+    if (!hasNotifiedRef.current) {
+      hasNotifiedRef.current = true
+      return
+    }
+    onFilesChangeRef.current?.(state.files)
+  }, [state.files])
+
   const validateFile = useCallback(
     (file: File | FileMetadata): string | null => {
       if (file instanceof File) {
@@ -163,10 +185,9 @@ export const useFileUpload = (
         errors: [],
       }
 
-      onFilesChange?.(newState.files)
       return newState
     })
-  }, [onFilesChange])
+  }, [])
 
   const addFiles = useCallback(
     (newFiles: FileList | File[]) => {
@@ -243,7 +264,6 @@ export const useFileUpload = (
           const newFiles = !multiple
             ? validFiles
             : [...prev.files, ...validFiles]
-          onFilesChange?.(newFiles)
           return {
             ...prev,
             files: newFiles,
@@ -272,7 +292,6 @@ export const useFileUpload = (
       createPreview,
       generateUniqueId,
       clearFiles,
-      onFilesChange,
       onFilesAdded,
     ]
   )
@@ -291,7 +310,6 @@ export const useFileUpload = (
         }
 
         const newFiles = prev.files.filter((file) => file.id !== id)
-        onFilesChange?.(newFiles)
 
         return {
           ...prev,
@@ -300,7 +318,7 @@ export const useFileUpload = (
         }
       })
     },
-    [onFilesChange]
+    []
   )
 
   const clearErrors = useCallback(() => {

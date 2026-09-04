@@ -1,5 +1,13 @@
 "use client"
 
+// Was components/examples/c-file-upload-4.tsx, a ReUI sample used verbatim in
+// the technician's maintenance-log modal. It shipped three stock photos from
+// picsum.photos as initialFiles, so every technician opened the form to find
+// three pictures already sitting in "หลักฐานก่อนซ่อม/หลังซ่อม" that were not
+// theirs (the counter read "Gallery (3/1)", past its own one-file limit). They
+// were never uploaded — the field is cosmetic until a real file is picked —
+// but there is no reason for the form to lie about what it holds.
+
 import { useState } from "react"
 import {
   formatBytes,
@@ -24,7 +32,7 @@ import {
 import { Spinner } from "@/components/ui/spinner"
 import { ImageIcon, UploadIcon, ZoomInIcon, XIcon, CircleAlertIcon } from "lucide-react"
 
-interface GalleryUploadProps {
+interface PhotoUploadProps {
   maxFiles?: number
   maxSize?: number
   accept?: string
@@ -33,44 +41,19 @@ interface GalleryUploadProps {
   onFilesChange?: (files: FileWithPreview[]) => void
 }
 
-export function Pattern({
+export function PhotoUpload({
   maxFiles = 10,
   maxSize = 5 * 1024 * 1024, // 5MB
   accept = "image/*",
   multiple = true,
   className,
   onFilesChange,
-}: GalleryUploadProps) {
+}: PhotoUploadProps) {
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [loadingImages, setLoadingImages] = useState<Record<string, boolean>>(
     {}
   )
   const [isPreviewLoading, setIsPreviewLoading] = useState(false)
-
-  // Create default images using FileMetadata type
-  const defaultImages: FileMetadata[] = [
-    {
-      id: "default-1",
-      name: "avatar-1.png",
-      size: 44608,
-      type: "image/png",
-      url: "https://picsum.photos/1000/800?random=1",
-    },
-    {
-      id: "default-2",
-      name: "avatar-2.png",
-      size: 42144,
-      type: "image/png",
-      url: "https://picsum.photos/1000/800?random=2",
-    },
-    {
-      id: "default-3",
-      name: "avatar-2.png",
-      size: 42144,
-      type: "image/png",
-      url: "https://picsum.photos/1000/800?random=3",
-    },
-  ]
 
   const [
     { files, isDragging, errors },
@@ -89,7 +72,6 @@ export function Pattern({
     maxSize,
     accept,
     multiple,
-    initialFiles: defaultImages,
     onFilesChange,
   })
 
@@ -139,7 +121,7 @@ export function Pattern({
             </p>
           </div>
 
-          <Button onClick={openFileDialog}>
+          <Button type="button" onClick={openFileDialog}>
             <UploadIcon className="h-4 w-4" />
             Select images
           </Button>
@@ -160,7 +142,7 @@ export function Pattern({
               )}
             </div>
           </div>
-          <Button onClick={clearFiles} variant="outline" size="sm">
+          <Button type="button" onClick={clearFiles} variant="outline" size="sm">
             Clear all
           </Button>
         </div>
@@ -209,6 +191,7 @@ export function Pattern({
                 {/* View Button */}
                 {fileItem.preview && (
                   <Button
+                    type="button"
                     onClick={() => {
                       setSelectedImage(fileItem.preview!)
                       setIsPreviewLoading(true)
@@ -223,6 +206,7 @@ export function Pattern({
 
                 {/* Remove Button */}
                 <Button
+                  type="button"
                   onClick={() => removeFile(fileItem.id)}
                   variant="secondary"
                   size="icon"
