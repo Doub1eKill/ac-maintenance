@@ -70,6 +70,46 @@ export type MaintenanceRow =
   | ({ kind: "upcoming" } & UpcomingMaintenanceAC)
   | ({ kind: "urgent" } & UrgentMaintenanceAC);
 
+/**
+ * What kind of work a row represents, decided in one place.
+ *
+ * `kind` alone does not say it: an "urgent" row is a repair or an overdue
+ * clean depending on the unit's condition, and the two are as different to an
+ * admin as either is to a scheduled clean. The rule used to live only inside
+ * the type column's cell, so the building headers ended up labelling the sum of
+ * the first two as "ด่วน" — a count that matched no badge in the table under it.
+ */
+export type JobTypeKind = "repair" | "overdueCleaning" | "scheduled";
+
+export function jobTypeOf(item: MaintenanceRow): JobTypeKind {
+  if (item.kind === "urgent" && item.status === "broken") return "repair";
+  if (item.kind === "urgent" && item.status === "needs_cleaning") return "overdueCleaning";
+  return "scheduled";
+}
+
+const JOB_TYPE_LABELS: Record<JobTypeKind, string> = {
+  repair: "ซ่อมด่วน",
+  overdueCleaning: "ค้างล้าง",
+  scheduled: "กำหนดล้าง",
+};
+
+/** One badge, used both in the table's ประเภท column and in the group headers. */
+export function JobTypeBadge({ kind, count }: { kind: JobTypeKind; count?: number }) {
+  const label = count === undefined ? JOB_TYPE_LABELS[kind] : `${JOB_TYPE_LABELS[kind]} ${count}`;
+
+  if (kind === "repair") {
+    return <Badge variant="destructive" className="text-[10px]">{label}</Badge>;
+  }
+  if (kind === "overdueCleaning") {
+    return (
+      <Badge variant="outline" className="text-[10px] border-amber-500/40 text-amber-600 bg-amber-500/10">
+        {label}
+      </Badge>
+    );
+  }
+  return <Badge variant="outline" className="text-[10px]">{label}</Badge>;
+}
+
 export const columns: ColumnDef<MaintenanceRow>[] = [
   {
     id: "select",
@@ -128,20 +168,7 @@ export const columns: ColumnDef<MaintenanceRow>[] = [
   {
     id: "type",
     header: () => <div className="text-xs font-bold">ประเภท</div>,
-    cell: ({ row }) => {
-      const item = row.original;
-      if (item.kind === "urgent" && item.status === "broken") {
-        return <Badge variant="destructive" className="text-[10px]">ซ่อมด่วน</Badge>;
-      }
-      if (item.kind === "urgent" && item.status === "needs_cleaning") {
-        return (
-          <Badge variant="outline" className="text-[10px] border-amber-500/40 text-amber-600 bg-amber-500/10">
-            ค้างล้าง
-          </Badge>
-        );
-      }
-      return <Badge variant="outline" className="text-[10px]">กำหนดล้าง</Badge>;
-    },
+    cell: ({ row }) => <JobTypeBadge kind={jobTypeOf(row.original)} />,
     enableSorting: false,
   },
   {
@@ -349,15 +376,26 @@ export function UpcomingMaintenanceTable({ data, onViewDetails, onCreateWorkOrde
         // Collapsing back to the first building when the search changes, the
         // same way the technician lists do.
         resetKey={(table.getColumn("acCode")?.getFilterValue() as string) ?? ""}
+        // One badge per kind of work in the building, using the same component
+        // the ประเภท column uses, so a header count and the rows it summarises
+        // always carry the same word and the same colour. The single "ด่วน N"
+        // this replaces added repairs and overdue cleans together under a label
+        // that matched neither.
         renderExtra={(group) => {
-          const urgentCount = group.items.filter(
-            (item) => item.row.original.kind === "urgent"
-          ).length;
-          return urgentCount > 0 ? (
-            <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-bold text-destructive">
-              ด่วน {urgentCount}
-            </span>
-          ) : null;
+          const counts = { repair: 0, overdueCleaning: 0, scheduled: 0 };
+          group.items.forEach((item) => {
+            counts[jobTypeOf(item.row.original)] += 1;
+          });
+
+          return (
+            <div className="flex flex-wrap items-center justify-end gap-1.5">
+              {(["repair", "overdueCleaning", "scheduled"] as const)
+                .filter((kind) => counts[kind] > 0)
+                .map((kind) => (
+                  <JobTypeBadge key={kind} kind={kind} count={counts[kind]} />
+                ))}
+            </div>
+          );
         }}
         renderItems={(group) => (
           <div className="rounded-xl border border-border overflow-hidden">
