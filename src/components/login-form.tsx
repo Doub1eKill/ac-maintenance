@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { signIn } from "next-auth/react";
+import { BROWSER_SESSION_KEY } from "@/lib/session-expiry";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff, AlertTriangle, Building2, Wrench, ArrowRight } from "lucide-react";
@@ -46,6 +47,17 @@ export function LoginForm() {
 
   const [emailInput, setEmailInput] = useState("");
   const [passwordInput, setPasswordInput] = useState("");
+
+  // Marks this browser session as one that has been through the login page, so
+  // BrowserSessionGuard does not read the redirect straight after signing in as
+  // a session left over from a previous run of the browser and undo it.
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem(BROWSER_SESSION_KEY, "1");
+    } catch {
+      // Storage unavailable: the guard handles that case by standing down.
+    }
+  }, []);
 
   /**
    * The demo buttons sign in directly rather than filling the form.

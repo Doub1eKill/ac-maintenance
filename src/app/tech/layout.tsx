@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { getTechShellData } from "@/lib/tech/pages";
 import { TechShell } from "@/components/tech/tech-shell";
+import { BrowserSessionGuard } from "@/components/auth/browser-session-guard";
 
 export const metadata = {
   title: "Technician Workspace | AC Maintenance System",
@@ -22,6 +23,7 @@ export default async function TechLayout({ children }: { children: React.ReactNo
 
   return (
     <TechShell user={user} universityName={universityName} buildings={buildings} badges={badges}>
+      <BrowserSessionGuard />
       {children}
     </TechShell>
   );

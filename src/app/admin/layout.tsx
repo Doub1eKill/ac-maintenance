@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { getAdminShellData } from "@/lib/admin/pages";
 import { AdminShell } from "@/components/admin/admin-shell";
 import { CreateWorkOrderProvider } from "@/components/admin/create-work-order-provider";
+import { BrowserSessionGuard } from "@/components/auth/browser-session-guard";
 
 export const metadata = {
   title: "Org Admin Dashboard | AC Maintenance System",
@@ -32,6 +33,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <CreateWorkOrderProvider>
+      <BrowserSessionGuard />
       <AdminShell user={user} universityName={universityName} badges={badges}>
         {children}
       </AdminShell>

@@ -1,4 +1,5 @@
 import type { NextAuthConfig } from "next-auth";
+import { nextMidnightAfter, isPastExpiry } from "@/lib/session-expiry";
 
 /**
  * The lightweight half of the NextAuth config — no Providers, no Prisma.
@@ -17,6 +18,13 @@ export const authConfig = {
     // look up on every request, so the session lives entirely in the
     // signed JWT.
     strategy: "jwt",
+    // A ceiling, not the real rule. The session actually ends at the next
+    // midnight, which the jwt callback below enforces exactly; this only stops
+    // the signed token outliving that by more than a day if it is ever read
+    // outside those callbacks. Auth.js re-signs the token on every session
+    // read, so a fixed maxAge alone would slide forward indefinitely and never
+    // expire anyone.
+    maxAge: 60 * 60 * 24,
   },
   callbacks: {
     // Lives here (not only in auth.ts) because proxy.ts builds its own
@@ -32,10 +40,29 @@ export const authConfig = {
       if (user) {
         token.role = user.role;
         token.status = user.status;
+        // Stamped once, at sign-in, and never extended afterwards. Auth.js
+        // re-signs this token on every session read, so anything recomputed
+        // here would push the deadline forward on each request and never
+        // arrive.
+        token.expiresAt = nextMidnightAfter();
       }
+
+      // Returning null makes Auth.js clear the session cookie
+      // (lib/actions/session.js: `else { response.cookies.push(...clean()) }`),
+      // which is what ends the session everywhere rather than only hiding it
+      // from this one response.
+      if (isPastExpiry(token.expiresAt)) {
+        return null;
+      }
+
       return token;
     },
     session({ session, token }) {
+      // The client is told the real deadline rather than the rolling maxAge, so
+      // anything reading session.expires sees midnight.
+      if (typeof token.expiresAt === "number") {
+        session.expires = new Date(token.expiresAt).toISOString() as typeof session.expires;
+      }
       session.user.id = token.sub as string;
       session.user.role = token.role as any;
       session.user.status = token.status as any;
