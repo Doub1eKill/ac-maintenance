@@ -5,6 +5,7 @@ import { Clock, Droplets, Snowflake, Wrench } from "lucide-react";
 import { BuildingGroupList, groupByBuilding } from "@/components/shared/building-groups";
 import type { TechnicianAssetUnit, TechnicianAssetSummary } from "@/lib/maintenance";
 import { filterJobs } from "@/components/tech/types";
+import { CatalogueMark } from "@/components/shared/catalogue-mark";
 
 interface AssetsPanelProps {
   assetList: TechnicianAssetUnit[];
@@ -88,6 +89,11 @@ export function AssetsPanel({ assetList, assetSummary, searchQuery, selectedBuil
                       <span className="font-mono text-xs font-bold text-muted-foreground">{unit.acCode}</span>
                       <span className="rounded-md bg-secondary px-2 py-0.5 text-[10px] font-bold text-foreground">
                         {unit.brand} {unit.btu ? `(${unit.btu} BTU)` : ""}
+                        <CatalogueMark
+                          brandDeleted={unit.brandDeleted}
+                          modelDeleted={unit.modelDeleted}
+                          className="ml-1"
+                        />
                       </span>
                     </div>
                   </div>

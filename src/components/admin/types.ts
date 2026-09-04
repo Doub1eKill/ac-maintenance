@@ -2,6 +2,10 @@ export interface WorkOrderItem {
   id: string;
   acCode: string;
   brand: string;
+  // Whether the brand/model behind that name has been retired from the
+  // catalogue. See @/lib/catalogue-status.
+  brandDeleted: boolean;
+  modelDeleted: boolean;
   btu: number | null;
   location: string;
   status: string;
@@ -25,6 +29,10 @@ export interface ACUnit {
   acCode: string;
   brand: string;
   model: string | null;
+  // Whether the brand/model above has been retired from the catalogue.
+  // See @/lib/catalogue-status — the name still resolves either way.
+  brandDeleted: boolean;
+  modelDeleted: boolean;
   btu: number | null;
   status: string;
   qrCode: string;

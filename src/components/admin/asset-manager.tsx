@@ -26,12 +26,17 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { CatalogueMark } from "@/components/shared/catalogue-mark";
 
 interface ACUnit {
   id: string;
   acCode: string;
   brand: string;
   model: string | null;
+  // Whether the brand/model above has been retired from the catalogue.
+  // See @/lib/catalogue-status — the name still resolves either way.
+  brandDeleted: boolean;
+  modelDeleted: boolean;
   btu: number | null;
   status: string;
   qrCode: string;
@@ -311,7 +316,10 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
                           <div className="flex items-start justify-between">
                             <div>
                               <div className="font-mono font-bold text-foreground text-sm">{ac.acCode}</div>
-                              <div className="text-[11px] text-muted-foreground mt-0.5">{ac.brand} {ac.model ? `• ${ac.model}` : ""}</div>
+                              <div className="text-[11px] text-muted-foreground mt-0.5">
+                                {ac.brand} {ac.model ? `• ${ac.model}` : ""}
+                                <CatalogueMark brandDeleted={ac.brandDeleted} modelDeleted={ac.modelDeleted} className="ml-1" />
+                              </div>
                             </div>
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-success/20 text-success-foreground border border-success/30 whitespace-nowrap">
                               {ac.status}

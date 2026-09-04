@@ -36,12 +36,17 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { CatalogueMark } from "@/components/shared/catalogue-mark";
 
 interface Schedule {
   id: string;
   airConditionerId: string;
   acCode: string;
   brand: string;
+  // Whether the brand/model behind that name has been retired from the
+  // catalogue. See @/lib/catalogue-status.
+  brandDeleted: boolean;
+  modelDeleted: boolean;
   location: string;
   buildingId: string;
   buildingName: string;
@@ -357,7 +362,14 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground text-xs">ยี่ห้อ</span>
-                <span className="font-bold text-foreground text-xs">{selectedEvent.brand}</span>
+                <span className="font-bold text-foreground text-xs">
+                  {selectedEvent.brand}
+                  <CatalogueMark
+                    brandDeleted={selectedEvent.brandDeleted}
+                    modelDeleted={selectedEvent.modelDeleted}
+                    className="ml-1"
+                  />
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground text-xs">ความถี่การล้าง</span>

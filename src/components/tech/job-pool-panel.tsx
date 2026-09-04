@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { BuildingGroupList, groupByBuilding } from "@/components/shared/building-groups";
 import type { TechJobItem } from "@/components/tech/types";
 import { filterJobs } from "@/components/tech/types";
+import { CatalogueMark } from "@/components/shared/catalogue-mark";
 
 interface JobPoolPanelProps {
   jobPool: TechJobItem[];
@@ -116,6 +117,11 @@ export function JobPoolPanel({ jobPool, searchQuery, selectedBuilding, isPending
                       <span className="font-mono text-xs font-bold text-muted-foreground">{job.acCode}</span>
                       <span className="rounded-md bg-secondary px-2 py-0.5 text-[10px] font-bold text-foreground">
                         {job.brand} {job.btu ? `(${job.btu} BTU)` : ""}
+                        <CatalogueMark
+                          brandDeleted={job.brandDeleted}
+                          modelDeleted={job.modelDeleted}
+                          className="ml-1"
+                        />
                       </span>
                     </div>
                   </div>

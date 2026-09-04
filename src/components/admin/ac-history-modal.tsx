@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { X, Clock, MapPin, Wrench, Loader2, Pencil } from "lucide-react";
 import { getAirConditionerHistory, updateMaintenanceLogAction } from "@/app/admin/actions";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { CatalogueMark } from "@/components/shared/catalogue-mark";
 
 interface AcHistoryModalProps {
   airConditionerId: string;
@@ -21,6 +22,10 @@ interface HistoryUnit {
   acCode: string;
   brand: string;
   model: string | null;
+  // Whether the brand/model above has been retired from the catalogue.
+  // See @/lib/catalogue-status.
+  brandDeleted: boolean;
+  modelDeleted: boolean;
   btu: number | null;
   status: string;
   location: string;
@@ -140,6 +145,7 @@ export function AcHistoryModal({ airConditionerId, onClose, currentUserId, isAdm
           <div className="rounded-xl border border-border bg-muted p-3.5 text-xs space-y-1.5">
             <div className="font-bold text-foreground text-sm">
               {unit.brand} {unit.model ? `• ${unit.model}` : ""} {unit.btu ? `(${unit.btu.toLocaleString()} BTU)` : ""}
+              <CatalogueMark brandDeleted={unit.brandDeleted} modelDeleted={unit.modelDeleted} className="ml-1" />
             </div>
             <div className="flex items-center gap-1.5 text-muted-foreground">
               <MapPin className="h-3.5 w-3.5" /> {unit.location}

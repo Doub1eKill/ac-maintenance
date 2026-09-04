@@ -20,6 +20,7 @@ import {
   DialogContent,
 } from "@/components/ui/dialog";
 import type { WorkOrderItem } from "@/components/admin/types";
+import { CatalogueMark } from "@/components/shared/catalogue-mark";
 
 interface WorkOrderDetailDialogProps {
   workOrder: WorkOrderItem | null;
@@ -254,6 +255,11 @@ export function WorkOrderDetailDialog({ workOrder, isPending, onClose, onCancelW
                       <span className="text-muted-foreground">ยี่ห้อ:</span>
                       <span className="font-medium text-foreground">
                         {workOrder.brand} {workOrder.btu ? `(${workOrder.btu} BTU)` : ""}
+                        <CatalogueMark
+                          brandDeleted={workOrder.brandDeleted}
+                          modelDeleted={workOrder.modelDeleted}
+                          className="ml-1"
+                        />
                       </span>
                     </div>
                     <div className="flex justify-between items-start">

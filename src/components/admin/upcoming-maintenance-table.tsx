@@ -8,7 +8,7 @@ import {
   VisibilityState,
   flexRender,
   getCoreRowModel,
-  getFilteredRowModel,
+  getFilteredRowModel,
   getSortedRowModel,
   SortingState,
   useReactTable,
@@ -33,11 +33,16 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ArrowUpDown, CalendarRange, ChevronDown, Copy, UserPlus } from "lucide-react";
 import { BuildingGroupList, groupByBuilding } from "@/components/shared/building-groups";
+import { CatalogueMark } from "@/components/shared/catalogue-mark";
 
 export interface UpcomingMaintenanceAC {
   id: string;
   acCode: string;
   brand: string;
+  // Whether the brand/model behind that name has been retired from the
+  // catalogue. See @/lib/catalogue-status.
+  brandDeleted: boolean;
+  modelDeleted: boolean;
   btu: number | null;
   location: string;
   buildingId: string;
@@ -53,6 +58,8 @@ export interface UrgentMaintenanceAC {
   id: string;
   acCode: string;
   brand: string;
+  brandDeleted: boolean;
+  modelDeleted: boolean;
   btu: number | null;
   location: string;
   buildingId: string;
@@ -176,6 +183,11 @@ export const columns: ColumnDef<MaintenanceRow>[] = [
         <div className="font-medium text-xs">{row.getValue("location")}</div>
         <div className="text-[10px] text-muted-foreground">
           {row.original.brand} {row.original.btu ? `(${row.original.btu} BTU)` : ""}
+          <CatalogueMark
+            brandDeleted={row.original.brandDeleted}
+            modelDeleted={row.original.modelDeleted}
+            className="ml-1"
+          />
         </div>
       </div>
     ),

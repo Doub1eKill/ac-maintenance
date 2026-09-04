@@ -5,6 +5,7 @@ import { AlertTriangle, MoreVertical } from "lucide-react";
 import { BuildingGroupList, groupByBuilding } from "@/components/shared/building-groups";
 import type { TechJobItem } from "@/components/tech/types";
 import { filterJobs } from "@/components/tech/types";
+import { CatalogueMark } from "@/components/shared/catalogue-mark";
 
 interface MyJobsPanelProps {
   myJobs: TechJobItem[];
@@ -51,6 +52,11 @@ export function MyJobsPanel({ myJobs, searchQuery, selectedBuilding, onSelectFor
                       </span>
                       <span className="rounded-md px-2 py-0.5 text-[10px] font-bold bg-secondary text-foreground">
                         {job.brand}
+                        <CatalogueMark
+                          brandDeleted={job.brandDeleted}
+                          modelDeleted={job.modelDeleted}
+                          className="ml-1"
+                        />
                       </span>
                     </div>
                   </div>

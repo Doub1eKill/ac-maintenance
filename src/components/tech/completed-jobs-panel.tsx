@@ -5,6 +5,7 @@ import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import { BuildingGroupList, groupByBuilding } from "@/components/shared/building-groups";
 import type { TechJobItem } from "@/components/tech/types";
 import { filterJobs } from "@/components/tech/types";
+import { CatalogueMark } from "@/components/shared/catalogue-mark";
 
 interface CompletedJobsPanelProps {
   completedJobs: TechJobItem[];
@@ -39,6 +40,11 @@ export function CompletedJobsPanel({ completedJobs, searchQuery, selectedBuildin
                       <span className="font-mono text-xs font-bold text-muted-foreground">{job.acCode}</span>
                       <span className="rounded-md bg-accent px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
                         {job.brand}
+                        <CatalogueMark
+                          brandDeleted={job.brandDeleted}
+                          modelDeleted={job.modelDeleted}
+                          className="ml-1"
+                        />
                       </span>
                       {job.priority === "critical" && (
                         <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-800">

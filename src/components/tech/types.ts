@@ -2,6 +2,11 @@ export interface TechJobItem {
   id: string;
   acCode: string;
   brand: string;
+  // Whether the brand/model behind that name has been retired from the
+  // catalogue — see @/lib/catalogue-status. Optional because the QR scan
+  // result builds a job without them.
+  brandDeleted?: boolean;
+  modelDeleted?: boolean;
   btu: number | null;
   status: string;
   location: string;

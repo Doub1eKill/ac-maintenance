@@ -4,12 +4,17 @@ import { useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { QrCode, Printer, X, CheckSquare } from "lucide-react";
 import { BuildingGroupList, groupByBuilding, type BuildingGroup } from "@/components/shared/building-groups";
+import { CatalogueMark } from "@/components/shared/catalogue-mark";
 
 interface ACUnit {
   id: string;
   acCode: string;
   brand: string;
   model: string | null;
+  // Whether the brand/model above has been retired from the catalogue.
+  // See @/lib/catalogue-status — the name still resolves either way.
+  brandDeleted: boolean;
+  modelDeleted: boolean;
   btu: number | null;
   status: string;
   qrCode: string;
@@ -267,7 +272,10 @@ export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
                         <div className="font-mono font-bold text-foreground">{ac.acCode}</div>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="font-medium text-foreground">{ac.brand}</div>
+                        <div className="font-medium text-foreground">
+                          {ac.brand}
+                          <CatalogueMark brandDeleted={ac.brandDeleted} modelDeleted={ac.modelDeleted} className="ml-1" />
+                        </div>
                         <div className="text-xs text-muted-foreground">{ac.model || "-"}</div>
                       </td>
                       <td className="px-4 py-3">

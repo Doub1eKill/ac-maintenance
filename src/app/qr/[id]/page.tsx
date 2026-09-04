@@ -7,6 +7,8 @@ import { format } from "date-fns";
 import { th } from "date-fns/locale";
 import { ArrowLeft, Clock, CalendarClock, Settings2, ShieldCheck, ClipboardPen, LogIn } from "lucide-react";
 import Link from "next/link";
+import { catalogueFlags } from "@/lib/catalogue-status";
+import { CatalogueMark } from "@/components/shared/catalogue-mark";
 
 // Thai wording for the log's action, kept here with the rest of this page's
 // copy rather than beside the query — same split as JOB_TYPE_LABEL in the
@@ -68,6 +70,10 @@ export default async function QRCodePage(props: { params: Promise<{ id: string }
     return notFound();
   }
 
+  // Same rule as the ten places that go through a mapper in src/lib — see the
+  // note on the select above, and catalogue-status.ts.
+  const { brandDeleted, modelDeleted } = catalogueFlags(ac);
+
   const activeSchedule = ac.maintenanceSchedules[0];
   // Same helper the asset manager's history panel uses, so the two views
   // can't drift apart in what they consider this unit's record.
@@ -104,11 +110,17 @@ export default async function QRCodePage(props: { params: Promise<{ id: string }
           <div className="grid grid-cols-2 gap-y-4 gap-x-2 text-sm">
             <div>
               <p className="text-slate-500 text-xs mb-1">ยี่ห้อ</p>
-              <p className="font-semibold text-slate-900">{ac.acBrand?.name || ac.brand || '-'}</p>
+              <p className="font-semibold text-slate-900">
+                {ac.acBrand?.name || ac.brand || '-'}
+                <CatalogueMark brandDeleted={brandDeleted} className="ml-1" />
+              </p>
             </div>
             <div>
               <p className="text-slate-500 text-xs mb-1">รุ่น</p>
-              <p className="font-semibold text-slate-900">{ac.acModel?.name || ac.model || '-'}</p>
+              <p className="font-semibold text-slate-900">
+                {ac.acModel?.name || ac.model || '-'}
+                <CatalogueMark modelDeleted={modelDeleted} className="ml-1" />
+              </p>
             </div>
             <div>
               <p className="text-slate-500 text-xs mb-1">ขนาด (BTU)</p>

@@ -119,6 +119,8 @@ export function OverviewPanel({
               id: ac.id,
               acCode: ac.acCode,
               brand: ac.brand || "ไม่ระบุยี่ห้อ",
+              brandDeleted: ac.brandDeleted,
+              modelDeleted: ac.modelDeleted,
               btu: ac.btu,
               location: `${b.name} - ห้อง ${r.name}`,
               buildingId: b.id,

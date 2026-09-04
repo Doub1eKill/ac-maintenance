@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { QrCode, X, CheckCircle2, AlertTriangle } from "lucide-react";
 import { scanQrCodeAction } from "@/app/tech/actions";
+import { CatalogueMark } from "@/components/shared/catalogue-mark";
 
 interface QrScanModalProps {
   open: boolean;
@@ -99,6 +100,11 @@ export function QrScanModal({ open, isPending, onClose, onClaim, onPlaceholderCr
                 </div>
                 <span className="bg-accent text-foreground text-[10px] font-bold px-2 py-1 rounded-md">
                   {qrResult.acDetails.brand}
+                  <CatalogueMark
+                    brandDeleted={qrResult.acDetails.brandDeleted}
+                    modelDeleted={qrResult.acDetails.modelDeleted}
+                    className="ml-1"
+                  />
                 </span>
               </div>
 
