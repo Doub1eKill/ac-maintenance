@@ -29,12 +29,6 @@ import * as schedules from "@/lib/admin/schedules";
 
 // --- work orders ---
 
-export async function getWorkOrdersPage(
-  ...args: Parameters<typeof workOrders.getWorkOrdersPage>
-) {
-  return workOrders.getWorkOrdersPage(...args);
-}
-
 export async function createWorkOrderAction(
   ...args: Parameters<typeof workOrders.createWorkOrderAction>
 ) {

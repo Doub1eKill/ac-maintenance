@@ -1,21 +1,27 @@
 // The work order board's query shape and row mapping, in one place.
 //
-// getOrgAdminData() serves the board's first page alongside the rest of the
-// dashboard and getWorkOrdersPage() serves every page after it. They have to
-// agree exactly: a field added to one and forgotten in the other shows up as
-// rows that change shape when you page past the first 50. Keeping the select,
-// the ordering and the mapper here is what makes that impossible to get wrong,
-// and none of it can live in a "use server" file, which may export only async
-// functions.
+// The board used to page through the table fifty rows at a time, which is why
+// this file exists: two callers built the same rows and had to agree exactly.
+// It now loads the whole board at once and groups it by building, the way the
+// technician lists and the urgent table do, so a building is never split
+// across pages. The shared select and mapper stay here because getOrgAdminData
+// still uses them, and because none of this can live in a "use server" file,
+// which may export only async functions.
 import type { Prisma } from "@/generated/prisma/client";
 import { catalogueFlags } from "@/lib/catalogue-status";
 import { formatUnitLocation } from "@/lib/location";
 
-// How many work orders the board loads at once. It lives here rather than in
-// a "use server" module because those may only export async functions — the
-// UI still receives the number as getOrgAdminData().workOrderPage.pageSize so
-// it can render real paging controls rather than silently showing one page.
+// How many work orders the overview's own copy of the board loads.
 export const WORK_ORDER_PAGE_SIZE = 50;
+
+// The ceiling on what the board page loads in one go. Grouping by building
+// only works on rows that are actually here, so the board takes the table
+// whole rather than a page of it — 58 work orders today against 73 units, and
+// this leaves an order of magnitude of headroom. It is a bound rather than no
+// limit at all because work orders accumulate with every cleaning cycle, where
+// units do not; if it is ever reached the board says so on screen instead of
+// quietly showing a truncated table.
+export const WORK_ORDER_BOARD_LIMIT = 500;
 
 // The board's row shape, defined once. getOrgAdminData() serves the first page
 // with the rest of the dashboard and getWorkOrdersPage() serves the others, so
@@ -48,7 +54,9 @@ export const workOrderBoardSelect = {
       room: {
         select: {
           name: true,
-          building: { select: { name: true, abbreviation: true } },
+          // id as well as the name: the board groups by building, and grouping
+          // on a display string would merge two buildings that share a name.
+          building: { select: { id: true, name: true, abbreviation: true } },
         },
       },
       acBrand: { select: { name: true, deletedAt: true } },
@@ -87,6 +95,11 @@ export function toWorkOrderBoardRow(wo: WorkOrderBoardRow) {
     btu: wo.airConditioner.btu,
     acStatus: wo.airConditioner.status,
     location: formatUnitLocation(wo.airConditioner.room, { withAbbreviation: true }),
+    // Split out of `location`, which is assembled for display. Same pair the
+    // technician job rows carry, so both sides group through groupByBuilding()
+    // without either of them parsing a formatted string back apart.
+    buildingId: wo.airConditioner.room.building.id.toString(),
+    buildingName: wo.airConditioner.room.building.name,
     status: wo.status,
     // The job this order was raised for, as recorded when it was opened. Kept
     // separate from acStatus below, which is the unit's condition right now
@@ -105,68 +118,4 @@ export function toWorkOrderBoardRow(wo: WorkOrderBoardRow) {
     createdAt: wo.createdAt ? wo.createdAt.toISOString() : null,
     airConditionerId: wo.airConditionerId.toString(),
   };
-}
-
-// Matches the board's search box against the database instead of against
-// whatever rows happen to be loaded.
-//
-// The client used to filter the current page only, which was fine while the
-// board loaded one page and stopped. Once real paging arrived, searching from
-// page 2 for a unit listed on page 1 reported \"not found\" — the row existed,
-// it simply was not in the array being filtered. Nothing about that failure
-// tells the user they are looking at a page rather than the whole table.
-//
-// The four fields are the ones the client matched: unit code, brand, location
-// and the technician holding the job. `location` is assembled for display from
-// the building and room, so there is no column to match it against — the
-// building name, its abbreviation and the room name are each matched instead,
-// which covers what anyone would actually type.
-//
-// No `mode: 'insensitive'`: these columns are utf8mb4_unicode_ci, so MySQL
-// already compares them without regard to case. Prisma only honours that flag
-// on PostgreSQL anyway.
-export function workOrderSearchWhere(search: string): Prisma.WorkOrderWhereInput | undefined {
-  const q = search.trim();
-  if (!q) return undefined;
-
-  return {
-    OR: [
-      { airConditioner: { acCode: { contains: q } } },
-      // Brand lives in the catalogue when the unit was registered from it, and
-      // in a free-text column when it was typed in as \"other\" — the board
-      // displays whichever exists, so both have to be searchable.
-      { airConditioner: { acBrand: { name: { contains: q } } } },
-      { airConditioner: { brand: { contains: q } } },
-      { airConditioner: { room: { name: { contains: q } } } },
-      { airConditioner: { room: { building: { name: { contains: q } } } } },
-      { airConditioner: { room: { building: { abbreviation: { contains: q } } } } },
-      { claimedByUser: { name: { contains: q } } },
-    ],
-  };
-}
-
-export type WorkOrderBoardStatusFilter = "pending" | "claimed" | "completed" | "cancelled";
-
-// Combines the search box with the board's status/building filters into one
-// where clause. Kept separate from workOrderSearchWhere so callers that only
-// need the search half (there are none left, but the split is cheap to keep)
-// aren't forced to reason about the other two.
-export function workOrderBoardWhere(params: {
-  search?: string;
-  status?: WorkOrderBoardStatusFilter;
-  buildingId?: string;
-}): Prisma.WorkOrderWhereInput | undefined {
-  const clauses: Prisma.WorkOrderWhereInput[] = [];
-
-  const searchWhere = workOrderSearchWhere(params.search ?? "");
-  if (searchWhere) clauses.push(searchWhere);
-
-  if (params.status) clauses.push({ status: params.status });
-
-  if (params.buildingId) {
-    clauses.push({ airConditioner: { room: { building: { id: BigInt(params.buildingId) } } } });
-  }
-
-  if (clauses.length === 0) return undefined;
-  return clauses.length === 1 ? clauses[0] : { AND: clauses };
 }

@@ -6,6 +6,7 @@ import { getOrganisationName, getOrganisationInfo, getDefaultMaintenanceFrequenc
 import { getAcMasterData } from "@/lib/admin/master-data";
 import {
   WORK_ORDER_PAGE_SIZE,
+  WORK_ORDER_BOARD_LIMIT,
   workOrderBoardSelect,
   workOrderBoardOrderBy,
   toWorkOrderBoardRow,
@@ -142,30 +143,32 @@ export async function getWorkOrdersPageData() {
   await verifyOrgAdmin();
   await syncOverdueMaintenanceWorkOrders();
 
-  const [rows, total, buildingRows, activeTechnicians] = await Promise.all([
+  // No building tree here any more. It was loaded solely to fill the board's
+  // "ทุกอาคาร" dropdown, and the board groups by building instead now — the
+  // rows carry their own building, so the whole building→room→unit query goes
+  // away with the dropdown that needed it.
+  const [rows, total, activeTechnicians] = await Promise.all([
     prisma.workOrder.findMany({
       select: workOrderBoardSelect,
       orderBy: workOrderBoardOrderBy,
-      take: WORK_ORDER_PAGE_SIZE,
+      // The whole board, not a page of it: it groups by building, and a group
+      // assembled from fifty of the table's rows would be missing whatever
+      // landed on the next page. See WORK_ORDER_BOARD_LIMIT for the ceiling.
+      take: WORK_ORDER_BOARD_LIMIT,
     }),
     prisma.workOrder.count(),
-    prisma.building.findMany({ select: buildingTreeSelect, orderBy: { name: "asc" } }),
     getActiveTechnicians(),
   ]);
 
-  const { buildings } = shapeBuildingTree(buildingRows, new Map());
   const workOrders = rows.map(toWorkOrderBoardRow);
 
   return {
     workOrders,
     workOrderPage: {
       total,
-      pageSize: WORK_ORDER_PAGE_SIZE,
       loaded: workOrders.length,
       hasMore: total > workOrders.length,
     },
-    buildings,
-    allAcUnits: flattenUnitOptions(buildings),
     activeTechnicians,
   };
 }

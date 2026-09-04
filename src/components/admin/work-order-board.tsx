@@ -1,23 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
-import { Ban, CheckCircle2, ClipboardList, Clock, Loader2, Sparkles, Wrench } from "lucide-react";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
-import { getWorkOrdersPage } from "@/app/admin/actions";
+import { useMemo, useState } from "react";
+import { Ban, CheckCircle2, ClipboardList, Clock, Sparkles, Wrench } from "lucide-react";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
-import type { WorkOrderItem, WorkOrderPageInfo, BuildingItem } from "@/components/admin/types";
+import { BuildingGroupList, groupByBuilding } from "@/components/shared/building-groups";
+import { CatalogueMark } from "@/components/shared/catalogue-mark";
+import type { WorkOrderItem, WorkOrderPageInfo } from "@/components/admin/types";
 
 interface WorkOrderBoardProps {
   workOrders: WorkOrderItem[];
   workOrderPage: WorkOrderPageInfo;
-  buildings: BuildingItem[];
   globalSearch: string;
   onOpenDetails: (workOrder: WorkOrderItem) => void;
   onAssign: (workOrderId: string) => void;
@@ -32,13 +24,6 @@ const STATUS_FILTER_OPTIONS: Array<{ value: StatusFilter; label: string }> = [
   { value: "completed", label: "เสร็จสิ้น" },
   { value: "cancelled", label: "ยกเลิกแล้ว" },
 ];
-
-// Cache key combining page, search term and the two filters — any one of
-// them changing needs its own set of pages, so keying by page alone would
-// show one combination's rows under another's number.
-function pageCacheKey(page: number, search: string, status: StatusFilter, buildingId: string) {
-  return `${search}::${status}::${buildingId}::${page}`;
-}
 
 function getWorkOrderRowClassName(wo: WorkOrderItem) {
   // No status color separately here — the "สถานะ" column already carries a
@@ -60,99 +45,50 @@ function getWorkOrderRowClassName(wo: WorkOrderItem) {
   return `${tintClass} ${fadeClass}`.trim();
 }
 
-export function WorkOrderBoard({ workOrders, workOrderPage, buildings, globalSearch, onOpenDetails, onAssign }: WorkOrderBoardProps) {
-  const [page, setPage] = useState(1);
+// The same four fields the board's search used to match in SQL: unit code,
+// brand, location and the technician holding the job. `location` is assembled
+// from the building name, its abbreviation and the room, so typing any of
+// those still finds the row.
+function matchesSearch(wo: WorkOrderItem, query: string) {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return (
+    wo.acCode.toLowerCase().includes(q) ||
+    wo.brand.toLowerCase().includes(q) ||
+    wo.location.toLowerCase().includes(q) ||
+    (wo.claimedByName ?? "").toLowerCase().includes(q)
+  );
+}
+
+// Groups the board by building, the way the technician lists and the urgent
+// table already read, so five buildings show as five sections instead of one
+// flat table repeating the building name down every row.
+//
+// This is why the board no longer pages fifty rows at a time. A group can only
+// be built from rows that are actually here, so paging in SQL would have split
+// a building across pages — the exact thing grouping the urgent table was
+// meant to stop. Filtering came back to the client along with the rows, and
+// the building dropdown went away with it: the section headers are the
+// building filter now, and a select that collapses four of five headers said
+// nothing they were not already saying.
+export function WorkOrderBoard({
+  workOrders,
+  workOrderPage,
+  globalSearch,
+  onOpenDetails,
+  onAssign,
+}: WorkOrderBoardProps) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("");
-  const [buildingFilter, setBuildingFilter] = useState("");
-  // Debounced so typing doesn't fire a query per keystroke — the board only
-  // searches once the user pauses for 300ms.
-  const [debouncedSearch, setDebouncedSearch] = useState(globalSearch.trim());
-  // Empty search + page 1 always comes from the dashboard's own load
-  // (getOrgAdminData()) so it renders instantly; every other page/search
-  // combination is fetched on demand via getWorkOrdersPage() and cached here,
-  // keyed by both so switching back to a term already searched doesn't refetch.
-  const [pagesLoaded, setPagesLoaded] = useState<Map<string, WorkOrderItem[]>>(new Map());
-  // total/hasMore for the active search — null means "not searching", so the
-  // board falls back to workOrderPage (the unfiltered count from the parent).
-  const [searchPageInfo, setSearchPageInfo] = useState<{ total: number; hasMore: boolean } | null>(null);
-  const [isLoadingPage, startPageTransition] = useTransition();
-  const [pageError, setPageError] = useState<string | null>(null);
-  // Guards against an older, slower request overwriting the total/error left
-  // by a newer one that already resolved — keyed rather than boolean because
-  // page and search can each change independently.
-  const latestRequestKeyRef = useRef<string | null>(null);
 
-  // The dashboard revalidates and hands down a fresh `workOrders` array after
-  // any action that changes a work order (assign, claim, complete, create).
-  // Drop the cache and jump back to page 1 so the board never shows a stale
-  // status next to a freshly-mutated row on some other cached page — the
-  // fetch effect below re-requests whatever page/search is current once the
-  // cache is empty.
-  useEffect(() => {
-    setPagesLoaded(new Map());
-    setSearchPageInfo(null);
-    setPage(1);
-    setPageError(null);
-  }, [workOrders]);
+  const filtered = useMemo(
+    () =>
+      workOrders.filter(
+        (wo) => (statusFilter === "" || wo.status === statusFilter) && matchesSearch(wo, globalSearch)
+      ),
+    [workOrders, statusFilter, globalSearch]
+  );
 
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(globalSearch.trim()), 300);
-    return () => clearTimeout(t);
-  }, [globalSearch]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [globalSearch, statusFilter, buildingFilter]);
-
-  // Whether any filter narrows the result away from the dashboard's own
-  // unfiltered first page — once true, page 1 has to be fetched like any
-  // other page instead of reusing the `workOrders` prop.
-  const isFiltered = debouncedSearch !== "" || statusFilter !== "" || buildingFilter !== "";
-
-  useEffect(() => {
-    const key = pageCacheKey(page, debouncedSearch, statusFilter, buildingFilter);
-    latestRequestKeyRef.current = key;
-
-    // The dashboard's own first page covers this combination already.
-    if (!isFiltered && page === 1) {
-      setPageError(null);
-      return;
-    }
-
-    if (pagesLoaded.has(key)) return;
-
-    setPageError(null);
-    startPageTransition(async () => {
-      const result = await getWorkOrdersPage(page, {
-        search: debouncedSearch,
-        status: statusFilter || undefined,
-        buildingId: buildingFilter || undefined,
-      });
-      // A newer page or search request landed and already updated the view —
-      // this response answers a question nobody's asking anymore.
-      if (latestRequestKeyRef.current !== key) return;
-
-      if ("error" in result && result.error) {
-        setPageError(result.error);
-        return;
-      }
-      setPagesLoaded((prev) => new Map(prev).set(key, result.workOrders));
-      setSearchPageInfo({ total: result.total, hasMore: result.hasMore });
-    });
-  }, [page, debouncedSearch, statusFilter, buildingFilter, pagesLoaded, isFiltered]);
-
-  const currentPageRows =
-    !isFiltered && page === 1
-      ? workOrders
-      : pagesLoaded.get(pageCacheKey(page, debouncedSearch, statusFilter, buildingFilter)) ?? [];
-
-  const effectiveTotal = !isFiltered ? workOrderPage.total : searchPageInfo?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(effectiveTotal / workOrderPage.pageSize));
-
-  function goToPage(target: number) {
-    const clamped = Math.max(1, Math.min(totalPages, target));
-    setPage(clamped);
-  }
+  const groups = useMemo(() => groupByBuilding(filtered), [filtered]);
 
   return (
     <div className="space-y-6 animate-in fade-in">
@@ -161,75 +97,93 @@ export function WorkOrderBoard({ workOrders, workOrderPage, buildings, globalSea
           <ClipboardList className="h-5 w-5 text-primary" /> ระบบจัดการงานซ่อมบำรุง
         </h2>
         <div className="text-sm text-muted-foreground font-medium">
-          ทั้งหมด <span className="font-bold text-foreground">{effectiveTotal}</span> รายการ
+          ทั้งหมด <span className="font-bold text-foreground">{filtered.length}</span> รายการ
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="w-full sm:w-48">
-          <NativeSelect
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-            aria-label="กรองตามสถานะ"
-          >
-            {STATUS_FILTER_OPTIONS.map((opt) => (
-              <NativeSelectOption key={opt.value} value={opt.value}>
-                {opt.label}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
+      {workOrderPage.hasMore && (
+        <div className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-xs text-warning-foreground">
+          แสดงใบงานล่าสุด {workOrderPage.loaded} รายการ จากทั้งหมด {workOrderPage.total} รายการ ·
+          ใบงานที่เก่ากว่านั้นยังไม่ถูกโหลดมา จึงไม่อยู่ในกลุ่มอาคารและการค้นหาด้านล่าง
         </div>
-        <div className="w-full sm:w-56">
-          <NativeSelect
-            value={buildingFilter}
-            onChange={(e) => setBuildingFilter(e.target.value)}
-            aria-label="กรองตามอาคาร"
-          >
-            <NativeSelectOption value="">ทุกอาคาร</NativeSelectOption>
-            {buildings.map((b) => (
-              <NativeSelectOption key={b.id} value={b.id}>
-                {b.name} ({b.abbreviation})
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
-        </div>
+      )}
+
+      <div className="w-full sm:w-48">
+        <NativeSelect
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+          aria-label="กรองตามสถานะ"
+        >
+          {STATUS_FILTER_OPTIONS.map((opt) => (
+            <NativeSelectOption key={opt.value} value={opt.value}>
+              {opt.label}
+            </NativeSelectOption>
+          ))}
+        </NativeSelect>
       </div>
 
-      <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-muted border-b border-border text-muted-foreground font-semibold">
-              <tr>
-                <th className="px-4 py-3 whitespace-nowrap">รหัสแอร์</th>
-                <th className="px-4 py-3">สถานที่ตั้ง / ยี่ห้อ</th>
-                <th className="px-4 py-3 whitespace-nowrap">ประเภทงาน</th>
-                <th className="px-4 py-3 whitespace-nowrap">วันที่แจ้ง</th>
-                <th className="px-4 py-3 whitespace-nowrap">ผู้รับผิดชอบ</th>
-                <th className="px-4 py-3 whitespace-nowrap text-center">สถานะ</th>
-                <th className="px-4 py-3 whitespace-nowrap text-right">จัดการ</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {isLoadingPage ? (
+      <BuildingGroupList
+        groups={groups}
+        resetKey={`${globalSearch}::${statusFilter}`}
+        getSubtitle={(group) => `${group.items.length} ใบงาน`}
+        emptyMessage="ไม่พบข้อมูลใบงาน"
+        renderExtra={(group) => {
+          // Two axes, drawn as two runs of badges. งานซ่อม + งานล้างแอร์ add up
+          // to the group's total; รอดำเนินการ and กำลังดำเนินการ cut across
+          // both and do not (the group also holds finished and cancelled jobs).
+          // Each badge uses the wording and colour its own column already uses
+          // in the rows below, so a header count and the rows it summarises
+          // read as the same thing rather than as separate numbers to
+          // reconcile — the mistake the urgent table's old "ด่วน N" made.
+          const repair = group.items.filter((wo) => wo.type === "repair").length;
+          const cleaning = group.items.filter((wo) => wo.type === "cleaning").length;
+          const pending = group.items.filter((wo) => wo.status === "pending").length;
+          const claimed = group.items.filter((wo) => wo.status === "claimed").length;
+          return (
+            <div className="flex flex-wrap items-center justify-end gap-1.5">
+              {repair > 0 && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-destructive/20 bg-destructive/10 px-2 py-0.5 text-[10px] font-bold text-destructive whitespace-nowrap">
+                  <Wrench className="h-3 w-3" />
+                  งานซ่อม {repair}
+                </span>
+              )}
+              {cleaning > 0 && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-sky-500/20 bg-sky-500/10 px-2 py-0.5 text-[10px] font-bold text-sky-600 whitespace-nowrap">
+                  <Sparkles className="h-3 w-3" />
+                  งานล้างแอร์ {cleaning}
+                </span>
+              )}
+              {pending > 0 && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-warning/30 bg-warning/20 px-2 py-0.5 text-[10px] font-bold text-warning-foreground whitespace-nowrap">
+                  <Clock className="h-3 w-3" />
+                  รอดำเนินการ {pending}
+                </span>
+              )}
+              {claimed > 0 && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/20 px-2 py-0.5 text-[10px] font-bold text-primary whitespace-nowrap">
+                  <Wrench className="h-3 w-3" />
+                  กำลังดำเนินการ {claimed}
+                </span>
+              )}
+            </div>
+          );
+        }}
+        renderItems={(group) => (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="border-b border-border text-muted-foreground font-semibold">
                 <tr>
-                  <td colSpan={7} className="px-6 py-10 text-center text-muted-foreground">
-                    <Loader2 className="inline h-4 w-4 animate-spin mr-2" /> กำลังโหลดหน้า {page}...
-                  </td>
+                  <th className="px-4 py-3 whitespace-nowrap">รหัสแอร์</th>
+                  <th className="px-4 py-3">สถานที่ตั้ง / ยี่ห้อ</th>
+                  <th className="px-4 py-3 whitespace-nowrap">ประเภทงาน</th>
+                  <th className="px-4 py-3 whitespace-nowrap">วันที่แจ้ง</th>
+                  <th className="px-4 py-3 whitespace-nowrap">ผู้รับผิดชอบ</th>
+                  <th className="px-4 py-3 whitespace-nowrap text-center">สถานะ</th>
+                  <th className="px-4 py-3 whitespace-nowrap text-right">จัดการ</th>
                 </tr>
-              ) : pageError ? (
-                <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-destructive">
-                    {pageError}
-                  </td>
-                </tr>
-              ) : currentPageRows.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-muted-foreground">
-                    ไม่พบข้อมูลใบงาน
-                  </td>
-                </tr>
-              ) : (
-                currentPageRows.map((wo) => (
+              </thead>
+              <tbody className="divide-y divide-border">
+                {group.items.map((wo) => (
                   <tr
                     key={wo.id}
                     className={`hover:bg-muted transition-colors cursor-pointer ${getWorkOrderRowClassName(wo)}`}
@@ -242,6 +196,7 @@ export function WorkOrderBoard({ workOrders, workOrderPage, buildings, globalSea
                       <div className="font-medium text-foreground">{wo.location}</div>
                       <div className="text-xs text-muted-foreground">
                         {wo.brand} {wo.btu ? `(${wo.btu} BTU)` : ""}
+                        <CatalogueMark brandDeleted={wo.brandDeleted} modelDeleted={wo.modelDeleted} className="ml-1" />
                       </div>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
@@ -319,50 +274,12 @@ export function WorkOrderBoard({ workOrders, workOrderPage, buildings, globalSea
                       )}
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination Controls */}
-        {totalPages > 1 && (
-          <div className="px-6 py-4 border-t border-border bg-muted flex items-center justify-between">
-            <div className="text-sm text-muted-foreground">
-              หน้า {page} จาก {totalPages}
-            </div>
-            <Pagination>
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious
-                    onClick={() => goToPage(page - 1)}
-                    className={page === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                  />
-                </PaginationItem>
-
-                {[...Array(totalPages)].map((_, i) => (
-                  <PaginationItem key={i}>
-                    <PaginationLink
-                      onClick={() => goToPage(i + 1)}
-                      isActive={page === i + 1}
-                      className="cursor-pointer"
-                    >
-                      {i + 1}
-                    </PaginationLink>
-                  </PaginationItem>
                 ))}
-
-                <PaginationItem>
-                  <PaginationNext
-                    onClick={() => goToPage(page + 1)}
-                    className={page === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
+              </tbody>
+            </table>
           </div>
         )}
-      </div>
+      />
     </div>
   );
 }

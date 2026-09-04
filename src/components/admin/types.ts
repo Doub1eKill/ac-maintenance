@@ -8,6 +8,10 @@ export interface WorkOrderItem {
   modelDeleted: boolean;
   btu: number | null;
   location: string;
+  // Split out of `location`, which is assembled for display — the board groups
+  // by building and must not parse a formatted string back apart.
+  buildingId: string;
+  buildingName: string;
   status: string;
   type: "repair" | "cleaning";
   priority: string | null;
@@ -59,8 +63,10 @@ export interface BuildingItem {
 }
 
 export interface WorkOrderPageInfo {
+  // Rows in the table, against rows the board actually received. They differ
+  // only if WORK_ORDER_BOARD_LIMIT was reached, which the board says on screen
+  // rather than showing a short table as though it were the whole thing.
   total: number;
-  pageSize: number;
   loaded: number;
   hasMore: boolean;
 }
