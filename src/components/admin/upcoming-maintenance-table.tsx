@@ -43,6 +43,10 @@ export interface UpcomingMaintenanceAC {
   buildingId: string;
   buildingName: string;
   nextDueDate: string;
+  // Always absent on a scheduled row — it is scheduled precisely because no job
+  // has been raised. Declared so both halves of the union can be asked the same
+  // question without narrowing first.
+  pendingWorkOrderId?: null;
 }
 
 export interface UrgentMaintenanceAC {
@@ -229,7 +233,14 @@ export const columns: ColumnDef<MaintenanceRow>[] = [
           >
             <Copy className="h-3.5 w-3.5" />
           </Button>
-          {item.kind === "upcoming" && (
+          {/*
+            Offered on every row that has no open job, not only the scheduled
+            ones. Twelve units here are flagged broken or overdue with nothing
+            raised against them: they could not be assigned — there is no job to
+            assign — and had no control to raise one either, so the row was a
+            dead end. This is the action those rows need.
+          */}
+          {!item.pendingWorkOrderId && (
             <Button
               variant="outline"
               size="sm"
@@ -239,7 +250,7 @@ export const columns: ColumnDef<MaintenanceRow>[] = [
                 meta?.onCreateWorkOrder?.(item.id);
               }}
             >
-              สร้างใบงานล้างแอร์
+              {item.kind === "upcoming" ? "สร้างใบงานล้างแอร์" : "สร้างใบงาน"}
             </Button>
           )}
         </div>
@@ -434,29 +445,65 @@ export function UpcomingMaintenanceTable({ data, onViewDetails, onCreateWorkOrde
         )}
       />
 
-      <div className="flex items-center justify-between pt-2">
-        <div className="flex items-center gap-3">
-          <div className="text-xs text-muted-foreground">
-            เลือกแล้ว {selectedRows.length} จาก{" "}
-            {table.getFilteredRowModel().rows.length} รายการ
+      {/*
+        Sticks to the bottom of the viewport while the list is scrolled, so the
+        action follows the rows being ticked. It used to live in the footer
+        below every building section, which meant ticking a row near the top and
+        then scrolling past five sections to reach the button.
+      */}
+      {selectedRows.length > 0 && (
+        <div className="sticky bottom-4 z-10 rounded-2xl border border-border bg-card/95 px-4 py-3 shadow-lg backdrop-blur">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-xs font-bold text-foreground">
+                เลือกแล้ว {selectedRows.length} รายการ
+              </div>
+              {/*
+                Says why the button is dead rather than leaving a "(0)" to be
+                puzzled over. A row can be ticked and still not be assignable:
+                assignment happens on a work order, and a unit flagged as broken
+                or overdue does not necessarily have one.
+              */}
+              {assignableWorkOrderIds.length === 0 ? (
+                <div className="text-[11px] text-muted-foreground mt-0.5">
+                  รายการที่เลือกยังไม่มีใบงาน จึงมอบหมายช่างไม่ได้ — กด &ldquo;สร้างใบงาน&rdquo; ที่แถวนั้นก่อน
+                </div>
+              ) : (
+                assignableWorkOrderIds.length < selectedRows.length && (
+                  <div className="text-[11px] text-muted-foreground mt-0.5">
+                    มอบหมายได้ {assignableWorkOrderIds.length} รายการ ส่วนอีก{" "}
+                    {selectedRows.length - assignableWorkOrderIds.length} รายการยังไม่มีใบงาน
+                  </div>
+                )
+              )}
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs px-2"
+                onClick={() => table.resetRowSelection()}
+              >
+                ล้างการเลือก
+              </Button>
+              <Button
+                size="sm"
+                className="h-8 text-xs px-3 gap-1.5"
+                disabled={assignableWorkOrderIds.length === 0}
+                onClick={() => onBulkAssignWorkOrder?.(assignableWorkOrderIds)}
+              >
+                <UserPlus className="h-3.5 w-3.5" />
+                มอบหมายช่าง ({assignableWorkOrderIds.length})
+              </Button>
+            </div>
           </div>
-          {selectedRows.length > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 text-xs px-2 gap-1.5"
-              disabled={assignableWorkOrderIds.length === 0}
-              title={
-                assignableWorkOrderIds.length === 0
-                  ? "แถวที่เลือกไม่มีใบงานค้างอยู่"
-                  : undefined
-              }
-              onClick={() => onBulkAssignWorkOrder?.(assignableWorkOrderIds)}
-            >
-              <UserPlus className="h-3.5 w-3.5" />
-              มอบหมายช่าง ({assignableWorkOrderIds.length})
-            </Button>
-          )}
+        </div>
+      )}
+
+      <div className="flex items-center justify-between pt-2">
+        <div className="text-xs text-muted-foreground">
+          เลือกแล้ว {selectedRows.length} จาก{" "}
+          {table.getFilteredRowModel().rows.length} รายการ
         </div>
         <div className="text-xs text-muted-foreground">
           {groups.length} อาคาร
