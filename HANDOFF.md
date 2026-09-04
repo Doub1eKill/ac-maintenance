@@ -149,6 +149,43 @@ SET created_at = COALESCE(claimed_at, assigned_at, completed_at, updated_at, NOW
 
 ---
 
+## ✅ ปุ่ม "ทดสอบเข้าสู่ระบบด่วน" ใช้งานได้แล้ว (3 ก.ย. `77f3d96`)
+
+2 ปุ่มบนหน้า login **ไม่เคยใช้ได้เลยตั้งแต่แรก** — มันกรอก `admin@pkru.ac.th` / `Password123!` ซึ่ง**ไม่มีบัญชีนี้ใน DB** และต่อให้กรอกอีเมลที่ถูกต้อง ก็เข้าไม่ได้อยู่ดีเพราะบัญชีทดสอบมี `password = NULL` ตามกฎของโปรเจกต์
+
+**ตอนนี้กดแล้วเข้าเลย ไม่ต้องตั้งรหัสผ่านก่อน** — เพิ่ม provider ตัวที่สองชื่อ `demo-role` ที่รับ **บทบาท** (ไม่ใช่อีเมล) แล้วล็อกอินเป็นบัญชี seed ของบทบาทนั้นโดยไม่ใช้รหัสผ่าน
+
+| ปุ่ม | เข้าเป็น |
+|---|---|
+| ผู้บริหารองค์กร | Hansen-Jacobs University Admin |
+| ช่างซ่อมบำรุง | Craig Yost |
+
+**กฎ password = NULL ยังอยู่เหมือนเดิม** ไม่ได้เอารหัสผ่านถาวรไปฝากไว้กับบัญชีจริงเพื่อให้ปุ่มทำงาน
+
+### ทำไมถึงปลอดภัยพอที่จะมีอยู่ในโค้ด
+
+- **ลงทะเบียนเฉพาะนอก production** และเช็คที่ตัว array ของ providers ไม่ใช่ `if` ข้างใน `authorize()` — บน production NextAuth ไม่รู้จัก provider นี้เลย ไม่มีกิ่งไหนในเส้นทางล็อกอินที่กดพลาดแล้วเข้าได้
+- **รับได้แค่บทบาท ไม่รับอีเมล** เจาะจงบัญชีใครไม่ได้
+- **ข้ามบัญชีที่ suspended/pending** ใช้ลัดขั้นตอนอนุมัติไม่ได้
+
+**ทดสอบบน production build จริง** (`next start`): ล็อกอินด้วยรหัสผ่านปกติ → ได้ session · ยิง `/api/auth/callback/demo-role` → **ไม่ได้ session** · HTML ของหน้า login **ไม่มีปุ่ม demo เลยสักตัว**
+
+### 🔴 เจอตอนทดสอบ production build — ต้องแก้ก่อน deploy
+
+**NextAuth ปฏิเสธทุก request บน production ถ้าไม่ตั้ง `AUTH_TRUST_HOST` หรือ `AUTH_URL`**
+
+```
+[auth][error] UntrustedHost: Host must be trusted. URL was: http://localhost:3100/api/auth/csrf
+```
+
+ทุก endpoint ของ auth คืน 500 ล็อกอินไม่ได้เลยแม้แต่คนเดียว — ตอน dev ไม่เจอเพราะ NextAuth ผ่อนให้ · **ต้องใส่ใน `.env` ตอน deploy** คู่กับ SMTP ที่ค้างอยู่:
+
+```
+AUTH_URL="https://<โดเมนจริง>"
+```
+
+---
+
 ## ⚠️ อ่านก่อนเริ่ม — หลัง `git pull` ต้องทำ 3 อย่าง ไม่งั้นหน้า `/admin` จะพัง
 
 ```bash
