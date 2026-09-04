@@ -116,23 +116,49 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
     setBuildingsPage(1);
   }, [globalSearch]);
 
+  // Matches what the header box says it searches — "ค้นหารหัสแอร์, สถานที่,
+  // หรือแบรนด์" — and in particular the unit code, which is how the overview's
+  // "ไปดูรายละเอียด" links here (/admin/assets?q=<ac code>). Matching only
+  // buildings and rooms meant that link always landed on "ไม่พบอาคารที่ตรงกับ
+  // B467711-1-846367-01": the unit is right there, but nothing was comparing
+  // the term against it.
   const filteredBuildings = buildings.map((b) => {
     if (!globalSearch.trim()) return b;
-    const s = globalSearch.toLowerCase();
-    const matchesBuilding = b.name.toLowerCase().includes(s) || b.abbreviation.toLowerCase().includes(s);
+    const s = globalSearch.trim().toLowerCase();
 
-    const matchingRooms = b.rooms.filter((r) => {
-      return r.name.toLowerCase().includes(s);
-    });
+    // A building match keeps the building whole — someone searching a building
+    // is asking for all of it, not for the parts whose names repeat its own.
+    if (b.name.toLowerCase().includes(s) || b.abbreviation.toLowerCase().includes(s)) return b;
 
-    if (matchesBuilding || matchingRooms.length > 0) {
-      return {
-        ...b,
-        rooms: matchingRooms.length > 0 ? matchingRooms : b.rooms,
-      };
-    }
-    return null;
+    const matchingRooms = b.rooms
+      .map((r) => {
+        if (r.name.toLowerCase().includes(s)) return r;
+
+        // Narrowed to the units that matched rather than the whole room: a
+        // search for one unit code should land on that unit, not on a room of
+        // eight with the answer somewhere inside it.
+        const matchingUnits = r.acUnits.filter(
+          (ac) =>
+            ac.acCode.toLowerCase().includes(s) ||
+            ac.brand.toLowerCase().includes(s) ||
+            (ac.model ?? "").toLowerCase().includes(s)
+        );
+        return matchingUnits.length > 0 ? { ...r, acUnits: matchingUnits } : null;
+      })
+      .filter(Boolean) as RoomItem[];
+
+    return matchingRooms.length > 0 ? { ...b, rooms: matchingRooms } : null;
   }).filter(Boolean) as BuildingItem[];
+
+  // While a search is active the one building left has to be open, or the
+  // result is a single collapsed header and the page still looks empty. The
+  // fallback also covers the building that was open scrolling out of the
+  // result set.
+  const effectiveExpandedBuilding = filteredBuildings.some((b) => b.id === expandedBuilding)
+    ? expandedBuilding
+    : globalSearch.trim()
+      ? filteredBuildings[0]?.id ?? null
+      : null;
 
   const totalBuildingsPages = Math.ceil(filteredBuildings.length / BUILDINGS_PER_PAGE);
   const paginatedBuildings = filteredBuildings.slice((buildingsPage - 1) * BUILDINGS_PER_PAGE, buildingsPage * BUILDINGS_PER_PAGE);
@@ -271,7 +297,7 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
       <div className="space-y-3">
         {paginatedBuildings.map((b) => (
           <div key={b.id} className="rounded-2xl border border-border bg-muted overflow-hidden">
-            <div className="w-full flex items-center justify-between p-4 text-left hover:bg-secondary transition-colors cursor-pointer" onClick={() => setExpandedBuilding(expandedBuilding === b.id ? null : b.id)}>
+            <div className="w-full flex items-center justify-between p-4 text-left hover:bg-secondary transition-colors cursor-pointer" onClick={() => setExpandedBuilding(effectiveExpandedBuilding === b.id ? null : b.id)}>
               <div className="flex items-center gap-3">
                 <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-mono text-xs font-bold">
                   {b.abbreviation}
@@ -289,12 +315,12 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
                   <Plus className="h-3 w-3" /> เพิ่มห้อง
                 </button>
                 <span className="text-muted-foreground font-bold">
-                  {expandedBuilding === b.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  {effectiveExpandedBuilding === b.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                 </span>
               </div>
             </div>
 
-            {expandedBuilding === b.id && (
+            {effectiveExpandedBuilding === b.id && (
               <div className="border-t border-border bg-card p-4 space-y-3">
                 {b.rooms.map((r) => (
                   <div key={r.id} className="rounded-xl border border-border p-3.5 space-y-2">
