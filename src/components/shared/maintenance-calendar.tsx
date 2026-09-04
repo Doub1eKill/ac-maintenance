@@ -18,6 +18,7 @@ import {
 } from "date-fns";
 import { th } from "date-fns/locale";
 import { 
+  ArrowLeft,
   ChevronLeft, 
   ChevronRight, 
   Calendar as CalendarIcon, 
@@ -87,6 +88,16 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
     jobs: Schedule[];
   } | null>(null);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
+  // Where the job modal was opened from, so it can offer a way back. Both
+  // routes into it close what they were opened from — the building modal and
+  // the day sheet each hand the screen over rather than stacking on top of it
+  // — so without this, stepping into a job and finding it was the wrong one
+  // means starting again from the calendar.
+  const [eventOrigin, setEventOrigin] = useState<
+    | { kind: "building"; building: { date: Date; buildingName: string; jobs: Schedule[] } }
+    | { kind: "day"; date: Date }
+    | null
+  >(null);
   const [dayBuildingFilter, setDayBuildingFilter] = useState<string>("all");
   const [dayRoomFilter, setDayRoomFilter] = useState<string>("all");
   const [dayTypeFilter, setDayTypeFilter] = useState<Schedule["jobType"] | "all">("all");
@@ -185,6 +196,25 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
     setDayBuildingFilter("all");
     setDayRoomFilter("all");
     setDayTypeFilter("all");
+  };
+
+  const closeEventModal = () => {
+    setSelectedEvent(null);
+    setEventOrigin(null);
+  };
+
+  // Reopens whichever list the job was picked from. The day sheet comes back
+  // with its filters cleared, since closing it cleared them — it reopens as a
+  // fresh view of that day rather than pretending to restore one.
+  const goBackFromEvent = () => {
+    if (!eventOrigin) return;
+    if (eventOrigin.kind === "building") {
+      setSelectedDayBuilding(eventOrigin.building);
+    } else {
+      setSelectedDay(eventOrigin.date);
+    }
+    setSelectedEvent(null);
+    setEventOrigin(null);
   };
 
   const renderHeader = () => {
@@ -337,6 +367,11 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
   const renderEventModal = () => {
     if (!selectedEvent) return null;
     const status = getEventStatus(new Date(selectedEvent.nextDueDate));
+    const backFromEventLabel = !eventOrigin
+      ? ""
+      : eventOrigin.kind === "building"
+        ? `กลับไปรายการงานของ ${eventOrigin.building.buildingName}`
+        : `กลับไปรายการงานวันที่ ${format(eventOrigin.date, "d MMMM yyyy", { locale: th })}`;
 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-xs p-4">
@@ -344,12 +379,26 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
           <div className="p-5 border-b border-border flex items-start justify-between">
             <div className="space-y-1">
               <h3 className="text-base font-bold text-foreground flex items-center gap-2">
-                <Wrench className="h-5 w-5 text-primary" />
+                {eventOrigin ? (
+                  // Names the list it goes back to rather than just "ย้อนกลับ":
+                  // two different lists lead here, and which one is waiting is
+                  // not otherwise visible from inside this modal.
+                  <button
+                    onClick={goBackFromEvent}
+                    aria-label={backFromEventLabel}
+                    title={backFromEventLabel}
+                    className="-ml-1 p-1 text-muted-foreground hover:text-foreground rounded-lg hover:bg-secondary transition-colors"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                  </button>
+                ) : (
+                  <Wrench className="h-5 w-5 text-primary" />
+                )}
                 {JOB_TYPE_LABEL[selectedEvent.jobType]}
               </h3>
               <p className="text-xs text-muted-foreground font-medium">รหัสเครื่อง: {selectedEvent.acCode}</p>
             </div>
-            <button onClick={() => setSelectedEvent(null)} className="p-1 text-muted-foreground hover:text-foreground rounded-lg hover:bg-secondary transition-colors">
+            <button onClick={closeEventModal} className="p-1 text-muted-foreground hover:text-foreground rounded-lg hover:bg-secondary transition-colors">
               <X className="h-4 w-4" />
             </button>
           </div>
@@ -393,7 +442,7 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
               <button
                 onClick={() => {
                   onCreateWorkOrder(selectedEvent.airConditionerId);
-                  setSelectedEvent(null);
+                  closeEventModal();
                 }}
                 className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground font-bold text-xs py-2.5 rounded-xl hover:bg-primary/90 transition-colors"
               >
@@ -435,6 +484,7 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
                 <div
                   key={job.id}
                   onClick={() => {
+                    setEventOrigin({ kind: "building", building: selectedDayBuilding });
                     setSelectedEvent(job);
                     setSelectedDayBuilding(null);
                   }}
@@ -522,6 +572,7 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
                       <div
                         key={job.id}
                         onClick={() => {
+                          setEventOrigin({ kind: "day", date: selectedDay });
                           setSelectedEvent(job);
                           closeDaySheet();
                         }}
