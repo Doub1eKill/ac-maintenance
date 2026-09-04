@@ -28,16 +28,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
+      // Nothing in here logs. It used to trace every step, and the first line
+      // printed the whole credentials object — including the password the user
+      // had just typed, in clear text, on every single sign-in. On a deployed
+      // server that fills the log with working credentials for every account.
+      //
+      // The rest of the trace was not harmless either: it recorded which email
+      // addresses exist, which accounts are suspended and whether a password
+      // matched, which is a ready-made account-enumeration trail. Sign-ins that
+      // need a record have system_audit_logs; a debug trace of the login path
+      // does not belong in the server console.
       async authorize(rawCredentials) {
-        console.log("[AUTH LOG] rawCredentials:", rawCredentials);
         const parsed = credentialsSchema.safeParse(rawCredentials);
         if (!parsed.success) {
-          console.log("[AUTH LOG] Zod validation failed:", parsed.error);
           return null;
         }
 
         const email = parsed.data.email.toLowerCase().trim();
-        console.log("[AUTH LOG] Looking for user with email:", email);
 
         try {
           const user = await prisma.user.findUnique({
@@ -45,36 +52,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           });
 
           if (!user) {
-            console.log("[AUTH LOG] User not found for email:", email);
             return null;
           }
 
-          console.log("[AUTH LOG] User found:", {
-            id: String(user.id),
-            email: user.email,
-            role: user.role,
-            status: user.status,
-            hasPassword: !!user.password,
-          });
-
           if (user.password === null) {
-            console.log("[AUTH LOG] Password is null");
             throw new PasswordResetRequired();
           }
           if (user.status === "suspended") {
-            console.log("[AUTH LOG] Account is suspended");
             throw new AccountSuspended();
           }
           if (user.status === "pending") {
-            console.log("[AUTH LOG] Account is pending approval");
             throw new AccountPendingApproval();
           }
 
           const passwordMatches = await bcrypt.compare(parsed.data.password, user.password);
-          console.log("[AUTH LOG] Password matches:", passwordMatches);
 
           if (!passwordMatches) {
-            console.log("[AUTH LOG] Password comparison failed!");
             return null;
           }
 
@@ -89,7 +82,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           if (error instanceof CredentialsSignin) {
             throw error;
           }
-          console.error("[AUTH LOG] Unexpected error in authorize:", error);
+          // Kept: an unexpected failure here needs to be visible. The error
+          // object carries no credentials — the ones the caller sent never
+          // reach it.
+          console.error("Sign-in failed unexpectedly:", error);
           return null;
         }
       },

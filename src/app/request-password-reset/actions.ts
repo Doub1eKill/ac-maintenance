@@ -83,10 +83,13 @@ export async function requestPasswordReset(
       html,
     });
 
-    if (result.status === "not_configured") {
-      // Development fallback only. The URL carries a working reset token, so
-      // this deliberately never runs once SMTP is configured — otherwise
-      // every reset would drop a live credential into the server logs.
+    if (result.status === "not_configured" && process.env.NODE_ENV !== "production") {
+      // Development fallback only: without SMTP there is no other way to reach
+      // the reset link while testing. The URL carries a working reset token, so
+      // it is gated on the environment as well as on SMTP being unset — SMTP is
+      // still unconfigured in this project, and without the second condition a
+      // deploy made before those credentials are filled in would print a live
+      // password reset for every request into the production log.
       console.log(`[password reset] ${user.email} -> ${resetUrl}`);
     }
   }
