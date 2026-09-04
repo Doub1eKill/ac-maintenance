@@ -127,17 +127,28 @@ export const columns: ColumnDef<MaintenanceRow>[] = [
         aria-label="Select all"
       />
     ),
-    cell: ({ row }) => (
-      // Stops the row's own onClick (opens the detail view) from firing when
-      // the checkbox itself is what got clicked.
-      <div onClick={(e) => e.stopPropagation()}>
-        <Checkbox
-          checked={row.getIsSelected()}
-          onCheckedChange={(value) => row.toggleSelected(!!value)}
-          aria-label="Select row"
-        />
-      </div>
-    ),
+    cell: ({ row }) => {
+      // No checkbox at all on a row that cannot be assigned. Selecting one was
+      // always possible and never did anything — it just added to the count
+      // while the button stayed at (0), which read as the button being broken.
+      // The row's own control is "สร้างใบงาน"; once that raises a job, the
+      // checkbox appears.
+      if (!row.getCanSelect()) {
+        return null;
+      }
+
+      // Stops the row's own onClick (opens the asset page) from firing when the
+      // checkbox itself is what got clicked.
+      return (
+        <div onClick={(e) => e.stopPropagation()}>
+          <Checkbox
+            checked={row.getIsSelected()}
+            onCheckedChange={(value) => row.toggleSelected(!!value)}
+            aria-label="Select row"
+          />
+        </div>
+      );
+    },
     enableSorting: false,
     enableHiding: false,
   },
@@ -284,6 +295,11 @@ export function UpcomingMaintenanceTable({ data, onViewDetails, onCreateWorkOrde
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
+    // Only rows with an open work order can be picked, because assignment
+    // happens on the job rather than on the unit. Declaring it here rather than
+    // filtering afterwards is what makes the header's select-all skip them too,
+    // instead of ticking rows that cannot go anywhere.
+    enableRowSelection: (row) => Boolean(row.original.pendingWorkOrderId),
     // No pagination row model: the rows are grouped by building below and it is
     // the buildings that page, the way the technician lists do. Paginating the
     // rows as well would cut a building in half across two pages.
@@ -439,7 +455,12 @@ export function UpcomingMaintenanceTable({ data, onViewDetails, onCreateWorkOrde
                       // few pixels off used to open the asset page — an easy
                       // miss on a phone, and a jarring one when the intent was
                       // to select several rows.
-                      const isSelectCell = cell.column.id === "select";
+                      // Only the cells that actually hold a checkbox take the
+                      // click. On a row that cannot be assigned the cell is
+                      // empty, so it behaves like the rest of the row and opens
+                      // the asset page rather than swallowing the click and
+                      // appearing dead.
+                      const isSelectCell = cell.column.id === "select" && row.getCanSelect();
                       return (
                         <TableCell
                           key={cell.id}
@@ -494,17 +515,19 @@ export function UpcomingMaintenanceTable({ data, onViewDetails, onCreateWorkOrde
                 assignment happens on a work order, and a unit flagged as broken
                 or overdue does not necessarily have one.
               */}
-              {assignableWorkOrderIds.length === 0 ? (
+              {/*
+                Kept as a safety net. Rows without a job no longer offer a
+                checkbox, so this should not be reachable — but if a row ever
+                loses its job while ticked, saying so beats a silent (0).
+              */}
+              {assignableWorkOrderIds.length < selectedRows.length && (
                 <div className="text-[11px] text-muted-foreground mt-0.5">
-                  รายการที่เลือกยังไม่มีใบงาน จึงมอบหมายช่างไม่ได้ — กด &ldquo;สร้างใบงาน&rdquo; ที่แถวนั้นก่อน
+                  {assignableWorkOrderIds.length === 0
+                    ? "รายการที่เลือกไม่มีใบงานแล้ว จึงมอบหมายช่างไม่ได้"
+                    : `มอบหมายได้ ${assignableWorkOrderIds.length} รายการ ส่วนอีก ${
+                        selectedRows.length - assignableWorkOrderIds.length
+                      } รายการไม่มีใบงานแล้ว`}
                 </div>
-              ) : (
-                assignableWorkOrderIds.length < selectedRows.length && (
-                  <div className="text-[11px] text-muted-foreground mt-0.5">
-                    มอบหมายได้ {assignableWorkOrderIds.length} รายการ ส่วนอีก{" "}
-                    {selectedRows.length - assignableWorkOrderIds.length} รายการยังไม่มีใบงาน
-                  </div>
-                )
               )}
             </div>
             <div className="flex items-center gap-2 shrink-0">
