@@ -85,7 +85,10 @@ export function OverviewPanel({
         };
       });
 
-    const upcomingRows: Array<{ kind: "upcoming"; id: string; acCode: string; brand: string; btu: number | null; location: string; nextDueDate: string }> = [];
+    // Typed off MaintenanceRow rather than restating its fields: the inline
+    // copy this replaces had to be edited in step with the interface, and was
+    // the thing that went stale when the building columns were added.
+    const upcomingRows: MaintenanceRow[] = [];
     buildings.forEach((b) => {
       b.rooms.forEach((r) => {
         r.acUnits.forEach((ac) => {
@@ -97,13 +100,20 @@ export function OverviewPanel({
               brand: ac.brand || "ไม่ระบุยี่ห้อ",
               btu: ac.btu,
               location: `${b.name} - ห้อง ${r.name}`,
+              buildingId: b.id,
+              buildingName: b.name,
               nextDueDate: ac.maintenanceSchedule.nextDueDate,
             });
           }
         });
       });
     });
-    upcomingRows.sort((a, b) => new Date(a.nextDueDate).getTime() - new Date(b.nextDueDate).getTime());
+    // Every row pushed above carries a date; the nullish guard is here because
+    // the shared row type allows an urgent row without one, and the array is
+    // now typed off that union rather than a local restatement of it.
+    const dueTime = (row: MaintenanceRow) =>
+      row.nextDueDate ? new Date(row.nextDueDate).getTime() : 0;
+    upcomingRows.sort((a, b) => dueTime(a) - dueTime(b));
 
     return [...urgentRows, ...upcomingRows];
   }, [urgentUnits, buildings, workOrders]);

@@ -8,8 +8,7 @@ import {
   VisibilityState,
   flexRender,
   getCoreRowModel,
-  getFilteredRowModel,
-  getPaginationRowModel,
+  getFilteredRowModel,
   getSortedRowModel,
   SortingState,
   useReactTable,
@@ -33,6 +32,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ArrowUpDown, CalendarRange, ChevronDown, Copy, UserPlus } from "lucide-react";
+import { BuildingGroupList, groupByBuilding } from "@/components/shared/building-groups";
 
 export interface UpcomingMaintenanceAC {
   id: string;
@@ -40,6 +40,8 @@ export interface UpcomingMaintenanceAC {
   brand: string;
   btu: number | null;
   location: string;
+  buildingId: string;
+  buildingName: string;
   nextDueDate: string;
 }
 
@@ -49,6 +51,8 @@ export interface UrgentMaintenanceAC {
   brand: string;
   btu: number | null;
   location: string;
+  buildingId: string;
+  buildingName: string;
   status: string;
   priority: string | null;
   issueDescription: string | null;
@@ -237,7 +241,9 @@ export function UpcomingMaintenanceTable({ data, onViewDetails, onCreateWorkOrde
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
+    // No pagination row model: the rows are grouped by building below and it is
+    // the buildings that page, the way the technician lists do. Paginating the
+    // rows as well would cut a building in half across two pages.
     onSortingChange: setSorting,
     getSortedRowModel: getSortedRowModel(),
     onColumnFiltersChange: setColumnFilters,
@@ -254,12 +260,25 @@ export function UpcomingMaintenanceTable({ data, onViewDetails, onCreateWorkOrde
       columnVisibility,
       rowSelection,
     },
-    initialState: {
-      pagination: {
-        pageSize: 5,
-      },
-    }
   });
+
+  // Grouped after filtering and sorting, so a building only appears when it has
+  // a row that survived the search, and the rows inside it keep whatever order
+  // the column headers asked for. groupByBuilding is the same helper the
+  // technician lists use — a building with nothing in it never gets an entry,
+  // so "hide empty buildings" needs no separate step.
+  // Not memoized on purpose. getRowModel() hands back a fresh object on every
+  // render, so a useMemo keyed on it would recompute anyway while giving the
+  // React Compiler something it warns about holding onto (see the
+  // react-hooks/incompatible-library note on useReactTable). Grouping a list
+  // this size is a single pass over a handful of rows.
+  const groups = groupByBuilding(
+    table.getRowModel().rows.map((row) => ({
+      buildingId: row.original.buildingId,
+      buildingName: row.original.buildingName,
+      row,
+    }))
+  );
 
   const selectedRows = table.getFilteredSelectedRowModel().rows;
   const assignableWorkOrderIds: string[] = [];
@@ -318,52 +337,59 @@ export function UpcomingMaintenanceTable({ data, onViewDetails, onCreateWorkOrde
         </div>
       </div>
 
-      <div className="rounded-xl border border-border overflow-hidden">
-        <Table>
-          <TableHeader className="bg-muted/50">
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => {
-                  return (
-                    <TableHead key={header.id} className="h-10 px-4 whitespace-normal text-xs">
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
-                    </TableHead>
-                  );
-                })}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  data-state={row.getIsSelected() && "selected"}
-                  className="h-12 cursor-pointer hover:bg-muted/50"
-                  onClick={() => onViewDetails?.(row.original.acCode)}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="px-4 py-2 whitespace-normal">
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center text-xs text-muted-foreground">
-                  ไม่มีงานซ่อมด่วนหรือกำหนดล้างในขณะนี้
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      <BuildingGroupList
+        groups={groups}
+        getSubtitle={(group) => `${group.items.length} รายการ`}
+        emptyMessage="ไม่มีงานซ่อมด่วนหรือกำหนดล้างในขณะนี้"
+        // Collapsing back to the first building when the search changes, the
+        // same way the technician lists do.
+        resetKey={(table.getColumn("acCode")?.getFilterValue() as string) ?? ""}
+        renderExtra={(group) => {
+          const urgentCount = group.items.filter(
+            (item) => item.row.original.kind === "urgent"
+          ).length;
+          return urgentCount > 0 ? (
+            <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-bold text-destructive">
+              ด่วน {urgentCount}
+            </span>
+          ) : null;
+        }}
+        renderItems={(group) => (
+          <div className="rounded-xl border border-border overflow-hidden">
+            <Table>
+              <TableHeader className="bg-muted/50">
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <TableRow key={headerGroup.id}>
+                    {headerGroup.headers.map((header) => (
+                      <TableHead key={header.id} className="h-10 px-4 whitespace-normal text-xs">
+                        {header.isPlaceholder
+                          ? null
+                          : flexRender(header.column.columnDef.header, header.getContext())}
+                      </TableHead>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableHeader>
+              <TableBody>
+                {group.items.map(({ row }) => (
+                  <TableRow
+                    key={row.id}
+                    data-state={row.getIsSelected() && "selected"}
+                    className="h-12 cursor-pointer hover:bg-muted/50"
+                    onClick={() => onViewDetails?.(row.original.acCode)}
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id} className="px-4 py-2 whitespace-normal">
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      />
 
       <div className="flex items-center justify-between pt-2">
         <div className="flex items-center gap-3">
@@ -389,28 +415,9 @@ export function UpcomingMaintenanceTable({ data, onViewDetails, onCreateWorkOrde
             </Button>
           )}
         </div>
-        {table.getPageCount() > 1 && (
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 text-xs px-2"
-              onClick={() => table.previousPage()}
-              disabled={!table.getCanPreviousPage()}
-            >
-              ก่อนหน้า
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 text-xs px-2"
-              onClick={() => table.nextPage()}
-              disabled={!table.getCanNextPage()}
-            >
-              ถัดไป
-            </Button>
-          </div>
-        )}
+        <div className="text-xs text-muted-foreground">
+          {groups.length} อาคาร
+        </div>
       </div>
     </div>
   );

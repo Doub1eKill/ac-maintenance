@@ -76,6 +76,10 @@ export interface UrgentUnit {
   modelDeleted: boolean;
   btu: number | null;
   status: string;
+  // Both, not just the name: the grouped list keys on the id (names are not
+  // unique enough — this dataset has two "Administration Building" entries
+  // differing only in a trailing number) and shows the name.
+  buildingId: string;
   buildingName: string;
   type: MaintenanceJobType;
   workOrderId: string | null;
@@ -130,6 +134,7 @@ export function shapeBuildingTree(
             ...catalogueFlags(ac),
             btu: ac.btu,
             status: ac.status,
+            buildingId: b.id.toString(),
             buildingName: b.name,
             // What the open job was raised for. A unit flagged as needing
             // attention without an open job still has to sort somewhere, and
