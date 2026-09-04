@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
   Zap,
@@ -58,8 +59,9 @@ export interface NavItem {
   badge?: number;
   description?: string;
   group?: string;
-  // A real route to navigate to instead of switching the in-page tab —
-  // for pages that live outside the tabbed dashboard (e.g. Master Data).
+  // The route this item points at. Every item has one now that both dashboards
+  // are real routes; the tab-switching path below is kept for any caller still
+  // driving the layout from state.
   href?: string;
 }
 
@@ -70,8 +72,10 @@ interface DashboardLayoutProps {
     role?: string | null;
     universityName?: string | null;
   };
-  activeTab: string;
-  setActiveTab: (tab: string) => void;
+  // Optional: a layout whose nav items carry hrefs works out which one is
+  // current from the URL, and has nothing to set.
+  activeTab?: string;
+  setActiveTab?: (tab: string) => void;
   navItems: NavItem[];
   onCreateAction?: () => void;
   createActionLabel?: string;
@@ -94,8 +98,21 @@ export function DashboardLayout({
   children,
 }: DashboardLayoutProps) {
   const roleLabel = user.role === "org_admin" ? "ผู้บริหารองค์กร" : "ช่างซ่อมบำรุง";
+  const pathname = usePathname();
 
-  const currentNav = navItems.find((item) => item.id === activeTab) || navItems[0];
+  // A nav item is current when its href is the deepest one matching the URL.
+  // Longest-match rather than exact, so a page with sub-routes keeps its item
+  // lit, and longest-first so "/admin/assets" does not also light "/admin".
+  const activeHref = navItems
+    .map((item) => item.href)
+    .filter((href): href is string => Boolean(href))
+    .filter((href) => pathname === href || pathname.startsWith(`${href}/`))
+    .sort((a, b) => b.length - a.length)[0];
+
+  const isCurrent = (item: NavItem) =>
+    item.href ? item.href === activeHref : item.id === activeTab;
+
+  const currentNav = navItems.find(isCurrent) || navItems[0];
 
   const groupOrder = Array.from(new Set(navItems.map(item => item.group || "เมนูทั่วไป")));
   const groupedNavItems = groupOrder.map(groupName => ({
@@ -137,7 +154,7 @@ export function DashboardLayout({
               <SidebarGroupContent>
                 <SidebarMenu>
                   {items.map((item) => {
-                    const isActive = activeTab === item.id;
+                    const isActive = isCurrent(item);
                     const Icon = item.icon;
                     const content = (
                       <>
@@ -155,13 +172,18 @@ export function DashboardLayout({
                     return (
                       <SidebarMenuItem key={item.id}>
                         {item.href ? (
-                          <SidebarMenuButton asChild tooltip={item.label} className="w-full justify-between">
+                          <SidebarMenuButton
+                            asChild
+                            isActive={isActive}
+                            tooltip={item.label}
+                            className="w-full justify-between"
+                          >
                             <Link href={item.href}>{content}</Link>
                           </SidebarMenuButton>
                         ) : (
                           <SidebarMenuButton
                             isActive={isActive}
-                            onClick={() => setActiveTab(item.id)}
+                            onClick={() => setActiveTab?.(item.id)}
                             tooltip={item.label}
                             className="w-full justify-between"
                           >
@@ -210,24 +232,53 @@ export function DashboardLayout({
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuGroup>
-                    {navItems.some((item) => item.id === "profile") && (
-                      <DropdownMenuItem
-                        onClick={() => setActiveTab("profile")}
-                        className="rounded-lg text-xs font-medium cursor-pointer"
-                      >
-                        <User className="mr-2 h-4 w-4" />
-                        <span>โปรไฟล์ส่วนตัว</span>
-                      </DropdownMenuItem>
-                    )}
-                    {navItems.some((item) => item.id === "settings") && (
-                      <DropdownMenuItem
-                        onClick={() => setActiveTab("settings")}
-                        className="rounded-lg text-xs font-medium cursor-pointer"
-                      >
-                        <Settings className="mr-2 h-4 w-4" />
-                        <span>ตั้งค่าระบบ</span>
-                      </DropdownMenuItem>
-                    )}
+                    {(() => {
+                      const shortcut = (id: string) => navItems.find((item) => item.id === id);
+                      const profileItem = shortcut("profile");
+                      const settingsItem = shortcut("settings");
+                      return (
+                        <>
+                          {profileItem && (
+                            <DropdownMenuItem
+                              asChild={Boolean(profileItem.href)}
+                              onClick={profileItem.href ? undefined : () => setActiveTab?.("profile")}
+                              className="rounded-lg text-xs font-medium cursor-pointer"
+                            >
+                              {profileItem.href ? (
+                                <Link href={profileItem.href}>
+                                  <User className="mr-2 h-4 w-4" />
+                                  <span>โปรไฟล์ส่วนตัว</span>
+                                </Link>
+                              ) : (
+                                <>
+                                  <User className="mr-2 h-4 w-4" />
+                                  <span>โปรไฟล์ส่วนตัว</span>
+                                </>
+                              )}
+                            </DropdownMenuItem>
+                          )}
+                          {settingsItem && (
+                            <DropdownMenuItem
+                              asChild={Boolean(settingsItem.href)}
+                              onClick={settingsItem.href ? undefined : () => setActiveTab?.("settings")}
+                              className="rounded-lg text-xs font-medium cursor-pointer"
+                            >
+                              {settingsItem.href ? (
+                                <Link href={settingsItem.href}>
+                                  <Settings className="mr-2 h-4 w-4" />
+                                  <span>ตั้งค่าระบบ</span>
+                                </Link>
+                              ) : (
+                                <>
+                                  <Settings className="mr-2 h-4 w-4" />
+                                  <span>ตั้งค่าระบบ</span>
+                                </>
+                              )}
+                            </DropdownMenuItem>
+                          )}
+                        </>
+                      );
+                    })()}
                   </DropdownMenuGroup>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem

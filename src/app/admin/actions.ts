@@ -15,8 +15,8 @@
 // Each wrapper borrows its parameters from the implementation with
 // Parameters<typeof ...>, so a signature only ever changes in one place.
 
-import * as dashboard from "@/lib/admin/dashboard";
 import * as workOrders from "@/lib/admin/work-orders";
+import * as pages from "@/lib/admin/pages";
 import * as users from "@/lib/admin/users";
 import * as profile from "@/lib/admin/profile";
 import * as organisationSettings from "@/lib/admin/organisation-settings";
@@ -26,12 +26,6 @@ import * as rooms from "@/lib/admin/rooms";
 import * as airConditioners from "@/lib/admin/air-conditioners";
 import * as maintenanceLogs from "@/lib/admin/maintenance-logs";
 import * as schedules from "@/lib/admin/schedules";
-
-// --- dashboard ---
-
-export async function getOrgAdminData() {
-  return dashboard.getOrgAdminData();
-}
 
 // --- work orders ---
 
@@ -145,4 +139,12 @@ export async function saveMaintenanceScheduleAction(
   ...args: Parameters<typeof schedules.saveMaintenanceScheduleAction>
 ) {
   return schedules.saveMaintenanceScheduleAction(...args);
+}
+
+// --- per-page loaders ---
+
+export async function getCreateWorkOrderFormData(
+  ...args: Parameters<typeof pages.getCreateWorkOrderFormData>
+) {
+  return pages.getCreateWorkOrderFormData(...args);
 }
