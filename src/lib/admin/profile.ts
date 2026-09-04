@@ -151,7 +151,7 @@ export async function updateProfileAction(
       await deleteUpload(replacedAvatarUrl);
     }
 
-    revalidatePath(session.user.role === "technician" ? "/tech" : "/admin");
+    revalidatePath(session.user.role === "technician" ? "/tech" : "/admin", "layout");
     return { success: true };
   } catch (error) {
     console.error("Failed to update own profile:", error);

@@ -36,7 +36,7 @@ export async function updateUserStatusByOrgAdminAction(
       `[AUDIT TRAIL] User status updated by OrgAdmin (AdminID: ${session.user.id}): TargetUser ${targetUserId} -> Status: ${newStatus} at ${new Date().toISOString()}`
     );
 
-    revalidatePath("/admin");
+    revalidatePath("/admin", "layout");
     return { success: true };
   } catch (error) {
     console.error("Failed to update user status by org admin:", error);
@@ -96,7 +96,7 @@ export async function adminResetUserPasswordAction(userId: string) {
       ipAddress: "server_action",
     });
 
-    revalidatePath("/admin");
+    revalidatePath("/admin", "layout");
     return { success: true };
   } catch (error) {
     console.error("Failed to reset user password:", error);

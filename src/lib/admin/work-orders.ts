@@ -146,7 +146,7 @@ export async function createWorkOrderAction(formData: FormData) {
       data: { status: parsed.data.type === "repair" ? "broken" : "needs_cleaning" },
     });
 
-    revalidatePath("/admin");
+    revalidatePath("/admin", "layout");
     return { success: true };
   } catch (error) {
     console.error("Failed to create work order:", error);
@@ -197,7 +197,7 @@ export async function assignWorkOrderAction(workOrderId: string, assignToUserId:
       ipAddress: "server_action",
     });
 
-    revalidatePath("/admin");
+    revalidatePath("/admin", "layout");
     return { success: true };
   } catch (error) {
     console.error("Failed to assign work order:", error);
@@ -298,9 +298,9 @@ export async function bulkAssignWorkOrdersAction(
       }))
     );
 
-    revalidatePath("/admin");
+    revalidatePath("/admin", "layout");
     // The technician's own job list changes too, not just the admin board.
-    revalidatePath("/tech");
+    revalidatePath("/tech", "layout");
 
     return {
       success: true,
@@ -398,8 +398,8 @@ export async function cancelWorkOrderAction(workOrderId: string, reason?: string
       ipAddress: "server_action",
     });
 
-    revalidatePath("/admin");
-    revalidatePath("/tech");
+    revalidatePath("/admin", "layout");
+    revalidatePath("/tech", "layout");
     return { success: true, statusReset: result.statusReset };
   } catch (error) {
     console.error("Failed to cancel work order:", error);

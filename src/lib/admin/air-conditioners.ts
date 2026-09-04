@@ -127,7 +127,7 @@ export async function createAirConditionerAction(formData: FormData) {
       });
     });
 
-    revalidatePath("/admin");
+    revalidatePath("/admin", "layout");
     return { success: true };
   } catch (error) {
     console.error(error);
@@ -271,7 +271,7 @@ export async function updateAirConditionerAction(formData: FormData) {
       ipAddress: "server_action",
     });
 
-    revalidatePath("/admin");
+    revalidatePath("/admin", "layout");
     return { success: true };
   } catch (error) {
     console.error("Failed to update air conditioner:", error);

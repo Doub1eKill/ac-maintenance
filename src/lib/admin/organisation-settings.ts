@@ -57,7 +57,7 @@ export async function updateDefaultFrequencyAction(value: number, unit: string) 
       ipAddress: "server_action",
     });
 
-    revalidatePath("/admin");
+    revalidatePath("/admin", "layout");
     return { success: true };
   } catch (error) {
     console.error("Failed to update default frequency:", error);
@@ -118,8 +118,8 @@ export async function updateOrganisationInfoAction(
 
     // The name appears in the header of every dashboard, so both trees have
     // to be rebuilt or the old one lingers until the next natural navigation.
-    revalidatePath("/admin");
-    revalidatePath("/tech");
+    revalidatePath("/admin", "layout");
+    revalidatePath("/tech", "layout");
     return { success: true };
   } catch (error) {
     console.error("Failed to update organisation info:", error);

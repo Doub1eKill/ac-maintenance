@@ -71,7 +71,7 @@ export async function saveMaintenanceScheduleAction(formData: FormData) {
       });
     }
 
-    revalidatePath("/admin");
+    revalidatePath("/admin", "layout");
     return { success: true };
   } catch (error) {
     console.error(error);

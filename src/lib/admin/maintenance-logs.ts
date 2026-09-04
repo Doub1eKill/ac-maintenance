@@ -166,8 +166,8 @@ export async function updateMaintenanceLogAction(
       ipAddress: "server_action",
     });
 
-    revalidatePath("/admin");
-    revalidatePath("/tech");
+    revalidatePath("/admin", "layout");
+    revalidatePath("/tech", "layout");
     return { success: true };
   } catch (error) {
     console.error("Failed to update maintenance log:", error);

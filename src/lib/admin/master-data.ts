@@ -82,7 +82,7 @@ export async function createAcBrandAction(formData: FormData) {
     }
     
     await prisma.acBrand.create({ data: { name: parsed.data.name } });
-    revalidatePath("/admin");
+    revalidatePath("/admin", "layout");
     return { success: true };
   } catch (error) {
     console.error(error);
@@ -138,7 +138,7 @@ export async function createAcModelAction(formData: FormData) {
       }
     });
     
-    revalidatePath("/admin");
+    revalidatePath("/admin", "layout");
     return { success: true };
   } catch (error) {
     console.error(error);
@@ -223,7 +223,7 @@ export async function deleteAcBrandAction(brandId: string) {
       ipAddress: "server_action",
     });
 
-    revalidatePath("/admin");
+    revalidatePath("/admin", "layout");
     return { success: true };
   } catch (error) {
     console.error(error);
@@ -251,7 +251,7 @@ export async function restoreAcBrandAction(brandId: string) {
       ipAddress: "server_action",
     });
 
-    revalidatePath("/admin");
+    revalidatePath("/admin", "layout");
     return { success: true };
   } catch (error) {
     console.error(error);
@@ -291,7 +291,7 @@ export async function permanentlyDeleteAcBrandAction(brandId: string) {
       ipAddress: "server_action",
     });
 
-    revalidatePath("/admin");
+    revalidatePath("/admin", "layout");
     return { success: true, cascadedModels };
   } catch (error) {
     console.error(error);
@@ -320,7 +320,7 @@ export async function deleteAcModelAction(modelId: string) {
       ipAddress: "server_action",
     });
 
-    revalidatePath("/admin");
+    revalidatePath("/admin", "layout");
     return { success: true };
   } catch (error) {
     console.error(error);
@@ -351,7 +351,7 @@ export async function restoreAcModelAction(modelId: string) {
       ipAddress: "server_action",
     });
 
-    revalidatePath("/admin");
+    revalidatePath("/admin", "layout");
     // Restoring the model is not refused while its brand is still in the trash —
     // the row genuinely comes back — but it stays out of the dropdowns until the
     // brand returns too, and saying nothing here would make it read as a no-op.
@@ -392,7 +392,7 @@ export async function permanentlyDeleteAcModelAction(modelId: string) {
       ipAddress: "server_action",
     });
 
-    revalidatePath("/admin");
+    revalidatePath("/admin", "layout");
     return { success: true };
   } catch (error) {
     console.error(error);

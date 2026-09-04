@@ -190,8 +190,8 @@ export async function logMaintenanceAction(formData: FormData) {
       ipAddress: "server_action",
     });
 
-    revalidatePath("/tech");
-    revalidatePath("/admin");
+    revalidatePath("/tech", "layout");
+    revalidatePath("/admin", "layout");
     return { success: true };
   } catch (error) {
     console.error("Failed to log maintenance action:", error);

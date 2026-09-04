@@ -75,7 +75,7 @@ export async function bulkClaimWorkOrdersAction(workOrderIds: string[]) {
       }))
     );
 
-    revalidatePath("/tech");
+    revalidatePath("/tech", "layout");
 
     return {
       success: true,
