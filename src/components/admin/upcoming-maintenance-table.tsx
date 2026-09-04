@@ -432,11 +432,41 @@ export function UpcomingMaintenanceTable({ data, onViewDetails, onCreateWorkOrde
                     className="h-12 cursor-pointer hover:bg-muted/50"
                     onClick={() => onViewDetails?.(row.original.acCode)}
                   >
-                    {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id} className="px-4 py-2 whitespace-normal">
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </TableCell>
-                    ))}
+                    {row.getVisibleCells().map((cell) => {
+                      // The tick column swallows the row's own click and toggles
+                      // instead, so the whole cell is the target rather than the
+                      // 16px box inside it. Aiming for a checkbox and landing a
+                      // few pixels off used to open the asset page — an easy
+                      // miss on a phone, and a jarring one when the intent was
+                      // to select several rows.
+                      const isSelectCell = cell.column.id === "select";
+                      return (
+                        <TableCell
+                          key={cell.id}
+                          className={
+                            isSelectCell
+                              ? "px-4 py-2 whitespace-normal cursor-default"
+                              : "px-4 py-2 whitespace-normal"
+                          }
+                          onClick={
+                            isSelectCell
+                              ? (event) => {
+                                  event.stopPropagation();
+                                  // A click that landed on the checkbox itself is
+                                  // already being handled by it; toggling here as
+                                  // well would undo it immediately.
+                                  if ((event.target as HTMLElement).closest('[role="checkbox"]')) {
+                                    return;
+                                  }
+                                  row.toggleSelected(!row.getIsSelected());
+                                }
+                              : undefined
+                          }
+                        >
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </TableCell>
+                      );
+                    })}
                   </TableRow>
                 ))}
               </TableBody>
