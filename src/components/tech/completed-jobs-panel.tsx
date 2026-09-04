@@ -35,7 +35,7 @@ export function CompletedJobsPanel({ completedJobs, searchQuery, selectedBuildin
               >
                 <div className="flex items-center justify-between opacity-80">
                   <div className="space-y-1">
-                    <div className="text-sm font-bold text-muted-foreground leading-snug">{job.location}</div>
+                    <div className="text-sm font-bold text-muted-foreground leading-snug">{job.roomLocation}</div>
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-xs font-bold text-muted-foreground">{job.acCode}</span>
                       <span className="rounded-md bg-accent px-2 py-0.5 text-[10px] font-bold text-muted-foreground">

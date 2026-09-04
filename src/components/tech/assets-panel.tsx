@@ -84,7 +84,7 @@ export function AssetsPanel({ assetList, assetSummary, searchQuery, selectedBuil
                     </div>
                   )}
                   <div className="pr-8 space-y-1">
-                    <div className="text-sm font-bold text-foreground leading-snug">{unit.location}</div>
+                    <div className="text-sm font-bold text-foreground leading-snug">{unit.roomLocation}</div>
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-xs font-bold text-muted-foreground">{unit.acCode}</span>
                       <span className="rounded-md bg-secondary px-2 py-0.5 text-[10px] font-bold text-foreground">

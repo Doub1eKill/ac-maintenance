@@ -45,6 +45,7 @@ export interface UpcomingMaintenanceAC {
   modelDeleted: boolean;
   btu: number | null;
   location: string;
+  roomLocation: string;
   buildingId: string;
   buildingName: string;
   nextDueDate: string;
@@ -62,6 +63,7 @@ export interface UrgentMaintenanceAC {
   modelDeleted: boolean;
   btu: number | null;
   location: string;
+  roomLocation: string;
   buildingId: string;
   buildingName: string;
   status: string;
@@ -180,7 +182,7 @@ export const columns: ColumnDef<MaintenanceRow>[] = [
     header: () => <div className="text-xs font-bold">สถานที่ / รุ่นแอร์</div>,
     cell: ({ row }) => (
       <div>
-        <div className="font-medium text-xs">{row.getValue("location")}</div>
+        <div className="font-medium text-xs">{row.original.roomLocation}</div>
         <div className="text-[10px] text-muted-foreground">
           {row.original.brand} {row.original.btu ? `(${row.original.btu} BTU)` : ""}
           <CatalogueMark

@@ -269,6 +269,9 @@ export interface TechnicianAssetUnit {
   btu: number | null;
   status: string;
   location: string;
+  // The same place without the building, for lists grouped under a building
+  // header. See @/lib/location.
+  roomLocation: string;
   // Split out of `location`, which is assembled for display — sorting needs the
   // building on its own, and a grouped layout needs the room and floor too.
   // `location` itself is unchanged, so existing callers are unaffected.
@@ -348,6 +351,8 @@ export async function getTechnicianAssetList(): Promise<{
       btu: u.btu ?? u.acModel?.defaultBtu ?? null,
       status: u.status,
       location: formatUnitLocation(u.room),
+      // See work-order-board.ts: the room on its own, for the grouped lists.
+      roomLocation: formatUnitLocation(u.room, { withBuilding: false }),
       buildingId: u.room.building.id.toString(),
       buildingName: u.room.building.name,
       roomName: u.room.name,

@@ -44,7 +44,7 @@ export function MyJobsPanel({ myJobs, searchQuery, selectedBuilding, onSelectFor
                 <div className="flex items-center justify-between pr-8">
                   <div className="space-y-1">
                     <div className="text-sm font-bold leading-snug text-foreground">
-                      {job.location}
+                      {job.roomLocation}
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-xs font-bold text-muted-foreground">

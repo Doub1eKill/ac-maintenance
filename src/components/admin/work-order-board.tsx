@@ -193,7 +193,7 @@ export function WorkOrderBoard({
                       {wo.acCode}
                     </td>
                     <td className="px-4 py-3 max-w-[190px]">
-                      <div className="font-medium text-foreground">{wo.location}</div>
+                      <div className="font-medium text-foreground">{wo.roomLocation}</div>
                       <div className="text-xs text-muted-foreground">
                         {wo.brand} {wo.btu ? `(${wo.btu} BTU)` : ""}
                         <CatalogueMark brandDeleted={wo.brandDeleted} modelDeleted={wo.modelDeleted} className="ml-1" />

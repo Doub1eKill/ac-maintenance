@@ -95,6 +95,12 @@ export function toWorkOrderBoardRow(wo: WorkOrderBoardRow) {
     btu: wo.airConditioner.btu,
     acStatus: wo.airConditioner.status,
     location: formatUnitLocation(wo.airConditioner.room, { withAbbreviation: true }),
+    // The same location without the building, for the lists that group their
+    // rows under a building header and would otherwise repeat it on every row.
+    roomLocation: formatUnitLocation(wo.airConditioner.room, {
+      withAbbreviation: true,
+      withBuilding: false,
+    }),
     // Split out of `location`, which is assembled for display. Same pair the
     // technician job rows carry, so both sides group through groupByBuilding()
     // without either of them parsing a formatted string back apart.

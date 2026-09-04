@@ -70,6 +70,7 @@ export interface UrgentUnit {
   id: string;
   acCode: string;
   location: string;
+  roomLocation: string;
   brand: string;
   model: string | null;
   brandDeleted: boolean;
@@ -129,6 +130,10 @@ export function shapeBuildingTree(
             id: ac.id.toString(),
             acCode: ac.acCode,
             location: formatUnitLocation({ name: r.name, building: { name: b.name } }),
+            roomLocation: formatUnitLocation(
+              { name: r.name, building: { name: b.name } },
+              { withBuilding: false }
+            ),
             brand: ac.acBrand?.name || ac.brand || "ไม่ระบุ",
             model: ac.acModel?.name || ac.model || null,
             ...catalogueFlags(ac),

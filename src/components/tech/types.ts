@@ -10,6 +10,9 @@ export interface TechJobItem {
   btu: number | null;
   status: string;
   location: string;
+  // The same place without the building, for lists grouped under a building
+  // header. See @/lib/location.
+  roomLocation: string;
   buildingId: string;
   buildingName: string;
   priority?: string | null;

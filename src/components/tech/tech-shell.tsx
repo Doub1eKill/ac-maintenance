@@ -104,6 +104,9 @@ export function TechShell({ user, universityName, buildings, badges, children }:
         btu: res.acDetails.btu,
         status: res.acDetails.status,
         location: res.acDetails.location,
+        // The scan result has no building of its own to group under, so the
+        // room line is the full location here.
+        roomLocation: res.acDetails.location,
         // scanQrCodeAction does not return a building — this synthetic job only
         // feeds the log form, which does not group by building.
         buildingId: "",

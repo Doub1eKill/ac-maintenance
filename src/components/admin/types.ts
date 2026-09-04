@@ -8,6 +8,9 @@ export interface WorkOrderItem {
   modelDeleted: boolean;
   btu: number | null;
   location: string;
+  // The same place without the building, for lists grouped under a building
+  // header. See @/lib/location.
+  roomLocation: string;
   // Split out of `location`, which is assembled for display — the board groups
   // by building and must not parse a formatted string back apart.
   buildingId: string;

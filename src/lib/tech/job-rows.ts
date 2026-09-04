@@ -52,6 +52,13 @@ export function toTechJobRow(wo: TechJobRecord) {
     status: wo.airConditioner.status,
     priority: wo.priority,
     location: formatUnitLocation(wo.airConditioner.room, { withAbbreviation: true, withFloor: true }),
+    // The same location without the building, for the lists that group their
+    // rows under a building header and would otherwise repeat it on every row.
+    roomLocation: formatUnitLocation(wo.airConditioner.room, {
+      withAbbreviation: true,
+      withFloor: true,
+      withBuilding: false,
+    }),
     buildingId: wo.airConditioner.room.building.id.toString(),
     buildingName: wo.airConditioner.room.building.name,
   };

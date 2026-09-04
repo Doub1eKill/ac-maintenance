@@ -111,7 +111,7 @@ export function JobPoolPanel({ jobPool, searchQuery, selectedBuilding, isPending
                         onCheckedChange={() => togglePoolSelection(job.id)}
                         aria-label={`เลือก ${job.acCode}`}
                       />
-                      <div className="text-sm font-bold text-foreground leading-snug">{job.location}</div>
+                      <div className="text-sm font-bold text-foreground leading-snug">{job.roomLocation}</div>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-xs font-bold text-muted-foreground">{job.acCode}</span>

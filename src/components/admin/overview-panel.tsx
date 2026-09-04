@@ -7,6 +7,7 @@ import { AnimatedIcon } from "@/components/ui/animated-icon";
 import { Slider } from "@/components/ui/slider";
 import { UpcomingMaintenanceTable, type MaintenanceRow, type UrgentMaintenanceAC } from "@/components/admin/upcoming-maintenance-table";
 import type { BuildingItem, WorkOrderItem } from "@/components/admin/types";
+import { formatUnitLocation } from "@/lib/location";
 
 const ChartAreaInteractive = dynamic(
   () => import("@/components/admin/chart-area-interactive").then((m) => m.ChartAreaInteractive),
@@ -122,7 +123,14 @@ export function OverviewPanel({
               brandDeleted: ac.brandDeleted,
               modelDeleted: ac.modelDeleted,
               btu: ac.btu,
-              location: `${b.name} - ห้อง ${r.name}`,
+              // Through the helper rather than an inline template: this row
+              // shows the same place as every other list, and the grouped
+              // table needs the room on its own as well.
+              location: formatUnitLocation({ name: r.name, building: { name: b.name } }),
+              roomLocation: formatUnitLocation(
+                { name: r.name, building: { name: b.name } },
+                { withBuilding: false }
+              ),
               buildingId: b.id,
               buildingName: b.name,
               nextDueDate: ac.maintenanceSchedule.nextDueDate,
