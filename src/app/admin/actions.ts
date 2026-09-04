@@ -17,8 +17,15 @@
 
 import * as dashboard from "@/lib/admin/dashboard";
 import * as workOrders from "@/lib/admin/work-orders";
-import * as settings from "@/lib/admin/settings";
-import * as assets from "@/lib/admin/assets";
+import * as users from "@/lib/admin/users";
+import * as profile from "@/lib/admin/profile";
+import * as organisationSettings from "@/lib/admin/organisation-settings";
+import * as auditLog from "@/lib/admin/audit-log";
+import * as buildings from "@/lib/admin/buildings";
+import * as rooms from "@/lib/admin/rooms";
+import * as airConditioners from "@/lib/admin/air-conditioners";
+import * as maintenanceLogs from "@/lib/admin/maintenance-logs";
+import * as schedules from "@/lib/admin/schedules";
 
 // --- dashboard ---
 
@@ -61,81 +68,81 @@ export async function cancelWorkOrderAction(
 // --- users, profile, system settings ---
 
 export async function updateUserStatusByOrgAdminAction(
-  ...args: Parameters<typeof settings.updateUserStatusByOrgAdminAction>
+  ...args: Parameters<typeof users.updateUserStatusByOrgAdminAction>
 ) {
-  return settings.updateUserStatusByOrgAdminAction(...args);
+  return users.updateUserStatusByOrgAdminAction(...args);
 }
 
 export async function updateProfileAction(
-  ...args: Parameters<typeof settings.updateProfileAction>
+  ...args: Parameters<typeof profile.updateProfileAction>
 ) {
-  return settings.updateProfileAction(...args);
+  return profile.updateProfileAction(...args);
 }
 
 export async function updateDefaultFrequencyAction(
-  ...args: Parameters<typeof settings.updateDefaultFrequencyAction>
+  ...args: Parameters<typeof organisationSettings.updateDefaultFrequencyAction>
 ) {
-  return settings.updateDefaultFrequencyAction(...args);
+  return organisationSettings.updateDefaultFrequencyAction(...args);
 }
 
 export async function updateOrganisationInfoAction(
-  ...args: Parameters<typeof settings.updateOrganisationInfoAction>
+  ...args: Parameters<typeof organisationSettings.updateOrganisationInfoAction>
 ) {
-  return settings.updateOrganisationInfoAction(...args);
+  return organisationSettings.updateOrganisationInfoAction(...args);
 }
 
 export async function adminResetUserPasswordAction(
-  ...args: Parameters<typeof settings.adminResetUserPasswordAction>
+  ...args: Parameters<typeof users.adminResetUserPasswordAction>
 ) {
-  return settings.adminResetUserPasswordAction(...args);
+  return users.adminResetUserPasswordAction(...args);
 }
 
 export async function getAuditLogs(
-  ...args: Parameters<typeof settings.getAuditLogs>
+  ...args: Parameters<typeof auditLog.getAuditLogs>
 ) {
-  return settings.getAuditLogs(...args);
+  return auditLog.getAuditLogs(...args);
 }
 
 // --- buildings, rooms, units, service history ---
 
 export async function createBuildingAction(
-  ...args: Parameters<typeof assets.createBuildingAction>
+  ...args: Parameters<typeof buildings.createBuildingAction>
 ) {
-  return assets.createBuildingAction(...args);
+  return buildings.createBuildingAction(...args);
 }
 
 export async function createRoomAction(
-  ...args: Parameters<typeof assets.createRoomAction>
+  ...args: Parameters<typeof rooms.createRoomAction>
 ) {
-  return assets.createRoomAction(...args);
+  return rooms.createRoomAction(...args);
 }
 
 export async function createAirConditionerAction(
-  ...args: Parameters<typeof assets.createAirConditionerAction>
+  ...args: Parameters<typeof airConditioners.createAirConditionerAction>
 ) {
-  return assets.createAirConditionerAction(...args);
+  return airConditioners.createAirConditionerAction(...args);
 }
 
 export async function updateAirConditionerAction(
-  ...args: Parameters<typeof assets.updateAirConditionerAction>
+  ...args: Parameters<typeof airConditioners.updateAirConditionerAction>
 ) {
-  return assets.updateAirConditionerAction(...args);
+  return airConditioners.updateAirConditionerAction(...args);
 }
 
 export async function getAirConditionerHistory(
-  ...args: Parameters<typeof assets.getAirConditionerHistory>
+  ...args: Parameters<typeof maintenanceLogs.getAirConditionerHistory>
 ) {
-  return assets.getAirConditionerHistory(...args);
+  return maintenanceLogs.getAirConditionerHistory(...args);
 }
 
 export async function updateMaintenanceLogAction(
-  ...args: Parameters<typeof assets.updateMaintenanceLogAction>
+  ...args: Parameters<typeof maintenanceLogs.updateMaintenanceLogAction>
 ) {
-  return assets.updateMaintenanceLogAction(...args);
+  return maintenanceLogs.updateMaintenanceLogAction(...args);
 }
 
 export async function saveMaintenanceScheduleAction(
-  ...args: Parameters<typeof assets.saveMaintenanceScheduleAction>
+  ...args: Parameters<typeof schedules.saveMaintenanceScheduleAction>
 ) {
-  return assets.saveMaintenanceScheduleAction(...args);
+  return schedules.saveMaintenanceScheduleAction(...args);
 }
