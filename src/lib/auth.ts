@@ -20,75 +20,130 @@ class PasswordResetRequired extends CredentialsSignin {
   code = "password-reset-required";
 }
 
+const passwordProvider = Credentials({
+  credentials: {
+    email: { label: "Email", type: "email" },
+    password: { label: "Password", type: "password" },
+  },
+  // Nothing in here logs. It used to trace every step, and the first line
+  // printed the whole credentials object — including the password the user
+  // had just typed, in clear text, on every single sign-in. On a deployed
+  // server that fills the log with working credentials for every account.
+  //
+  // The rest of the trace was not harmless either: it recorded which email
+  // addresses exist, which accounts are suspended and whether a password
+  // matched, which is a ready-made account-enumeration trail. Sign-ins that
+  // need a record have system_audit_logs; a debug trace of the login path
+  // does not belong in the server console.
+  async authorize(rawCredentials) {
+    const parsed = credentialsSchema.safeParse(rawCredentials);
+    if (!parsed.success) {
+      return null;
+    }
+
+    const email = parsed.data.email.toLowerCase().trim();
+
+    try {
+      const user = await prisma.user.findUnique({
+        where: { email },
+      });
+
+      if (!user) {
+        return null;
+      }
+
+      if (user.password === null) {
+        throw new PasswordResetRequired();
+      }
+      if (user.status === "suspended") {
+        throw new AccountSuspended();
+      }
+      if (user.status === "pending") {
+        throw new AccountPendingApproval();
+      }
+
+      const passwordMatches = await bcrypt.compare(parsed.data.password, user.password);
+
+      if (!passwordMatches) {
+        return null;
+      }
+
+      return {
+        id: String(user.id),
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        status: user.status,
+      };
+    } catch (error) {
+      if (error instanceof CredentialsSignin) {
+        throw error;
+      }
+      // Kept: an unexpected failure here needs to be visible. The error
+      // object carries no credentials — the ones the caller sent never
+      // reach it.
+      console.error("Sign-in failed unexpectedly:", error);
+      return null;
+    }
+  },
+});
+
+/**
+ * The two "ทดสอบเข้าสู่ระบบด่วน" buttons on the login page.
+ *
+ * The seeded accounts have no password — that is the project's rule, and the
+ * reason those buttons never worked: they filled in an address that does not
+ * exist and a password that could not have matched. Rather than parking a
+ * standing password on two real accounts, this provider signs in as the seeded
+ * account for a role, with no password at all.
+ *
+ * It is registered only outside production. The check is on the providers array
+ * rather than inside authorize(), so there is no branch within the sign-in path
+ * that could be reached by mistake: in production NextAuth is simply never told
+ * this provider exists, and a request to /api/auth/callback/demo-role finds no
+ * provider to run. (The function itself may still sit in the bundle — dead code
+ * elimination is the bundler's business, not something to rely on — but nothing
+ * routes to it.)
+ *
+ * It takes a role, never an address: the most it can do is sign in as whichever
+ * account seeded that role, which is exactly what the buttons offer. Suspended
+ * and pending accounts are excluded, so it cannot be used to step past the
+ * approval flow either.
+ */
+const demoRoleProvider = Credentials({
+  id: "demo-role",
+  name: "Demo role sign-in (development only)",
+  credentials: {
+    role: { label: "Role", type: "text" },
+  },
+  async authorize(rawCredentials) {
+    const role = rawCredentials?.role;
+    if (role !== "org_admin" && role !== "technician") {
+      return null;
+    }
+
+    const user = await prisma.user.findFirst({
+      where: { role, status: "active" },
+      orderBy: { id: "asc" },
+    });
+    if (!user) {
+      return null;
+    }
+
+    return {
+      id: String(user.id),
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      status: user.status,
+    };
+  },
+});
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
-  providers: [
-    Credentials({
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
-      },
-      // Nothing in here logs. It used to trace every step, and the first line
-      // printed the whole credentials object — including the password the user
-      // had just typed, in clear text, on every single sign-in. On a deployed
-      // server that fills the log with working credentials for every account.
-      //
-      // The rest of the trace was not harmless either: it recorded which email
-      // addresses exist, which accounts are suspended and whether a password
-      // matched, which is a ready-made account-enumeration trail. Sign-ins that
-      // need a record have system_audit_logs; a debug trace of the login path
-      // does not belong in the server console.
-      async authorize(rawCredentials) {
-        const parsed = credentialsSchema.safeParse(rawCredentials);
-        if (!parsed.success) {
-          return null;
-        }
-
-        const email = parsed.data.email.toLowerCase().trim();
-
-        try {
-          const user = await prisma.user.findUnique({
-            where: { email },
-          });
-
-          if (!user) {
-            return null;
-          }
-
-          if (user.password === null) {
-            throw new PasswordResetRequired();
-          }
-          if (user.status === "suspended") {
-            throw new AccountSuspended();
-          }
-          if (user.status === "pending") {
-            throw new AccountPendingApproval();
-          }
-
-          const passwordMatches = await bcrypt.compare(parsed.data.password, user.password);
-
-          if (!passwordMatches) {
-            return null;
-          }
-
-          return {
-            id: String(user.id),
-            email: user.email,
-            name: user.name,
-            role: user.role,
-            status: user.status,
-          };
-        } catch (error) {
-          if (error instanceof CredentialsSignin) {
-            throw error;
-          }
-          // Kept: an unexpected failure here needs to be visible. The error
-          // object carries no credentials — the ones the caller sent never
-          // reach it.
-          console.error("Sign-in failed unexpectedly:", error);
-          return null;
-        }
-      },
-    }),
-  ],
+  providers:
+    process.env.NODE_ENV === "production"
+      ? [passwordProvider]
+      : [passwordProvider, demoRoleProvider],
 });

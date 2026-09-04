@@ -32,6 +32,10 @@ function safeCallbackUrl(raw: string | null): string | null {
   return raw;
 }
 
+// Inlined at build time, so the demo panel is not merely hidden in production —
+// it is not in the bundle, matching the provider it depends on.
+const isDevelopment = process.env.NODE_ENV !== "production";
+
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -43,10 +47,34 @@ export function LoginForm() {
   const [emailInput, setEmailInput] = useState("");
   const [passwordInput, setPasswordInput] = useState("");
 
-  function quickFillAccount(email: string) {
-    setEmailInput(email);
-    setPasswordInput("Password123!");
+  /**
+   * The demo buttons sign in directly rather than filling the form.
+   *
+   * They used to prefill admin@pkru.ac.th / Password123!, which never worked:
+   * no such account exists, and the seeded ones deliberately have no password
+   * at all. There is nothing to type into the form that would let them in, so
+   * they go through the development-only "demo-role" provider instead, which
+   * takes the role and signs in as the account seeded for it.
+   *
+   * That provider does not exist in a production build, so these buttons are
+   * hidden there too — see the isDevelopment check below.
+   */
+  async function quickSignIn(role: "org_admin" | "technician") {
+    setIsSubmitting(true);
     setError(null);
+
+    const result = await signIn("demo-role", { role, redirect: false });
+    setIsSubmitting(false);
+
+    if (result?.error) {
+      setError(
+        "เข้าสู่ระบบด่วนไม่สำเร็จ — ไม่พบบัญชีจำลองที่ใช้งานอยู่สำหรับบทบาทนี้ (ลองรัน seed ใหม่)"
+      );
+      return;
+    }
+
+    router.push(callbackUrl ?? "/");
+    router.refresh();
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -82,31 +110,35 @@ export function LoginForm() {
 
   return (
     <div className="space-y-6">
-      {/* Quick Test Demo Presets */}
-      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 space-y-2">
-        <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
-          <span>ทดสอบเข้าสู่ระบบด่วน (บัญชีผู้ใช้จำลอง)</span>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => quickFillAccount("admin@pkru.ac.th")}
-            className="flex flex-col items-center justify-center rounded-xl border border-sky-200 bg-sky-50 p-2 text-center hover:bg-sky-100 transition-all group shadow-2xs"
-          >
-            <Building2 className="h-4 w-4 text-sky-700 mb-1" />
-            <span className="text-[10px] font-bold text-sky-900">ผู้บริหารองค์กร</span>
-          </button>
+      {/* Quick Test Demo Presets — development only, see quickSignIn above */}
+      {isDevelopment && (
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 space-y-2">
+          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
+            <span>ทดสอบเข้าสู่ระบบด่วน (บัญชีผู้ใช้จำลอง)</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              disabled={isSubmitting}
+              onClick={() => quickSignIn("org_admin")}
+              className="flex flex-col items-center justify-center rounded-xl border border-sky-200 bg-sky-50 p-2 text-center hover:bg-sky-100 transition-all group shadow-2xs disabled:opacity-50"
+            >
+              <Building2 className="h-4 w-4 text-sky-700 mb-1" />
+              <span className="text-[10px] font-bold text-sky-900">ผู้บริหารองค์กร</span>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => quickFillAccount("tech@pkru.ac.th")}
-            className="flex flex-col items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 p-2 text-center hover:bg-emerald-100 transition-all group shadow-2xs"
-          >
-            <Wrench className="h-4 w-4 text-emerald-700 mb-1" />
-            <span className="text-[10px] font-bold text-emerald-900">ช่างซ่อมบำรุง</span>
-          </button>
+            <button
+              type="button"
+              disabled={isSubmitting}
+              onClick={() => quickSignIn("technician")}
+              className="flex flex-col items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 p-2 text-center hover:bg-emerald-100 transition-all group shadow-2xs disabled:opacity-50"
+            >
+              <Wrench className="h-4 w-4 text-emerald-700 mb-1" />
+              <span className="text-[10px] font-bold text-emerald-900">ช่างซ่อมบำรุง</span>
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
