@@ -52,11 +52,11 @@ interface BuildingGroupListProps<T> {
   buildingsPerPage?: number;
 }
 
-// Groups items by building into collapsible sections (single one open at a
-// time, matching the admin asset-manager pattern this was modeled on) and
-// paginates the *buildings*, not the items — a section that's collapsed
-// costs almost no vertical space, so there's no need to also cap how many
-// items render inside an expanded one.
+// Groups items by building into collapsible sections (all collapsed on mount,
+// single one open at a time, matching the admin asset-manager pattern this
+// was modeled on) and paginates the *buildings*, not the items — a section
+// that's collapsed costs almost no vertical space, so there's no need to also
+// cap how many items render inside an expanded one.
 export function BuildingGroupList<T>({
   groups,
   getSubtitle,
@@ -66,7 +66,11 @@ export function BuildingGroupList<T>({
   resetKey,
   buildingsPerPage = 5,
 }: BuildingGroupListProps<T>) {
-  const [expandedBuildingId, setExpandedBuildingId] = useState<string | null>(groups[0]?.buildingId ?? null);
+  // Starts with every building collapsed: the header row already carries the
+  // count and the status badges, so the list reads as an overview until the
+  // user picks a building. Auto-opening the first one used to bury the other
+  // buildings under ~20 rows of the alphabetically-first one.
+  const [expandedBuildingId, setExpandedBuildingId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
 
   useEffect(() => {

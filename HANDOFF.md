@@ -426,6 +426,37 @@ src/lib/admin/asset-tree.ts                       query + shape ของ อา
 
 ---
 
+# 🔽 กลุ่มอาคารหุบไว้ทั้งหมดเป็นค่าเริ่มต้น (4 ก.ย. 2026, DoubleKill)
+
+เจ้าของโปรเจกต์แจ้งว่าเข้าหน้าภาพรวมมาแล้วอาคารแรกถูกกางไว้ให้อัตโนมัติ (`Administration Building 293183` 23 รายการ) อีก 4 อาคารเลยถูกดันตกจอ ต้องเลื่อนลงไปหา จึงขอให้ **เริ่มต้นเป็นหุบทั้งหมด**
+
+**ไฟล์ที่แตะ: `src/components/shared/building-groups.tsx` ไฟล์เดียว**
+
+```ts
+// เดิม — กางอาคารแรกให้เสมอ
+const [expandedBuildingId, setExpandedBuildingId] = useState<string | null>(groups[0]?.buildingId ?? null);
+
+// ใหม่
+const [expandedBuildingId, setExpandedBuildingId] = useState<string | null>(null);
+```
+
+ไม่ต้องแก้อย่างอื่นเลย เพราะโค้ดรองรับสถานะ "ไม่มีอาคารไหนเปิด" อยู่แล้ว (`effectiveExpandedId` fallback เป็น `null` เวลากรองแล้วอาคารที่เปิดค้างอยู่หลุดหายไป) · พฤติกรรมเปิดได้ทีละอาคารและกดหัวกลุ่มเพื่อปิดยังเหมือนเดิม
+
+**⚠️ `BuildingGroupList` เป็นคอมโพเนนต์กลาง — เปลี่ยนครั้งเดียวมีผลทั้ง 6 จุด** เลือกทางนี้แทนการเพิ่ม prop `defaultExpanded` เพราะหน้าที่มีอาคารเดียวก็กดเปิดครั้งเดียวจบ ไม่คุ้มกับการเพิ่มทางแยกให้คอมโพเนนต์
+
+| ฝั่ง | ไฟล์ | ทดสอบผ่านหน้าจอจริงแล้ว |
+|---|---|---|
+| admin | `admin/upcoming-maintenance-table.tsx` (รอซ่อมด่วน) | ✅ 5 อาคารหุบหมด · กดแล้วกางได้ |
+| admin | `admin/qr-code-manager.tsx` | ✅ (ปุ่ม "เลือกทั้งหมด" บนหัวกลุ่มยังอยู่ครบ) |
+| tech | `tech/assets-panel.tsx` | ✅ |
+| tech | `tech/job-pool-panel.tsx` | ✅ |
+| tech | `tech/my-jobs-panel.tsx` | ✅ กดกางแล้วการ์ดใบงานขึ้นครบ 3 ใบ |
+| tech | `tech/completed-jobs-panel.tsx` | ✅ |
+
+ทดสอบด้วยการกดใช้จริงทั้ง 6 หน้าผ่าน dev server (login ด้วยปุ่ม demo ทั้ง admin และ Craig Yost) · console ไม่มี error · `tsc --noEmit` ผ่าน
+
+---
+
 # 📦 คู่มือย้ายงานที่ค้างอยู่ — ถึง Esther03u
 
 ## ข่าวดี: panel ทุกตัวไม่ถูกแตะเลย
