@@ -109,6 +109,7 @@ export function TechShell({ user, universityName, buildings, badges, children }:
         roomLocation: res.acDetails.location,
         roomId: "",
         roomName: "",
+        floor: null,
         // scanQrCodeAction does not return a building — this synthetic job only
         // feeds the log form, which does not group by building.
         buildingId: "",

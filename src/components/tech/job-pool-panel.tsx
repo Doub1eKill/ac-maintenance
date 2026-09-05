@@ -4,7 +4,14 @@ import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { AlertTriangle, Clock } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
-import { BuildingGroupList, RoomGroupList, groupByBuilding, groupByRoom } from "@/components/shared/building-groups";
+import {
+  BuildingGroupList,
+  FloorGroupList,
+  RoomGroupList,
+  groupByBuilding,
+  groupByFloor,
+  groupByRoom,
+} from "@/components/shared/building-groups";
 import type { TechJobItem } from "@/components/tech/types";
 import { filterJobs } from "@/components/tech/types";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
@@ -83,73 +90,78 @@ export function JobPoolPanel({ jobPool, searchQuery, selectedBuilding, isPending
           emptyMessage="ไม่มีงานซ่อมบำรุงที่รอรับ"
           resetKey={`${searchQuery}|${selectedBuilding}`}
           renderItems={(group) => (
-            <RoomGroupList
-              rooms={groupByRoom(group.items)}
-              getSubtitle={(room) => {
-                const floor = room.items.find((j) => j.floor != null)?.floor;
-                return `${floor != null ? `ชั้น ${floor} • ` : ""}${room.items.length} ใบงาน`;
-              }}
-              renderItems={(room) => (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {room.items.map((job) => (
-                    <div key={job.id} className="biz-card p-5 space-y-4 hover:border-muted-foreground transition-all relative overflow-hidden">
-                      {job.priority === "critical" ? (
-                        <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1 shadow-sm">
-                          <AlertTriangle className="w-3 h-3" /> ด่วนที่สุด
-                        </div>
-                      ) : job.priority === "high" ? (
-                        <div className="absolute top-0 right-0 bg-orange-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1 shadow-sm">
-                          <AlertTriangle className="w-3 h-3" /> ด่วน
-                        </div>
-                      ) : isUrgent(job.createdAt) ? (
-                        // Priority takes the corner when set; this waiting-time flag
-                        // (unclaimed 3+ days) only shows up when there's no priority
-                        // to display, so the two concepts never compete for the same
-                        // badge. Worded "รอนาน" (not "ด่วน") so it can't be mistaken
-                        // for a priority signal.
-                        <div className="absolute top-0 right-0 bg-amber-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1 shadow-sm">
-                          <Clock className="w-3 h-3" /> รอนาน
-                        </div>
-                      ) : null}
-                      <div className="pr-8 space-y-1">
-                        <div className="flex items-center gap-2">
-                          <Checkbox
-                            checked={selectedPoolIds.includes(job.id)}
-                            onCheckedChange={() => togglePoolSelection(job.id)}
-                            aria-label={`เลือก ${job.acCode}`}
-                          />
+            <FloorGroupList
+              floors={groupByFloor(group.items)}
+              getSubtitle={(floor) =>
+                `${new Set(floor.items.map((i) => i.roomId)).size} ห้อง • ${floor.items.length} ใบงาน`
+              }
+              renderItems={(floor) => (
+                <RoomGroupList
+                  rooms={groupByRoom(floor.items)}
+                  getSubtitle={(room) => `${room.items.length} ใบงาน`}
+                  renderItems={(room) => (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {room.items.map((job) => (
+                        <div key={job.id} className="biz-card p-5 space-y-4 hover:border-muted-foreground transition-all relative overflow-hidden">
+                          {job.priority === "critical" ? (
+                            <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1 shadow-sm">
+                              <AlertTriangle className="w-3 h-3" /> ด่วนที่สุด
                             </div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs font-bold text-muted-foreground">{job.acCode}</span>
-                          <span className="rounded-md bg-secondary px-2 py-0.5 text-[10px] font-bold text-foreground">
-                            {job.brand} {job.btu ? `(${job.btu} BTU)` : ""}
-                            <CatalogueMark
-                              brandDeleted={job.brandDeleted}
-                              modelDeleted={job.modelDeleted}
-                              className="ml-1"
-                            />
-                          </span>
-                        </div>
-                      </div>
+                          ) : job.priority === "high" ? (
+                            <div className="absolute top-0 right-0 bg-orange-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1 shadow-sm">
+                              <AlertTriangle className="w-3 h-3" /> ด่วน
+                            </div>
+                          ) : isUrgent(job.createdAt) ? (
+                            // Priority takes the corner when set; this waiting-time flag
+                            // (unclaimed 3+ days) only shows up when there's no priority
+                            // to display, so the two concepts never compete for the same
+                            // badge. Worded "รอนาน" (not "ด่วน") so it can't be mistaken
+                            // for a priority signal.
+                            <div className="absolute top-0 right-0 bg-amber-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1 shadow-sm">
+                              <Clock className="w-3 h-3" /> รอนาน
+                            </div>
+                          ) : null}
+                          <div className="pr-8 space-y-1">
+                            <div className="flex items-center gap-2">
+                              <Checkbox
+                                checked={selectedPoolIds.includes(job.id)}
+                                onCheckedChange={() => togglePoolSelection(job.id)}
+                                aria-label={`เลือก ${job.acCode}`}
+                              />
+                                </div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-xs font-bold text-muted-foreground">{job.acCode}</span>
+                              <span className="rounded-md bg-secondary px-2 py-0.5 text-[10px] font-bold text-foreground">
+                                {job.brand} {job.btu ? `(${job.btu} BTU)` : ""}
+                                <CatalogueMark
+                                  brandDeleted={job.brandDeleted}
+                                  modelDeleted={job.modelDeleted}
+                                  className="ml-1"
+                                />
+                              </span>
+                            </div>
+                          </div>
 
-                      <div className="pt-2 flex items-center justify-between text-xs border-t border-border">
-                        <div className="flex flex-col">
-                          <span className="text-[11px] font-bold text-warning-foreground">รอรับงาน</span>
-                          <span className="text-[10px] text-muted-foreground mt-1">
-                            {job.createdAt ? `แจ้งเมื่อ: ${format(new Date(job.createdAt), "dd/MM/yyyy")}` : ""}
-                          </span>
+                          <div className="pt-2 flex items-center justify-between text-xs border-t border-border">
+                            <div className="flex flex-col">
+                              <span className="text-[11px] font-bold text-warning-foreground">รอรับงาน</span>
+                              <span className="text-[10px] text-muted-foreground mt-1">
+                                {job.createdAt ? `แจ้งเมื่อ: ${format(new Date(job.createdAt), "dd/MM/yyyy")}` : ""}
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => onClaim(job.id)}
+                              disabled={isPending}
+                              className="rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-all shadow-sm active:scale-95"
+                            >
+                              รับงาน
+                            </button>
+                          </div>
                         </div>
-                        <button
-                          onClick={() => onClaim(job.id)}
-                          disabled={isPending}
-                          className="rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-all shadow-sm active:scale-95"
-                        >
-                          รับงาน
-                        </button>
-                      </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+              )}
+                />
           )}
             />
           )}

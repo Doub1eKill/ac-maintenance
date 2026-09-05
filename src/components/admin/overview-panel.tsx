@@ -133,6 +133,7 @@ export function OverviewPanel({
               ),
               roomId: r.id,
               roomName: r.name,
+              floor: r.floor,
               buildingId: b.id,
               buildingName: b.name,
               nextDueDate: ac.maintenanceSchedule.nextDueDate,

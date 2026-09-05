@@ -5,8 +5,10 @@ import { QRCodeSVG } from "qrcode.react";
 import { QrCode, Printer, X, CheckSquare } from "lucide-react";
 import {
   BuildingGroupList,
+  FloorGroupList,
   RoomGroupList,
   groupByBuilding,
+  groupByFloor,
   groupByRoom,
 } from "@/components/shared/building-groups";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
@@ -51,6 +53,7 @@ interface FlatACUnit extends ACUnit {
   buildingName: string;
   roomId: string;
   roomName: string;
+  floor: number | null;
 }
 
 interface QrCodeManagerProps {
@@ -72,6 +75,7 @@ export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
         buildingName: b.name,
         roomId: r.id,
         roomName: r.name,
+        floor: r.floor,
       }))
     )
   );
@@ -244,65 +248,73 @@ export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
             </label>
           )}
           renderItems={(group) => (
-            <RoomGroupList
-              rooms={groupByRoom(group.items)}
-              getSubtitle={(room) => `${room.items.length} เครื่อง`}
-              renderItems={(room) => (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm whitespace-nowrap">
-                    <thead className="bg-muted text-muted-foreground font-bold border-b border-border">
-                      <tr>
-                        <th className="px-4 py-3 font-semibold rounded-tl-xl w-10 text-center">
-                          <input
-                            type="checkbox"
-                            className="w-4 h-4 rounded border-border text-primary focus:ring-ring cursor-pointer"
-                            checked={room.items.length > 0 && room.items.every((ac) => selectedAcs.includes(ac.id))}
-                            onChange={() => toggleSelectAllInGroup(room)}
-                          />
-                        </th>
-                        <th className="px-4 py-3 font-semibold">รหัสเครื่อง (AC Code)</th>
-                        <th className="px-4 py-3 font-semibold">ยี่ห้อ / รุ่น</th>
-                        <th className="px-4 py-3 font-semibold text-center rounded-tr-xl">จัดการ</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {room.items.map((ac) => (
-                        <tr
-                          key={ac.id}
-                          className={`transition-colors cursor-pointer ${selectedAcs.includes(ac.id) ? 'bg-primary/10' : 'hover:bg-muted'}`}
-                          onClick={() => toggleSelect(ac.id)}
-                        >
-                          <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
-                            <input
-                              type="checkbox"
-                              className="w-4 h-4 rounded border-border text-primary focus:ring-ring cursor-pointer"
-                              checked={selectedAcs.includes(ac.id)}
-                              onChange={() => toggleSelect(ac.id)}
-                            />
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="font-mono font-bold text-foreground">{ac.acCode}</div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="font-medium text-foreground">
-                              {ac.brand}
-                              <CatalogueMark brandDeleted={ac.brandDeleted} modelDeleted={ac.modelDeleted} className="ml-1" />
-                            </div>
-                            <div className="text-xs text-muted-foreground">{ac.model || "-"}</div>
-                          </td>
-                          <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
-                            <button
-                              onClick={() => setShowQrCode(ac)}
-                              className="inline-flex items-center gap-1.5 rounded-lg bg-secondary px-3 py-1.5 text-xs font-bold text-foreground hover:bg-accent transition-colors"
+            <FloorGroupList
+              floors={groupByFloor(group.items)}
+              getSubtitle={(floor) =>
+                `${new Set(floor.items.map((i) => i.roomId)).size} ห้อง • ${floor.items.length} เครื่อง`
+              }
+              renderItems={(floor) => (
+                <RoomGroupList
+                  rooms={groupByRoom(floor.items)}
+                  getSubtitle={(room) => `${room.items.length} เครื่อง`}
+                  renderItems={(room) => (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-sm whitespace-nowrap">
+                        <thead className="bg-muted text-muted-foreground font-bold border-b border-border">
+                          <tr>
+                            <th className="px-4 py-3 font-semibold rounded-tl-xl w-10 text-center">
+                              <input
+                                type="checkbox"
+                                className="w-4 h-4 rounded border-border text-primary focus:ring-ring cursor-pointer"
+                                checked={room.items.length > 0 && room.items.every((ac) => selectedAcs.includes(ac.id))}
+                                onChange={() => toggleSelectAllInGroup(room)}
+                              />
+                            </th>
+                            <th className="px-4 py-3 font-semibold">รหัสเครื่อง (AC Code)</th>
+                            <th className="px-4 py-3 font-semibold">ยี่ห้อ / รุ่น</th>
+                            <th className="px-4 py-3 font-semibold text-center rounded-tr-xl">จัดการ</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {room.items.map((ac) => (
+                            <tr
+                              key={ac.id}
+                              className={`transition-colors cursor-pointer ${selectedAcs.includes(ac.id) ? 'bg-primary/10' : 'hover:bg-muted'}`}
+                              onClick={() => toggleSelect(ac.id)}
                             >
-                              <Printer className="h-3.5 w-3.5" /> ดูตัวอย่าง
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                              <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                                <input
+                                  type="checkbox"
+                                  className="w-4 h-4 rounded border-border text-primary focus:ring-ring cursor-pointer"
+                                  checked={selectedAcs.includes(ac.id)}
+                                  onChange={() => toggleSelect(ac.id)}
+                                />
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="font-mono font-bold text-foreground">{ac.acCode}</div>
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="font-medium text-foreground">
+                                  {ac.brand}
+                                  <CatalogueMark brandDeleted={ac.brandDeleted} modelDeleted={ac.modelDeleted} className="ml-1" />
+                                </div>
+                                <div className="text-xs text-muted-foreground">{ac.model || "-"}</div>
+                              </td>
+                              <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                                <button
+                                  onClick={() => setShowQrCode(ac)}
+                                  className="inline-flex items-center gap-1.5 rounded-lg bg-secondary px-3 py-1.5 text-xs font-bold text-foreground hover:bg-accent transition-colors"
+                                >
+                                  <Printer className="h-3.5 w-3.5" /> ดูตัวอย่าง
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+              )}
+                />
           )}
             />
           )}

@@ -27,6 +27,7 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
+import { FloorGroupList, groupByFloor } from "@/components/shared/building-groups";
 
 interface ACUnit {
   id: string;
@@ -322,10 +323,17 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
 
             {effectiveExpandedBuilding === b.id && (
               <div className="border-t border-border bg-card p-4 space-y-3">
-                {b.rooms.map((r) => (
+                <FloorGroupList
+                  floors={groupByFloor(b.rooms)}
+                  getSubtitle={(floor) =>
+                    `${floor.items.length} ห้อง • ${floor.items.reduce((n, r) => n + r.acUnits.length, 0)} แอร์`
+                  }
+                  renderItems={(floor) => (
+                    <div className="space-y-3">
+                      {floor.items.map((r) => (
                   <div key={r.id} className="rounded-xl border border-border p-3.5 space-y-2">
                     <div className="flex items-center justify-between text-xs font-bold text-foreground border-b border-border pb-2">
-                      <span>ห้อง {r.name} (ชั้น {r.floor || 1})</span>
+                      <span>ห้อง {r.name}</span>
                       <div className="flex items-center gap-3">
                         <span className="text-muted-foreground font-normal">{r.acUnits.length} แอร์</span>
                         <button
@@ -382,7 +390,10 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
                       ))}
                     </div>
                   </div>
-                ))}
+                      ))}
+                    </div>
+                  )}
+                />
               </div>
             )}
           </div>
@@ -461,8 +472,8 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
                 <input name="name" required placeholder="เช่น 204 หรือ ห้องสมุด" className="w-full rounded-xl border border-border px-3.5 py-2.5 text-foreground focus:border-primary focus:outline-none" />
               </div>
               <div>
-                <label className="mb-1.5 block font-bold text-foreground">ชั้น (ไม่บังคับ)</label>
-                <input name="floor" type="number" placeholder="เช่น 2" className="w-full rounded-xl border border-border px-3.5 py-2.5 text-foreground focus:border-primary focus:outline-none" />
+                <label className="mb-1.5 block font-bold text-foreground">ชั้น</label>
+                <input name="floor" type="number" min={0} required placeholder="เช่น 2" className="w-full rounded-xl border border-border px-3.5 py-2.5 text-foreground focus:border-primary focus:outline-none" />
               </div>
               <button type="submit" disabled={isPending} className="w-full rounded-xl bg-primary py-2.5 font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
                 {isPending ? "กำลังบันทึก..." : "บันทึกห้อง"}

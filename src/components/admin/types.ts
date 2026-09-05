@@ -11,9 +11,10 @@ export interface WorkOrderItem {
   // The same place without the building, for lists grouped under a building
   // header. See @/lib/location.
   roomLocation: string;
-  // The room the unit sits in, for the second level of the drill-down.
+  // Where the unit sits, for the floor and room levels of the drill-down.
   roomId: string;
   roomName: string;
+  floor: number | null;
   // Split out of `location`, which is assembled for display — the board groups
   // by building and must not parse a formatted string back apart.
   buildingId: string;

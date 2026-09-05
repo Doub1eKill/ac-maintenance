@@ -73,6 +73,7 @@ export interface UrgentUnit {
   roomLocation: string;
   roomId: string;
   roomName: string;
+  floor: number | null;
   brand: string;
   model: string | null;
   brandDeleted: boolean;
@@ -138,6 +139,7 @@ export function shapeBuildingTree(
             ),
             roomId: r.id.toString(),
             roomName: r.name,
+            floor: r.floor,
             brand: ac.acBrand?.name || ac.brand || "ไม่ระบุ",
             model: ac.acModel?.name || ac.model || null,
             ...catalogueFlags(ac),

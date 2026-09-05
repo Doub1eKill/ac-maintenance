@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { Building2, ChevronDown, ChevronUp, DoorClosed } from "lucide-react";
+import { Building2, ChevronDown, ChevronUp, DoorClosed, Layers } from "lucide-react";
 import {
   Pagination,
   PaginationContent,
@@ -36,6 +36,106 @@ export function groupByBuilding<T extends Buildable>(items: T[]): BuildingGroup<
     }
   }
   return Array.from(groups.values()).sort((a, b) => a.buildingName.localeCompare(b.buildingName, "th"));
+}
+
+export interface Floorable {
+  floor?: number | null;
+}
+
+export interface FloorGroup<T> {
+  /** null for rooms with no floor recorded — see groupByFloor. */
+  floor: number | null;
+  items: T[];
+}
+
+// Groups by floor, ordered by the number rather than by its text: sorted as
+// strings, floor 10 would come before floor 2. Rooms with no floor recorded
+// gather into a single group that sorts last — they are the ones somebody has
+// to go and fix, and burying them mid-list would hide that.
+export function groupByFloor<T extends Floorable>(items: T[]): FloorGroup<T>[] {
+  const groups = new Map<number | null, FloorGroup<T>>();
+  for (const item of items) {
+    const key = item.floor ?? null;
+    const existing = groups.get(key);
+    if (existing) {
+      existing.items.push(item);
+    } else {
+      groups.set(key, { floor: key, items: [item] });
+    }
+  }
+  return Array.from(groups.values()).sort((a, b) => {
+    if (a.floor === null) return 1;
+    if (b.floor === null) return -1;
+    return a.floor - b.floor;
+  });
+}
+
+export function floorLabel(floor: number | null): string {
+  return floor === null ? "ไม่ระบุชั้น" : `ชั้น ${floor}`;
+}
+
+interface FloorGroupListProps<T> {
+  floors: FloorGroup<T>[];
+  getSubtitle: (floor: FloorGroup<T>) => string;
+  renderExtra?: (floor: FloorGroup<T>) => ReactNode;
+  renderItems: (floor: FloorGroup<T>) => ReactNode;
+}
+
+// The middle level: a building opens onto its floors, a floor onto its rooms.
+//
+// Weighted between the two it sits between — the building header is a filled
+// card with a primary-coloured chip, the room header is the lightest, and this
+// is in between — so three stacked bars read as three depths rather than as
+// three of the same thing.
+export function FloorGroupList<T>({ floors, getSubtitle, renderExtra, renderItems }: FloorGroupListProps<T>) {
+  const [picked, setPicked] = useState<number | null | "none">(null);
+
+  // Same rule as the rooms: a building with one floor opens onto it, and
+  // "closed" has to be expressible separately from "not chosen yet" or that
+  // sole floor would reopen itself the moment it was closed.
+  const soleFloor = floors.length === 1 ? floors[0].floor : undefined;
+  const effectiveFloor =
+    picked === "none"
+      ? undefined
+      : picked !== null && floors.some((f) => f.floor === picked)
+        ? picked
+        : soleFloor;
+
+  return (
+    <div className="space-y-2.5">
+      {floors.map((floor) => {
+        const isExpanded = effectiveFloor !== undefined && effectiveFloor === floor.floor;
+        return (
+          <div
+            key={floor.floor ?? "none"}
+            className="rounded-xl border border-border bg-muted/60 overflow-hidden"
+          >
+            <div
+              className="w-full flex items-center justify-between p-3.5 text-left hover:bg-secondary transition-colors cursor-pointer"
+              onClick={() => setPicked(isExpanded ? "none" : floor.floor)}
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-foreground shrink-0">
+                  <Layers className="h-4 w-4" />
+                </span>
+                <div className="min-w-0">
+                  <h4 className="font-bold text-foreground text-[13px]">{floorLabel(floor.floor)}</h4>
+                  <p className="text-[11px] text-muted-foreground">{getSubtitle(floor)}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                {renderExtra?.(floor)}
+                <span className="text-muted-foreground">
+                  {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </span>
+              </div>
+            </div>
+            {isExpanded && <div className="border-t border-border bg-card/40 p-3">{renderItems(floor)}</div>}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 export interface Roomable {
@@ -105,17 +205,17 @@ export function RoomGroupList<T>({ rooms, getSubtitle, renderExtra, renderItems 
       {rooms.map((room) => {
         const isExpanded = effectiveExpandedId === room.roomId;
         return (
-          <div key={room.roomId} className="rounded-xl border border-border bg-card overflow-hidden">
+          <div key={room.roomId} className="rounded-lg border border-border bg-card overflow-hidden">
             <div
               className="w-full flex items-center justify-between p-3 text-left hover:bg-secondary transition-colors cursor-pointer"
               onClick={() => setPicked(isExpanded ? "none" : room.roomId)}
             >
               <div className="flex items-center gap-2.5 min-w-0">
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-secondary text-foreground shrink-0">
-                  <DoorClosed className="h-3.5 w-3.5" />
+                <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-secondary text-foreground shrink-0">
+                  <DoorClosed className="h-3 w-3" />
                 </span>
                 <div className="min-w-0">
-                  <h4 className="font-bold text-foreground text-xs">ห้อง {room.roomName}</h4>
+                  <h5 className="font-bold text-foreground text-xs">ห้อง {room.roomName}</h5>
                   <p className="text-[11px] text-muted-foreground">{getSubtitle(room)}</p>
                 </div>
               </div>
@@ -166,7 +266,9 @@ export function BuildingGroupList<T>({
   // count and the status badges, so the list reads as an overview until the
   // user picks a building. Auto-opening the first one used to bury the other
   // buildings under ~20 rows of the alphabetically-first one.
-  const [expandedBuildingId, setExpandedBuildingId] = useState<string | null>(null);
+  // Same sentinel as the two levels below: "closed" has to be distinguishable
+  // from "nothing chosen yet", or the sole building would reopen itself.
+  const [picked, setPicked] = useState<string | null | "none">(null);
   const [page, setPage] = useState(1);
 
   useEffect(() => {
@@ -187,8 +289,16 @@ export function BuildingGroupList<T>({
   // Falls back to "nothing open" rather than clinging to a building that
   // scrolled off after a filter change — see resetKey above for the same
   // idea applied to the page number.
-  const isExpandedValid = groups.some((g) => g.buildingId === expandedBuildingId);
-  const effectiveExpandedId = isExpandedValid ? expandedBuildingId : null;
+  // A search that leaves one building open onto it rather than answering with
+  // a single collapsed bar; the tree is four levels now and every click that
+  // can be spared is worth sparing.
+  const soleBuildingId = groups.length === 1 ? groups[0].buildingId : null;
+  const effectiveExpandedId =
+    picked === "none"
+      ? null
+      : picked !== null && groups.some((g) => g.buildingId === picked)
+        ? picked
+        : soleBuildingId;
 
   return (
     <div className="space-y-3">
@@ -198,7 +308,7 @@ export function BuildingGroupList<T>({
           <div key={group.buildingId} className="rounded-2xl border border-border bg-muted overflow-hidden">
             <div
               className="w-full flex items-center justify-between p-4 text-left hover:bg-secondary transition-colors cursor-pointer"
-              onClick={() => setExpandedBuildingId(isExpanded ? null : group.buildingId)}
+              onClick={() => setPicked(isExpanded ? "none" : group.buildingId)}
             >
               <div className="flex items-center gap-3 min-w-0">
                 <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shrink-0">

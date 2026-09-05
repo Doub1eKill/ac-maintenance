@@ -7,7 +7,15 @@ import { verifyOrgAdmin } from "@/lib/auth-guards";
 const roomSchema = z.object({
   buildingId: z.string().min(1, "กรุณาเลือกอาคาร"),
   name: z.string().min(1, "กรุณาระบุชื่อ/หมายเลขห้อง"),
-  floor: z.string().transform(val => val ? parseInt(val, 10) : null).nullable(),
+  // Required since the asset lists navigate by floor (4 Sep 2026): a room
+  // saved without one lands in the "ไม่ระบุชั้น" group, which is a place to
+  // fix things rather than a place to file them. Existing rooms with a null
+  // floor are left alone — this guards what comes in from here on.
+  floor: z
+    .string()
+    .min(1, "กรุณาระบุชั้น")
+    .transform((val) => parseInt(val, 10))
+    .refine((val) => Number.isFinite(val) && val >= 0, "ชั้นต้องเป็นตัวเลข"),
 });
 
 export async function createRoomAction(formData: FormData) {
@@ -16,7 +24,10 @@ export async function createRoomAction(formData: FormData) {
   const parsed = roomSchema.safeParse({
     buildingId: formData.get("buildingId"),
     name: formData.get("name"),
-    floor: formData.get("floor"),
+    // `?? ""` because formData.get() returns null for a field that was not
+    // sent at all, and a null reaches Zod as a type error whose message is
+    // about types rather than about the floor — see the same rule in HANDOFF.
+    floor: formData.get("floor") ?? "",
   });
   
   if (!parsed.success) return { error: parsed.error.issues[0]?.message || "ข้อมูลไม่ถูกต้อง" };

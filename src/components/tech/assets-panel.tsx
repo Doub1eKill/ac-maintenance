@@ -2,7 +2,14 @@
 
 import { format } from "date-fns";
 import { Clock, Droplets, Snowflake, Wrench } from "lucide-react";
-import { BuildingGroupList, RoomGroupList, groupByBuilding, groupByRoom } from "@/components/shared/building-groups";
+import {
+  BuildingGroupList,
+  FloorGroupList,
+  RoomGroupList,
+  groupByBuilding,
+  groupByFloor,
+  groupByRoom,
+} from "@/components/shared/building-groups";
 import type { TechnicianAssetUnit, TechnicianAssetSummary } from "@/lib/maintenance";
 import { filterJobs } from "@/components/tech/types";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
@@ -77,51 +84,57 @@ export function AssetsPanel({ assetList, assetSummary, searchQuery, selectedBuil
           resetKey={`${searchQuery}|${selectedBuilding}`}
           renderExtra={(group) => <GroupJobBadges items={group.items} />}
           renderItems={(group) => (
-            <RoomGroupList
-              rooms={groupByRoom(group.items)}
-              getSubtitle={(room) => {
-                const floor = room.items.find((u) => u.floor != null)?.floor;
-                return `${floor != null ? `ชั้น ${floor} • ` : ""}${room.items.length} แอร์`;
-              }}
-              renderExtra={(room) => <GroupJobBadges items={room.items} />}
-              renderItems={(room) => (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {room.items.map((unit) => (
-                    <div key={unit.id} className="biz-card p-5 space-y-4 hover:border-muted-foreground transition-all relative overflow-hidden">
-                      {unit.isOverdue && (
-                        <div
-                          className={`absolute top-0 right-0 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1 shadow-sm ${
-                            unit.status === "broken" ? "bg-red-500" : "bg-amber-500"
-                          }`}
-                        >
-                          <Clock className="w-3 h-3" /> {unit.status === "broken" ? "รอซ่อม" : "รอล้าง"}
-                        </div>
-                      )}
-                      <div className="pr-8 space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs font-bold text-muted-foreground">{unit.acCode}</span>
-                          <span className="rounded-md bg-secondary px-2 py-0.5 text-[10px] font-bold text-foreground">
-                            {unit.brand} {unit.btu ? `(${unit.btu} BTU)` : ""}
-                            <CatalogueMark
-                              brandDeleted={unit.brandDeleted}
-                              modelDeleted={unit.modelDeleted}
-                              className="ml-1"
-                            />
-                          </span>
-                        </div>
-                      </div>
+            <FloorGroupList
+              floors={groupByFloor(group.items)}
+              getSubtitle={(floor) =>
+                `${new Set(floor.items.map((i) => i.roomId)).size} ห้อง • ${floor.items.length} แอร์`
+              }
+              renderExtra={(floor) => <GroupJobBadges items={floor.items} />}
+              renderItems={(floor) => (
+                <RoomGroupList
+                  rooms={groupByRoom(floor.items)}
+                  getSubtitle={(room) => `${room.items.length} แอร์`}
+                  renderExtra={(room) => <GroupJobBadges items={room.items} />}
+                  renderItems={(room) => (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {room.items.map((unit) => (
+                        <div key={unit.id} className="biz-card p-5 space-y-4 hover:border-muted-foreground transition-all relative overflow-hidden">
+                          {unit.isOverdue && (
+                            <div
+                              className={`absolute top-0 right-0 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1 shadow-sm ${
+                                unit.status === "broken" ? "bg-red-500" : "bg-amber-500"
+                              }`}
+                            >
+                              <Clock className="w-3 h-3" /> {unit.status === "broken" ? "รอซ่อม" : "รอล้าง"}
+                            </div>
+                          )}
+                          <div className="pr-8 space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-xs font-bold text-muted-foreground">{unit.acCode}</span>
+                              <span className="rounded-md bg-secondary px-2 py-0.5 text-[10px] font-bold text-foreground">
+                                {unit.brand} {unit.btu ? `(${unit.btu} BTU)` : ""}
+                                <CatalogueMark
+                                  brandDeleted={unit.brandDeleted}
+                                  modelDeleted={unit.modelDeleted}
+                                  className="ml-1"
+                                />
+                              </span>
+                            </div>
+                          </div>
 
-                      <div className="pt-2 flex items-center justify-between text-xs border-t border-border">
-                        <div className="flex flex-col">
-                          <span className="text-[11px] font-bold text-muted-foreground">ล้างล่าสุด</span>
-                          <span className="text-[10px] text-muted-foreground mt-1">
-                            {unit.lastCleanedAt ? format(new Date(unit.lastCleanedAt), "dd/MM/yyyy") : "ยังไม่เคยล้าง"}
-                          </span>
+                          <div className="pt-2 flex items-center justify-between text-xs border-t border-border">
+                            <div className="flex flex-col">
+                              <span className="text-[11px] font-bold text-muted-foreground">ล้างล่าสุด</span>
+                              <span className="text-[10px] text-muted-foreground mt-1">
+                                {unit.lastCleanedAt ? format(new Date(unit.lastCleanedAt), "dd/MM/yyyy") : "ยังไม่เคยล้าง"}
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                      </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+              )}
+                />
           )}
             />
           )}

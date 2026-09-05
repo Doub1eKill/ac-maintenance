@@ -35,8 +35,8 @@ export interface UnitLocationParts {
 export interface UnitLocationOptions {
   /** Append the building abbreviation in brackets: "อาคาร (B123) - ..." */
   withAbbreviation?: boolean;
-  /** Append the floor: "... - ห้อง 1-2 (ชั้น 3)". Falls back to 1, as the
-   *  technician lists have always done for a room with no floor recorded. */
+  /** Append the floor: "... - ห้อง 1-2 (ชั้น 3)". A room with no floor
+   *  recorded prints no floor at all. */
   withFloor?: boolean;
   /** Print the "ห้อง" label before the room name. On by default. */
   withRoomLabel?: boolean;
@@ -63,7 +63,11 @@ export function formatUnitLocation(
       : room.building.name;
 
   const roomPart = withRoomLabel ? `ห้อง ${room.name}` : room.name;
-  const floorPart = withFloor ? ` (ชั้น ${room.floor || 1})` : "";
+  // `?? null` rather than `||`: this used to print "ชั้น 1" for a room whose
+  // floor was never recorded — and for a ground floor entered as 0 — which was
+  // survivable while the floor was decoration and is not now that the lists
+  // navigate by it. No floor recorded, no floor printed.
+  const floorPart = withFloor && room.floor != null ? ` (ชั้น ${room.floor})` : "";
 
   return withBuilding ? `${building} - ${roomPart}${floorPart}` : `${roomPart}${floorPart}`;
 }
