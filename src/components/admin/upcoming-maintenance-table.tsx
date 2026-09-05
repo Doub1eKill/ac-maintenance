@@ -10,6 +10,7 @@ import {
   getCoreRowModel,
   getFilteredRowModel,
   getSortedRowModel,
+  type Row,
   SortingState,
   useReactTable,
 } from "@tanstack/react-table";
@@ -125,6 +126,31 @@ export function JobTypeBadge({ kind, count }: { kind: JobTypeKind; count?: numbe
     );
   }
   return <Badge variant="outline" className="text-[10px]">{label}</Badge>;
+}
+
+/**
+ * The breakdown carried by a group header — one badge per kind of work, in the
+ * wording and colour the ประเภท column uses on the rows themselves.
+ *
+ * Shared by the building header and the room header rather than written twice:
+ * two levels summarising the same rows have to agree, and the way they stop
+ * agreeing is one of them being edited alone.
+ */
+function GroupTypeBadges({ items }: { items: { row: Row<MaintenanceRow> }[] }) {
+  const counts = { repair: 0, overdueCleaning: 0, scheduled: 0 };
+  items.forEach((item) => {
+    counts[jobTypeOf(item.row.original)] += 1;
+  });
+
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-1.5">
+      {(["repair", "overdueCleaning", "scheduled"] as const)
+        .filter((kind) => counts[kind] > 0)
+        .map((kind) => (
+          <JobTypeBadge key={kind} kind={kind} count={counts[kind]} />
+        ))}
+    </div>
+  );
 }
 
 export const columns: ColumnDef<MaintenanceRow>[] = [
@@ -425,26 +451,12 @@ export function UpcomingMaintenanceTable({ data, onViewDetails, onCreateWorkOrde
         // always carry the same word and the same colour. The single "ด่วน N"
         // this replaces added repairs and overdue cleans together under a label
         // that matched neither.
-        renderExtra={(group) => {
-          const counts = { repair: 0, overdueCleaning: 0, scheduled: 0 };
-          group.items.forEach((item) => {
-            counts[jobTypeOf(item.row.original)] += 1;
-          });
-
-          return (
-            <div className="flex flex-wrap items-center justify-end gap-1.5">
-              {(["repair", "overdueCleaning", "scheduled"] as const)
-                .filter((kind) => counts[kind] > 0)
-                .map((kind) => (
-                  <JobTypeBadge key={kind} kind={kind} count={counts[kind]} />
-                ))}
-            </div>
-          );
-        }}
+        renderExtra={(group) => <GroupTypeBadges items={group.items} />}
         renderItems={(group) => (
           <RoomGroupList
             rooms={groupByRoom(group.items)}
             getSubtitle={(room) => `${room.items.length} รายการ`}
+            renderExtra={(room) => <GroupTypeBadges items={room.items} />}
             renderItems={(room) => (
               <div className="rounded-xl border border-border overflow-hidden">
                 <Table>

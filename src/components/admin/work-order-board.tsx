@@ -60,6 +60,53 @@ function matchesSearch(wo: WorkOrderItem, query: string) {
   );
 }
 
+// The counts a group header carries. Two axes: งานซ่อม + งานล้างแอร์ add up to
+// the group's total, while รอดำเนินการ and กำลังดำเนินการ cut across both and
+// do not — the group also holds finished and cancelled jobs. Each badge uses
+// the wording and colour its own column already uses in the rows below, so a
+// header count and the rows it summarises read as the same thing rather than
+// as separate numbers to reconcile — the mistake the urgent table's old
+// "ด่วน N" made.
+//
+// One component for the building header and the room header: two levels
+// summarising the same rows have to agree, and the way they stop agreeing is
+// one of them being edited alone.
+function GroupTypeBadges({ items }: { items: WorkOrderItem[] }) {
+  const repair = items.filter((wo) => wo.type === "repair").length;
+  const cleaning = items.filter((wo) => wo.type === "cleaning").length;
+  const pending = items.filter((wo) => wo.status === "pending").length;
+  const claimed = items.filter((wo) => wo.status === "claimed").length;
+
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-1.5">
+      {repair > 0 && (
+        <span className="inline-flex items-center gap-1 rounded-full border border-destructive/20 bg-destructive/10 px-2 py-0.5 text-[10px] font-bold text-destructive whitespace-nowrap">
+          <Wrench className="h-3 w-3" />
+          งานซ่อม {repair}
+        </span>
+      )}
+      {cleaning > 0 && (
+        <span className="inline-flex items-center gap-1 rounded-full border border-sky-500/20 bg-sky-500/10 px-2 py-0.5 text-[10px] font-bold text-sky-600 whitespace-nowrap">
+          <Sparkles className="h-3 w-3" />
+          งานล้างแอร์ {cleaning}
+        </span>
+      )}
+      {pending > 0 && (
+        <span className="inline-flex items-center gap-1 rounded-full border border-warning/30 bg-warning/20 px-2 py-0.5 text-[10px] font-bold text-warning-foreground whitespace-nowrap">
+          <Clock className="h-3 w-3" />
+          รอดำเนินการ {pending}
+        </span>
+      )}
+      {claimed > 0 && (
+        <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/20 px-2 py-0.5 text-[10px] font-bold text-primary whitespace-nowrap">
+          <Wrench className="h-3 w-3" />
+          กำลังดำเนินการ {claimed}
+        </span>
+      )}
+    </div>
+  );
+}
+
 // Groups the board by building, the way the technician lists and the urgent
 // table already read, so five buildings show as five sections instead of one
 // flat table repeating the building name down every row.
@@ -127,51 +174,12 @@ export function WorkOrderBoard({
         resetKey={`${globalSearch}::${statusFilter}`}
         getSubtitle={(group) => `${group.items.length} ใบงาน`}
         emptyMessage="ไม่พบข้อมูลใบงาน"
-        renderExtra={(group) => {
-          // Two axes, drawn as two runs of badges. งานซ่อม + งานล้างแอร์ add up
-          // to the group's total; รอดำเนินการ and กำลังดำเนินการ cut across
-          // both and do not (the group also holds finished and cancelled jobs).
-          // Each badge uses the wording and colour its own column already uses
-          // in the rows below, so a header count and the rows it summarises
-          // read as the same thing rather than as separate numbers to
-          // reconcile — the mistake the urgent table's old "ด่วน N" made.
-          const repair = group.items.filter((wo) => wo.type === "repair").length;
-          const cleaning = group.items.filter((wo) => wo.type === "cleaning").length;
-          const pending = group.items.filter((wo) => wo.status === "pending").length;
-          const claimed = group.items.filter((wo) => wo.status === "claimed").length;
-          return (
-            <div className="flex flex-wrap items-center justify-end gap-1.5">
-              {repair > 0 && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-destructive/20 bg-destructive/10 px-2 py-0.5 text-[10px] font-bold text-destructive whitespace-nowrap">
-                  <Wrench className="h-3 w-3" />
-                  งานซ่อม {repair}
-                </span>
-              )}
-              {cleaning > 0 && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-sky-500/20 bg-sky-500/10 px-2 py-0.5 text-[10px] font-bold text-sky-600 whitespace-nowrap">
-                  <Sparkles className="h-3 w-3" />
-                  งานล้างแอร์ {cleaning}
-                </span>
-              )}
-              {pending > 0 && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-warning/30 bg-warning/20 px-2 py-0.5 text-[10px] font-bold text-warning-foreground whitespace-nowrap">
-                  <Clock className="h-3 w-3" />
-                  รอดำเนินการ {pending}
-                </span>
-              )}
-              {claimed > 0 && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/20 px-2 py-0.5 text-[10px] font-bold text-primary whitespace-nowrap">
-                  <Wrench className="h-3 w-3" />
-                  กำลังดำเนินการ {claimed}
-                </span>
-              )}
-            </div>
-          );
-        }}
+        renderExtra={(group) => <GroupTypeBadges items={group.items} />}
         renderItems={(group) => (
           <RoomGroupList
             rooms={groupByRoom(group.items)}
             getSubtitle={(room) => `${room.items.length} ใบงาน`}
+            renderExtra={(room) => <GroupTypeBadges items={room.items} />}
             renderItems={(room) => (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left">

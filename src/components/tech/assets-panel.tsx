@@ -14,6 +14,30 @@ interface AssetsPanelProps {
   selectedBuilding: string;
 }
 
+// The open work on a group of units, as the two badges the cards themselves
+// use. Shared by the building header and the room header so the two levels
+// cannot drift apart.
+function GroupJobBadges({ items }: { items: TechnicianAssetUnit[] }) {
+  const repairCount = items.filter((u) => u.pendingWorkOrder?.type === "repair").length;
+  const cleaningCount = items.filter((u) => u.pendingWorkOrder?.type === "cleaning").length;
+  if (repairCount === 0 && cleaningCount === 0) return null;
+
+  return (
+    <div className="hidden sm:flex items-center gap-1.5 text-[10px] font-bold">
+      {repairCount > 0 && (
+        <span className="inline-flex items-center gap-1 rounded-md bg-destructive/10 text-destructive px-1.5 py-0.5">
+          <Wrench className="h-3 w-3" /> {repairCount}
+        </span>
+      )}
+      {cleaningCount > 0 && (
+        <span className="inline-flex items-center gap-1 rounded-md bg-warning/10 text-warning-foreground px-1.5 py-0.5">
+          <Droplets className="h-3 w-3" /> {cleaningCount}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export function AssetsPanel({ assetList, assetSummary, searchQuery, selectedBuilding }: AssetsPanelProps) {
   const filteredAssets = filterJobs(assetList, searchQuery, selectedBuilding);
   const groups = groupByBuilding(filteredAssets);
@@ -51,25 +75,7 @@ export function AssetsPanel({ assetList, assetSummary, searchQuery, selectedBuil
           }}
           emptyMessage="ไม่มีเครื่องปรับอากาศในระบบ"
           resetKey={`${searchQuery}|${selectedBuilding}`}
-          renderExtra={(group) => {
-            const repairCount = group.items.filter((u) => u.pendingWorkOrder?.type === "repair").length;
-            const cleaningCount = group.items.filter((u) => u.pendingWorkOrder?.type === "cleaning").length;
-            if (repairCount === 0 && cleaningCount === 0) return null;
-            return (
-              <div className="hidden sm:flex items-center gap-1.5 text-[10px] font-bold">
-                {repairCount > 0 && (
-                  <span className="inline-flex items-center gap-1 rounded-md bg-destructive/10 text-destructive px-1.5 py-0.5">
-                    <Wrench className="h-3 w-3" /> {repairCount}
-                  </span>
-                )}
-                {cleaningCount > 0 && (
-                  <span className="inline-flex items-center gap-1 rounded-md bg-warning/10 text-warning-foreground px-1.5 py-0.5">
-                    <Droplets className="h-3 w-3" /> {cleaningCount}
-                  </span>
-                )}
-              </div>
-            );
-          }}
+          renderExtra={(group) => <GroupJobBadges items={group.items} />}
           renderItems={(group) => (
             <RoomGroupList
               rooms={groupByRoom(group.items)}
@@ -77,6 +83,7 @@ export function AssetsPanel({ assetList, assetSummary, searchQuery, selectedBuil
                 const floor = room.items.find((u) => u.floor != null)?.floor;
                 return `${floor != null ? `ชั้น ${floor} • ` : ""}${room.items.length} แอร์`;
               }}
+              renderExtra={(room) => <GroupJobBadges items={room.items} />}
               renderItems={(room) => (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {room.items.map((unit) => (
