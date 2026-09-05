@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Ban, CheckCircle2, ClipboardList, Clock, Sparkles, Wrench } from "lucide-react";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
-import { BuildingGroupList, groupByBuilding } from "@/components/shared/building-groups";
+import { BuildingGroupList, RoomGroupList, groupByBuilding, groupByRoom } from "@/components/shared/building-groups";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
 import type { WorkOrderItem, WorkOrderPageInfo } from "@/components/admin/types";
 
@@ -169,115 +169,120 @@ export function WorkOrderBoard({
           );
         }}
         renderItems={(group) => (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="border-b border-border text-muted-foreground font-semibold">
-                <tr>
-                  <th className="px-4 py-3 whitespace-nowrap">รหัสแอร์</th>
-                  <th className="px-4 py-3">สถานที่ตั้ง / ยี่ห้อ</th>
-                  <th className="px-4 py-3 whitespace-nowrap">ประเภทงาน</th>
-                  <th className="px-4 py-3 whitespace-nowrap">วันที่แจ้ง</th>
-                  <th className="px-4 py-3 whitespace-nowrap">ผู้รับผิดชอบ</th>
-                  <th className="px-4 py-3 whitespace-nowrap text-center">สถานะ</th>
-                  <th className="px-4 py-3 whitespace-nowrap text-right">จัดการ</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {group.items.map((wo) => (
-                  <tr
-                    key={wo.id}
-                    className={`hover:bg-muted transition-colors cursor-pointer ${getWorkOrderRowClassName(wo)}`}
-                    onClick={() => onOpenDetails(wo)}
-                  >
-                    <td className="px-4 py-3 whitespace-nowrap font-mono font-bold text-base text-foreground">
-                      {wo.acCode}
-                    </td>
-                    <td className="px-4 py-3 max-w-[190px]">
-                      <div className="font-medium text-foreground">{wo.roomLocation}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {wo.brand} {wo.btu ? `(${wo.btu} BTU)` : ""}
-                        <CatalogueMark brandDeleted={wo.brandDeleted} modelDeleted={wo.modelDeleted} className="ml-1" />
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      {wo.type === "repair" ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-destructive/10 text-destructive border border-destructive/20">
-                          <Wrench className="h-3 w-3" />
-                          งานซ่อม
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-sky-500/10 text-sky-600 border border-sky-500/20">
-                          <Sparkles className="h-3 w-3" />
-                          งานล้างแอร์
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
-                      {wo.createdAt ? new Date(wo.createdAt).toLocaleDateString("th-TH") : "-"}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      {wo.claimedByName ? (
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-accent flex items-center justify-center text-[10px] font-bold text-muted-foreground shrink-0">
-                            {wo.claimedByName.charAt(0)}
+          <RoomGroupList
+            rooms={groupByRoom(group.items)}
+            getSubtitle={(room) => `${room.items.length} ใบงาน`}
+            renderItems={(room) => (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="border-b border-border text-muted-foreground font-semibold">
+                    <tr>
+                      <th className="px-4 py-3 whitespace-nowrap">รหัสแอร์</th>
+                      <th className="px-4 py-3">ยี่ห้อ / ขนาด</th>
+                      <th className="px-4 py-3 whitespace-nowrap">ประเภทงาน</th>
+                      <th className="px-4 py-3 whitespace-nowrap">วันที่แจ้ง</th>
+                      <th className="px-4 py-3 whitespace-nowrap">ผู้รับผิดชอบ</th>
+                      <th className="px-4 py-3 whitespace-nowrap text-center">สถานะ</th>
+                      <th className="px-4 py-3 whitespace-nowrap text-right">จัดการ</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {room.items.map((wo) => (
+                      <tr
+                        key={wo.id}
+                        className={`hover:bg-muted transition-colors cursor-pointer ${getWorkOrderRowClassName(wo)}`}
+                        onClick={() => onOpenDetails(wo)}
+                      >
+                        <td className="px-4 py-3 whitespace-nowrap font-mono font-bold text-base text-foreground">
+                          {wo.acCode}
+                        </td>
+                        <td className="px-4 py-3 max-w-[190px]">
+                          <div className="text-xs text-muted-foreground">
+                            {wo.brand} {wo.btu ? `(${wo.btu} BTU)` : ""}
+                            <CatalogueMark brandDeleted={wo.brandDeleted} modelDeleted={wo.modelDeleted} className="ml-1" />
                           </div>
-                          <span className="font-medium text-foreground">{wo.claimedByName}</span>
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground italic">-</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-center">
-                      {wo.status === "pending" && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-warning/20 text-warning-foreground border border-warning/30">
-                          <Clock className="h-3 w-3" />
-                          รอดำเนินการ
-                        </span>
-                      )}
-                      {wo.status === "claimed" && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary/20 text-primary border border-primary/30">
-                          <Wrench className="h-3 w-3" />
-                          กำลังดำเนินการ
-                        </span>
-                      )}
-                      {wo.status === "completed" && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-success/20 text-success-foreground border border-success/30">
-                          <CheckCircle2 className="h-3 w-3" />
-                          เสร็จสิ้น
-                        </span>
-                      )}
-                      {wo.status === "cancelled" && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-muted text-muted-foreground border border-border">
-                          <Ban className="h-3 w-3" />
-                          ยกเลิกแล้ว
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-right">
-                      {wo.status === "pending" ? (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onAssign(wo.id);
-                          }}
-                          className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-bold text-primary bg-primary/10 border border-primary/30 rounded-lg hover:bg-primary/20 transition-colors"
-                        >
-                          จ่ายงาน
-                        </button>
-                      ) : (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); onOpenDetails(wo); }}
-                          className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-bold text-foreground bg-secondary border border-border rounded-lg hover:bg-secondary/80 transition-colors"
-                        >
-                          ดูรายละเอียด
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {wo.type === "repair" ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-destructive/10 text-destructive border border-destructive/20">
+                              <Wrench className="h-3 w-3" />
+                              งานซ่อม
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-sky-500/10 text-sky-600 border border-sky-500/20">
+                              <Sparkles className="h-3 w-3" />
+                              งานล้างแอร์
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
+                          {wo.createdAt ? new Date(wo.createdAt).toLocaleDateString("th-TH") : "-"}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {wo.claimedByName ? (
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 rounded-full bg-accent flex items-center justify-center text-[10px] font-bold text-muted-foreground shrink-0">
+                                {wo.claimedByName.charAt(0)}
+                              </div>
+                              <span className="font-medium text-foreground">{wo.claimedByName}</span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground italic">-</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-center">
+                          {wo.status === "pending" && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-warning/20 text-warning-foreground border border-warning/30">
+                              <Clock className="h-3 w-3" />
+                              รอดำเนินการ
+                            </span>
+                          )}
+                          {wo.status === "claimed" && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary/20 text-primary border border-primary/30">
+                              <Wrench className="h-3 w-3" />
+                              กำลังดำเนินการ
+                            </span>
+                          )}
+                          {wo.status === "completed" && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-success/20 text-success-foreground border border-success/30">
+                              <CheckCircle2 className="h-3 w-3" />
+                              เสร็จสิ้น
+                            </span>
+                          )}
+                          {wo.status === "cancelled" && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-muted text-muted-foreground border border-border">
+                              <Ban className="h-3 w-3" />
+                              ยกเลิกแล้ว
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-right">
+                          {wo.status === "pending" ? (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onAssign(wo.id);
+                              }}
+                              className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-bold text-primary bg-primary/10 border border-primary/30 rounded-lg hover:bg-primary/20 transition-colors"
+                            >
+                              จ่ายงาน
+                            </button>
+                          ) : (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); onOpenDetails(wo); }}
+                              className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-bold text-foreground bg-secondary border border-border rounded-lg hover:bg-secondary/80 transition-colors"
+                            >
+                              ดูรายละเอียด
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+        )}
+          />
         )}
       />
     </div>

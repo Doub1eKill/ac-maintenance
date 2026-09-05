@@ -131,6 +131,8 @@ export function OverviewPanel({
                 { name: r.name, building: { name: b.name } },
                 { withBuilding: false }
               ),
+              roomId: r.id,
+              roomName: r.name,
               buildingId: b.id,
               buildingName: b.name,
               nextDueDate: ac.maintenanceSchedule.nextDueDate,

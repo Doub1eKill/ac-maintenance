@@ -2,7 +2,7 @@
 
 import { format } from "date-fns";
 import { AlertTriangle, MoreVertical } from "lucide-react";
-import { BuildingGroupList, groupByBuilding } from "@/components/shared/building-groups";
+import { BuildingGroupList, RoomGroupList, groupByBuilding, groupByRoom } from "@/components/shared/building-groups";
 import type { TechJobItem } from "@/components/tech/types";
 import { filterJobs } from "@/components/tech/types";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
@@ -26,60 +26,66 @@ export function MyJobsPanel({ myJobs, searchQuery, selectedBuilding, onSelectFor
         emptyMessage="คุณไม่มีงานที่กำลังดำเนินการ"
         resetKey={`${searchQuery}|${selectedBuilding}`}
         renderItems={(group) => (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {group.items.map((job) => (
-              <div
-                key={job.id}
-                className="biz-card p-5 space-y-4 hover:border-muted-foreground transition-all relative overflow-hidden"
-              >
-                {job.priority === "critical" ? (
-                  <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1 shadow-sm">
-                    <AlertTriangle className="w-3 h-3" /> ด่วนที่สุด
-                  </div>
-                ) : job.priority === "high" ? (
-                  <div className="absolute top-0 right-0 bg-orange-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1 shadow-sm">
-                    <AlertTriangle className="w-3 h-3" /> ด่วน
-                  </div>
-                ) : null}
-                <div className="flex items-center justify-between pr-8">
-                  <div className="space-y-1">
-                    <div className="text-sm font-bold leading-snug text-foreground">
-                      {job.roomLocation}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs font-bold text-muted-foreground">
-                        {job.acCode}
-                      </span>
-                      <span className="rounded-md px-2 py-0.5 text-[10px] font-bold bg-secondary text-foreground">
-                        {job.brand}
-                        <CatalogueMark
-                          brandDeleted={job.brandDeleted}
-                          modelDeleted={job.modelDeleted}
-                          className="ml-1"
-                        />
-                      </span>
-                    </div>
-                  </div>
-                  <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                </div>
-
-                <div className="pt-2 flex items-center justify-between text-xs border-t border-border">
-                  <div className="flex flex-col">
-                    <span className="text-[11px] font-bold text-sky-400">กำลังดำเนินการ</span>
-                    <span className="text-[10px] mt-1 text-muted-foreground">
-                      {job.claimedAt ? `รับงานเมื่อ: ${format(new Date(job.claimedAt), "dd/MM HH:mm")}` : ""}
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => onSelectForLog(job)}
-                    className="rounded-xl px-4 py-2 text-xs font-bold transition-all shadow-sm active:scale-95 bg-primary text-primary-foreground hover:bg-primary/90"
+          <RoomGroupList
+            rooms={groupByRoom(group.items)}
+            getSubtitle={(room) => {
+              const floor = room.items.find((j) => j.floor != null)?.floor;
+              return `${floor != null ? `ชั้น ${floor} • ` : ""}${room.items.length} ใบงาน`;
+            }}
+            renderItems={(room) => (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {room.items.map((job) => (
+                  <div
+                    key={job.id}
+                    className="biz-card p-5 space-y-4 hover:border-muted-foreground transition-all relative overflow-hidden"
                   >
-                    บันทึกและปิดงาน
-                  </button>
-                </div>
+                    {job.priority === "critical" ? (
+                      <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1 shadow-sm">
+                        <AlertTriangle className="w-3 h-3" /> ด่วนที่สุด
+                      </div>
+                    ) : job.priority === "high" ? (
+                      <div className="absolute top-0 right-0 bg-orange-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1 shadow-sm">
+                        <AlertTriangle className="w-3 h-3" /> ด่วน
+                      </div>
+                    ) : null}
+                    <div className="flex items-center justify-between pr-8">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs font-bold text-muted-foreground">
+                            {job.acCode}
+                          </span>
+                          <span className="rounded-md px-2 py-0.5 text-[10px] font-bold bg-secondary text-foreground">
+                            {job.brand}
+                            <CatalogueMark
+                              brandDeleted={job.brandDeleted}
+                              modelDeleted={job.modelDeleted}
+                              className="ml-1"
+                            />
+                          </span>
+                        </div>
+                      </div>
+                      <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                    </div>
+
+                    <div className="pt-2 flex items-center justify-between text-xs border-t border-border">
+                      <div className="flex flex-col">
+                        <span className="text-[11px] font-bold text-sky-400">กำลังดำเนินการ</span>
+                        <span className="text-[10px] mt-1 text-muted-foreground">
+                          {job.claimedAt ? `รับงานเมื่อ: ${format(new Date(job.claimedAt), "dd/MM HH:mm")}` : ""}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => onSelectForLog(job)}
+                        className="rounded-xl px-4 py-2 text-xs font-bold transition-all shadow-sm active:scale-95 bg-primary text-primary-foreground hover:bg-primary/90"
+                      >
+                        บันทึกและปิดงาน
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+        )}
+          />
         )}
       />
     </div>

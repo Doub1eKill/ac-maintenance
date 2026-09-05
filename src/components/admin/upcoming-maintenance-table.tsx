@@ -32,7 +32,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ArrowUpDown, CalendarRange, ChevronDown, Copy, UserPlus } from "lucide-react";
-import { BuildingGroupList, groupByBuilding } from "@/components/shared/building-groups";
+import { BuildingGroupList, RoomGroupList, groupByBuilding, groupByRoom } from "@/components/shared/building-groups";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
 
 export interface UpcomingMaintenanceAC {
@@ -46,6 +46,8 @@ export interface UpcomingMaintenanceAC {
   btu: number | null;
   location: string;
   roomLocation: string;
+  roomId: string;
+  roomName: string;
   buildingId: string;
   buildingName: string;
   nextDueDate: string;
@@ -64,6 +66,8 @@ export interface UrgentMaintenanceAC {
   btu: number | null;
   location: string;
   roomLocation: string;
+  roomId: string;
+  roomName: string;
   buildingId: string;
   buildingName: string;
   status: string;
@@ -179,18 +183,15 @@ export const columns: ColumnDef<MaintenanceRow>[] = [
   },
   {
     accessorKey: "location",
-    header: () => <div className="text-xs font-bold">สถานที่ / รุ่นแอร์</div>,
+    header: () => <div className="text-xs font-bold">รุ่นแอร์</div>,
     cell: ({ row }) => (
-      <div>
-        <div className="font-medium text-xs">{row.original.roomLocation}</div>
-        <div className="text-[10px] text-muted-foreground">
-          {row.original.brand} {row.original.btu ? `(${row.original.btu} BTU)` : ""}
-          <CatalogueMark
-            brandDeleted={row.original.brandDeleted}
-            modelDeleted={row.original.modelDeleted}
-            className="ml-1"
-          />
-        </div>
+      <div className="text-[10px] text-muted-foreground">
+        {row.original.brand} {row.original.btu ? `(${row.original.btu} BTU)` : ""}
+        <CatalogueMark
+          brandDeleted={row.original.brandDeleted}
+          modelDeleted={row.original.modelDeleted}
+          className="ml-1"
+        />
       </div>
     ),
   },
@@ -349,6 +350,8 @@ export function UpcomingMaintenanceTable({ data, onViewDetails, onCreateWorkOrde
     table.getRowModel().rows.map((row) => ({
       buildingId: row.original.buildingId,
       buildingName: row.original.buildingName,
+      roomId: row.original.roomId,
+      roomName: row.original.roomName,
       row,
     }))
   );
@@ -439,74 +442,80 @@ export function UpcomingMaintenanceTable({ data, onViewDetails, onCreateWorkOrde
           );
         }}
         renderItems={(group) => (
-          <div className="rounded-xl border border-border overflow-hidden">
-            <Table>
-              <TableHeader className="bg-muted/50">
-                {table.getHeaderGroups().map((headerGroup) => (
-                  <TableRow key={headerGroup.id}>
-                    {headerGroup.headers.map((header) => (
-                      <TableHead key={header.id} className="h-10 px-4 whitespace-normal text-xs">
-                        {header.isPlaceholder
-                          ? null
-                          : flexRender(header.column.columnDef.header, header.getContext())}
-                      </TableHead>
+          <RoomGroupList
+            rooms={groupByRoom(group.items)}
+            getSubtitle={(room) => `${room.items.length} รายการ`}
+            renderItems={(room) => (
+              <div className="rounded-xl border border-border overflow-hidden">
+                <Table>
+                  <TableHeader className="bg-muted/50">
+                    {table.getHeaderGroups().map((headerGroup) => (
+                      <TableRow key={headerGroup.id}>
+                        {headerGroup.headers.map((header) => (
+                          <TableHead key={header.id} className="h-10 px-4 whitespace-normal text-xs">
+                            {header.isPlaceholder
+                              ? null
+                              : flexRender(header.column.columnDef.header, header.getContext())}
+                          </TableHead>
+                        ))}
+                      </TableRow>
                     ))}
-                  </TableRow>
-                ))}
-              </TableHeader>
-              <TableBody>
-                {group.items.map(({ row }) => (
-                  <TableRow
-                    key={row.id}
-                    data-state={row.getIsSelected() && "selected"}
-                    className="h-12 cursor-pointer hover:bg-muted/50"
-                    onClick={() => onViewDetails?.(row.original.acCode)}
-                  >
-                    {row.getVisibleCells().map((cell) => {
-                      // The tick column swallows the row's own click and toggles
-                      // instead, so the whole cell is the target rather than the
-                      // 16px box inside it. Aiming for a checkbox and landing a
-                      // few pixels off used to open the asset page — an easy
-                      // miss on a phone, and a jarring one when the intent was
-                      // to select several rows.
-                      // Only the cells that actually hold a checkbox take the
-                      // click. On a row that cannot be assigned the cell is
-                      // empty, so it behaves like the rest of the row and opens
-                      // the asset page rather than swallowing the click and
-                      // appearing dead.
-                      const isSelectCell = cell.column.id === "select" && row.getCanSelect();
-                      return (
-                        <TableCell
-                          key={cell.id}
-                          className={
-                            isSelectCell
-                              ? "px-4 py-2 whitespace-normal cursor-default"
-                              : "px-4 py-2 whitespace-normal"
-                          }
-                          onClick={
-                            isSelectCell
-                              ? (event) => {
-                                  event.stopPropagation();
-                                  // A click that landed on the checkbox itself is
-                                  // already being handled by it; toggling here as
-                                  // well would undo it immediately.
-                                  if ((event.target as HTMLElement).closest('[role="checkbox"]')) {
-                                    return;
-                                  }
-                                  row.toggleSelected(!row.getIsSelected());
-                                }
-                              : undefined
-                          }
-                        >
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </TableCell>
-                      );
-                    })}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                  </TableHeader>
+                  <TableBody>
+                    {room.items.map(({ row }) => (
+                      <TableRow
+                        key={row.id}
+                        data-state={row.getIsSelected() && "selected"}
+                        className="h-12 cursor-pointer hover:bg-muted/50"
+                        onClick={() => onViewDetails?.(row.original.acCode)}
+                      >
+                        {row.getVisibleCells().map((cell) => {
+                          // The tick column swallows the row's own click and toggles
+                          // instead, so the whole cell is the target rather than the
+                          // 16px box inside it. Aiming for a checkbox and landing a
+                          // few pixels off used to open the asset page — an easy
+                          // miss on a phone, and a jarring one when the intent was
+                          // to select several rows.
+                          // Only the cells that actually hold a checkbox take the
+                          // click. On a row that cannot be assigned the cell is
+                          // empty, so it behaves like the rest of the row and opens
+                          // the asset page rather than swallowing the click and
+                          // appearing dead.
+                          const isSelectCell = cell.column.id === "select" && row.getCanSelect();
+                          return (
+                            <TableCell
+                              key={cell.id}
+                              className={
+                                isSelectCell
+                                  ? "px-4 py-2 whitespace-normal cursor-default"
+                                  : "px-4 py-2 whitespace-normal"
+                              }
+                              onClick={
+                                isSelectCell
+                                  ? (event) => {
+                                      event.stopPropagation();
+                                      // A click that landed on the checkbox itself is
+                                      // already being handled by it; toggling here as
+                                      // well would undo it immediately.
+                                      if ((event.target as HTMLElement).closest('[role="checkbox"]')) {
+                                        return;
+                                      }
+                                      row.toggleSelected(!row.getIsSelected());
+                                    }
+                                  : undefined
+                              }
+                            >
+                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                            </TableCell>
+                          );
+                        })}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+        )}
+          />
         )}
       />
 

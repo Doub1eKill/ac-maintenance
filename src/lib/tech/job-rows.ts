@@ -59,6 +59,11 @@ export function toTechJobRow(wo: TechJobRecord) {
       withFloor: true,
       withBuilding: false,
     }),
+    // The room the unit sits in, for the second level of the drill-down.
+    // By id as well as name: room names are not unique across buildings.
+    roomId: wo.airConditioner.room.id.toString(),
+    roomName: wo.airConditioner.room.name,
+    floor: wo.airConditioner.room.floor,
     buildingId: wo.airConditioner.room.building.id.toString(),
     buildingName: wo.airConditioner.room.building.name,
   };

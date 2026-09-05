@@ -13,6 +13,10 @@ export interface TechJobItem {
   // The same place without the building, for lists grouped under a building
   // header. See @/lib/location.
   roomLocation: string;
+  // The room the unit sits in, for the second level of the drill-down.
+  roomId: string;
+  roomName: string;
+  floor?: number | null;
   buildingId: string;
   buildingName: string;
   priority?: string | null;

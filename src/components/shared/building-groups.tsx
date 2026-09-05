@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { Building2, ChevronDown, ChevronUp } from "lucide-react";
+import { Building2, ChevronDown, ChevronUp, DoorClosed } from "lucide-react";
 import {
   Pagination,
   PaginationContent,
@@ -36,6 +36,102 @@ export function groupByBuilding<T extends Buildable>(items: T[]): BuildingGroup<
     }
   }
   return Array.from(groups.values()).sort((a, b) => a.buildingName.localeCompare(b.buildingName, "th"));
+}
+
+export interface Roomable {
+  roomId: string;
+  roomName: string;
+}
+
+export interface RoomGroup<T> {
+  roomId: string;
+  roomName: string;
+  items: T[];
+}
+
+// The same grouping one level in. Rooms are keyed by id rather than name for
+// the reason buildings are: two rooms in different buildings can share a name,
+// and a room's name is not unique on its own.
+export function groupByRoom<T extends Roomable>(items: T[]): RoomGroup<T>[] {
+  const groups = new Map<string, RoomGroup<T>>();
+  for (const item of items) {
+    const existing = groups.get(item.roomId);
+    if (existing) {
+      existing.items.push(item);
+    } else {
+      groups.set(item.roomId, { roomId: item.roomId, roomName: item.roomName, items: [item] });
+    }
+  }
+  return Array.from(groups.values()).sort((a, b) => a.roomName.localeCompare(b.roomName, "th"));
+}
+
+interface RoomGroupListProps<T> {
+  rooms: RoomGroup<T>[];
+  getSubtitle: (room: RoomGroup<T>) => string;
+  renderExtra?: (room: RoomGroup<T>) => ReactNode;
+  renderItems: (room: RoomGroup<T>) => ReactNode;
+}
+
+// The second level of the drill-down: a building opens onto its rooms, and a
+// room opens onto its units. Rendered inside BuildingGroupList's renderItems.
+//
+// Deliberately lighter than the building header — smaller type, a flat border
+// instead of a filled card — so the nesting is visible at a glance rather than
+// leaving two identical bars stacked on each other. It keeps the same rules
+// otherwise: everything closed to start with, one room open at a time, and a
+// room with no matching items never appears because grouping never creates it.
+//
+// No pagination here. Buildings page because there can be many; the rooms
+// inside one building are few, and a pager nested inside a pager would be its
+// own puzzle.
+export function RoomGroupList<T>({ rooms, getSubtitle, renderExtra, renderItems }: RoomGroupListProps<T>) {
+  // null means "nothing picked yet", which is not the same as "closed" here:
+  // a building holding one room opens onto it directly, so a search narrowed
+  // to a single unit does not answer with one collapsed bar inside another.
+  // Closing that sole room has to be expressible, hence the explicit sentinel
+  // rather than going back to null and reopening itself.
+  const [picked, setPicked] = useState<string | null | "none">(null);
+
+  const soleRoomId = rooms.length === 1 ? rooms[0].roomId : null;
+  const effectiveExpandedId =
+    picked === "none"
+      ? null
+      : picked !== null && rooms.some((r) => r.roomId === picked)
+        ? picked
+        : soleRoomId;
+
+  return (
+    <div className="space-y-2">
+      {rooms.map((room) => {
+        const isExpanded = effectiveExpandedId === room.roomId;
+        return (
+          <div key={room.roomId} className="rounded-xl border border-border bg-card overflow-hidden">
+            <div
+              className="w-full flex items-center justify-between p-3 text-left hover:bg-secondary transition-colors cursor-pointer"
+              onClick={() => setPicked(isExpanded ? "none" : room.roomId)}
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-secondary text-foreground shrink-0">
+                  <DoorClosed className="h-3.5 w-3.5" />
+                </span>
+                <div className="min-w-0">
+                  <h4 className="font-bold text-foreground text-xs">ห้อง {room.roomName}</h4>
+                  <p className="text-[11px] text-muted-foreground">{getSubtitle(room)}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2.5 shrink-0">
+                {renderExtra?.(room)}
+                <span className="text-muted-foreground">
+                  {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                </span>
+              </div>
+            </div>
+            {isExpanded && <div className="border-t border-border p-3">{renderItems(room)}</div>}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 interface BuildingGroupListProps<T> {

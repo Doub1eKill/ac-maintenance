@@ -53,6 +53,7 @@ export const workOrderBoardSelect = {
       status: true,
       room: {
         select: {
+          id: true,
           name: true,
           // id as well as the name: the board groups by building, and grouping
           // on a display string would merge two buildings that share a name.
@@ -101,6 +102,10 @@ export function toWorkOrderBoardRow(wo: WorkOrderBoardRow) {
       withAbbreviation: true,
       withBuilding: false,
     }),
+    // The room the unit sits in, for the second level of the drill-down.
+    // By id as well as name: room names are not unique across buildings.
+    roomId: wo.airConditioner.room.id.toString(),
+    roomName: wo.airConditioner.room.name,
     // Split out of `location`, which is assembled for display. Same pair the
     // technician job rows carry, so both sides group through groupByBuilding()
     // without either of them parsing a formatted string back apart.

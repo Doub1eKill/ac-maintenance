@@ -277,6 +277,7 @@ export interface TechnicianAssetUnit {
   // `location` itself is unchanged, so existing callers are unaffected.
   buildingId: string;
   buildingName: string;
+  roomId: string;
   roomName: string;
   floor: number | null;
   // Whether the brand/model shown above has been retired from the catalogue.
@@ -324,7 +325,7 @@ export async function getTechnicianAssetList(): Promise<{
       acBrand: { select: { name: true, deletedAt: true } },
       acModel: { select: { name: true, defaultBtu: true, deletedAt: true } },
       room: {
-        select: { name: true, floor: true, building: { select: { id: true, name: true } } },
+        select: { id: true, name: true, floor: true, building: { select: { id: true, name: true } } },
       },
       maintenanceLogs: {
         orderBy: { performedAt: "desc" },
@@ -355,6 +356,7 @@ export async function getTechnicianAssetList(): Promise<{
       roomLocation: formatUnitLocation(u.room, { withBuilding: false }),
       buildingId: u.room.building.id.toString(),
       buildingName: u.room.building.name,
+      roomId: u.room.id.toString(),
       roomName: u.room.name,
       floor: u.room.floor,
       lastCleanedAt: lastCleanedAt ? lastCleanedAt.toISOString() : null,
