@@ -247,41 +247,6 @@ export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
 
   return (
     <div className="space-y-4">
-      {selectedAcs.length > 0 && (
-        // Sticky for the same reason the technician's claim bar is: stickers
-        // are picked across floors and rooms, and the count and the print
-        // button were left behind at the top the moment the list got long.
-        // The opaque background lives on the wrapper — the bar itself is a
-        // translucent tint, which the list would otherwise show through.
-        <div className="sticky top-0 z-30 bg-background/95 py-2 backdrop-blur-sm">
-        <div className="bg-primary/10 border border-primary/30 rounded-2xl p-4 flex items-center justify-between shadow-sm animate-in fade-in slide-in-from-top-4">
-          <div className="flex items-center gap-3">
-            <div className="bg-primary/20 p-2 rounded-xl text-primary">
-              <CheckSquare className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="font-bold text-primary text-sm">เลือกแล้ว {selectedAcs.length} รายการ</div>
-              <div className="text-xs text-primary">พร้อมสำหรับพิมพ์ลงสติ๊กเกอร์ A4</div>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setSelectedAcs([])}
-              className="text-xs font-bold text-primary hover:text-primary px-3 py-2 rounded-lg hover:bg-primary/20 transition-colors"
-            >
-              ยกเลิกทั้งหมด
-            </button>
-            <button
-              onClick={handleBatchPrint}
-              className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-xl text-sm font-bold shadow-md shadow-primary/20 hover:bg-primary/90 transition-colors"
-            >
-              <Printer className="w-4 h-4" /> พิมพ์ QR Code ({selectedAcs.length})
-            </button>
-          </div>
-        </div>
-        </div>
-      )}
-
       <div className="biz-card p-6 space-y-6 animate-in fade-in">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-border pb-4 gap-4">
           <h2 className="text-base font-bold text-foreground flex items-center gap-2">
@@ -487,6 +452,43 @@ export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
           </div>
         )}
       </div>
+
+      {selectedAcs.length > 0 && (
+        // Same bar, same reason, same edge as the technician's: stickers are
+        // picked across floors and rooms, so the count and the print button
+        // were left behind the moment the list got long. Rendered last so
+        // bottom-0 has something to hold it there.
+        //
+        // The opaque background lives on the wrapper — the bar itself is a
+        // translucent tint, which the list would otherwise show through.
+        <div className="sticky bottom-0 z-30 bg-background/95 py-2 backdrop-blur-sm">
+          <div className="bg-primary/10 border border-primary/30 rounded-2xl p-4 flex items-center justify-between shadow-sm animate-in fade-in slide-in-from-bottom-4">
+          <div className="flex items-center gap-3">
+            <div className="bg-primary/20 p-2 rounded-xl text-primary">
+              <CheckSquare className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="font-bold text-primary text-sm">เลือกแล้ว {selectedAcs.length} รายการ</div>
+              <div className="text-xs text-primary">พร้อมสำหรับพิมพ์ลงสติ๊กเกอร์ A4</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setSelectedAcs([])}
+              className="text-xs font-bold text-primary hover:text-primary px-3 py-2 rounded-lg hover:bg-primary/20 transition-colors"
+            >
+              ยกเลิกทั้งหมด
+            </button>
+            <button
+              onClick={handleBatchPrint}
+              className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-xl text-sm font-bold shadow-md shadow-primary/20 hover:bg-primary/90 transition-colors"
+            >
+              <Printer className="w-4 h-4" /> พิมพ์ QR Code ({selectedAcs.length})
+            </button>
+          </div>
+        </div>
+        </div>
+      )}
     </div>
   );
 }
