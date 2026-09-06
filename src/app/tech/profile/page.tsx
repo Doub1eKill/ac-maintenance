@@ -5,5 +5,5 @@ export const metadata = { title: "โปรไฟล์ของฉัน | AC M
 
 export default async function TechProfilePage() {
   const { profile, universityName } = await getTechShellData();
-  return <ProfilePanel profile={profile} universityName={universityName} showPhone={false} />;
+  return <ProfilePanel profile={profile} universityName={universityName} />;
 }

@@ -19,13 +19,6 @@ interface ProfilePanelProps {
     avatarUrl: string | null;
   };
   universityName: string;
-  // Technician data doesn't carry a phone number yet (backend request
-  // pending — see HANDOFF.md F5) — showing an empty field would let a
-  // save silently clear a real phone number the day the field does exist,
-  // since updateProfileAction treats an empty string as "clear it". Hiding
-  // the field entirely (and not sending phone at all, which the action
-  // treats as "leave it untouched") avoids that until the data is real.
-  showPhone?: boolean;
 }
 
 const ROLE_LABEL: Record<string, string> = {
@@ -38,7 +31,13 @@ const ROLE_LABEL: Record<string, string> = {
 // server still checks — this is a courtesy, not the guard.
 const AVATAR_MAX_BYTES = 8 * 1024 * 1024;
 
-export function ProfilePanel({ profile, universityName, showPhone = true }: ProfilePanelProps) {
+// Both dashboards render this, and both now feed it a real phone number.
+// The technician page used to pass showPhone={false}: its data did not carry
+// one, and an empty field would have let a save clear a number the user could
+// not see, since updateProfileAction reads "" as "clear it". getTechShellData
+// selects the primary phone now, so the flag is gone rather than flipped —
+// leaving it would only be a switch nobody may use.
+export function ProfilePanel({ profile, universityName }: ProfilePanelProps) {
   const [name, setName] = useState(profile.name);
   const [phone, setPhone] = useState(profile.phone ?? "");
   const [saveResult, setSaveResult] = useState<{ success?: boolean; error?: string } | null>(null);
@@ -102,9 +101,7 @@ export function ProfilePanel({ profile, universityName, showPhone = true }: Prof
   const handleSave = () => {
     setSaveResult(null);
     startSaveTransition(async () => {
-      const result = showPhone
-        ? await updateProfileAction(name, phone, avatarFile)
-        : await updateProfileAction(name, undefined, avatarFile);
+      const result = await updateProfileAction(name, phone, avatarFile);
       setSaveResult(result);
       if (result?.success) {
         // Only the pending state is cleared. The preview stays on screen — it
@@ -202,24 +199,22 @@ export function ProfilePanel({ profile, universityName, showPhone = true }: Prof
             />
           </div>
 
-          {showPhone && (
-            <div>
-              <label htmlFor="profile-phone" className="mb-1.5 block text-xs font-bold text-foreground">
-                เบอร์โทรศัพท์
-              </label>
-              <div className="relative">
-                <Phone className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  id="profile-phone"
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="081-234-5678"
-                  className="w-full rounded-xl border border-border bg-muted pl-10 pr-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
-                />
-              </div>
+          <div>
+            <label htmlFor="profile-phone" className="mb-1.5 block text-xs font-bold text-foreground">
+              เบอร์โทรศัพท์
+            </label>
+            <div className="relative">
+              <Phone className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                id="profile-phone"
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="081-234-5678"
+                className="w-full rounded-xl border border-border bg-muted pl-10 pr-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
+              />
             </div>
-          )}
+          </div>
 
           <div>
             <label htmlFor="profile-email" className="mb-1.5 block text-xs font-bold text-foreground">
