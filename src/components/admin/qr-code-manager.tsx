@@ -248,6 +248,12 @@ export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
   return (
     <div className="space-y-4">
       {selectedAcs.length > 0 && (
+        // Sticky for the same reason the technician's claim bar is: stickers
+        // are picked across floors and rooms, and the count and the print
+        // button were left behind at the top the moment the list got long.
+        // The opaque background lives on the wrapper — the bar itself is a
+        // translucent tint, which the list would otherwise show through.
+        <div className="sticky top-0 z-30 bg-background/95 py-2 backdrop-blur-sm">
         <div className="bg-primary/10 border border-primary/30 rounded-2xl p-4 flex items-center justify-between shadow-sm animate-in fade-in slide-in-from-top-4">
           <div className="flex items-center gap-3">
             <div className="bg-primary/20 p-2 rounded-xl text-primary">
@@ -272,6 +278,7 @@ export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
               <Printer className="w-4 h-4" /> พิมพ์ QR Code ({selectedAcs.length})
             </button>
           </div>
+        </div>
         </div>
       )}
 

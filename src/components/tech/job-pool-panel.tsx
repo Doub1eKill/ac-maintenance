@@ -60,26 +60,37 @@ export function JobPoolPanel({ jobPool, searchQuery, selectedBuilding, isPending
     <div className="animate-in fade-in">
       <div className="space-y-4">
         {selectedPoolIds.length > 0 && (
-          <div className="biz-card p-4 flex items-center justify-between gap-3 bg-secondary/40 border-dashed">
-            <span className="text-xs font-bold text-foreground">เลือกแล้ว {selectedPoolIds.length} งาน</span>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setSelectedPoolIds([])}
-                className="rounded-xl border border-border px-3 py-1.5 text-xs font-bold text-foreground hover:bg-muted transition-all"
-              >
-                ยกเลิกการเลือก
-              </button>
-              <button
-                onClick={async () => {
-                  if (selectedPoolIds.length === 0) return;
-                  const success = await onBulkClaim(selectedPoolIds);
-                  if (success) setSelectedPoolIds([]);
-                }}
-                disabled={isPending}
-                className="rounded-xl bg-primary px-4 py-1.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-all shadow-sm active:scale-95 disabled:opacity-50"
-              >
-                รับงานที่เลือก ({selectedPoolIds.length})
-              </button>
+          // Follows the screen. Jobs are picked across several floors and rooms
+          // of a four-level tree, so by the time the last box is ticked the bar
+          // that confirms them is far above the fold — and the only way to find
+          // out how many are selected was to scroll back up and lose your place
+          // in the list.
+          //
+          // The sticky wrapper carries the opaque background rather than the
+          // card itself: the card is deliberately translucent, which is fine
+          // sitting still and unreadable with the list sliding underneath it.
+          <div className="sticky top-0 z-30 bg-background/95 py-2 backdrop-blur-sm">
+            <div className="biz-card p-4 flex items-center justify-between gap-3 bg-secondary/40 border-dashed">
+              <span className="text-xs font-bold text-foreground">เลือกแล้ว {selectedPoolIds.length} งาน</span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setSelectedPoolIds([])}
+                  className="rounded-xl border border-border px-3 py-1.5 text-xs font-bold text-foreground hover:bg-muted transition-all"
+                >
+                  ยกเลิกการเลือก
+                </button>
+                <button
+                  onClick={async () => {
+                    if (selectedPoolIds.length === 0) return;
+                    const success = await onBulkClaim(selectedPoolIds);
+                    if (success) setSelectedPoolIds([]);
+                  }}
+                  disabled={isPending}
+                  className="rounded-xl bg-primary px-4 py-1.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-all shadow-sm active:scale-95 disabled:opacity-50"
+                >
+                  รับงานที่เลือก ({selectedPoolIds.length})
+                </button>
+              </div>
             </div>
           </div>
         )}
