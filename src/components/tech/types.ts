@@ -9,6 +9,10 @@ export interface TechJobItem {
   modelDeleted?: boolean;
   btu: number | null;
   status: string;
+  // Repair or cleaning, straight off the work order. Optional for the same
+  // reason as the catalogue flags above: the QR scan result builds a job
+  // without one.
+  type?: "repair" | "cleaning";
   location: string;
   // The same place without the building, for lists grouped under a building
   // header. See @/lib/location.

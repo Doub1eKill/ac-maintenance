@@ -50,6 +50,10 @@ export function toTechJobRow(wo: TechJobRecord) {
     btu: wo.airConditioner.btu,
     airConditionerId: wo.airConditionerId.toString(),
     status: wo.airConditioner.status,
+    // What the job actually is. Read off the work order rather than inferred
+    // from the unit's condition — see the note on WorkOrder.type in the schema
+    // for why that inference was wrong in both directions.
+    type: wo.type,
     priority: wo.priority,
     location: formatUnitLocation(wo.airConditioner.room, { withAbbreviation: true, withFloor: true }),
     // The same location without the building, for the lists that group their

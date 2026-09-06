@@ -1,7 +1,7 @@
 "use client";
 
 import { format } from "date-fns";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Clock } from "lucide-react";
 import {
   BuildingGroupList,
   FloorGroupList,
@@ -13,15 +13,25 @@ import {
 import type { TechJobItem } from "@/components/tech/types";
 import { filterJobs } from "@/components/tech/types";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
+import { JobTypeBadge } from "@/components/tech/job-type-badge";
 
 interface MyJobsPanelProps {
   myJobs: TechJobItem[];
   searchQuery: string;
   selectedBuilding: string;
   onSelectForLog: (job: TechJobItem) => void;
+  // Opens the shared history modal on the unit this job belongs to. Optional
+  // so the panel still renders read-only wherever no handler is wired.
+  onViewHistory?: (airConditionerId: string) => void;
 }
 
-export function MyJobsPanel({ myJobs, searchQuery, selectedBuilding, onSelectForLog }: MyJobsPanelProps) {
+export function MyJobsPanel({
+  myJobs,
+  searchQuery,
+  selectedBuilding,
+  onSelectForLog,
+  onViewHistory,
+}: MyJobsPanelProps) {
   const filteredMyJobs = filterJobs(myJobs, searchQuery, selectedBuilding);
   const groups = groupByBuilding(filteredMyJobs);
 
@@ -75,6 +85,7 @@ export function MyJobsPanel({ myJobs, searchQuery, selectedBuilding, onSelectFor
                                 />
                               </span>
                             </div>
+                            <JobTypeBadge type={job.type} />
                           </div>
                         </div>
 
@@ -85,12 +96,27 @@ export function MyJobsPanel({ myJobs, searchQuery, selectedBuilding, onSelectFor
                               {job.claimedAt ? `รับงานเมื่อ: ${format(new Date(job.claimedAt), "dd/MM HH:mm")}` : ""}
                             </span>
                           </div>
-                          <button
-                            onClick={() => onSelectForLog(job)}
-                            className="rounded-xl px-4 py-2 text-xs font-bold transition-all shadow-sm active:scale-95 bg-primary text-primary-foreground hover:bg-primary/90"
-                          >
-                            บันทึกและปิดงาน
-                          </button>
+                          <div className="flex items-center gap-2">
+                            {/* Same button, same wording as the asset list's —
+                                it opens the identical modal. Worth having here
+                                too: what was done to this unit last time is the
+                                thing you want before starting, not after. */}
+                            {onViewHistory && job.airConditionerId && (
+                              <button
+                                type="button"
+                                onClick={() => onViewHistory(job.airConditionerId!)}
+                                className="inline-flex shrink-0 items-center justify-center gap-1 rounded border border-border bg-card px-2.5 py-1.5 text-[10px] font-bold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                              >
+                                <Clock className="h-3 w-3" /> ดูประวัติ
+                              </button>
+                            )}
+                            <button
+                              onClick={() => onSelectForLog(job)}
+                              className="rounded-xl px-4 py-2 text-xs font-bold transition-all shadow-sm active:scale-95 bg-primary text-primary-foreground hover:bg-primary/90"
+                            >
+                              บันทึกและปิดงาน
+                            </button>
+                          </div>
                         </div>
                       </div>
                     ))}

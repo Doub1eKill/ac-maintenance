@@ -15,6 +15,7 @@ import {
 import type { TechJobItem } from "@/components/tech/types";
 import { filterJobs } from "@/components/tech/types";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
+import { JobTypeBadge } from "@/components/tech/job-type-badge";
 
 interface JobPoolPanelProps {
   jobPool: TechJobItem[];
@@ -114,6 +115,11 @@ export function JobPoolPanel({ jobPool, searchQuery, selectedBuilding, isPending
                                   className="ml-1"
                                 />
                               </span>
+                              {/* Matters most here of the three lists: this is
+                                  the one where a job is picked up, and claiming
+                                  a clean when you packed for a repair is a
+                                  wasted trip. */}
+                              <JobTypeBadge type={job.type} />
                             </div>
                           </div>
 
