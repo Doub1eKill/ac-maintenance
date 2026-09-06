@@ -82,7 +82,15 @@ interface AssetManagerProps {
 
 export function AssetManager({ buildings, brands, globalSearch, onClearSearch }: AssetManagerProps) {
   const [isPending, startTransition] = useTransition();
-  const [expandedBuilding, setExpandedBuilding] = useState<string | null>(buildings[0]?.id || null);
+  // Every building starts collapsed, like the seven grouped lists that
+  // BuildingGroupList drives. This one predates that component and kept
+  // auto-opening the alphabetically-first building, which buried the other
+  // four under ~20 rows belonging to a building nobody asked about — and now
+  // that a floor level sits inside, under a whole tier more than that.
+  // "none" is a separate value from null on purpose: null means "nothing
+  // chosen yet", and the sole-building fallback below has to be able to tell
+  // the two apart or a closed single building would reopen itself.
+  const [expandedBuilding, setExpandedBuilding] = useState<string | null | "none">(null);
   
   // Modals state
   const [showAddBuilding, setShowAddBuilding] = useState(false);
@@ -115,6 +123,11 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
 
   useEffect(() => {
     setBuildingsPage(1);
+    // Also drops a deliberate collapse, so it can't outlive the list it was
+    // aimed at. Without this, closing a building and then searching would
+    // suppress the search's own auto-open and answer with a page that looks
+    // empty — which is the bug the auto-open was added to fix.
+    setExpandedBuilding(null);
   }, [globalSearch]);
 
   // Matches what the header box says it searches — "ค้นหารหัสแอร์, สถานที่,
@@ -155,11 +168,20 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
   // result is a single collapsed header and the page still looks empty. The
   // fallback also covers the building that was open scrolling out of the
   // result set.
-  const effectiveExpandedBuilding = filteredBuildings.some((b) => b.id === expandedBuilding)
-    ? expandedBuilding
-    : globalSearch.trim()
-      ? filteredBuildings[0]?.id ?? null
-      : null;
+  // A search that leaves exactly one building opens onto it rather than
+  // answering with a single collapsed bar — the same rule the grouped lists
+  // follow, extended here to any lone building rather than only a searched-for
+  // one, since a tenant with one building would otherwise pay a click on every
+  // visit that no other page charges.
+  const soleBuildingId = filteredBuildings.length === 1 ? filteredBuildings[0].id : null;
+  const effectiveExpandedBuilding =
+    expandedBuilding === "none"
+      ? null
+      : filteredBuildings.some((b) => b.id === expandedBuilding)
+        ? expandedBuilding
+        : globalSearch.trim()
+          ? filteredBuildings[0]?.id ?? null
+          : soleBuildingId;
 
   const totalBuildingsPages = Math.ceil(filteredBuildings.length / BUILDINGS_PER_PAGE);
   const paginatedBuildings = filteredBuildings.slice((buildingsPage - 1) * BUILDINGS_PER_PAGE, buildingsPage * BUILDINGS_PER_PAGE);
@@ -298,14 +320,22 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
       <div className="space-y-3">
         {paginatedBuildings.map((b) => (
           <div key={b.id} className="rounded-2xl border border-border bg-muted overflow-hidden">
-            <div className="w-full flex items-center justify-between p-4 text-left hover:bg-secondary transition-colors cursor-pointer" onClick={() => setExpandedBuilding(effectiveExpandedBuilding === b.id ? null : b.id)}>
+            <div className="w-full flex items-center justify-between p-4 text-left hover:bg-secondary transition-colors cursor-pointer" onClick={() => setExpandedBuilding(effectiveExpandedBuilding === b.id ? "none" : b.id)}>
               <div className="flex items-center gap-3">
                 <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-mono text-xs font-bold">
                   {b.abbreviation}
                 </span>
                 <div>
                   <h3 className="font-bold text-foreground text-sm">{b.name}</h3>
-                  <p className="text-xs text-muted-foreground">{b.rooms.length} ห้อง • {b.unitsCount} แอร์</p>
+                  {/* Both halves counted off the same (filtered) rooms. Taking
+                      the unit half from the server's `unitsCount` instead made
+                      one line contradict itself under a search — "1 ห้อง • 22
+                      แอร์", a room count narrowed to the result next to a unit
+                      count for the whole building. Identical when nothing is
+                      filtered, which is why it went unnoticed. */}
+                  <p className="text-xs text-muted-foreground">
+                    {b.rooms.length} ห้อง • {b.rooms.reduce((n, r) => n + r.acUnits.length, 0)} แอร์
+                  </p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
