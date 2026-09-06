@@ -1,5 +1,171 @@
 # Project Handoff & Technical Summary
 
+# 🐘 แผนย้ายฐานข้อมูลไป Aiven PostgreSQL — ยังไม่ได้ลงมือ (เขียน 6 ก.ย. 2026, DoubleKill)
+
+> **สถานะ: แผน ไม่ใช่งานที่ทำแล้ว** · เจ้าของโปรเจกต์ตัดสินใจไป PostgreSQL หลังเทียบกับ Aiven MySQL แล้ว โดยมีเงื่อนไขสำคัญข้อเดียวที่ทำให้ทางนี้เป็นไปได้: **ข้อมูลปัจจุบันจะถูกล้างทิ้งทั้งหมดอยู่แล้ว** เพราะจะเปลี่ยนไปใช้ข้อมูลจริง · ถ้าเงื่อนไขนี้เปลี่ยน (ต้องเก็บข้อมูลเดิม) แผนนี้ใช้ไม่ได้ ต้องคุยกันใหม่
+
+## ทำไมถึงทำได้ — สิ่งที่ตรวจโค้ดแล้วยืนยันว่า *ไม่* เป็นอุปสรรค
+
+ตอนแรกผมประเมินว่าเป็นการ "เขียนชั้นฐานข้อมูลใหม่" ซึ่ง**ผิด** พอไล่ตรวจจริงโปรเจกต์นี้พกพาได้ดีกว่านั้นมาก:
+
+| กลัวว่า | ตรวจแล้ว |
+|---|---|
+| SQL ดิบผูกกับ MySQL | **ไม่มี `$queryRaw` / `$executeRaw` ใน `src/` เลยสักจุด** — SQL ดิบอยู่แต่ในไฟล์ migration ซึ่งจะถูก generate ใหม่ทั้งชุดอยู่แล้ว |
+| ตรรกะเรื่องเวลาต้องรื้อ | **ไม่ต้อง** — `businessDateToday()` / `businessDateFrom()` / `addMaintenanceInterval()` ใน `src/lib/maintenance.ts` คำนวณด้วย JS ล้วน ปักที่ UTC midnight เอง ไม่เรียกฟังก์ชันของ engine · Prisma เขียน UTC ลง `timestamp(0)` และ `date` บน PG ได้ผลเหมือน MySQL ทุกประการ |
+| collation ต่างกันแล้วค้นหาเพี้ยน | **ไม่มีผล** — ไม่มี `contains:` / `startsWith:` / `mode: "insensitive"` ใน Prisma query เลย การกรองทั้งหมดทำใน JS หลังดึงข้อมูล |
+| PG case-sensitive แล้วอีเมลซ้ำ/ล็อกอินพัง | **ไม่พัง** — `register/actions.ts:64` และ `auth.ts:44` ทำ `.toLowerCase().trim()` ก่อน query ทั้งคู่ |
+| seed ต้องเขียนใหม่ | **ไม่ต้อง** — `prisma/seed.ts` (260 บรรทัด) ใช้ Prisma client ล้วน ไม่มี SQL ดิบ |
+
+ที่เหลือคือ**งานกลไกล้วน** ประเมิน **~1 วัน** รวมทดสอบ (ไม่รวมเวลาเตรียมข้อมูลจริง)
+
+---
+
+## ขั้นที่ 0 — เตรียมก่อนแตะโค้ด
+
+1. **สร้าง branch** `feat/postgres` — master ยังต่อ MariaDB ได้จนกว่า PG จะผ่านการทดสอบทั้งหมด · rollback = ไม่ merge เท่านั้น
+2. **ลง PostgreSQL บนเครื่อง dev ด้วย** (แนะนำ PostgreSQL 16 ผ่าน EDB installer สำหรับ Windows) — **ข้อนี้ไม่ใช่ทางเลือก** ถ้า prod เป็น PG แต่เครื่อง dev ยังเป็น MariaDB จะกลายเป็นทดสอบบน engine หนึ่งแล้วขึ้นจริงอีก engine หนึ่ง ซึ่งแย่กว่าเลือกอันไหนก็ได้ · สร้าง database `ac_maintenance` และ user ให้เรียบร้อย
+3. **สร้าง service บน Aiven** เลือก PostgreSQL · plan เล็กพอสำหรับ 12 ตาราง · จดไว้ 3 อย่าง: **Service URI** (รูปแบบ `postgres://avnadmin:…@HOST:PORT/defaultdb?sslmode=require` — port ของ Aiven **ไม่ใช่ 5432**), **CA certificate** (`ca.pem` ดาวน์โหลดจากหน้า service), และ **`max_connections`** ของ plan ที่เลือก (สำคัญ ดูขั้นที่ 3)
+
+## ขั้นที่ 1 — `prisma/schema.prisma` (34 บรรทัด ทั้งหมดเป็น native type ที่ PG ไม่มี)
+
+เปลี่ยน `datasource` ก่อน:
+
+```prisma
+datasource db {
+  provider = "postgresql"
+}
+```
+
+แล้วแก้ annotation ตามตารางนี้ — **ตรรกะไม่เปลี่ยนสักบรรทัด** เปลี่ยนแค่ native type:
+
+| เดิม | เปลี่ยนเป็น | จำนวน | บรรทัด |
+|---|---|---|---|
+| `@db.UnsignedBigInt` | **ลบ attribute ทิ้ง** (`BigInt` → `bigint` เอง) | 27 | 26, 41, 42, 58, 97, 98, 114, 131, 132, 151–154, 184–187, 220, 221, 234, 235, 237, 273, 274, 277, 290, 291 |
+| `@db.UnsignedInt` | **ลบ attribute ทิ้ง** (`Int` → `integer`) | 4 | 134, 159, 293, 315 |
+| `@db.UnsignedSmallInt` | `@db.SmallInt` | 2 | 44 (`floor`), 292 (`frequencyMonths`) |
+| `@db.DateTime(0)` | `@db.Timestamp(0)` | 1 | 199 (`MaintenanceLog.performedAt`) |
+
+**ไม่ต้องแตะ** (PG รองรับตรงตัว): `@db.Timestamp(0)` ×28, `@db.VarChar(n)` ×26, `@db.Text` ×4, `@db.Date` ×3, `@db.Char(36)` ×1, `Json` ×3 (จะกลายเป็น `jsonb`), enum ทั้ง 6 ตัวพร้อม `@@map` (PG สร้างเป็น type จริงชื่อตาม map), ชื่อ index/FK ที่ระบุด้วย `map:` ทั้งหมด
+
+**คอมเมนต์ที่ต้องแก้ตาม:** บรรทัด ~244–250 (`WorkOrder.createdAt`) พูดถึง `CURRENT_TIMESTAMP` ของ MySQL และ `UTC_TIMESTAMP()` — กฎยังเหมือนเดิม (ห้ามพึ่ง default ของ DB, Prisma เป็นคนใส่ค่า UTC) แต่ตัวอย่างต้องเปลี่ยนเป็น `now() AT TIME ZONE 'UTC'` ของ PG
+
+## ขั้นที่ 2 — migration history: ทิ้งทั้งชุด สร้างใหม่ใบเดียว
+
+13 ใบเดิมมี DDL เฉพาะ MySQL อยู่ 80 จุดใน 6 ไฟล์ (`AUTO_INCREMENT`, `BIGINT UNSIGNED`, `utf8mb4_unicode_ci`, `MODIFY COLUMN`, `UTC_TIMESTAMP()`) แปลงไม่คุ้ม และ**ไม่จำเป็นเพราะไม่มีข้อมูลให้ migrate**
+
+```bash
+# ชี้ DATABASE_URL ไปที่ PG บนเครื่องก่อน (ขั้นที่ 3)
+Remove-Item -Recurse -Force prisma\migrations
+npx prisma migrate dev --name init
+npx prisma generate
+```
+
+`migration_lock.toml` จะถูกสร้างใหม่เป็น `provider = "postgresql"` เอง · **ประวัติการแก้สคีมาตั้งแต่ย้ายจาก Laravel ไม่ได้หายไปไหน** — อยู่ใน git history ของ `prisma/migrations/` เดิม และเหตุผลทุกข้ออยู่ในคอมเมนต์ของ `schema.prisma` ซึ่งยังอยู่ครบ
+
+## ขั้นที่ 3 — `src/lib/prisma.ts` เขียนใหม่ทั้งไฟล์ (~30 บรรทัด)
+
+```bash
+npm uninstall @prisma/adapter-mariadb
+npm install @prisma/adapter-pg@7.9.0 pg
+npm install -D @types/pg
+```
+
+**ปักเวอร์ชัน adapter ให้ตรงกับ `prisma` / `@prisma/client` ที่ใช้อยู่ (7.9.0)** — ตอนเขียนแผน npm ล่าสุดคือ 7.10.0 ซึ่งถ้าปล่อยให้ติดตั้งเองจะได้ adapter ใหม่กว่า client · ถ้าจะอัปเกรดให้อัปทั้งสามตัวพร้อมกัน
+
+```ts
+import { PrismaClient } from "@/generated/prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+
+function createPrismaClient() {
+  const connectionString = process.env.DATABASE_URL;
+  // ตั้งใจให้ล้มดังๆ: ของเดิม fallback ไป 127.0.0.1:3307 เงียบๆ ซึ่งบน
+  // production แปลว่า env หลุดแล้วแอปยังขึ้นได้แต่ต่อผิดที่
+  if (!connectionString) throw new Error("DATABASE_URL is not set");
+
+  // Aiven บังคับ TLS · CA ส่งผ่าน env เป็น PEM ไม่ commit ไฟล์ cert ลง repo
+  const ca = process.env.DATABASE_CA_CERT;
+
+  const adapter = new PrismaPg({
+    connectionString,
+    ssl: ca ? { ca, rejectUnauthorized: true } : undefined,
+    // ดูหมายเหตุเรื่อง connection ด้านล่าง — ห้ามยกเลข 20 ของ MariaDB มาใช้
+    max: Number(process.env.DATABASE_POOL_MAX ?? 5),
+  });
+
+  return new PrismaClient({ adapter });
+}
+```
+
+ส่วน `globalForPrisma` (กัน hot-reload สร้าง client ซ้ำ) เก็บไว้เหมือนเดิม
+
+**⚠️ เรื่อง connection — จุดที่กัดตอนขึ้นจริงบ่อยที่สุด:** ของเดิมตั้ง `connectionLimit: 20` ซึ่งบน MySQL ไม่มีใครสนใจ แต่ connection ของ PostgreSQL หนักกว่ามาก และ **plan เล็กของ Aiven มี `max_connections` ต่ำ** — Next.js instance เดียวเปิด 20 ก็อาจกินไปครึ่งหนึ่งของ plan แล้ว · เริ่มที่ **5** · ถ้าไม่พอค่อยเปิด **connection pooler (PgBouncer) ที่ Aiven มีให้ในตัว** ซึ่งจะได้ port แยกอีกอัน — แต่ต่อตรงก่อนเสมอ pooler เป็นแผนสอง
+
+**`.env` ที่ต้องมี:**
+```
+DATABASE_URL=postgres://avnadmin:…@HOST:PORT/ac_maintenance?sslmode=require
+DATABASE_CA_CERT="-----BEGIN CERTIFICATE-----
+…
+-----END CERTIFICATE-----"
+DATABASE_POOL_MAX=5
+```
+(เครื่อง dev: `postgresql://USER:PASS@127.0.0.1:5432/ac_maintenance` ไม่ต้องมี CA)
+
+## ขั้นที่ 4 — `src/lib/db-retry.ts` (2 บรรทัด)
+
+`isDeadlock()` ดักด้วย `errno === 1213` / `ER_LOCK_DEADLOCK` / ข้อความ `"Deadlock found"` ซึ่งเป็นของ MySQL ทั้งหมด · PostgreSQL ใช้ **SQLSTATE `40P01`** (`deadlock_detected`) และ driver `pg` ส่งมาใน `error.code` · เพิ่มก่อนบรรทัด "Last resort":
+
+```ts
+  // pg driver: SQLSTATE ตรงๆ · 40001 (serialization_failure) ใส่ไว้ด้วยเพราะ
+  // retry แบบเดียวกันแก้ได้ แม้ที่ READ COMMITTED จะแทบไม่เจอ
+  if (e.code === "40P01" || e.code === "40001") return true;
+```
+
+ของ MySQL เดิม**ลบทิ้งได้** หลัง merge — เหลือไว้ไม่ผิดแต่จะทำให้คนอ่านคิดว่ายังรองรับสอง engine
+
+## ขั้นที่ 5 — เก็บกวาดที่อ้างถึง MySQL
+
+| ไฟล์ | ทำอะไร |
+|---|---|
+| `prisma/clear-legacy-passwords.ts` | import `PrismaMariaDb` ตรงๆ — **ลบไฟล์ทิ้ง** เป็นสคริปต์ครั้งเดียวตอนย้ายจาก Laravel ไม่มีเหตุให้รันอีก (ยิ่งข้อมูลใหม่หมดยิ่งไม่ต้อง) |
+| `src/lib/tech/dashboard.ts:111` | ข้อความ `dbError` บอก "MariaDB/MySQL … พอร์ต 3307" — **port ผิดอยู่แล้วตั้งแต่ตอนนี้** (`.env` ใช้ 3306) แก้เป็นข้อความกลางๆ ไม่ระบุ engine/port |
+| `src/app/admin/error.tsx:35` | "เซิร์ฟเวอร์ MySQL/MariaDB" → ข้อความกลางๆ เช่นกัน |
+| `.agents/AGENTS.md:10` | เปลี่ยน `@prisma/adapter-mariadb` → `@prisma/adapter-pg` |
+| `PRODUCT.md:26` | เปลี่ยน stack line |
+| `HANDOFF.md` | หัวข้อ environment ทั้งหมดที่พูดถึง XAMPP / WMI spawn mysqld / `mysql.exe -h 127.0.0.1 -P 3306` / deadlock ของ MariaDB 10.4.32 — **ใส่ป้าย "หมดอายุ — ย้ายไป PG แล้ว"** ไม่ต้องลบ เก็บไว้เป็นประวัติ แล้วเขียนวิธี start/stop PG บนเครื่อง + วิธีใช้ `psql` แทน |
+
+## ขั้นที่ 6 — โหลดข้อมูลจริง: กฎที่ต่างจาก MySQL
+
+- **อีเมลต้อง lowercase ก่อน insert** — `users_email_unique` บน PG แยกตัวพิมพ์ใหญ่-เล็ก (`A@x.com` กับ `a@x.com` เป็นคนละคน) โค้ดล็อกอิน lowercase ให้ก่อน query อยู่แล้ว ดังนั้น**ถ้าข้อมูลที่โหลดเข้าไปมีตัวพิมพ์ใหญ่ คนนั้นจะล็อกอินไม่ได้เลย**
+- ห้องทุกห้องต้องมี `floor` (บังคับตั้งแต่ 5 ก.ย.) ไม่งั้นจะตกไปกอง "ไม่ระบุชั้น"
+- ใบงานทุกใบต้องมี `type` (repair/cleaning) — คอลัมน์ไม่มี default ตั้งใจ
+- ⚠️ **การเรียงชื่อภาษาไทยที่ระดับ DB อาจต่างจาก MariaDB** — มี `orderBy: { name: "asc" }` อยู่ **11 จุด** ใน `src/lib/**` (อาคาร ห้อง ยี่ห้อ รุ่น) · seed ใช้ชื่ออังกฤษเลยไม่เคยเห็นปัญหา แต่ข้อมูลจริงเป็นไทย · collation default ของ Aiven คือ `en_US.UTF-8` ซึ่งเรียงไทยตาม codepoint (คำที่ขึ้นด้วยสระหน้า เ แ โ ใ ไ จะไปกองผิดที่) · **หลังโหลดข้อมูลจริงให้เปิดดูลิสต์อาคาร/ห้อง/ยี่ห้อว่าเรียงถูกไหม** ถ้าผิด แก้ได้ 2 ทาง: (ก) สร้าง database ใหม่ด้วย ICU collation `th-TH-x-icu` ตั้งแต่ต้น (ต้องทำก่อน migrate เพราะเปลี่ยนทีหลังไม่ได้) หรือ (ข) เรียงใน JS ด้วย `localeCompare(…, "th")` ซึ่งลิสต์แบบกลุ่มทั้ง 8 หน้าทำอยู่แล้วใน `building-groups.tsx` — แนะนำ (ก) ถ้ายังไม่ได้สร้าง DB
+
+## ขั้นที่ 7 — ทดสอบก่อน merge (ทำบนเครื่อง dev ที่เป็น PG แล้ว)
+
+รันแอปจริง ไม่ใช่แค่ `tsc` — ไล่ตามลำดับที่เคยทดสอบไว้ใน HANDOFF:
+
+- [ ] `npx tsx prisma/seed.ts` ผ่าน · ยอด 73 เครื่อง / 5 อาคาร / 32 ห้อง ขึ้นถูก
+- [ ] ล็อกอินทั้ง 2 role ผ่านปุ่ม demo
+- [ ] **3 action ที่เคยมีปัญหาตอนรื้อเฟส A**: บันทึกผลงาน (มีรูป 2 ใบ → ทดสอบ `sharp` + `saveUpload`), สแกน QR, สร้างใบงาน
+- [ ] รับงานหลายงานพร้อมกัน (bulk claim) — เส้นทางที่ `withDeadlockRetry` คุมอยู่
+- [ ] แก้โปรไฟล์: ชื่อ + เบอร์ + รูป — ตรวจ `user_phones` ว่าเบอร์รองไม่หาย
+- [ ] **เรื่องเวลา** (จุดที่เคยพลาดบ่อยที่สุด): ตั้งรอบล้าง → `nextDueDate` โชว์วันเดียวกับที่ตั้ง (ไม่เลื่อน 1 วัน) · `performedAt` / `claimedAt` โชว์เวลาไทยถูก · ปฏิทินดึงช่วงเดือนถูก (`nextDueDate gte/lte`)
+- [ ] `images` (`Json @default("[]")`) และ `old_values`/`new_values` ใน audit log อ่าน-เขียนได้ (ตอนนี้เป็น `jsonb` แล้ว key อาจเรียงใหม่ ซึ่งไม่กระทบ)
+- [ ] ถังขยะยี่ห้อ/รุ่น: ลบ → กู้คืน → ลบถาวร (ทดสอบ `deletedAt` + unique constraint ที่ยังนับตัวที่อยู่ในถัง)
+- [ ] `npx tsc --noEmit` และ `npm run build` (หยุด dev server ก่อน build ตามกฎเดิม)
+
+## ขั้นที่ 8 — ขึ้น production (ทำพร้อมกัน ไม่แยก)
+
+ตอนตั้ง `.env` บน server ต้องใส่ **`AUTH_URL` และ SMTP จริง** ที่ค้างอยู่ ("ยกเว้นข้อ 4 ยังไม่ต้อง" ตั้งแต่ 5 ก.ย.) ไปในรอบเดียวกัน — ไม่มีเหตุผลจะตั้ง env สองรอบ
+
+## สิ่งที่ *ไม่* อยู่ในแผนนี้โดยตั้งใจ
+
+- **ไม่ย้ายข้อมูลเดิม** — เงื่อนไขตั้งต้นคือล้างทิ้ง ถ้าเปลี่ยนใจต้องวางแผนใหม่ (การแปลง `BIGINT UNSIGNED` และ enum ข้าม engine ไม่ใช่เรื่องเล็ก)
+- **ไม่แตะ `next-auth`** — ใช้ JWT ไม่มีตาราง session ในฐานข้อมูล
+- **ไม่เปลี่ยน `Timestamp(0)` เป็น `timestamptz`** — จะเป็นการเปลี่ยนความหมายของทุกคอลัมน์เวลาพร้อมกันตอนที่กำลังเปลี่ยน engine ทำทีละอย่าง ค่อยพิจารณาทีหลังถ้ามีเหตุ
+
+---
+
 ## ✅ Backlog รอบ 27 ส.ค. — ปิดครบทั้ง backend และ UI แล้ว (1 ก.ย. 2026)
 
 เจ้าของโปรเจกต์ไล่ทดสอบระบบเองผ่านเบราว์เซอร์อีกรอบหลัง UI ปิดครบเมื่อ 27 ส.ค. แล้วสั่งงานมาเป็นชุด **ตกลงรายละเอียดครบทุกข้อแล้ว** · 28 ส.ค. เจ้าของโปรเจกต์เคาะการตัดสินใจที่ค้างอยู่ทั้ง 4 เรื่อง แล้ว DoubleKill ปิดงาน backend ทั้งหมดในวันเดียวกัน (`85c5c6a`, `97e24bc`) · **1 ก.ย. Esther03u ปิดฝั่ง UI ครบทั้ง 4 ข้อ** (ข้อ 4 เสร็จเฉพาะเฟส 1 ตามที่ตกลงเลื่อนเฟส 2 ไว้ก่อน)
