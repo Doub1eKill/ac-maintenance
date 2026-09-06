@@ -12,6 +12,7 @@ import {
   groupByRoom,
 } from "@/components/shared/building-groups";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
+import { useEscapeToClose } from "@/hooks/use-escape-to-close";
 
 interface ACUnit {
   id: string;
@@ -110,6 +111,10 @@ function SelectAllToggle({
 export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
   const [showQrCode, setShowQrCode] = useState<FlatACUnit | null>(null);
   const [selectedAcs, setSelectedAcs] = useState<string[]>([]);
+
+  // The preview modal shows a code and a print button and holds nothing the
+  // user typed, so Escape can close it outright.
+  useEscapeToClose(() => setShowQrCode(null), showQrCode !== null);
 
   // Flatten ACs
   const allAcs: FlatACUnit[] = buildings.flatMap((b) =>

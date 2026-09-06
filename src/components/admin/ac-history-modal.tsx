@@ -6,6 +6,7 @@ import { X, Clock, MapPin, Wrench, Loader2, Pencil } from "lucide-react";
 import { getAirConditionerHistory, updateMaintenanceLogAction } from "@/app/admin/actions";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
+import { useEscapeToClose } from "@/hooks/use-escape-to-close";
 
 interface AcHistoryModalProps {
   airConditionerId: string;
@@ -96,6 +97,18 @@ export function AcHistoryModal({ airConditionerId, onClose, currentUserId, isAdm
       toast.success("แก้ไขประวัติสำเร็จ");
     });
   }
+
+  // Escape backs out one layer at a time. Editing a log entry happens inline
+  // inside this panel, so closing the whole thing on the first press would
+  // discard a correction the user was halfway through typing — and give them
+  // no way to abandon just the edit.
+  useEscapeToClose(() => {
+    if (editingLogId) {
+      setEditingLogId(null);
+      return;
+    }
+    onClose();
+  });
 
   useEffect(() => {
     let cancelled = false;

@@ -15,6 +15,7 @@ import {
 } from "@/app/admin/actions";
 import { QRCodeSVG } from "qrcode.react";
 import { AcHistoryModal } from "@/components/admin/ac-history-modal";
+import { useEscapeToClose } from "@/hooks/use-escape-to-close";
 import {
   NativeSelect,
   NativeSelectOption,
@@ -120,6 +121,11 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
 
   const [buildingsPage, setBuildingsPage] = useState(1);
   const BUILDINGS_PER_PAGE = 5;
+
+  // Only the QR preview. The add/edit forms in this file deliberately keep
+  // their explicit cancel: half-typed room and unit details are worth more
+  // than the convenience of dismissing them with a key.
+  useEscapeToClose(() => setShowQrCode(null), showQrCode !== null);
 
   useEffect(() => {
     setBuildingsPage(1);

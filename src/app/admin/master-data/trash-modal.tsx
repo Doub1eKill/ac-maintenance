@@ -12,6 +12,7 @@ import {
   restoreAcModelAction,
   permanentlyDeleteAcModelAction,
 } from "./actions";
+import { useEscapeToClose } from "@/hooks/use-escape-to-close";
 
 type TrashBrand = {
   id: string;
@@ -49,6 +50,17 @@ export function TrashModal({ onClose }: TrashModalProps) {
   // Only one purge-confirm row open at a time, tracked as "<kind>:<id>" so a
   // brand and a model can never collide even if their ids happen to match.
   const [confirmPurgeKey, setConfirmPurgeKey] = useState<string | null>(null);
+
+  // Escape backs out one step: it withdraws an open purge confirmation before
+  // it closes the panel, so the key that means "never mind" is never the one
+  // that leaves a permanent delete armed and out of sight.
+  useEscapeToClose(() => {
+    if (confirmPurgeKey) {
+      setConfirmPurgeKey(null);
+      return;
+    }
+    onClose();
+  });
 
   const loadTrash = () => {
     setIsLoading(true);

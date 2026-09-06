@@ -39,6 +39,7 @@ import {
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
 import { formatUnitLocation } from "@/lib/location";
+import { useEscapeToClose } from "@/hooks/use-escape-to-close";
 
 interface Schedule {
   id: string;
@@ -260,6 +261,13 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
     setSelectedEvent(null);
     setEventOrigin(null);
   };
+
+  // Both of these are rendered by the helpers below, where a hook cannot go, so
+  // they are switched on by the same state that puts the modal on screen. Only
+  // one is ever on: opening either closes the other. The day sheet needs
+  // nothing here — it is a Radix Sheet and handles Escape itself.
+  useEscapeToClose(closeEventModal, selectedEvent !== null);
+  useEscapeToClose(() => setSelectedDayBuilding(null), selectedDayBuilding !== null);
 
   const renderHeader = () => {
     return (
