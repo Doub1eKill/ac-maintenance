@@ -61,6 +61,52 @@ interface QrCodeManagerProps {
   globalSearch: string;
 }
 
+// One control for all three depths. "Select everything under this header"
+// means the same thing whether the header is a building, a floor or a room,
+// so it is one component rather than three copies free to drift apart.
+//
+// The indeterminate state is what makes a four-level tree selectable at all.
+// Tick one room and the floor and building above it have to show that
+// something inside them is chosen — otherwise a partly-selected floor looks
+// exactly like an empty one, and the only way to find your own selection
+// again is to open every floor one by one.
+function SelectAllToggle({
+  label,
+  items,
+  selected,
+  onToggle,
+}: {
+  label: string;
+  items: { id: string }[];
+  selected: Set<string>;
+  onToggle: () => void;
+}) {
+  const selectedCount = items.reduce((n, ac) => (selected.has(ac.id) ? n + 1 : n), 0);
+  const allSelected = items.length > 0 && selectedCount === items.length;
+
+  return (
+    <label
+      // Stops the click reaching the header, which would open or close the
+      // group underneath — selecting a floor should not also expand it.
+      className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <input
+        type="checkbox"
+        className="w-3.5 h-3.5 rounded border-border text-primary focus:ring-ring cursor-pointer"
+        checked={allSelected}
+        // `indeterminate` is a DOM property with no HTML attribute behind it,
+        // so JSX cannot set it — it has to be written onto the node.
+        ref={(el) => {
+          if (el) el.indeterminate = selectedCount > 0 && !allSelected;
+        }}
+        onChange={onToggle}
+      />
+      {label}
+    </label>
+  );
+}
+
 export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
   const [showQrCode, setShowQrCode] = useState<FlatACUnit | null>(null);
   const [selectedAcs, setSelectedAcs] = useState<string[]>([]);
@@ -94,6 +140,10 @@ export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
   });
 
   const groups = groupByBuilding(filteredAcs);
+  // Built once per render: the three levels of select-all headers each count
+  // their own selected units, so a plain array would be scanned again for
+  // every unit on screen.
+  const selectedSet = new Set(selectedAcs);
 
   // Takes anything with items, so the same tick works on a whole building and
   // on one room inside it.
@@ -234,18 +284,12 @@ export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
           emptyMessage="ไม่พบข้อมูลเครื่องปรับอากาศ"
           resetKey={globalSearch}
           renderExtra={(group) => (
-            <label
-              className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <input
-                type="checkbox"
-                className="w-3.5 h-3.5 rounded border-border text-primary focus:ring-ring cursor-pointer"
-                checked={group.items.length > 0 && group.items.every((ac) => selectedAcs.includes(ac.id))}
-                onChange={() => toggleSelectAllInGroup(group)}
-              />
-              เลือกทั้งอาคาร
-            </label>
+            <SelectAllToggle
+              label="เลือกทั้งอาคาร"
+              items={group.items}
+              selected={selectedSet}
+              onToggle={() => toggleSelectAllInGroup(group)}
+            />
           )}
           renderItems={(group) => (
             <FloorGroupList
@@ -253,23 +297,38 @@ export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
               getSubtitle={(floor) =>
                 `${new Set(floor.items.map((i) => i.roomId)).size} ห้อง • ${floor.items.length} เครื่อง`
               }
+              renderExtra={(floor) => (
+                <SelectAllToggle
+                  label="เลือกทั้งชั้น"
+                  items={floor.items}
+                  selected={selectedSet}
+                  onToggle={() => toggleSelectAllInGroup(floor)}
+                />
+              )}
               renderItems={(floor) => (
                 <RoomGroupList
                   rooms={groupByRoom(floor.items)}
                   getSubtitle={(room) => `${room.items.length} เครื่อง`}
+                  renderExtra={(room) => (
+                    <SelectAllToggle
+                      label="เลือกทั้งห้อง"
+                      items={room.items}
+                      selected={selectedSet}
+                      onToggle={() => toggleSelectAllInGroup(room)}
+                    />
+                  )}
                   renderItems={(room) => (
                     <div className="overflow-x-auto">
                       <table className="w-full text-left text-sm whitespace-nowrap">
                         <thead className="bg-muted text-muted-foreground font-bold border-b border-border">
                           <tr>
-                            <th className="px-4 py-3 font-semibold rounded-tl-xl w-10 text-center">
-                              <input
-                                type="checkbox"
-                                className="w-4 h-4 rounded border-border text-primary focus:ring-ring cursor-pointer"
-                                checked={room.items.length > 0 && room.items.every((ac) => selectedAcs.includes(ac.id))}
-                                onChange={() => toggleSelectAllInGroup(room)}
-                              />
-                            </th>
+                            {/* Deliberately empty. This used to hold a second
+                                select-all for the room — the same action, in
+                                the same state, a few pixels below the labelled
+                                "เลือกทั้งห้อง" on the header above it. The
+                                header one wins: it says what it does, and it
+                                works without expanding the room first. */}
+                            <th className="px-4 py-3 font-semibold rounded-tl-xl w-10 text-center" />
                             <th className="px-4 py-3 font-semibold">รหัสเครื่อง (AC Code)</th>
                             <th className="px-4 py-3 font-semibold">ยี่ห้อ / รุ่น</th>
                             <th className="px-4 py-3 font-semibold text-center rounded-tr-xl">จัดการ</th>
