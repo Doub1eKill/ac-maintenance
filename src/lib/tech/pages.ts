@@ -47,6 +47,8 @@ export async function getTechShellData() {
       name: currentUser?.name ?? session.user.name ?? "",
       email: currentUser?.email ?? session.user.email ?? "",
       role: currentUser?.role ?? session.user.role,
+      // See the note in admin/pages.ts — the sidebar chip needs it too.
+      avatarUrl: currentUser?.avatarUrl ?? null,
     },
     universityName: organisationName,
     profile: {

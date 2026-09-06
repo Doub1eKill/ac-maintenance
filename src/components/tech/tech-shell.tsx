@@ -54,7 +54,13 @@ const PAGE_TITLES: Record<string, string> = {
 };
 
 export interface TechShellProps {
-  user: { id?: string | null; name?: string | null; email?: string | null; role?: string | null };
+  user: {
+    id?: string | null;
+    name?: string | null;
+    email?: string | null;
+    role?: string | null;
+    avatarUrl?: string | null;
+  };
   universityName: string;
   buildings: Building[];
   badges: { jobPool: number; myJobs: number };
@@ -172,7 +178,7 @@ export function TechShell({ user, universityName, buildings, badges, children }:
       }}
     >
       <DashboardLayout
-        user={{ name: user.name, email: user.email, role: user.role, universityName }}
+        user={{ name: user.name, email: user.email, role: user.role, avatarUrl: user.avatarUrl, universityName }}
         navItems={navItems}
         searchValue={search}
         onSearchChange={showFilters ? setSearch : undefined}

@@ -29,7 +29,13 @@ import { useCreateWorkOrder } from "@/components/admin/create-work-order-provide
  * props and eight pieces of state.
  */
 export interface AdminShellProps {
-  user: { id?: string | null; name?: string | null; email?: string | null; role?: string | null };
+  user: {
+    id?: string | null;
+    name?: string | null;
+    email?: string | null;
+    role?: string | null;
+    avatarUrl?: string | null;
+  };
   universityName: string;
   badges: { pendingWorkOrders: number; pendingUsers: number };
   children: React.ReactNode;
@@ -80,7 +86,7 @@ function AdminShellInner({ user, universityName, badges, children }: AdminShellP
 
   return (
     <DashboardLayout
-      user={{ name: user.name, email: user.email, role: user.role, universityName }}
+      user={{ name: user.name, email: user.email, role: user.role, avatarUrl: user.avatarUrl, universityName }}
       navItems={navItems}
       searchValue={search}
       onSearchChange={placeholder ? setSearch : undefined}

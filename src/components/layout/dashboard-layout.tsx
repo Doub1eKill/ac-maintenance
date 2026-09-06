@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
@@ -70,6 +71,9 @@ interface DashboardLayoutProps {
     name?: string | null;
     email?: string | null;
     role?: string | null;
+    // Path under /uploads, or null for an account that has never set one —
+    // the chip falls back to initials, the same way the profile card does.
+    avatarUrl?: string | null;
     universityName?: string | null;
   };
   // Optional: a layout whose nav items carry hrefs works out which one is
@@ -208,8 +212,12 @@ export function DashboardLayout({
                     size="lg"
                     className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                   >
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground font-bold text-xs shadow-xs">
-                      {user.name ? user.name.slice(0, 2).toUpperCase() : "US"}
+                    <div className="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-primary text-primary-foreground font-bold text-xs shadow-xs">
+                      {user.avatarUrl ? (
+                        <Image src={user.avatarUrl} alt="" fill sizes="32px" className="object-cover" />
+                      ) : (
+                        user.name ? user.name.slice(0, 2).toUpperCase() : "US"
+                      )}
                     </div>
                     <div className="grid flex-1 text-left text-xs leading-tight">
                       <span className="truncate font-bold">{user.name || "ผู้ใช้งาน"}</span>

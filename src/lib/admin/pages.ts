@@ -60,6 +60,10 @@ export async function getAdminShellData() {
       name: currentUser?.name ?? session.user.name ?? "",
       email: currentUser?.email ?? session.user.email ?? "",
       role: currentUser?.role ?? session.user.role,
+      // Also on `user`, not only on `profile`: the sidebar chip draws an
+      // avatar too, and leaving it on initials after an upload reads as the
+      // upload having failed.
+      avatarUrl: currentUser?.avatarUrl ?? null,
     },
     universityName: organisationName,
     profile: {

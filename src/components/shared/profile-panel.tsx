@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, useTransition, useActionState } from "react";
+import { useEffect, useRef, useState, useTransition, useActionState } from "react";
+import Image from "next/image";
 import { useTheme } from "next-themes";
-import { User, Mail, Phone, Building2, KeyRound, AlertTriangle, CheckCircle2, Sun, Moon, Monitor } from "lucide-react";
+import { User, Mail, Phone, Building2, KeyRound, AlertTriangle, CheckCircle2, Sun, Moon, Monitor, Camera } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { requestPasswordReset, type RequestResetState } from "@/app/request-password-reset/actions";
 import { updateProfileAction } from "@/app/admin/actions";
@@ -13,6 +14,9 @@ interface ProfilePanelProps {
     email: string;
     role?: string | null;
     phone: string | null;
+    // null means this account has never set a picture — the card falls back to
+    // the user's initials, which is a real state rather than missing data.
+    avatarUrl: string | null;
   };
   universityName: string;
   // Technician data doesn't carry a phone number yet (backend request
@@ -29,11 +33,34 @@ const ROLE_LABEL: Record<string, string> = {
   technician: "ช่างซ่อมบำรุง",
 };
 
+// Mirrors the ceiling updateProfileAction enforces, so an oversized file is
+// refused here instead of after several megabytes have crossed the wire. The
+// server still checks — this is a courtesy, not the guard.
+const AVATAR_MAX_BYTES = 8 * 1024 * 1024;
+
 export function ProfilePanel({ profile, universityName, showPhone = true }: ProfilePanelProps) {
   const [name, setName] = useState(profile.name);
   const [phone, setPhone] = useState(profile.phone ?? "");
   const [saveResult, setSaveResult] = useState<{ success?: boolean; error?: string } | null>(null);
   const [isSaving, startSaveTransition] = useTransition();
+
+  // The chosen file and the blob: URL showing it. The picture is not uploaded
+  // on selection: updateProfileAction writes name, phone and avatar in one
+  // call, so it goes up with everything else when the user saves. That is why
+  // the notice below spells out that a save is still needed — a preview that
+  // changed on screen otherwise reads as "done".
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+
+  // A blob: URL is held by the browser until it is revoked. Cleaning up as the
+  // value changes releases the one just replaced, so picking five pictures in
+  // a row stops pinning five images in memory for the life of the page.
+  useEffect(() => {
+    if (!avatarPreview) return;
+    return () => URL.revokeObjectURL(avatarPreview);
+  }, [avatarPreview]);
 
   const [resetState, resetFormAction, isResetPending] = useActionState<RequestResetState, FormData>(
     requestPasswordReset,
@@ -42,12 +69,50 @@ export function ProfilePanel({ profile, universityName, showPhone = true }: Prof
 
   const initials = profile.name ? profile.name.slice(0, 2).toUpperCase() : "US";
   const roleLabel = profile.role ? ROLE_LABEL[profile.role] ?? profile.role : "-";
+  // The pending pick wins over what is stored: after a save it is the same
+  // image anyway, and it keeps the avatar from flicking back to the old one
+  // while the refreshed server data is still on its way.
+  const avatarSrc = avatarPreview ?? profile.avatarUrl;
+
+  const handlePickAvatar = (file: File | null) => {
+    if (!file) return;
+    setSaveResult(null);
+    if (!file.type.startsWith("image/")) {
+      setAvatarError("รูปโปรไฟล์ต้องเป็นไฟล์รูปภาพเท่านั้น");
+      return;
+    }
+    if (file.size > AVATAR_MAX_BYTES) {
+      setAvatarError("รูปโปรไฟล์ต้องมีขนาดไม่เกิน 8 MB");
+      return;
+    }
+    setAvatarError(null);
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+  };
+
+  const cancelAvatarPick = () => {
+    setAvatarFile(null);
+    setAvatarPreview(null);
+    setAvatarError(null);
+    // Without this the same file cannot be chosen again: the input keeps its
+    // value, so re-selecting it fires no change event.
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
   const handleSave = () => {
     setSaveResult(null);
     startSaveTransition(async () => {
-      const result = showPhone ? await updateProfileAction(name, phone) : await updateProfileAction(name);
+      const result = showPhone
+        ? await updateProfileAction(name, phone, avatarFile)
+        : await updateProfileAction(name, undefined, avatarFile);
       setSaveResult(result);
+      if (result?.success) {
+        // Only the pending state is cleared. The preview stays on screen — it
+        // is the picture that was just saved, and profile.avatarUrl catches up
+        // a moment later when the revalidated data arrives.
+        setAvatarFile(null);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
     });
   };
 
@@ -55,9 +120,44 @@ export function ProfilePanel({ profile, universityName, showPhone = true }: Prof
     <div className="space-y-6 max-w-2xl">
       {/* Card 1: Personal Info */}
       <div className="biz-card p-6 space-y-6">
-        <div className="flex items-center gap-4">
-          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground font-bold text-xl shadow-xs">
-            {initials}
+        <div className="flex items-start gap-4">
+          <div className="flex shrink-0 flex-col items-center gap-2">
+            <div className="relative h-16 w-16 overflow-hidden rounded-2xl bg-primary text-primary-foreground shadow-xs">
+              {avatarSrc ? (
+                <Image
+                  src={avatarSrc}
+                  // The name is right beside it, so describing the picture too
+                  // would only make a screen reader say it twice.
+                  alt=""
+                  fill
+                  sizes="64px"
+                  className="object-cover"
+                  // A blob: URL has no path through the image optimiser.
+                  // Stored pictures do, and saveUpload() has already capped
+                  // them at 1600px on the way in.
+                  unoptimized={avatarSrc.startsWith("blob:")}
+                />
+              ) : (
+                <span className="flex h-full w-full items-center justify-center text-xl font-bold">
+                  {initials}
+                </span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-1 whitespace-nowrap rounded-lg border border-border bg-card px-2 py-1 text-[11px] font-bold text-foreground hover:bg-secondary transition-colors"
+            >
+              <Camera className="h-3 w-3" />
+              เปลี่ยนรูป
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => handlePickAvatar(e.target.files?.[0] ?? null)}
+            />
           </div>
           <div>
             <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
@@ -72,6 +172,21 @@ export function ProfilePanel({ profile, universityName, showPhone = true }: Prof
             </p>
           </div>
         </div>
+
+        {avatarError && <p className="text-xs font-bold text-destructive">{avatarError}</p>}
+
+        {avatarFile && !avatarError && (
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-3.5 py-2.5 text-xs text-foreground">
+            <span>เลือกรูปใหม่แล้ว — กด &quot;บันทึกการเปลี่ยนแปลง&quot; ด้านล่างเพื่อยืนยัน</span>
+            <button
+              type="button"
+              onClick={cancelAvatarPick}
+              className="font-bold underline underline-offset-2 hover:text-primary"
+            >
+              ยกเลิกรูปที่เลือก
+            </button>
+          </div>
+        )}
 
         <div className="space-y-4 pt-2 border-t border-border">
           <div>
