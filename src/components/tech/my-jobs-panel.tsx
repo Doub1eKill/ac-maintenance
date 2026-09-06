@@ -1,7 +1,7 @@
 "use client";
 
 import { format } from "date-fns";
-import { AlertTriangle, MoreVertical } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import {
   BuildingGroupList,
   FloorGroupList,
@@ -58,7 +58,9 @@ export function MyJobsPanel({ myJobs, searchQuery, selectedBuilding, onSelectFor
                             <AlertTriangle className="w-3 h-3" /> ด่วน
                           </div>
                         ) : null}
-                        <div className="flex items-center justify-between pr-8">
+                        {/* pr-8 keeps this clear of the priority ribbon pinned
+                            to the card's top-right corner. */}
+                        <div className="flex items-center pr-8">
                           <div className="space-y-1">
                             <div className="flex items-center gap-2">
                               <span className="font-mono text-xs font-bold text-muted-foreground">
@@ -74,7 +76,6 @@ export function MyJobsPanel({ myJobs, searchQuery, selectedBuilding, onSelectFor
                               </span>
                             </div>
                           </div>
-                          <MoreVertical className="h-4 w-4 text-muted-foreground" />
                         </div>
 
                         <div className="pt-2 flex items-center justify-between text-xs border-t border-border">
