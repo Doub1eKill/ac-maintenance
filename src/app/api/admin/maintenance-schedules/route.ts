@@ -57,6 +57,7 @@ export async function GET(request: NextRequest) {
             room: {
               select: {
                 name: true,
+                floor: true,
                 building: { select: { id: true, name: true } },
               },
             },
@@ -92,15 +93,16 @@ export async function GET(request: NextRequest) {
         acCode: s.airConditioner.acCode,
         brand: s.airConditioner.acBrand?.name ?? s.airConditioner.brand ?? "ไม่ระบุ",
         ...catalogueFlags(s.airConditioner),
-        // The only view that leaves out the "ห้อง" label — preserved as it was.
-        location: formatUnitLocation(s.airConditioner.room),
-        // Building and room broken out alongside the combined `location`
-        // string, so a day with too many jobs to list can be grouped by
-        // building without the client having to split that string back apart.
-        // `location` is unchanged for existing callers.
+        location: formatUnitLocation(s.airConditioner.room, { withFloor: true }),
+        // Building, room and floor broken out alongside the combined
+        // `location` string, so a day with too many jobs to list can be
+        // grouped by building without the client having to split that string
+        // back apart, and so the cards can print a shorter form of the same
+        // place without re-deriving it.
         buildingId: s.airConditioner.room.building.id.toString(),
         buildingName: s.airConditioner.room.building.name,
         roomName: s.airConditioner.room.name,
+        floor: s.airConditioner.room.floor,
         lastPerformedByName: lastLog?.technician.name ?? null,
         // Nothing stores a job type for *upcoming* work: maintenance_schedules
         // is the cleaning cycle, and work_orders only carries a status. So it's

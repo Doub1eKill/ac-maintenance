@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/sheet";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
+import { formatUnitLocation } from "@/lib/location";
 
 interface Schedule {
   id: string;
@@ -52,6 +53,7 @@ interface Schedule {
   buildingId: string;
   buildingName: string;
   roomName: string;
+  floor: number | null;
   frequencyValue: number;
   frequencyUnit: string;
   lastPerformedAt: string | null;
@@ -65,6 +67,25 @@ const JOB_TYPE_LABEL: Record<Schedule["jobType"], string> = {
   repair: "งานซ่อม",
   cleaning: "งานล้าง",
 };
+
+// The calendar deliberately does not grow a floor level the way the lists did
+// (6 ก.ย. 2026): a month grid has no room for another tier of nesting, and the
+// day panel is one flat list on purpose — it answers "what is due today", a
+// question the floor does not narrow. So the floor rides along with the room
+// name instead of becoming a level: "ห้อง 5-883136 (ชั้น 5)".
+//
+// Routed through formatUnitLocation so it is spelled the same here as in every
+// other view. The building is left off because each caller below either prints
+// it alongside or is already scoped to one building.
+function roomWithFloor(
+  job: Pick<Schedule, "roomName" | "floor" | "buildingName">,
+  options: { withRoomLabel?: boolean } = {}
+) {
+  return formatUnitLocation(
+    { name: job.roomName, floor: job.floor, building: { name: job.buildingName } },
+    { withBuilding: false, withFloor: true, withRoomLabel: options.withRoomLabel ?? true }
+  );
+}
 
 function formatFrequencyLabel(value: number, unit: string) {
   const unitLabel = unit === "days" ? "วัน" : unit === "years" ? "ปี" : "เดือน";
@@ -160,17 +181,40 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
   const dayRoomOptions = useMemo(() => {
     const jobsInBuilding =
       dayBuildingFilter === "all" ? dayJobs : dayJobs.filter((job) => job.buildingName === dayBuildingFilter);
-    const seen = new Map<string, { value: string; label: string }>();
+    const seen = new Map<
+      string,
+      { value: string; label: string; buildingName: string; floor: number | null }
+    >();
     for (const job of jobsInBuilding) {
       const value = `${job.buildingId}::${job.roomName}`;
       if (!seen.has(value)) {
+        // No "ห้อง" prefix here — the field's own label already says it — but
+        // the floor is spelled the way it is everywhere else.
+        const room = roomWithFloor(job, { withRoomLabel: false });
         seen.set(value, {
           value,
-          label: dayBuildingFilter === "all" ? `${job.buildingName} • ${job.roomName}` : job.roomName,
+          label: dayBuildingFilter === "all" ? `${job.buildingName} • ${room}` : room,
+          buildingName: job.buildingName,
+          floor: job.floor,
         });
       }
     }
-    return Array.from(seen.values()).sort((a, b) => a.label.localeCompare(b.label, "th"));
+    // Building, then floor, then room. Sorting by the label alone was fine
+    // while the floor was invisible; now that every option shows one, an
+    // alphabetical order running ชั้น 3, ชั้น 1, ชั้น 3 reads as a bug.
+    // Building stays the first key so showing every building doesn't
+    // interleave them by floor. Rooms with no floor recorded go last within
+    // their building, as they do in the grouped lists.
+    return Array.from(seen.values()).sort((a, b) => {
+      const byBuilding = a.buildingName.localeCompare(b.buildingName, "th");
+      if (byBuilding !== 0) return byBuilding;
+      if (a.floor !== b.floor) {
+        if (a.floor === null) return 1;
+        if (b.floor === null) return -1;
+        return a.floor - b.floor;
+      }
+      return a.label.localeCompare(b.label, "th");
+    });
   }, [dayJobs, dayBuildingFilter]);
 
   const filteredDayJobs = useMemo(
@@ -492,7 +536,7 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
                 >
                   <div className="min-w-0">
                     <div className="font-bold text-foreground truncate">{JOB_TYPE_LABEL[job.jobType]} - {job.acCode}</div>
-                    <div className="text-muted-foreground text-[11px] truncate">ห้อง {job.roomName}</div>
+                    <div className="text-muted-foreground text-[11px] truncate">{roomWithFloor(job)}</div>
                   </div>
                   {status === "overdue" && <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-red-600" />}
                 </div>
@@ -583,7 +627,7 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
                             {JOB_TYPE_LABEL[job.jobType]} - {job.acCode}
                           </div>
                           <div className="text-muted-foreground text-[11px] truncate">
-                            {job.buildingName} • ห้อง {job.roomName}
+                            {job.buildingName} • {roomWithFloor(job)}
                           </div>
                         </div>
                         {status === "overdue" && <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-red-600" />}
