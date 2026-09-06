@@ -19,6 +19,9 @@ interface AssetsPanelProps {
   assetSummary: TechnicianAssetSummary;
   searchQuery: string;
   selectedBuilding: string;
+  // Opens the shared history modal on one unit. Optional so the panel still
+  // renders read-only wherever no handler is wired.
+  onViewHistory?: (airConditionerId: string) => void;
 }
 
 // The open work on a group of units, as the two badges the cards themselves
@@ -45,7 +48,13 @@ function GroupJobBadges({ items }: { items: TechnicianAssetUnit[] }) {
   );
 }
 
-export function AssetsPanel({ assetList, assetSummary, searchQuery, selectedBuilding }: AssetsPanelProps) {
+export function AssetsPanel({
+  assetList,
+  assetSummary,
+  searchQuery,
+  selectedBuilding,
+  onViewHistory,
+}: AssetsPanelProps) {
   const filteredAssets = filterJobs(assetList, searchQuery, selectedBuilding);
   const groups = groupByBuilding(filteredAssets);
 
@@ -122,13 +131,29 @@ export function AssetsPanel({ assetList, assetSummary, searchQuery, selectedBuil
                             </div>
                           </div>
 
-                          <div className="pt-2 flex items-center justify-between text-xs border-t border-border">
+                          <div className="pt-2 flex items-center justify-between gap-3 text-xs border-t border-border">
                             <div className="flex flex-col">
                               <span className="text-[11px] font-bold text-muted-foreground">ล้างล่าสุด</span>
                               <span className="text-[10px] text-muted-foreground mt-1">
                                 {unit.lastCleanedAt ? format(new Date(unit.lastCleanedAt), "dd/MM/yyyy") : "ยังไม่เคยล้าง"}
                               </span>
                             </div>
+                            {/* A real button rather than making the whole card
+                                clickable, which is how /tech/history opens the
+                                same modal: this card already carries a status
+                                ribbon and a brand chip, so a card-wide click
+                                target gives no clue that it does anything.
+                                Same wording and shape as the admin asset
+                                manager's — it opens the identical modal. */}
+                            {onViewHistory && (
+                              <button
+                                type="button"
+                                onClick={() => onViewHistory(unit.id)}
+                                className="inline-flex shrink-0 items-center justify-center gap-1 rounded border border-border bg-card px-2.5 py-1.5 text-[10px] font-bold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                              >
+                                <Clock className="h-3 w-3" /> ดูประวัติ
+                              </button>
+                            )}
                           </div>
                         </div>
                       ))}

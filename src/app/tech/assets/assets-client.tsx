@@ -11,13 +11,14 @@ export function TechAssetsClient({
   assetList: TechnicianAssetUnit[];
   assetSummary: TechnicianAssetSummary;
 }) {
-  const { search, building } = useTechFilters();
+  const { search, building, openHistoryFor } = useTechFilters();
   return (
     <AssetsPanel
       assetList={assetList}
       assetSummary={assetSummary}
       searchQuery={search}
       selectedBuilding={building}
+      onViewHistory={openHistoryFor}
     />
   );
 }
