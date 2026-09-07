@@ -23,8 +23,7 @@ export function RegisterForm() {
 
   // The picture rides along in the form's own FormData — the input keeps its
   // name and stays uncontrolled, and this is only here to show what was
-  // picked. Optional: an account with no picture falls back to initials
-  // everywhere, which is a real state rather than missing data.
+  // picked and to know whether anything was.
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [avatarError, setAvatarError] = useState<string | null>(null);
@@ -49,6 +48,18 @@ export function RegisterForm() {
     }
     setAvatarError(null);
     setAvatarPreview(URL.createObjectURL(file));
+  };
+
+  // The hidden input cannot carry `required` — the browser will not submit a
+  // form whose invalid control it cannot focus, and shows nothing to explain
+  // why. So the rule is enforced here, next to the field it is about, rather
+  // than by a round trip that comes back with the message at the top of the
+  // page. The action checks again regardless; this only saves the trip.
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    if (avatarPreview) return;
+    event.preventDefault();
+    setAvatarError("กรุณาเลือกรูปโปรไฟล์");
+    avatarInputRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
   };
 
   if (state?.success) {
@@ -89,7 +100,7 @@ export function RegisterForm() {
   }
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form action={formAction} onSubmit={handleSubmit} className="space-y-4">
       {state?.error && (
         <Alert variant="destructive" className="border-red-200 bg-red-50">
           <AlertTriangle className="h-4 w-4" />
@@ -97,7 +108,7 @@ export function RegisterForm() {
         </Alert>
       )}
 
-      {/* Profile picture — optional, and first because it is the one field
+      {/* Profile picture — required, and first because it is the one field
           that says who this is rather than what they may do. */}
       <div className="flex flex-col items-center gap-2 pb-1">
         <div className="relative h-20 w-20 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-2xs">
@@ -123,7 +134,7 @@ export function RegisterForm() {
           className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-bold text-slate-800 hover:bg-slate-50 transition-colors shadow-2xs"
         >
           <Camera className="h-3 w-3" />
-          {avatarPreview ? "เปลี่ยนรูปโปรไฟล์" : "เพิ่มรูปโปรไฟล์"}
+          {avatarPreview ? "เปลี่ยนรูปโปรไฟล์" : "เลือกรูปโปรไฟล์"}
         </button>
         <input
           ref={avatarInputRef}
@@ -134,7 +145,9 @@ export function RegisterForm() {
           className="hidden"
           onChange={(e) => handlePickAvatar(e.target.files?.[0] ?? null)}
         />
-        <span className="text-[10px] text-slate-400">ไม่ใส่ก็ได้ ใส่ทีหลังในหน้าโปรไฟล์ได้</span>
+        <span className="text-[10px] text-slate-400">
+          จำเป็นต้องใส่ · ไฟล์รูปภาพ ขนาดไม่เกิน 8 MB
+        </span>
         {avatarError && (
           <p className="text-[11px] font-bold text-red-600">{avatarError}</p>
         )}

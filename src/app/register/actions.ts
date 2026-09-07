@@ -78,13 +78,19 @@ export async function registerUser(
 
   const { name, email, password, role, phone } = parsed.data;
 
+  // Required, and checked here rather than only in the form: the file input
+  // is hidden behind a styled button, and a hidden input cannot carry the
+  // browser's own `required` — Chrome refuses to submit a form it cannot
+  // focus the offending control in, and reports nothing the user can see.
+  // The form blocks it too, but this is the rule; that is the courtesy.
+  //
   // Checked before anything is written, so a rejected file costs nothing.
   const avatarFile = formData.get("avatar");
-  const hasAvatar = avatarFile instanceof File && avatarFile.size > 0;
-  if (hasAvatar) {
-    const rejection = avatarRejectionReason(avatarFile);
-    if (rejection) return { error: rejection };
+  if (!(avatarFile instanceof File) || avatarFile.size === 0) {
+    return { error: "กรุณาเลือกรูปโปรไฟล์" };
   }
+  const avatarRejection = avatarRejectionReason(avatarFile);
+  if (avatarRejection) return { error: avatarRejection };
 
   try {
     const cleanEmail = email.toLowerCase().trim();
@@ -114,8 +120,8 @@ export async function registerUser(
     // file behind on every attempt. Outside the transaction as well: this is
     // a multi-megabyte write, and holding a transaction open across it would
     // keep its locks for the whole duration.
-    const avatarUrl = hasAvatar ? await saveUpload(avatarFile as File) : null;
-    if (hasAvatar && !avatarUrl) {
+    const avatarUrl = await saveUpload(avatarFile);
+    if (!avatarUrl) {
       return { error: "ไม่สามารถบันทึกรูปโปรไฟล์ได้ กรุณาลองใหม่อีกครั้ง" };
     }
 
