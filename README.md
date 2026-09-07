@@ -50,6 +50,15 @@ CREATE DATABASE ac_maintenance
   LC_COLLATE 'C' LC_CTYPE 'C';
 ```
 
+> **⚠️ `prisma migrate reset` จะทำลายการตั้งค่านี้เงียบๆ** — มันลบ database แล้วสร้างใหม่จาก
+> `template1` ซึ่งไม่ใช่ ICU การเรียงภาษาไทยจะกลับไปผิดโดยไม่มีอะไรฟ้อง
+> ถ้าจำเป็นต้องรีเซ็ต ให้ `DROP DATABASE` แล้วรันคำสั่งข้างบนใหม่เอง ตามด้วย `prisma migrate deploy`
+>
+> ตรวจว่ายังถูกอยู่ได้ด้วย — ต้องได้ `i` กับ `th-TH`:
+> ```sql
+> SELECT datlocprovider, daticulocale FROM pg_database WHERE datname = 'ac_maintenance';
+> ```
+
 สร้างไฟล์ `.env` ที่ root:
 
 ```env
