@@ -1,5 +1,26 @@
 # Project Handoff & Technical Summary
 
+# 📄 `PRODUCT.md` — ล้างเนื้อหา multi-tenant ที่ตกยุค (7 ก.ย. 2026, DoubleKill)
+
+ไฟล์นี้ไม่ได้ถูกแตะตั้งแต่ก่อนถอด multi-tenancy (`20260811093000_remove_multi_tenancy`) จึงยังบรรยายระบบที่ไม่มีอยู่จริงแล้ว · ใครอ่านเพื่อทำความเข้าใจขอบเขตผลิตภัณฑ์จะเข้าใจผิดทั้งหมด
+
+| เดิม | แก้เป็น |
+|---|---|
+| มี 3 บทบาท รวม **Super Admin** จัดการ multi-tenant | เหลือ 2 บทบาทตาม `enum UserRole` จริง — `org_admin`, `technician` |
+| RBAC ระบุเส้นทาง `/super-admin/*` | ไม่มีโฟลเดอร์นี้ใน `src/app/` แล้ว เหลือ `/admin/*` กับ `/tech/*` และระบุ route guard ที่ `src/proxy.ts` |
+| หัวข้อ **Multi-Tenant Boundary** แยกข้อมูลด้วย `university_id` | เปลี่ยนเป็น **Single-Tenant** พร้อมหมายเหตุว่าทำไม `org_admin` ยังใช้ชื่อเดิม (ตรงกับคอมเมนต์ใน `schema.prisma`) |
+| Asset Hierarchy = `University` ➔ `Building` ➔ `Room` ➔ `AirConditioner` | `Building` ➔ `Floor` ➔ `Room` ➔ `AirConditioner` ตามโครงสร้าง 4 ระดับที่ใช้จริงทั้งระบบ |
+| Product Principle ข้อ 2 = Strict Multi-Tenant Boundary | เปลี่ยนเป็น **QR Code as the Entry Point** ซึ่งเป็นแกนจริงของผลิตภัณฑ์ |
+| ลิงก์เอกสารดีไซน์ชี้ไป `file:///c:/Users/LENOVO/OneDrive%20-%20.../DESIGN.md` | ลิงก์สัมพัทธ์ `design.md` (ชื่อที่ git track จริงคือตัวพิมพ์เล็ก) + เพิ่มลิงก์ `HANDOFF.md` |
+
+**เพิ่มใหม่ 2 บรรทัด** ที่ระบบทำได้จริงแต่เอกสารไม่เคยพูดถึง: กติกาการสมัคร (บังคับครบทุกช่องรวมรูป · `.ac.th`/`.edu`/`.edu.th` ได้ `active` ทันที นอกนั้น `pending` — ตรวจกับ `register/actions.ts:58,117` แล้ว) และกฎห้ามใช้ emoji ใน UI ที่ `AGENTS.md` บังคับอยู่
+
+**เอาคำว่า "แบบ Real-time" ออกจาก Work Order Dispatch** เพราะระบบเป็น Server Components + `revalidatePath` ไม่ได้ push อะไรแบบเรียลไทม์
+
+diff ออกมา **+12 −10** เพราะเขียนกลับเป็น CRLF ตามของเดิม
+
+---
+
 # 🧹 เก็บกวาด repo — README กับ python bytecode (7 ก.ย. 2026, DoubleKill)
 
 เจ้าของโปรเจกต์สังเกตว่าหน้า GitHub ยังขึ้นข้อความ *Rebuild entire application from Laravel/PHP/MySQL to Next.js* อยู่หลายไฟล์ · **ตรวจแล้วไม่มีโค้ด Laravel เหลืออยู่เลย** (ไฟล์ `.php` / `composer.json` / `artisan` = 0 จาก 328 ไฟล์ที่ track) · ข้อความนั้นคือ *commit ล่าสุดที่แตะไฟล์นั้น* ไม่ใช่เนื้อหาไฟล์ · ไฟล์อย่าง `postcss.config.mjs` ขึ้นแบบนั้นเพราะไม่มีใครต้องแก้มันอีกเลย ซึ่งปกติ
