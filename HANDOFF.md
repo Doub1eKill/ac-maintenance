@@ -1,5 +1,47 @@
 # Project Handoff & Technical Summary
 
+# 🖥️ ตั้งเครื่อง dev ใหม่ + คืนฐานข้อมูลให้ตรงกับเครื่องเดิม (7 ก.ย. 2026, DoubleKill)
+
+เจ้าของโปรเจกต์ย้ายมาทำงานบนเครื่องใหม่ที่ `C:\Project\ac-maintenance` · บันทึกไว้เพราะขั้นตอนนี้มีกับดักที่เสียเวลาไปจริง
+
+## กับดักที่เจอ เรียงตามเวลาที่เสีย
+
+**1. `prisma/seed.ts` รันแล้วค้างไม่ยอมจบ** — ไม่ใช่ error ข้อมูลลงครบแล้ว แต่ process ไม่ exit เพราะท้ายไฟล์มีแค่ `.catch()` ไม่มี `$disconnect()` ส่วน `src/lib/prisma.ts` เปิด pool ไว้ `connectionLimit: 20` connection จึงค้างคา event loop · **ถ้าจะรัน seed อีกให้เติม** `.then(() => prisma.$disconnect())` **ก่อน** ไม่งั้นต้องนั่งรอจนหมดเวลาแล้วไป kill เอง
+
+**2. `npx tsx <ไฟล์>.ts` ที่มี top-level await จะพัง** — `package.json` ไม่มี `"type": "module"` tsx จึงคอมไพล์เป็น CJS แล้วฟ้อง `Top-level await is currently not supported with the "cjs" output format` · ต้องห่อใน `async function main()` แบบที่ `seed.ts` ทำอยู่แล้ว
+
+**3. ไฟล์ `.env` ถูกก็อปมาในชื่อ `env` (ไม่มีจุดนำหน้า)** — Next.js กับ dotenv ไม่โหลดให้ และที่อันตรายกว่าคือ pattern `.env*` ใน `.gitignore` **ไม่ครอบชื่อ `env`** มันจึงโผล่เป็นไฟล์ untracked พร้อมถูก commit ขึ้น GitHub ทั้ง `DATABASE_URL` และ `AUTH_SECRET` · rename เป็น `.env` แล้ว ตรวจด้วย `git check-ignore -v .env` ว่าโดน ignore จริง
+
+## ฐานข้อมูล — อย่า seed ถ้าอยากได้ข้อมูลเดียวกับเครื่องเดิม
+
+ตอนแรกใช้ `seed.ts` สร้างข้อมูลขึ้นมาใหม่ ได้ users 2 คน (`admin@pkru.ac.th` / `tech@pkru.ac.th`) ซึ่ง **คนละชุดกับที่ HANDOFF ทั้งไฟล์อ้างอิงอยู่** (users 5 / phones 7, `admin@hansen-jacobs-university.test` / `houston16@example.net`) · ทดสอบตามเคสในเอกสารแล้วจะหาบัญชีไม่เจอ และตัวเลขที่ใช้ยืนยันว่าคืนค่าข้อมูลทดสอบครบก็เทียบกันไม่ได้
+
+**ทางที่ถูกคือ mysqldump จากเครื่องเดิมมา restore** ไม่ใช่ seed ใหม่:
+
+```bash
+# บนเครื่องต้นทาง
+"C:\xampp\mysql\bin\mysqldump.exe" -h 127.0.0.1 -P 3306 -u root --default-character-set=utf8mb4 --single-transaction ac_maintenance > ac_maintenance_YYYYMMDD.sql
+
+# บนเครื่องปลายทาง — ดัมป์มี DROP TABLE IF EXISTS ครบทุกตาราง จึง restore ทับได้เลย ไม่ต้อง DROP DATABASE
+"C:\xampp\mysql\bin\mysql.exe" -h 127.0.0.1 -P 3306 -u root --default-character-set=utf8mb4 ac_maintenance < ac_maintenance_YYYYMMDD.sql
+```
+
+ผลลัพธ์ที่ได้ ตรงกับเครื่องเดิมทุกตัว: **users 5 · phones 7 · buildings 5 · rooms 32 · air_conditioners 73 · work_orders 61 · maintenance_logs 230 · system_settings 1** · `prisma migrate status` ขึ้น *Database schema is up to date* โดยไม่ต้องรัน `migrate deploy` เพิ่ม เพราะ `_prisma_migrations` ติดมากับดัมป์ครบทั้ง 12 ใบ
+
+> ดัมป์เก่า `db-backups/ac_maintenance_before_F1_20260811.sql` **ใช้แทนไม่ได้** — เป็นสภาพก่อนถอด multi-tenancy มี 19 users กับตาราง `universities` และรู้จัก migration แค่ 4 ใบแรก
+
+## `.next` ที่ก็อปข้ามเครื่องมาต้องลบทิ้ง
+
+แคช 272 MB จากเครื่องเดิมถูกก็อปติดมาด้วย · ถ้าไม่ลบจะเจออาการที่เขียนไว้แล้วในหัวข้อ *"หลัง `git pull` ต้องทำ 3 อย่าง"* คือหน้า `/admin` ฟ้อง *"ไม่สามารถเชื่อมต่อฐานข้อมูล ... พอร์ต 3307"* ทั้งที่ไม่เกี่ยวกับ MySQL เลย · ปิด dev server ก่อนแล้วค่อย `Remove-Item -Recurse -Force .next`
+
+## สถานะเครื่องนี้ ณ ตอนจบ
+
+working tree สะอาด · `tsc --noEmit` ผ่าน 0 error · mysqld เปิดอยู่ที่ 3306 (spawn ผ่าน WMI) · dev server **ยังไม่ได้เปิด** · `.next` ว่าง build แรกจะช้ารอบเดียว · `.env` มีแค่ `DATABASE_URL` กับ `AUTH_SECRET` **ยังไม่มี `AUTH_URL` และ SMTP** ตามที่พักไว้
+
+**บั๊ก fallback port 3307 ยังอยู่เหมือนเดิม** ทั้ง `src/lib/prisma.ts` และข้อความ error ที่ `src/lib/tech/dashboard.ts:111` — แผน PostgreSQL ขั้นที่ 3 แก้ให้อยู่แล้ว
+
+---
+
 # 📄 `PRODUCT.md` — ล้างเนื้อหา multi-tenant ที่ตกยุค (7 ก.ย. 2026, DoubleKill)
 
 ไฟล์นี้ไม่ได้ถูกแตะตั้งแต่ก่อนถอด multi-tenancy (`20260811093000_remove_multi_tenancy`) จึงยังบรรยายระบบที่ไม่มีอยู่จริงแล้ว · ใครอ่านเพื่อทำความเข้าใจขอบเขตผลิตภัณฑ์จะเข้าใจผิดทั้งหมด
