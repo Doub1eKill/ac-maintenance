@@ -19,11 +19,11 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "postgresql"
 }
 
 model Building {
-  id           BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  id           BigInt    @id @default(autoincrement())
   name         String    @unique(map: "buildings_name_unique") @db.VarChar(255)
   abbreviation String    @unique(map: "buildings_abbreviation_unique") @db.VarChar(10) // feeds ac_code's first segment, e.g. "B1"
   createdAt    DateTime? @map("created_at") @db.Timestamp(0)
@@ -38,10 +38,10 @@ model Building {
 }
 
 model Room {
-  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
-  buildingId BigInt    @map("building_id") @db.UnsignedBigInt
+  id         BigInt    @id @default(autoincrement())
+  buildingId BigInt    @map("building_id")
   name       String    @db.VarChar(255) // room number/label, e.g. "301"
-  floor      Int?      @db.UnsignedSmallInt
+  floor      Int?      @db.SmallInt
   createdAt  DateTime? @map("created_at") @db.Timestamp(0)
   updatedAt  DateTime? @map("updated_at") @db.Timestamp(0)
 
@@ -55,7 +55,7 @@ model Room {
 }
 
 model User {
-  id              BigInt     @id @default(autoincrement()) @db.UnsignedBigInt
+  id              BigInt     @id @default(autoincrement())
   role            UserRole   @default(technician)
   status          UserStatus @default(pending) // separate from role — an account can be a valid technician and still be pending/suspended
   name            String     @db.VarChar(255)
@@ -78,12 +78,12 @@ model User {
   updatedAt       DateTime?  @map("updated_at") @db.Timestamp(0)
   deletedAt       DateTime?  @map("deleted_at") @db.Timestamp(0)
 
-  phones            UserPhone[]
-  maintenanceLogs   MaintenanceLog[]
-  claimedWorkOrders WorkOrder[]      @relation("work_orders_claimed_by")
-  reportedWorkOrders WorkOrder[]     @relation("work_orders_reported_by")
-  assignedWorkOrders WorkOrder[]     @relation("work_orders_assigned_to")
-  systemAuditLogs   SystemAuditLog[]
+  phones             UserPhone[]
+  maintenanceLogs    MaintenanceLog[]
+  claimedWorkOrders  WorkOrder[]      @relation("work_orders_claimed_by")
+  reportedWorkOrders WorkOrder[]      @relation("work_orders_reported_by")
+  assignedWorkOrders WorkOrder[]      @relation("work_orders_assigned_to")
+  systemAuditLogs    SystemAuditLog[]
 
   // Replaces the two tenant-prefixed indexes this table used to carry. The
   // one query that filters users looks for active technicians, so a single
@@ -94,8 +94,8 @@ model User {
 }
 
 model UserPhone {
-  id          BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
-  userId      BigInt    @map("user_id") @db.UnsignedBigInt
+  id          BigInt    @id @default(autoincrement())
+  userId      BigInt    @map("user_id")
   phoneNumber String    @map("phone_number") @db.VarChar(255)
   isPrimary   Boolean   @default(false) @map("is_primary")
   createdAt   DateTime? @map("created_at") @db.Timestamp(0)
@@ -111,7 +111,7 @@ model UserPhone {
 }
 
 model AcBrand {
-  id        BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  id        BigInt    @id @default(autoincrement())
   name      String    @unique(map: "ac_brands_name_unique") @db.VarChar(255)
   createdAt DateTime? @map("created_at") @db.Timestamp(0)
   updatedAt DateTime? @map("updated_at") @db.Timestamp(0)
@@ -128,10 +128,10 @@ model AcBrand {
 }
 
 model AcModel {
-  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
-  brandId    BigInt    @map("brand_id") @db.UnsignedBigInt
+  id         BigInt    @id @default(autoincrement())
+  brandId    BigInt    @map("brand_id")
   name       String    @db.VarChar(255)
-  defaultBtu Int?      @map("default_btu") @db.UnsignedInt
+  defaultBtu Int?      @map("default_btu")
   createdAt  DateTime? @map("created_at") @db.Timestamp(0)
   updatedAt  DateTime? @map("updated_at") @db.Timestamp(0)
   // Soft delete. Independent of the brand's own deleted_at: deleting a brand
@@ -148,15 +148,15 @@ model AcModel {
 }
 
 model AirConditioner {
-  id          BigInt               @id @default(autoincrement()) @db.UnsignedBigInt
-  roomId      BigInt               @map("room_id") @db.UnsignedBigInt
-  acBrandId   BigInt?              @map("ac_brand_id") @db.UnsignedBigInt
-  acModelId   BigInt?              @map("ac_model_id") @db.UnsignedBigInt
+  id          BigInt               @id @default(autoincrement())
+  roomId      BigInt               @map("room_id")
+  acBrandId   BigInt?              @map("ac_brand_id")
+  acModelId   BigInt?              @map("ac_model_id")
   acCode      String               @unique(map: "air_conditioners_ac_code_unique") @map("ac_code") @db.VarChar(255) // human-readable, globally unique: [BLDG]-[ROOM]-[NN] (the [UNI] segment went away with multi-tenancy)
   qrCode      String               @unique(map: "air_conditioners_qr_code_unique") @map("qr_code") @db.Char(36) // uuid embedded in the printed QR — never exposes the sequential ac_code
   brand       String?              @db.VarChar(255) // Fallback for "Other" custom brands
   model       String?              @db.VarChar(255) // Fallback for "Other" custom models
-  btu         Int?                 @db.UnsignedInt
+  btu         Int?
   installedAt DateTime?            @map("installed_at") @db.Date
   // The unit's own picture, taken when it is registered and shown first on
   // the public sticker page — distinct from the before/after photos a visit
@@ -175,11 +175,11 @@ model AirConditioner {
   // as editable) — this is what makes denormalizing tenant info onto
   // work_orders safe (see WorkOrder below): there's no window where a
   // unit's tenant chain could go stale.
-  room            Room             @relation(fields: [roomId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "air_conditioners_room_id_foreign")
-  acBrand         AcBrand?         @relation(fields: [acBrandId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "airConditioners_ac_brand_id_foreign")
-  acModel         AcModel?         @relation(fields: [acModelId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "airConditioners_ac_model_id_foreign")
-  maintenanceLogs MaintenanceLog[]
-  workOrders      WorkOrder[]
+  room                 Room                  @relation(fields: [roomId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "air_conditioners_room_id_foreign")
+  acBrand              AcBrand?              @relation(fields: [acBrandId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "airConditioners_ac_brand_id_foreign")
+  acModel              AcModel?              @relation(fields: [acModelId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "airConditioners_ac_model_id_foreign")
+  maintenanceLogs      MaintenanceLog[]
+  workOrders           WorkOrder[]
   maintenanceSchedules MaintenanceSchedule[]
 
   @@index([roomId], map: "air_conditioners_room_id_index")
@@ -187,24 +187,24 @@ model AirConditioner {
 }
 
 model MaintenanceLog {
-  id               BigInt            @id @default(autoincrement()) @db.UnsignedBigInt
-  airConditionerId BigInt            @map("air_conditioner_id") @db.UnsignedBigInt
-  workOrderId      BigInt?           @map("work_order_id") @db.UnsignedBigInt // set only when this log closes a claimed pool job
-  userId           BigInt            @map("user_id") @db.UnsignedBigInt // the technician who performed the work
-  action           MaintenanceAction
-  notes            String?           @db.Text
+  id                   BigInt            @id @default(autoincrement())
+  airConditionerId     BigInt            @map("air_conditioner_id")
+  workOrderId          BigInt?           @map("work_order_id") // set only when this log closes a claimed pool job
+  userId               BigInt            @map("user_id") // the technician who performed the work
+  action               MaintenanceAction
+  notes                String?           @db.Text
   // What was actually repaired. Kept apart from `notes` (which is a free
   // remark about the visit as a whole) so repair work can be searched and
   // reported on without parsing prose. Only ever set on rows whose action is
   // `repair` — a visit that also cleaned the unit writes a separate row, and
   // that row has nothing to say here.
-  repairDetail     String?           @map("repair_detail") @db.Text
-  beforePhotoUrl       String?       @map("before_photo_url") @db.VarChar(255)
-  afterPhotoUrl        String?       @map("after_photo_url") @db.VarChar(255)
-  customerSignatureUrl String?       @map("customer_signature_url") @db.VarChar(255)
-  performedAt      DateTime          @map("performed_at") @db.DateTime(0)
-  createdAt        DateTime?         @map("created_at") @db.Timestamp(0)
-  updatedAt        DateTime?         @map("updated_at") @db.Timestamp(0)
+  repairDetail         String?           @map("repair_detail") @db.Text
+  beforePhotoUrl       String?           @map("before_photo_url") @db.VarChar(255)
+  afterPhotoUrl        String?           @map("after_photo_url") @db.VarChar(255)
+  customerSignatureUrl String?           @map("customer_signature_url") @db.VarChar(255)
+  performedAt          DateTime          @map("performed_at") @db.Timestamp(0)
+  createdAt            DateTime?         @map("created_at") @db.Timestamp(0)
+  updatedAt            DateTime?         @map("updated_at") @db.Timestamp(0)
 
   // Central transaction table. Never CASCADE on either FK below: a
   // physical asset's repair history, and a technician's accountability for
@@ -223,8 +223,8 @@ model MaintenanceLog {
 }
 
 model WorkOrder {
-  id               BigInt          @id @default(autoincrement()) @db.UnsignedBigInt
-  airConditionerId BigInt          @map("air_conditioner_id") @db.UnsignedBigInt
+  id               BigInt          @id @default(autoincrement())
+  airConditionerId BigInt          @map("air_conditioner_id")
   status           WorkOrderStatus @default(pending)
   // What the job is for, recorded when the order is raised. It used to be
   // inferred from the unit's current condition, which was wrong in two
@@ -237,10 +237,10 @@ model WorkOrder {
   issueDescription String?         @map("issue_description") @db.Text
   resolutionNotes  String?         @map("resolution_notes") @db.Text
   images           Json?           @default("[]")
-  reportedById     BigInt?         @map("reported_by_id") @db.UnsignedBigInt
-  assignedToId     BigInt?         @map("assigned_to_id") @db.UnsignedBigInt
+  reportedById     BigInt?         @map("reported_by_id")
+  assignedToId     BigInt?         @map("assigned_to_id")
   assignedAt       DateTime?       @map("assigned_at") @db.Timestamp(0)
-  claimedBy        BigInt?         @map("claimed_by") @db.UnsignedBigInt
+  claimedBy        BigInt?         @map("claimed_by")
   claimedAt        DateTime?       @map("claimed_at") @db.Timestamp(0) // separate from updatedAt, which gets overwritten again on completion
   completedAt      DateTime?       @map("completed_at") @db.Timestamp(0)
   // Was nullable with no default, so every caller had to remember to set it
@@ -250,10 +250,14 @@ model WorkOrder {
   // @default(now()) is what actually fills this: Prisma stamps the value client
   // side, in UTC, like every other timestamp here. The column also carries a
   // DEFAULT CURRENT_TIMESTAMP in the database, which nothing reaches today and
-  // which is NOT equivalent -- MySQL's CURRENT_TIMESTAMP is the server's local
-  // time, seven hours off what this column is read as. A raw-SQL insert that
-  // omits the column would land in that trap; it needs UTC_TIMESTAMP().
-  // See 20260903140000_fix_work_order_created_at_backfill_timezone.
+  // which is NOT equivalent -- on PostgreSQL CURRENT_TIMESTAMP resolves against
+  // the session TimeZone, so storing it into this `timestamp(0)` (no time zone)
+  // column records local time, seven hours off what this column is read as. A
+  // raw-SQL insert that omits the column would land in that trap; it needs
+  // now() AT TIME ZONE 'UTC'.
+  // The MySQL-era migration that fixed this backfill was 20260903140000_fix_
+  // work_order_created_at_backfill_timezone; it is gone from prisma/migrations
+  // after the PostgreSQL switch, but survives in git history and in HANDOFF.md.
   createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt        DateTime?       @map("updated_at") @db.Timestamp(0)
 
@@ -276,15 +280,15 @@ model WorkOrder {
 }
 
 model SystemAuditLog {
-  id           BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
-  userId       BigInt   @map("user_id") @db.UnsignedBigInt
-  action       String   @db.VarChar(100)
-  entityType   String   @map("entity_type") @db.VarChar(50)
-  entityId     BigInt   @map("entity_id") @db.UnsignedBigInt
-  oldValues    Json?    @map("old_values")
-  newValues    Json?    @map("new_values")
-  ipAddress    String?  @map("ip_address") @db.VarChar(45)
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  id         BigInt   @id @default(autoincrement())
+  userId     BigInt   @map("user_id")
+  action     String   @db.VarChar(100)
+  entityType String   @map("entity_type") @db.VarChar(50)
+  entityId   BigInt   @map("entity_id")
+  oldValues  Json?    @map("old_values")
+  newValues  Json?    @map("new_values")
+  ipAddress  String?  @map("ip_address") @db.VarChar(45)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamp(0)
 
   user User @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "audit_user_fk")
 
@@ -293,16 +297,16 @@ model SystemAuditLog {
 }
 
 model MaintenanceSchedule {
-  id               BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
-  airConditionerId BigInt   @map("air_conditioner_id") @db.UnsignedBigInt
-  frequencyMonths  Int?     @map("frequency_months") @db.UnsignedSmallInt // Legacy
-  frequencyValue   Int      @default(6) @map("frequency_value") @db.UnsignedInt
-  frequencyUnit    String   @default("months") @map("frequency_unit") @db.VarChar(20) // "days", "months", "years"
+  id               BigInt    @id @default(autoincrement())
+  airConditionerId BigInt    @map("air_conditioner_id")
+  frequencyMonths  Int?      @map("frequency_months") @db.SmallInt // Legacy
+  frequencyValue   Int       @default(6) @map("frequency_value")
+  frequencyUnit    String    @default("months") @map("frequency_unit") @db.VarChar(20) // "days", "months", "years"
   lastPerformedAt  DateTime? @map("last_performed_at") @db.Date
-  nextDueDate      DateTime @map("next_due_date") @db.Date
-  isActive         Boolean  @default(true) @map("is_active")
+  nextDueDate      DateTime  @map("next_due_date") @db.Date
+  isActive         Boolean   @default(true) @map("is_active")
 
-  airConditioner   AirConditioner @relation(fields: [airConditionerId], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "schedule_ac_fk")
+  airConditioner AirConditioner @relation(fields: [airConditionerId], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "schedule_ac_fk")
 
   @@index([nextDueDate], map: "schedule_due_date_idx")
   @@map("maintenance_schedules")
@@ -318,7 +322,7 @@ model SystemSettings {
 
   // Applied to air conditioners registered from here on. Existing units keep
   // whatever cycle they were given; changing this never rewrites them.
-  defaultFrequencyValue Int    @default(6) @map("default_frequency_value") @db.UnsignedInt
+  defaultFrequencyValue Int    @default(6) @map("default_frequency_value")
   defaultFrequencyUnit  String @default("months") @map("default_frequency_unit") @db.VarChar(20)
 
   // Replaces the ORGANISATION_NAME constant that stood in for the University
