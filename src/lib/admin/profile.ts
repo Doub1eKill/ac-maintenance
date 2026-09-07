@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { saveUpload, deleteUpload } from "@/lib/upload";
+import { avatarRejectionReason } from "@/lib/avatar";
 import { verifyOrgAdmin } from "@/lib/auth-guards";
 
 // Editing your own profile — name, phone and avatar. Shared by both dashboards:
@@ -27,11 +28,6 @@ const updateProfileSchema = z.object({
     )
     .optional(),
 });
-
-// A profile picture is displayed at avatar size and downscaled to 1600px on
-// the way in, so anything past this is a camera original that would be thrown
-// away — rejected up front with a message rather than silently accepted.
-const MAX_AVATAR_BYTES = 8 * 1024 * 1024;
 
 /**
  * Updates the signed-in user's own name, primary phone number and picture.
@@ -74,12 +70,8 @@ export async function updateProfileAction(
   // Checked before anything is written, so a rejected file costs nothing.
   const hasNewAvatar = !!avatarFile && avatarFile.size > 0;
   if (hasNewAvatar) {
-    if (!avatarFile!.type?.startsWith("image/")) {
-      return { error: "รูปโปรไฟล์ต้องเป็นไฟล์รูปภาพเท่านั้น" };
-    }
-    if (avatarFile!.size > MAX_AVATAR_BYTES) {
-      return { error: "รูปโปรไฟล์ต้องมีขนาดไม่เกิน 8 MB" };
-    }
+    const rejection = avatarRejectionReason(avatarFile!);
+    if (rejection) return { error: rejection };
   }
 
   // Written to disk before the transaction opens, never inside it: this is a

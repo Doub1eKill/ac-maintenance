@@ -7,6 +7,7 @@ import { User, Mail, Phone, Building2, KeyRound, AlertTriangle, CheckCircle2, Su
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { requestPasswordReset, type RequestResetState } from "@/app/request-password-reset/actions";
 import { updateProfileAction } from "@/app/admin/actions";
+import { avatarRejectionReason } from "@/lib/avatar";
 
 interface ProfilePanelProps {
   profile: {
@@ -25,11 +26,6 @@ const ROLE_LABEL: Record<string, string> = {
   org_admin: "ผู้บริหารองค์กร",
   technician: "ช่างซ่อมบำรุง",
 };
-
-// Mirrors the ceiling updateProfileAction enforces, so an oversized file is
-// refused here instead of after several megabytes have crossed the wire. The
-// server still checks — this is a courtesy, not the guard.
-const AVATAR_MAX_BYTES = 8 * 1024 * 1024;
 
 // Both dashboards render this, and both now feed it a real phone number.
 // The technician page used to pass showPhone={false}: its data did not carry
@@ -81,12 +77,9 @@ export function ProfilePanel({ profile, universityName }: ProfilePanelProps) {
   const handlePickAvatar = (file: File | null) => {
     if (!file) return;
     setSaveResult(null);
-    if (!file.type.startsWith("image/")) {
-      setAvatarError("รูปโปรไฟล์ต้องเป็นไฟล์รูปภาพเท่านั้น");
-      return;
-    }
-    if (file.size > AVATAR_MAX_BYTES) {
-      setAvatarError("รูปโปรไฟล์ต้องมีขนาดไม่เกิน 8 MB");
+    const rejection = avatarRejectionReason(file);
+    if (rejection) {
+      setAvatarError(rejection);
       return;
     }
     setAvatarError(null);

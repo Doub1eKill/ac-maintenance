@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useActionState } from "react";
+import { useEffect, useRef, useState, useActionState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { registerUser, type RegisterState } from "@/app/register/actions";
-import { Wrench, Building2, Eye, EyeOff, AlertTriangle, Clock, ArrowLeft, UserPlus } from "lucide-react";
+import { avatarRejectionReason } from "@/lib/avatar";
+import { Wrench, Building2, Eye, EyeOff, AlertTriangle, Clock, ArrowLeft, UserPlus, Camera, Phone, User } from "lucide-react";
 import { AnimatedIcon } from "@/components/ui/animated-icon";
 import {
   Alert,
@@ -18,6 +20,36 @@ export function RegisterForm() {
 
   const [showPassword, setShowPassword] = useState(false);
   const [selectedRole, setSelectedRole] = useState<"technician" | "org_admin">("technician");
+
+  // The picture rides along in the form's own FormData — the input keeps its
+  // name and stays uncontrolled, and this is only here to show what was
+  // picked. Optional: an account with no picture falls back to initials
+  // everywhere, which is a real state rather than missing data.
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+
+  // A blob: URL is held until revoked; cleaning up as the value changes
+  // releases the one just replaced.
+  useEffect(() => {
+    if (!avatarPreview) return;
+    return () => URL.revokeObjectURL(avatarPreview);
+  }, [avatarPreview]);
+
+  const handlePickAvatar = (file: File | null) => {
+    if (!file) return;
+    const rejection = avatarRejectionReason(file);
+    if (rejection) {
+      // Clear the input as well, or the file the server would refuse is still
+      // sitting in the form waiting to be submitted.
+      if (avatarInputRef.current) avatarInputRef.current.value = "";
+      setAvatarPreview(null);
+      setAvatarError(rejection);
+      return;
+    }
+    setAvatarError(null);
+    setAvatarPreview(URL.createObjectURL(file));
+  };
 
   if (state?.success) {
     return (
@@ -64,6 +96,49 @@ export function RegisterForm() {
           <AlertDescription className="text-red-900">{state.error}</AlertDescription>
         </Alert>
       )}
+
+      {/* Profile picture — optional, and first because it is the one field
+          that says who this is rather than what they may do. */}
+      <div className="flex flex-col items-center gap-2 pb-1">
+        <div className="relative h-20 w-20 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-2xs">
+          {avatarPreview ? (
+            <Image
+              src={avatarPreview}
+              alt=""
+              fill
+              sizes="80px"
+              className="object-cover"
+              // A blob: URL has no path through the image optimiser.
+              unoptimized
+            />
+          ) : (
+            <span className="flex h-full w-full items-center justify-center text-slate-400">
+              <User className="h-8 w-8" />
+            </span>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => avatarInputRef.current?.click()}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-bold text-slate-800 hover:bg-slate-50 transition-colors shadow-2xs"
+        >
+          <Camera className="h-3 w-3" />
+          {avatarPreview ? "เปลี่ยนรูปโปรไฟล์" : "เพิ่มรูปโปรไฟล์"}
+        </button>
+        <input
+          ref={avatarInputRef}
+          id="avatar"
+          name="avatar"
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => handlePickAvatar(e.target.files?.[0] ?? null)}
+        />
+        <span className="text-[10px] text-slate-400">ไม่ใส่ก็ได้ ใส่ทีหลังในหน้าโปรไฟล์ได้</span>
+        {avatarError && (
+          <p className="text-[11px] font-bold text-red-600">{avatarError}</p>
+        )}
+      </div>
 
       {/* Role Selector Tabs */}
       <div>
@@ -112,6 +187,25 @@ export function RegisterForm() {
           placeholder="เช่น นายสมชาย ใจดี"
           className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:border-slate-950 focus:outline-none shadow-2xs"
         />
+      </div>
+
+      {/* Phone Input — optional, sitting with the name because the two
+          together are "who you are"; the credentials follow. */}
+      <div>
+        <label htmlFor="phone" className="mb-1.5 block text-xs font-bold text-slate-800">
+          เบอร์โทรศัพท์ (Phone){" "}
+          <span className="font-normal text-slate-400">— ไม่บังคับ</span>
+        </label>
+        <div className="relative">
+          <Phone className="absolute left-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+          <input
+            id="phone"
+            name="phone"
+            type="tel"
+            placeholder="081-234-5678"
+            className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:border-slate-950 focus:outline-none shadow-2xs"
+          />
+        </div>
       </div>
 
       {/* Email Input */}

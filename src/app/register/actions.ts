@@ -4,6 +4,8 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { UserRole } from "@/generated/prisma/client";
+import { saveUpload, deleteUpload } from "@/lib/upload";
+import { avatarRejectionReason } from "@/lib/avatar";
 
 export type RegisterState = {
   success?: boolean;
@@ -16,6 +18,19 @@ const registerSchema = z.object({
   email: z.string().email("กรุณากรอกอีเมลให้ถูกต้อง"),
   password: z.string().min(8, "รหัสผ่านต้องมีความยาวอย่างน้อย 8 ตัวอักษร"),
   role: z.enum(["technician", "org_admin"]).default("technician"),
+  // Same permissive rule updateProfileAction uses, and for the same reason:
+  // Thai numbers get written with and without spaces, dashes and a +66
+  // prefix, and turning away a real number someone typed their own way is
+  // worse here than storing it a little unevenly. Optional — nothing about
+  // registering needs a phone number, and demanding one only invites a fake.
+  phone: z
+    .string()
+    .trim()
+    .max(20, "เบอร์โทรศัพท์ยาวเกินไป")
+    .refine(
+      (v) => v === "" || /^[\d+\-\s()]{9,20}$/.test(v),
+      "รูปแบบเบอร์โทรศัพท์ไม่ถูกต้อง"
+    ),
 });
 
 const PUBLIC_EMAIL_DOMAINS = [
@@ -49,6 +64,9 @@ export async function registerUser(
     email: formData.get("email"),
     password: formData.get("password"),
     role: formData.get("role") || "technician",
+    // formData.get returns null for a field the browser did not send, which
+    // Zod would reject as "expected string" rather than treat as blank.
+    phone: formData.get("phone") ?? "",
   };
 
   const parsed = registerSchema.safeParse(rawData);
@@ -58,7 +76,15 @@ export async function registerUser(
     return { error: firstError };
   }
 
-  const { name, email, password, role } = parsed.data;
+  const { name, email, password, role, phone } = parsed.data;
+
+  // Checked before anything is written, so a rejected file costs nothing.
+  const avatarFile = formData.get("avatar");
+  const hasAvatar = avatarFile instanceof File && avatarFile.size > 0;
+  if (hasAvatar) {
+    const rejection = avatarRejectionReason(avatarFile);
+    if (rejection) return { error: rejection };
+  }
 
   try {
     const cleanEmail = email.toLowerCase().trim();
@@ -83,15 +109,44 @@ export async function registerUser(
     // Hash password with bcrypt
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    await prisma.user.create({
-      data: {
-        name,
-        email: cleanEmail,
-        password: hashedPassword,
-        role: role as UserRole,
-        status: initialStatus,
-      },
-    });
+    // Written to disk only once the email is known to be free, so retrying a
+    // registration against an address that is already taken cannot leave a
+    // file behind on every attempt. Outside the transaction as well: this is
+    // a multi-megabyte write, and holding a transaction open across it would
+    // keep its locks for the whole duration.
+    const avatarUrl = hasAvatar ? await saveUpload(avatarFile as File) : null;
+    if (hasAvatar && !avatarUrl) {
+      return { error: "ไม่สามารถบันทึกรูปโปรไฟล์ได้ กรุณาลองใหม่อีกครั้ง" };
+    }
+
+    try {
+      await prisma.$transaction(async (tx) => {
+        const user = await tx.user.create({
+          data: {
+            name,
+            email: cleanEmail,
+            password: hashedPassword,
+            role: role as UserRole,
+            status: initialStatus,
+            avatarUrl,
+          },
+        });
+
+        // One row, flagged primary, which is the shape the profile page reads
+        // back. Skipped entirely when the field was left blank rather than
+        // stored as an empty string nobody can tell from "not given".
+        if (phone) {
+          await tx.userPhone.create({
+            data: { userId: user.id, phoneNumber: phone, isPrimary: true },
+          });
+        }
+      });
+    } catch (error) {
+      // The account was never created, so the file just written belongs to
+      // nothing. Leaving it would strand a few megabytes per failed attempt.
+      if (avatarUrl) await deleteUpload(avatarUrl);
+      throw error;
+    }
 
     if (initialStatus === "active") {
       return {
