@@ -18,17 +18,21 @@ const registerSchema = z.object({
   email: z.string().email("กรุณากรอกอีเมลให้ถูกต้อง"),
   password: z.string().min(8, "รหัสผ่านต้องมีความยาวอย่างน้อย 8 ตัวอักษร"),
   role: z.enum(["technician", "org_admin"]).default("technician"),
-  // Same permissive rule updateProfileAction uses, and for the same reason:
-  // Thai numbers get written with and without spaces, dashes and a +66
-  // prefix, and turning away a real number someone typed their own way is
-  // worse here than storing it a little unevenly. Optional — nothing about
-  // registering needs a phone number, and demanding one only invites a fake.
+  // Required, like every other field on this form. The shape stays as
+  // permissive as updateProfileAction's, and for the same reason: Thai
+  // numbers get written with and without spaces, dashes and a +66 prefix,
+  // and turning away a real number someone typed their own way is worse
+  // than storing it a little unevenly.
+  //
+  // trim() runs before min(1), so a box holding only spaces is empty here
+  // even though the browser's own `required` was satisfied by it.
   phone: z
     .string()
     .trim()
+    .min(1, "กรุณากรอกเบอร์โทรศัพท์")
     .max(20, "เบอร์โทรศัพท์ยาวเกินไป")
     .refine(
-      (v) => v === "" || /^[\d+\-\s()]{9,20}$/.test(v),
+      (v) => /^[\d+\-\s()]{9,20}$/.test(v),
       "รูปแบบเบอร์โทรศัพท์ไม่ถูกต้อง"
     ),
 });
@@ -139,13 +143,11 @@ export async function registerUser(
         });
 
         // One row, flagged primary, which is the shape the profile page reads
-        // back. Skipped entirely when the field was left blank rather than
-        // stored as an empty string nobody can tell from "not given".
-        if (phone) {
-          await tx.userPhone.create({
-            data: { userId: user.id, phoneNumber: phone, isPrimary: true },
-          });
-        }
+        // back. Unconditional now that the field is required — the schema
+        // above has already refused a blank one.
+        await tx.userPhone.create({
+          data: { userId: user.id, phoneNumber: phone, isPrimary: true },
+        });
       });
     } catch (error) {
       // The account was never created, so the file just written belongs to

@@ -55,9 +55,18 @@ export function RegisterForm() {
   // why. So the rule is enforced here, next to the field it is about, rather
   // than by a round trip that comes back with the message at the top of the
   // page. The action checks again regardless; this only saves the trip.
+  //
+  // Asks the input what it is actually holding rather than trusting the
+  // preview: React resets this form's uncontrolled fields when the action
+  // returns, and that empties the file input — but not avatarPreview, which
+  // is state and survives. Trusting the preview would wave through a submit
+  // carrying no file at all, and the server would then refuse a picture the
+  // user can plainly see on screen. Clearing the preview here is what keeps
+  // the two from disagreeing.
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    if (avatarPreview) return;
+    if ((avatarInputRef.current?.files?.length ?? 0) > 0) return;
     event.preventDefault();
+    setAvatarPreview(null);
     setAvatarError("กรุณาเลือกรูปโปรไฟล์");
     avatarInputRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
   };
@@ -202,12 +211,11 @@ export function RegisterForm() {
         />
       </div>
 
-      {/* Phone Input — optional, sitting with the name because the two
-          together are "who you are"; the credentials follow. */}
+      {/* Phone Input — sits with the name because the two together are "who
+          you are"; the credentials follow. */}
       <div>
         <label htmlFor="phone" className="mb-1.5 block text-xs font-bold text-slate-800">
-          เบอร์โทรศัพท์ (Phone){" "}
-          <span className="font-normal text-slate-400">— ไม่บังคับ</span>
+          เบอร์โทรศัพท์ (Phone)
         </label>
         <div className="relative">
           <Phone className="absolute left-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
@@ -215,6 +223,7 @@ export function RegisterForm() {
             id="phone"
             name="phone"
             type="tel"
+            required
             placeholder="081-234-5678"
             className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:border-slate-950 focus:outline-none shadow-2xs"
           />
