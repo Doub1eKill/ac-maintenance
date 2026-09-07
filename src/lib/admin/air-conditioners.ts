@@ -229,7 +229,13 @@ const updateAcSchema = z.object({
   customBrand: z.string().optional(),
   customModel: z.string().optional(),
   btu: z.string().transform((val) => (val ? parseInt(val, 10) : null)).nullable(),
-  status: z.enum(["normal", "broken", "needs_cleaning"]),
+  // status and installedAt are optional so a form can edit only what it shows.
+  // Absent means "leave it alone"; an empty installedAt still means "clear it".
+  // formData.get() gives null for a field that is not in the DOM and "" for one
+  // rendered empty, which is exactly the distinction needed — the technician's
+  // model/BTU panel does not show either field, and without this it would blank
+  // the install date and reset the status every time it saved.
+  status: z.enum(["normal", "broken", "needs_cleaning"]).optional(),
   installedAt: z
     .string()
     .trim()
@@ -263,7 +269,7 @@ export async function updateAirConditionerAction(formData: FormData) {
     customBrand: formData.get("customBrand") ?? undefined,
     customModel: formData.get("customModel") ?? undefined,
     btu: formData.get("btu"),
-    status: formData.get("status"),
+    status: formData.get("status") ?? undefined,
     installedAt: formData.get("installedAt") ?? undefined,
   });
 
@@ -311,8 +317,12 @@ export async function updateAirConditionerAction(formData: FormData) {
       data: {
         ...brandFields,
         btu: data.btu,
-        status: data.status,
-        installedAt: data.installedAt ? businessDateFrom(data.installedAt) : null,
+        // Both left out of the update entirely when the form did not send them,
+        // rather than written as null. See the schema comment above.
+        ...(data.status !== undefined ? { status: data.status } : {}),
+        ...(data.installedAt !== undefined
+          ? { installedAt: data.installedAt ? businessDateFrom(data.installedAt) : null }
+          : {}),
       },
     });
 
@@ -327,9 +337,12 @@ export async function updateAirConditionerAction(formData: FormData) {
         installedAt: existing.installedAt?.toISOString() ?? null,
       },
       newValues: {
-        status: data.status,
+        status: data.status ?? existing.status,
         btu: data.btu,
-        installedAt: data.installedAt || null,
+        installedAt:
+          data.installedAt !== undefined
+            ? data.installedAt || null
+            : existing.installedAt?.toISOString() ?? null,
       },
       ipAddress: "server_action",
     });

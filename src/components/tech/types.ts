@@ -1,3 +1,5 @@
+import { matchesQuery } from "@/lib/search";
+
 export interface TechJobItem {
   id: string;
   acCode: string;
@@ -42,10 +44,10 @@ export function filterJobs<T extends { acCode: string; brand: string; location: 
   selectedBuilding: string
 ): T[] {
   return jobs.filter((job) => {
-    const matchesSearch =
-      job.acCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      job.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      job.location.toLowerCase().includes(searchQuery.toLowerCase());
+    // Same comparison the pickers in the forms use — see @/lib/search. Behaviour
+    // is unchanged from the three inline toLowerCase().includes() this replaced;
+    // it just stopped being a fourth private copy of the rule.
+    const matchesSearch = matchesQuery(searchQuery, job.acCode, job.brand, job.location);
 
     const matchesBuilding = selectedBuilding === "all" || job.location.includes(selectedBuilding);
 

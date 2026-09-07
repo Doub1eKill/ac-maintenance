@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { X, Sparkles, Wrench, Droplets } from "lucide-react";
+import { X, Sparkles, Wrench, Droplets, PencilLine } from "lucide-react";
 import { PhotoUpload } from "@/components/tech/photo-upload";
+import { UnitCataloguePanel } from "@/components/tech/unit-catalogue-panel";
 import {
   NativeSelect,
   NativeSelectOption,
@@ -22,6 +23,10 @@ export function LogActionModal({ job, isPending, onClose, onSubmit, onValidation
   const [beforePhotos, setBeforePhotos] = useState<any[]>([]);
   const [afterPhotos, setAfterPhotos] = useState<any[]>([]);
   const [repairDetail, setRepairDetail] = useState("");
+  const [editingUnit, setEditingUnit] = useState(false);
+  // What the unit says after an in-modal correction. null until one is made,
+  // so the job's own values stay the source of truth the rest of the time.
+  const [unitOverride, setUnitOverride] = useState<{ label: string; btu: number | null } | null>(null);
 
   function toggleAction(action: string) {
     setSelectedActions((prev) =>
@@ -78,6 +83,48 @@ export function LogActionModal({ job, isPending, onClose, onSubmit, onValidation
         <form onSubmit={handleSubmit} className="space-y-4 text-xs">
           <input type="hidden" name="workOrderId" value={job.id} />
           <input type="hidden" name="airConditionerId" value={job.airConditionerId || ""} />
+
+          {/* The unit's own record, correctable here. A technician who finds
+              that the model on screen is wrong, or missing from the catalogue
+              entirely, used to have to abandon the visit and ask an admin. */}
+          {job.airConditionerId && (
+            <div>
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <span className="block font-bold text-foreground">เครื่องที่กำลังบันทึก</span>
+                  <span className="block truncate text-[11px] text-muted-foreground">
+                    {unitOverride?.label ?? job.brand}
+                    {(() => {
+                      const btu = unitOverride ? unitOverride.btu : job.btu;
+                      return btu ? ` · ${btu.toLocaleString()} BTU` : "";
+                    })()}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditingUnit((prev) => !prev)}
+                  className="flex shrink-0 items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-[11px] font-bold text-foreground hover:bg-secondary"
+                >
+                  <PencilLine className="h-3.5 w-3.5" />
+                  {editingUnit ? "ปิด" : "แก้ไขรุ่น/BTU"}
+                </button>
+              </div>
+
+              {editingUnit && (
+                <div className="mt-2">
+                  <UnitCataloguePanel
+                    airConditionerId={job.airConditionerId}
+                    currentLabel={job.brand}
+                    currentBtu={job.btu}
+                    onSaved={(next) => {
+                      setUnitOverride(next);
+                      setEditingUnit(false);
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          )}
 
           <div>
             <label className="mb-2 block font-bold text-foreground">ประเภทการดำเนินการ <span className="text-red-500">*</span></label>
