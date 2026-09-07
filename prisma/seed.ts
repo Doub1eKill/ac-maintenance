@@ -254,7 +254,11 @@ async function main() {
   console.log("✅ Comprehensive seed completed successfully!");
 }
 
-main().catch((e) => {
-  console.error("❌ Seed failed:", e);
-  process.exit(1);
-});
+main()
+  .catch((e) => {
+    console.error("Seed failed:", e);
+    process.exitCode = 1;
+  })
+  // Without this the script hangs after printing success: prisma.ts keeps a
+  // connection pool open, and an idle pool keeps the event loop alive forever.
+  .finally(() => prisma.$disconnect());

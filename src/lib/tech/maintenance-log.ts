@@ -86,13 +86,14 @@ export async function logMaintenanceAction(formData: FormData) {
       () => prisma.$transaction(async (tx) => {
       // The two parent rows this transaction ends up owning — the work order
       // and the unit — are locked exclusively first, before the log rows that
-      // reference them are inserted. Insert first and InnoDB takes a shared
-      // lock on each parent for the foreign-key check, so the updates below
-      // become S->X upgrades; an admin cancelling the same job, or the overdue
-      // check touching the same unit, holds the matching lock and neither side
-      // can move. Both cases were reproducible deadlocks (error 1213) before
-      // this order was imposed. Locking X up front leaves the FK checks to
-      // find a lock this transaction already holds.
+      // reference them are inserted. Insert first and PostgreSQL takes a FOR
+      // KEY SHARE lock on each parent for the foreign-key check, so the updates
+      // below become lock upgrades; an admin cancelling the same job, or the
+      // overdue check touching the same unit, holds the matching lock and
+      // neither side can move. Both cases were reproducible deadlocks (SQLSTATE
+      // 40P01, MySQL error 1213 before the port) before this order was imposed.
+      // Locking exclusively up front leaves the FK checks to find a lock this
+      // transaction already holds.
 
       // 1. Walk-up work: no job was raised in advance, so one is opened and
       //    closed in the same breath. Every log row points at a work order,

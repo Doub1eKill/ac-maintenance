@@ -108,7 +108,10 @@ export async function getTechnicianData() {
   } catch (error) {
     console.error("Technician Data query failed:", error);
     return {
-      dbError: "ไม่สามารถเชื่อมต่อฐานข้อมูล MariaDB/MySQL ได้ (Connection Pool Timeout) - กรุณาตรวจสอบว่าเซิร์ฟเวอร์ MySQL บนพอร์ต 3307 เปิดใช้งานอยู่ และเรียกใช้ 'npx tsx prisma/seed.ts'",
+      // No port or engine-setup instructions here: this string reaches
+      // technicians in the field, who can do nothing about either, and the old
+      // one named a port the app has never actually connected to.
+      dbError: "ขณะนี้ระบบเชื่อมต่อฐานข้อมูลไม่ได้ กรุณาลองใหม่อีกครั้งในอีกสักครู่ หากยังไม่หายให้แจ้งผู้ดูแลระบบ",
       universityName: await getOrganisationName(),
       // Session-only fallback: the database is unreachable on this path, so the
       // profile card still renders with whatever the JWT carries. Without this

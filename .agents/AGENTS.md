@@ -7,7 +7,7 @@
 - Server Actions & Route Handlers must independently re-validate role/tenant authorization.
 
 ## 2. Prisma 7 Database & Driver Adapter
-- Prisma 7 requires driver adapter `@prisma/adapter-mariadb` passed into `PrismaClient({ adapter })` in `src/lib/prisma.ts`.
+- Prisma 7 requires driver adapter `@prisma/adapter-pg` passed into `PrismaClient({ adapter })` in `src/lib/prisma.ts`.
 - `datasource.url` in `schema.prisma` is not used at runtime; database URL is loaded via `prisma.config.ts` and `src/lib/prisma.ts`.
 
 ## 3. Multi-Tenant Boundary & RBAC

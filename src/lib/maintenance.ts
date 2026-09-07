@@ -169,13 +169,15 @@ export async function syncOverdueMaintenanceWorkOrders() {
     const overdueIds = overdue.map((s) => s.airConditionerId);
 
     // The unit update comes first, and the order matters: inserting a work
-    // order makes InnoDB take a *shared* lock on the air_conditioners row its
-    // foreign key points at, and asking for the exclusive lock afterwards is
-    // an S->X upgrade. logMaintenanceAction reaches the same row the same way,
-    // so with both holding S and both wanting X, neither can proceed — a
-    // reproducible deadlock (error 1213) that rolled this check back whenever
-    // a technician happened to close a job on a unit in this batch. Taking X
-    // up front means there's no upgrade to contend over.
+    // order makes PostgreSQL take a FOR KEY SHARE lock on the air_conditioners
+    // row its foreign key points at, and asking for the exclusive row lock
+    // afterwards is an upgrade. logMaintenanceAction reaches the same row the
+    // same way, so with both holding the share lock and both wanting the
+    // exclusive one, neither can proceed — a reproducible deadlock (SQLSTATE
+    // 40P01, MySQL error 1213 before the port) that rolled this check back
+    // whenever a technician happened to close a job on a unit in this batch.
+    // Taking the exclusive lock up front means there's no upgrade to contend
+    // over.
     //
     // Nothing about the result changes: the insert doesn't read unit status,
     // and the update is guarded on status = "normal" either way.

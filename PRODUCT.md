@@ -22,7 +22,7 @@ web
 - **การจ่ายงานซ่อมบำรุง (Work Order Dispatch):** การติดตามสถานะใบงานตั้งแต่เปิดแจ้งซ่อม (`pending`) ช่างรับงาน (`claimed`) กำลังดำเนินการ (`in_progress`) จนถึงปิดงาน (`completed`)
 
 ## Capabilities and Constraints
-- **Tech Stack:** Next.js 16 (App Router), Tailwind CSS v4, Prisma 7 (`@prisma/adapter-mariadb`), NextAuth v5, React 19
+- **Tech Stack:** Next.js 16 (App Router), Tailwind CSS v4, Prisma 7 (`@prisma/adapter-pg`), NextAuth v5, React 19
 - **Role-Based Access Control (RBAC):** สิทธิ์การเข้าถึงแยกตามเส้นทาง `/admin/*` และ `/tech/*` โดยมี route guard ที่ `src/proxy.ts` และตรวจ authorization ซ้ำใน Server Actions / Route Handlers
 - **Single-Tenant:** ระบบรองรับสถาบันเดียว ไม่มีการแยกขอบเขตข้อมูลรายหน่วยงาน (ถอด Multi-Tenant ออกแล้วเมื่อ 11 ส.ค. 2026) — บทบาท `org_admin` ยังคงชื่อเดิมไว้เพื่อไม่ให้กระทบการตรวจสิทธิ์ทุกจุด
 - **Authentication Rules:** ผู้ใช้ที่ไม่มี password (`password: null`) จะต้องรีเซ็ตรหัสผ่านก่อนเข้าใช้งาน และผู้ใช้ที่มีสถานะไม่ใช่ `active` จะถูกบล็อกการเข้าถึงระบบ

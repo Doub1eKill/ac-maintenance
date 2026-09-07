@@ -23,8 +23,8 @@
 | React / React DOM | 19.2.4 |
 | TypeScript | 5.9.3 |
 | Prisma ORM + CLI | 7.9.0 |
-| Driver adapter | `@prisma/adapter-mariadb` |
-| ฐานข้อมูล (dev) | MariaDB 10.4.32 (XAMPP, port 3306) |
+| Driver adapter | `@prisma/adapter-pg` |
+| ฐานข้อมูล (dev) | PostgreSQL 16 (port 5432) |
 | NextAuth | 5.0.0-beta |
 | Tailwind CSS | v4 |
 | UI | shadcn/ui + Radix + `lucide-react` |
@@ -34,16 +34,26 @@ route guard อยู่ที่ `src/proxy.ts` (Next.js 16 เปลี่ย�
 
 ## เริ่มต้นใช้งาน
 
-ต้องมี Node.js 20+ และ MariaDB/MySQL ที่เข้าถึงได้
+ต้องมี Node.js 20+ และ PostgreSQL 16 ที่เข้าถึงได้
 
 ```bash
 npm install
 ```
 
+สร้าง database ด้วย **ICU collation ภาษาไทย** — ต้องทำตอนสร้างเท่านั้น เปลี่ยนทีหลังไม่ได้
+และถ้าใช้ค่าเริ่มต้น ชื่อที่ขึ้นต้นด้วยสระหน้า (เ แ โ ใ ไ) จะเรียงผิดทุกหน้าจอ:
+
+```sql
+CREATE DATABASE ac_maintenance
+  TEMPLATE template0 ENCODING 'UTF8'
+  LOCALE_PROVIDER icu ICU_LOCALE 'th-TH'
+  LC_COLLATE 'C' LC_CTYPE 'C';
+```
+
 สร้างไฟล์ `.env` ที่ root:
 
 ```env
-DATABASE_URL="mysql://root:@127.0.0.1:3306/ac_maintenance"
+DATABASE_URL="postgresql://postgres:<รหัสผ่าน>@127.0.0.1:5432/ac_maintenance"
 AUTH_SECRET="<สร้างด้วย npx auth secret>"
 ```
 
