@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition, useActionState } from "react";
 import Image from "next/image";
 import { useTheme } from "next-themes";
-import { User, Mail, Phone, Building2, KeyRound, AlertTriangle, CheckCircle2, Sun, Moon, Monitor, Camera } from "lucide-react";
+import { User, Mail, Phone, Building2, KeyRound, AlertTriangle, CheckCircle2, Sun, Moon, Monitor, Camera, Pencil } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { requestPasswordReset, type RequestResetState } from "@/app/request-password-reset/actions";
 import { updateProfileAction } from "@/app/admin/actions";
@@ -38,6 +38,11 @@ const AVATAR_MAX_BYTES = 8 * 1024 * 1024;
 // selects the primary phone now, so the flag is gone rather than flipped —
 // leaving it would only be a switch nobody may use.
 export function ProfilePanel({ profile, universityName }: ProfilePanelProps) {
+  // Read-only until the user asks to edit. A profile page is opened far more
+  // often to look something up than to change something, and fields that are
+  // always live invite a stray keystroke into a name nobody meant to touch.
+  // The picture is the deliberate exception — see the note on the save button.
+  const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState(profile.name);
   const [phone, setPhone] = useState(profile.phone ?? "");
   const [saveResult, setSaveResult] = useState<{ success?: boolean; error?: string } | null>(null);
@@ -98,12 +103,41 @@ export function ProfilePanel({ profile, universityName }: ProfilePanelProps) {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  const startEditing = () => {
+    // Seed the inputs from the server data rather than from whatever the last
+    // edit left in state, so reopening the form always starts from what is
+    // actually stored.
+    setName(profile.name);
+    setPhone(profile.phone ?? "");
+    setSaveResult(null);
+    setIsEditing(true);
+  };
+
+  const cancelEditing = () => {
+    setIsEditing(false);
+    setName(profile.name);
+    setPhone(profile.phone ?? "");
+    setSaveResult(null);
+    // A pending picture is deliberately left alone: it can be chosen without
+    // entering the form at all, so cancelling the form must not silently throw
+    // away a pick made before the form was even opened. It has its own
+    // "ยกเลิกรูปที่เลือก" beside the preview.
+  };
+
   const handleSave = () => {
     setSaveResult(null);
+    // Outside the form the only thing that can have changed is the picture, so
+    // the name and phone sent are the stored ones, not the local state. That
+    // state was seeded at mount and would otherwise write a stale name back
+    // over a newer one on a picture-only save.
+    const nextName = isEditing ? name : profile.name;
+    const nextPhone = isEditing ? phone : profile.phone ?? "";
+
     startSaveTransition(async () => {
-      const result = await updateProfileAction(name, phone, avatarFile);
+      const result = await updateProfileAction(nextName, nextPhone, avatarFile);
       setSaveResult(result);
       if (result?.success) {
+        setIsEditing(false);
         // Only the pending state is cleared. The preview stays on screen — it
         // is the picture that was just saved, and profile.avatarUrl catches up
         // a moment later when the revalidated data arrives.
@@ -112,6 +146,13 @@ export function ProfilePanel({ profile, universityName }: ProfilePanelProps) {
       }
     });
   };
+
+  // Named after the button it points at, because the button is not always the
+  // same one: inside the form it saves everything, outside it there is only
+  // ever a picture to save.
+  const saveLabel = isEditing ? "บันทึกการเปลี่ยนแปลง" : "บันทึกรูปโปรไฟล์";
+  // Nothing to save outside the form until a picture is waiting.
+  const canSave = isEditing || avatarFile !== null;
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -174,7 +215,7 @@ export function ProfilePanel({ profile, universityName }: ProfilePanelProps) {
 
         {avatarFile && !avatarError && (
           <div className="flex flex-wrap items-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-3.5 py-2.5 text-xs text-foreground">
-            <span>เลือกรูปใหม่แล้ว — กด &quot;บันทึกการเปลี่ยนแปลง&quot; ด้านล่างเพื่อยืนยัน</span>
+            <span>เลือกรูปใหม่แล้ว — กด &quot;{saveLabel}&quot; ด้านล่างเพื่อยืนยัน</span>
             <button
               type="button"
               onClick={cancelAvatarPick}
@@ -186,34 +227,58 @@ export function ProfilePanel({ profile, universityName }: ProfilePanelProps) {
         )}
 
         <div className="space-y-4 pt-2 border-t border-border">
+          {/* Read-only rows borrow the email field's treatment, which has always
+              been display-only here — so "cannot be edited right now" and
+              "cannot be edited at all" look the same, which is the truth from
+              where the user is standing. */}
           <div>
             <label htmlFor="profile-name" className="mb-1.5 block text-xs font-bold text-foreground">
               ชื่อ-นามสกุล
             </label>
-            <input
-              id="profile-name"
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-xl border border-border bg-muted px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
-            />
+            {isEditing ? (
+              <input
+                id="profile-name"
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full rounded-xl border border-border bg-muted px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
+              />
+            ) : (
+              <div
+                id="profile-name"
+                className="flex items-center gap-2 rounded-xl border border-border bg-muted/50 px-3.5 py-2.5 text-sm text-muted-foreground"
+              >
+                <User className="h-4 w-4 shrink-0" />
+                {profile.name || "-"}
+              </div>
+            )}
           </div>
 
           <div>
             <label htmlFor="profile-phone" className="mb-1.5 block text-xs font-bold text-foreground">
               เบอร์โทรศัพท์
             </label>
-            <div className="relative">
-              <Phone className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <input
+            {isEditing ? (
+              <div className="relative">
+                <Phone className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  id="profile-phone"
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="081-234-5678"
+                  className="w-full rounded-xl border border-border bg-muted pl-10 pr-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
+                />
+              </div>
+            ) : (
+              <div
                 id="profile-phone"
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="081-234-5678"
-                className="w-full rounded-xl border border-border bg-muted pl-10 pr-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
-              />
-            </div>
+                className="flex items-center gap-2 rounded-xl border border-border bg-muted/50 px-3.5 py-2.5 text-sm text-muted-foreground"
+              >
+                <Phone className="h-4 w-4 shrink-0" />
+                {profile.phone || "ยังไม่ได้ระบุ"}
+              </div>
+            )}
           </div>
 
           <div>
@@ -246,14 +311,42 @@ export function ProfilePanel({ profile, universityName }: ProfilePanelProps) {
           </Alert>
         )}
 
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={isSaving}
-          className="w-full sm:w-auto rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
-        >
-          {isSaving ? "กำลังบันทึก..." : "บันทึกการเปลี่ยนแปลง"}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {!isEditing && (
+            <button
+              type="button"
+              onClick={startEditing}
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-border bg-card px-5 py-2.5 text-sm font-bold text-foreground hover:bg-secondary transition-colors sm:w-auto"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              แก้ไขข้อมูล
+            </button>
+          )}
+
+          {/* Shown outside the form too, because a picture can be changed
+              without opening it and would otherwise have no way to be saved. */}
+          {canSave && (
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={isSaving}
+              className="w-full sm:w-auto rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+            >
+              {isSaving ? "กำลังบันทึก..." : saveLabel}
+            </button>
+          )}
+
+          {isEditing && (
+            <button
+              type="button"
+              onClick={cancelEditing}
+              disabled={isSaving}
+              className="w-full sm:w-auto rounded-xl border border-border bg-card px-5 py-2.5 text-sm font-bold text-foreground hover:bg-secondary disabled:opacity-50 transition-colors"
+            >
+              ยกเลิก
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Card 2: Appearance */}
