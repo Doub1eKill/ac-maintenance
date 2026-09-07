@@ -2,7 +2,25 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { logAudit } from "@/lib/audit";
-import { verifyOrgAdmin } from "@/lib/auth-guards";
+import { verifyOrgAdmin, verifyAssetEditor } from "@/lib/auth-guards";
+
+/**
+ * How two catalogue names are compared for "is this the same thing".
+ *
+ * The unique indexes match byte for byte, which was enough while one admin
+ * typed every row. Technicians add models from the field now, and "Inverter
+ * 12000", "inverter 12000" and "Inverter  12000" are the same product typed by
+ * three people — all three get past a byte comparison and leave the catalogue
+ * holding duplicates that no query can collapse afterwards.
+ */
+function normaliseCatalogueName(name: string): string {
+  return name.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+/** Stored form: trimmed and de-doubled, but the author's own capitalisation. */
+function tidyCatalogueName(name: string): string {
+  return name.trim().replace(/\s+/g, " ");
+}
 
 // The AC brand/model catalogue: the list of brands and models an air
 // conditioner can be registered against, plus the soft-delete trash bin behind
@@ -13,7 +31,7 @@ import { verifyOrgAdmin } from "@/lib/auth-guards";
 // to the org admin instead — through the shared verifyOrgAdmin guard rather
 // than the byte-identical private copy this file used to carry.
 export async function getAcMasterData() {
-  await verifyOrgAdmin();
+  await verifyAssetEditor();
   
   try {
     const brands = await prisma.acBrand.findMany({
@@ -60,30 +78,51 @@ const brandSchema = z.object({
 });
 
 export async function createAcBrandAction(formData: FormData) {
-  await verifyOrgAdmin();
-  
+  const session = await verifyAssetEditor();
+
   const parsed = brandSchema.safeParse({ name: formData.get("name") });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message };
-  
+
   try {
+    const name = tidyCatalogueName(parsed.data.name);
+
     // ac_brands_name_unique covers retired brands too, so a plain "already
     // exists" would be a dead end here: the row is real but invisible on the
     // page, and no amount of retyping gets past it. Point at the trash bin
     // instead — restoring is what is actually being asked for.
-    const existing = await prisma.acBrand.findUnique({
-      where: { name: parsed.data.name }
-    });
+    //
+    // Compared in JS rather than by findUnique so a differently-cased or
+    // differently-spaced spelling of the same brand is caught as the duplicate
+    // it is. The catalogue is a handful of rows, so reading it costs nothing.
+    const existing = (
+      await prisma.acBrand.findMany({ select: { id: true, name: true, deletedAt: true } })
+    ).find((b) => normaliseCatalogueName(b.name) === normaliseCatalogueName(name));
+
     if (existing) {
       return {
         error: existing.deletedAt
-          ? "ยี่ห้อนี้อยู่ในถังขยะ กรุณากู้คืนจากถังขยะแทนการเพิ่มใหม่"
-          : "มียี่ห้อนี้อยู่ในระบบแล้ว"
+          ? `ยี่ห้อนี้อยู่ในถังขยะ (ชื่อในระบบ: ${existing.name}) กรุณาให้ผู้ดูแลระบบกู้คืนแทนการเพิ่มใหม่`
+          : `มียี่ห้อนี้อยู่ในระบบแล้ว (ชื่อในระบบ: ${existing.name})`
       };
     }
-    
-    await prisma.acBrand.create({ data: { name: parsed.data.name } });
+
+    const brand = await prisma.acBrand.create({ data: { name }, select: { id: true } });
+
+    // Audited from here on because two roles write to the catalogue now, and
+    // "who added this brand" is the first question asked when a duplicate or a
+    // typo turns up in the dropdown.
+    await logAudit({
+      userId: BigInt(session.user.id!),
+      action: "CREATE_AC_BRAND",
+      entityType: "acBrand",
+      entityId: brand.id,
+      newValues: { name },
+      ipAddress: "server_action",
+    });
+
     revalidatePath("/admin", "layout");
-    return { success: true };
+    revalidatePath("/tech", "layout");
+    return { success: true, brandId: brand.id.toString() };
   } catch (error) {
     console.error(error);
     return { error: "เกิดข้อผิดพลาดในการบันทึกยี่ห้อ" };
@@ -97,8 +136,8 @@ const modelSchema = z.object({
 });
 
 export async function createAcModelAction(formData: FormData) {
-  await verifyOrgAdmin();
-  
+  const session = await verifyAssetEditor();
+
   const parsed = modelSchema.safeParse({
     brandId: formData.get("brandId"),
     name: formData.get("name"),
@@ -111,35 +150,50 @@ export async function createAcModelAction(formData: FormData) {
   }
   
   try {
-    const existing = await prisma.acModel.findUnique({
-      where: {
-        brandId_name: {
-          brandId: BigInt(parsed.data.brandId),
-          name: parsed.data.name
-        }
-      }
-    });
-    
+    const brandId = BigInt(parsed.data.brandId);
+    const name = tidyCatalogueName(parsed.data.name);
+
     // Same trap as the brand name above: ac_models_brand_id_name_unique does
-    // not care that the row is in the trash.
+    // not care that the row is in the trash. Scoped to the chosen brand, since
+    // the same model name under a different brand is a different product.
+    const existing = (
+      await prisma.acModel.findMany({
+        where: { brandId },
+        select: { id: true, name: true, deletedAt: true },
+      })
+    ).find((m) => normaliseCatalogueName(m.name) === normaliseCatalogueName(name));
+
     if (existing) {
       return {
         error: existing.deletedAt
-          ? "รุ่นนี้อยู่ในถังขยะ กรุณากู้คืนจากถังขยะแทนการเพิ่มใหม่"
-          : "มีรุ่นนี้อยู่ในยี่ห้อที่เลือกแล้ว"
+          ? `รุ่นนี้อยู่ในถังขยะ (ชื่อในระบบ: ${existing.name}) กรุณาให้ผู้ดูแลระบบกู้คืนแทนการเพิ่มใหม่`
+          : `มีรุ่นนี้อยู่ในยี่ห้อที่เลือกแล้ว (ชื่อในระบบ: ${existing.name})`
       };
     }
-    
-    await prisma.acModel.create({
+
+    const model = await prisma.acModel.create({
       data: {
-        brandId: BigInt(parsed.data.brandId),
-        name: parsed.data.name,
+        brandId,
+        name,
         defaultBtu: parsed.data.defaultBtu
-      }
+      },
+      select: { id: true }
     });
-    
+
+    await logAudit({
+      userId: BigInt(session.user.id!),
+      action: "CREATE_AC_MODEL",
+      entityType: "acModel",
+      entityId: model.id,
+      newValues: { brandId: brandId.toString(), name, defaultBtu: parsed.data.defaultBtu },
+      ipAddress: "server_action",
+    });
+
     revalidatePath("/admin", "layout");
-    return { success: true };
+    revalidatePath("/tech", "layout");
+    // The id goes back so a form that created a model on the spot can select it
+    // without a round trip — the whole point of adding one from the field.
+    return { success: true, modelId: model.id.toString() };
   } catch (error) {
     console.error(error);
     return { error: "เกิดข้อผิดพลาดในการบันทึกรุ่นแอร์" };

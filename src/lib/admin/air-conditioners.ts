@@ -4,7 +4,24 @@ import { prisma } from "@/lib/prisma";
 import { logAudit } from "@/lib/audit";
 import { businessDateToday, businessDateFrom, addMaintenanceInterval } from "@/lib/maintenance";
 import { getDefaultMaintenanceFrequency } from "@/lib/organisation";
-import { verifyOrgAdmin } from "@/lib/auth-guards";
+import { verifyAssetEditor } from "@/lib/auth-guards";
+
+/**
+ * A unique-constraint violation coming back from Prisma.
+ *
+ * Only ac_code and qr_code are unique on the insert below, and qr_code is a
+ * freshly minted uuid, so in practice this means the sequence number lost a
+ * race. Matched on the code alone rather than on meta.target, whose shape
+ * differs between the driver adapters.
+ */
+function isUniqueConflict(error: unknown): boolean {
+  return (
+    typeof error === "object" && error !== null && (error as { code?: unknown }).code === "P2002"
+  );
+}
+
+// How many times to recompute the sequence number before giving up.
+const MAX_AC_CODE_ATTEMPTS = 5;
 
 // Registering and editing an air conditioner. The longest of the five asset
 // modules, because creating a unit also mints its QR code and opens its first
@@ -26,7 +43,7 @@ const acSchema = z.object({
 });
 
 export async function createAirConditionerAction(formData: FormData) {
-  await verifyOrgAdmin();
+  const session = await verifyAssetEditor();
 
   // Every optional field is read with `?? undefined`. The form renders only
   // one of the two brand branches at a time, so the inputs belonging to the
@@ -57,20 +74,13 @@ export async function createAirConditionerAction(formData: FormData) {
   try {
     const room = await prisma.room.findUnique({
       where: { id: BigInt(data.roomId) },
-      include: { building: true, airConditioners: true }
+      select: { id: true, name: true, building: { select: { abbreviation: true } } }
     });
 
     if (!room) {
       return { error: "ห้องไม่ถูกต้อง" };
     }
 
-    // Generate AC Code: [BLDG]-[ROOM]-[NN]. The university segment this used
-    // to carry was dropped along with multi-tenancy — one institution means
-    // the building abbreviation is already unique on its own.
-    const unitCount = room.airConditioners.length + 1;
-    const acCode = `${room.building.abbreviation}-${room.name}-${unitCount.toString().padStart(2, '0')}`;
-    const qrCode = crypto.randomUUID();
-    
     // installed_at is a DATE column, so it needs a calendar day anchored at
     // UTC midnight — not `new Date()`, whose UTC date is still yesterday
     // between 00:00 and 07:00 here (the same trap P16 fixed for the
@@ -81,12 +91,10 @@ export async function createAirConditionerAction(formData: FormData) {
 
     let dbData: any = {
       roomId: room.id,
-      acCode,
-      qrCode,
       btu: data.btu,
       installedAt,
     };
-    
+
     if (data.brandType === "master") {
       // findFirst rather than findUnique: a retired model — or one whose brand
       // was retired — is still a row with that id, and accepting it here would
@@ -113,22 +121,77 @@ export async function createAirConditionerAction(formData: FormData) {
     const { value: frequencyValue, unit: frequencyUnit } =
       await getDefaultMaintenanceFrequency();
 
-    await prisma.$transaction(async (tx) => {
-      const ac = await tx.airConditioner.create({ data: dbData, select: { id: true } });
+    // acCode is [BLDG]-[ROOM]-[NN]; the university segment it used to carry
+    // went away with multi-tenancy, since one institution makes the building
+    // abbreviation unique on its own. No floor segment on purpose: rooms are
+    // already unique per building by constraint, both datasets encode the floor
+    // in the room name, rooms.floor is nullable, and this string is printed on
+    // a sticker and never changes while the floor can be corrected at any time.
+    //
+    // The sequence is counted, not stored, so two people registering into the
+    // same room at once compute the same number. One admin could not race
+    // themselves; technicians in the field can. Recount and try again rather
+    // than hold a row lock: locking would mean raw SQL, and src/ has none —
+    // which is what kept the move to PostgreSQL a mechanical job.
+    //
+    // `+ attempt` rather than `+ 1` so a room whose codes have a gap in them
+    // (a unit hard-deleted long ago) climbs past the gap instead of retrying
+    // onto the same taken number until it runs out of attempts.
+    let created: { id: bigint; acCode: string } | null = null;
 
-      await tx.maintenanceSchedule.create({
-        data: {
-          airConditionerId: ac.id,
-          frequencyValue,
-          frequencyUnit,
-          nextDueDate: firstDueDateFor(installedAt, frequencyValue, frequencyUnit),
-          isActive: true,
-        },
-      });
+    for (let attempt = 1; attempt <= MAX_AC_CODE_ATTEMPTS; attempt++) {
+      // Soft-deleted units are counted deliberately: skipping them would hand
+      // a new unit the code of a retired one, which is still a row under the
+      // same unique index.
+      const unitCount = await prisma.airConditioner.count({ where: { roomId: room.id } });
+      const sequence = unitCount + attempt;
+      const acCode = `${room.building.abbreviation}-${room.name}-${sequence.toString().padStart(2, "0")}`;
+
+      try {
+        created = await prisma.$transaction(async (tx) => {
+          const ac = await tx.airConditioner.create({
+            data: { ...dbData, acCode, qrCode: crypto.randomUUID() },
+            select: { id: true, acCode: true },
+          });
+
+          await tx.maintenanceSchedule.create({
+            data: {
+              airConditionerId: ac.id,
+              frequencyValue,
+              frequencyUnit,
+              nextDueDate: firstDueDateFor(installedAt, frequencyValue, frequencyUnit),
+              isActive: true,
+            },
+          });
+
+          return ac;
+        });
+        break;
+      } catch (error) {
+        if (!isUniqueConflict(error) || attempt === MAX_AC_CODE_ATTEMPTS) throw error;
+        console.warn(`[ac-code] ${acCode} taken, recomputing (attempt ${attempt})`);
+      }
+    }
+
+    if (!created) return { error: "ไม่สามารถสร้างรหัสแอร์ที่ไม่ซ้ำได้ กรุณาลองใหม่อีกครั้ง" };
+
+    await logAudit({
+      userId: BigInt(session.user.id!),
+      action: "CREATE_AIRCONDITIONER",
+      entityType: "airConditioner",
+      entityId: created.id,
+      newValues: {
+        acCode: created.acCode,
+        roomId: room.id.toString(),
+        btu: data.btu,
+        installedAt: installedAt?.toISOString() ?? null,
+      },
+      ipAddress: "server_action",
     });
 
     revalidatePath("/admin", "layout");
-    return { success: true };
+    revalidatePath("/tech", "layout");
+    return { success: true, acCode: created.acCode };
   } catch (error) {
     console.error(error);
     return { error: "เกิดข้อผิดพลาดในการลงทะเบียนแอร์" };
@@ -191,7 +254,7 @@ const updateAcSchema = z.object({
  * different decision from correcting a status.
  */
 export async function updateAirConditionerAction(formData: FormData) {
-  const session = await verifyOrgAdmin();
+  const session = await verifyAssetEditor();
 
   const parsed = updateAcSchema.safeParse({
     airConditionerId: formData.get("airConditionerId"),
@@ -272,6 +335,7 @@ export async function updateAirConditionerAction(formData: FormData) {
     });
 
     revalidatePath("/admin", "layout");
+    revalidatePath("/tech", "layout");
     return { success: true };
   } catch (error) {
     console.error("Failed to update air conditioner:", error);

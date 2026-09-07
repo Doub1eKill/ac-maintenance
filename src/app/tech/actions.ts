@@ -17,6 +17,14 @@ import * as dashboard from "@/lib/tech/dashboard";
 import * as jobs from "@/lib/tech/jobs";
 import * as maintenanceLog from "@/lib/tech/maintenance-log";
 import * as qr from "@/lib/tech/qr";
+// The asset catalogue is not duplicated under src/lib/tech: these are the same
+// modules the admin pages call, now behind verifyAssetEditor instead of
+// verifyOrgAdmin. Their rules — retired models filtered out, the first-due-date
+// cutoff, the two mutually exclusive brand paths, the schedule opened inside
+// the unit's transaction — are the reason there is one copy and not two.
+import * as masterData from "@/lib/admin/master-data";
+import * as airConditioners from "@/lib/admin/air-conditioners";
+import * as schedules from "@/lib/admin/schedules";
 
 // --- dashboard ---
 
@@ -52,4 +60,49 @@ export async function logMaintenanceAction(
 
 export async function scanQrCodeAction(...args: Parameters<typeof qr.scanQrCodeAction>) {
   return qr.scanQrCodeAction(...args);
+}
+
+// --- the AC catalogue ---
+//
+// Adding only. Deleting, restoring and purging stay off this surface on
+// purpose: they are guarded by verifyOrgAdmin and would throw even if a
+// wrapper existed, and leaving them out means the technician bundle never
+// carries a reference to them at all.
+
+export async function getAcMasterDataAction(
+  ...args: Parameters<typeof masterData.getAcMasterData>
+) {
+  return masterData.getAcMasterData(...args);
+}
+
+export async function createAcBrandAction(
+  ...args: Parameters<typeof masterData.createAcBrandAction>
+) {
+  return masterData.createAcBrandAction(...args);
+}
+
+export async function createAcModelAction(
+  ...args: Parameters<typeof masterData.createAcModelAction>
+) {
+  return masterData.createAcModelAction(...args);
+}
+
+// --- units ---
+
+export async function createAirConditionerAction(
+  ...args: Parameters<typeof airConditioners.createAirConditionerAction>
+) {
+  return airConditioners.createAirConditionerAction(...args);
+}
+
+export async function updateAirConditionerAction(
+  ...args: Parameters<typeof airConditioners.updateAirConditionerAction>
+) {
+  return airConditioners.updateAirConditionerAction(...args);
+}
+
+export async function saveMaintenanceScheduleAction(
+  ...args: Parameters<typeof schedules.saveMaintenanceScheduleAction>
+) {
+  return schedules.saveMaintenanceScheduleAction(...args);
 }

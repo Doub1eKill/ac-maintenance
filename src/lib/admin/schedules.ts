@@ -2,7 +2,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { businessDateToday, addMaintenanceInterval } from "@/lib/maintenance";
-import { verifyOrgAdmin } from "@/lib/auth-guards";
+import { verifyAssetEditor } from "@/lib/auth-guards";
 
 // Preventive-maintenance schedules: how often a unit is due for a clean.
 const scheduleSchema = z.object({
@@ -12,7 +12,7 @@ const scheduleSchema = z.object({
 });
 
 export async function saveMaintenanceScheduleAction(formData: FormData) {
-  await verifyOrgAdmin();
+  await verifyAssetEditor();
 
   const parsed = scheduleSchema.safeParse({
     airConditionerId: formData.get("airConditionerId"),
