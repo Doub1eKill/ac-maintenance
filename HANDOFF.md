@@ -1849,6 +1849,98 @@ useEffect(() => {
 
 ---
 
+# 🐘 ย้ายไป PostgreSQL — ขั้นที่ 0–5 เสร็จแล้วบน `feat/postgres` (7 ก.ย. 2026, DoubleKill)
+
+> **อ่านก่อน:** ทุกหัวข้อในไฟล์นี้ที่บอกวิธีสตาร์ท mysqld ผ่าน WMI, เรียก `mysql.exe -h 127.0.0.1 -P 3306`, หรือพูดถึง deadlock errno 1213 ของ MariaDB 10.4.32 — **ใช้กับ branch `feat/postgres` ไม่ได้แล้ว** เก็บไว้เป็นประวัติของฝั่ง `master` ซึ่งยังต่อ MariaDB อยู่ · คำสั่งที่ใช้แทนอยู่ท้ายหัวข้อนี้
+
+## สถานะ: ขั้น 0–5 เสร็จ · ขั้น 6–8 ยังไม่เริ่ม
+
+| ขั้น | สถานะ | commit |
+|---|---|---|
+| 0. เตรียม (branch, ลง PG, สร้าง Aiven service) | **เสร็จ 2 จาก 3** — Aiven ยังไม่ได้สร้าง ต้องเจ้าของโปรเจกต์ล็อกอินเอง | — |
+| 1. `schema.prisma` 34 annotation | **เสร็จ** | `620d4d1` |
+| 2. migration ทิ้งทั้งชุด สร้างใหม่ใบเดียว | **เสร็จ** | `620d4d1` |
+| 3. `src/lib/prisma.ts` เขียนใหม่ | **เสร็จ** | `6d37760` |
+| 4. `src/lib/db-retry.ts` | **เสร็จ** | `6d37760` |
+| 5. เก็บกวาดที่อ้างถึง MySQL | **เสร็จ** | `6d37760` |
+| 6. โหลดข้อมูลจริง | ยังไม่เริ่ม — รอข้อมูลจริงจากเจ้าของโปรเจกต์ |
+| 7. ทดสอบก่อน merge | ทดสอบเบื้องต้นผ่านแล้ว (ดูด้านล่าง) แต่ยังไม่ครบ checklist |
+| 8. ขึ้น production | ยังไม่เริ่ม — บล็อกที่ Aiven |
+
+**จำนวนที่แผนประเมินไว้ตรงกับของจริงทุกตัว:** `@db.UnsignedBigInt` 27 · `@db.UnsignedInt` 4 · `@db.UnsignedSmallInt` 2 · `@db.DateTime(0)` 1 = 34
+
+## PostgreSQL บนเครื่อง dev
+
+ลงผ่าน `winget install PostgreSQL.PostgreSQL.16` (EDB installer, hash ตรวจแล้ว) → **PostgreSQL 16.15** · service `postgresql-x64-16` ตั้งเป็น **Automatic ขึ้นเองตอนบูต ไม่ต้อง spawn ผ่าน WMI แบบ mysqld อีกแล้ว** · พอร์ต 5432
+
+```powershell
+# สตาร์ท/หยุด — ธรรมดา ไม่มีกับดักแบบ mysqld
+Start-Service postgresql-x64-16
+Stop-Service  postgresql-x64-16
+Get-Service   postgresql-x64-16
+```
+
+```bash
+# psql — ต้องตั้ง PGCLIENTENCODING ไม่งั้นภาษาไทยบน command line จะพัง
+# ("invalid byte sequence for encoding UTF8" เพราะ console เป็น CP874)
+export PGPASSWORD='<รหัส postgres>'; export PGCLIENTENCODING=UTF8
+"/c/Program Files/PostgreSQL/16/bin/psql.exe" -U postgres -h 127.0.0.1 -d ac_maintenance -c "SELECT ..."
+
+# ภาษาไทยยาวๆ ให้เขียนลงไฟล์ .sql แล้วใช้ -f แทน -c จะปลอดภัยกว่ามาก
+```
+
+### 🔴 database ถูกสร้างด้วย ICU collation แล้ว — ห้ามสร้างใหม่โดยลืมข้อนี้
+
+```sql
+CREATE DATABASE ac_maintenance
+  TEMPLATE template0 ENCODING 'UTF8'
+  LOCALE_PROVIDER icu ICU_LOCALE 'th-TH'
+  LC_COLLATE 'C' LC_CTYPE 'C';
+```
+
+ตรวจแล้วว่าติดจริง (`pg_database`: `datlocprovider = i`, `daticulocale = th-TH`) และพิสูจน์ผลด้วยข้อมูลจริง:
+
+| collation | ผลการเรียง |
+|---|---|
+| ICU th-TH (ที่ใช้) | กองกลาง < เครื่องปรับอากาศ < แผนกซ่อม < ไฟฟ้า < โรงอาหาร < ห้องประชุม < อาคารวิทยาศาสตร์ |
+| C / codepoint (ถ้าพลาด) | กองกลาง < ห้องประชุม < อาคารวิทยาศาสตร์ < เครื่องปรับอากาศ < แผนกซ่อม < โรงอาหาร < ไฟฟ้า |
+
+แถวล่างคือสิ่งที่ `orderBy: { name: "asc" }` ทั้ง 11 จุดใน `src/lib/**` จะได้ถ้าใช้ค่าเริ่มต้น — คำที่ขึ้นต้นด้วยสระหน้าไปกองท้ายหมด · **เปลี่ยนทีหลังไม่ได้ ต้อง dump/restore ใหม่**
+
+## ⚠️ `.env` ไม่ได้ถูก track ใน git — มันไม่เปลี่ยนตามตอน checkout ข้าม branch
+
+สลับไป `master` (ซึ่งยังเป็น MariaDB) ทั้งที่ `.env` ชี้ PG อยู่ = แอปพัง หาสาเหตุยาก · ตอนนี้ `.env` เก็บทั้งสองบรรทัดไว้แล้ว สลับด้วยการสลับคอมเมนต์:
+
+```env
+DATABASE_URL="postgresql://postgres:<รหัส>@127.0.0.1:5432/ac_maintenance"
+# DATABASE_URL="mysql://root:@127.0.0.1:3306/ac_maintenance"
+```
+
+## ทดสอบผ่านหน้าจอจริงแล้ว (ยังไม่ครบ checklist ขั้นที่ 7)
+
+| ทดสอบ | ผล |
+|---|---|
+| `prisma migrate dev` สร้าง init ใบเดียว | DDL ไม่มี `AUTO_INCREMENT` / `BIGINT UNSIGNED` / `utf8mb4` / `UTC_TIMESTAMP()` เลย · ได้ BIGSERIAL 11, enum type 6, `timestamp(0)` 29, `jsonb` 3 ✅ |
+| `npx tsx prisma/seed.ts` | สำเร็จ **และ process จบเอง** (แก้เรื่องไม่ `$disconnect()` แล้ว) ✅ |
+| ล็อกอิน demo-role ทั้ง admin และ technician | ผ่านทั้งคู่ ✅ |
+| `/admin` แดชบอร์ด | สถิติ กลุ่มอาคาร ตารางรอซ่อมด่วน ขึ้นครบ 9 เครื่อง / 3 ใบงาน ✅ |
+| route guard | admin เปิด `/tech` แล้วเด้งกลับ login ✅ |
+| `/tech` job pool | เห็นใบงานที่รอรับ พร้อมวันที่แจ้ง 07/09/2026 ถูกต้อง ✅ |
+| **กดรับงาน (write + transaction)** | `status` → `claimed`, `claimed_by` = 2, `claimed_at` เก็บเป็น **UTC** ถูกต้อง ✅ |
+| console / server log | ไม่มี error ✅ |
+| `tsc --noEmit` | ผ่าน 0 error ✅ |
+| `eslint` | ไม่มีปัญหาใหม่ — 51 รายการที่เหลือ**มีมาก่อน**ทั้งหมด (ตรวจทีละไฟล์ที่แก้แล้ว) ✅ |
+
+**คืนค่าข้อมูลทดสอบแล้ว** ด้วยการรัน seed ซ้ำ · id ของ work_orders ขยับเป็น 4–6 เพราะ BIGSERIAL ไม่ย้อน sequence (พฤติกรรมเดียวกับ AUTO_INCREMENT)
+
+## 🔎 เจอระหว่างทาง ยังไม่ได้แก้
+
+**หน้า login ยังมีป้าย "Multi-Tenant Campus Platform"** — เป็นข้อความที่ผู้ใช้เห็นจริงบนหน้าจอ ทั้งที่ถอด multi-tenancy ไปตั้งแต่ 11 ส.ค. · อยู่คนละเรื่องกับการย้าย DB เลยไม่แตะในรอบนี้ (`PRODUCT.md` ที่มีปัญหาเดียวกันแก้ไปแล้วใน `dca5dff`)
+
+**`prisma.config.ts` ยังไม่มี key `seed`** จึงใช้ `npx prisma db seed` ไม่ได้ ต้องเรียก `npx tsx prisma/seed.ts` ตรงๆ (README เขียนไว้แล้ว)
+
+---
+
 # 🖥️ ตั้งเครื่อง dev ใหม่ + คืนฐานข้อมูลให้ตรงกับเครื่องเดิม (7 ก.ย. 2026, DoubleKill)
 
 เจ้าของโปรเจกต์ย้ายมาทำงานบนเครื่องใหม่ที่ `C:\Project\ac-maintenance` · บันทึกไว้เพราะขั้นตอนนี้มีกับดักที่เสียเวลาไปจริง
