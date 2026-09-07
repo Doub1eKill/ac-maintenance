@@ -1,7 +1,7 @@
 "use client";
 
 import { format } from "date-fns";
-import { Clock, Droplets, Snowflake, Wrench } from "lucide-react";
+import { CalendarClock, Clock, Droplets, Snowflake, Wrench } from "lucide-react";
 import {
   BuildingGroupList,
   FloorGroupList,
@@ -22,6 +22,8 @@ interface AssetsPanelProps {
   // Opens the shared history modal on one unit. Optional so the panel still
   // renders read-only wherever no handler is wired.
   onViewHistory?: (airConditionerId: string) => void;
+  // Opens the cleaning-cycle modal. Optional for the same reason.
+  onEditSchedule?: (unit: TechnicianAssetUnit) => void;
 }
 
 // The open work on a group of units, as the two badges the cards themselves
@@ -54,6 +56,7 @@ export function AssetsPanel({
   searchQuery,
   selectedBuilding,
   onViewHistory,
+  onEditSchedule,
 }: AssetsPanelProps) {
   const filteredAssets = filterJobs(assetList, searchQuery, selectedBuilding);
   const groups = groupByBuilding(filteredAssets);
@@ -137,6 +140,20 @@ export function AssetsPanel({
                               <span className="text-[10px] text-muted-foreground mt-1">
                                 {unit.lastCleanedAt ? format(new Date(unit.lastCleanedAt), "dd/MM/yyyy") : "ยังไม่เคยล้าง"}
                               </span>
+                              {/* The cycle sits under the last visit because the
+                                  two are read together: "cleaned in March, due
+                                  every 6 months" is one thought. */}
+                              <span className="text-[10px] text-muted-foreground">
+                                {unit.schedule
+                                  ? `ล้างทุก ${unit.schedule.value} ${
+                                      unit.schedule.unit === "days"
+                                        ? "วัน"
+                                        : unit.schedule.unit === "years"
+                                          ? "ปี"
+                                          : "เดือน"
+                                    }`
+                                  : "ยังไม่ได้ตั้งรอบล้าง"}
+                              </span>
                             </div>
                             {/* A real button rather than making the whole card
                                 clickable, which is how /tech/history opens the
@@ -145,15 +162,26 @@ export function AssetsPanel({
                                 target gives no clue that it does anything.
                                 Same wording and shape as the admin asset
                                 manager's — it opens the identical modal. */}
-                            {onViewHistory && (
-                              <button
-                                type="button"
-                                onClick={() => onViewHistory(unit.id)}
-                                className="inline-flex shrink-0 items-center justify-center gap-1 rounded border border-border bg-card px-2.5 py-1.5 text-[10px] font-bold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                              >
-                                <Clock className="h-3 w-3" /> ดูประวัติ
-                              </button>
-                            )}
+                            <div className="flex shrink-0 items-center gap-1.5">
+                              {onEditSchedule && (
+                                <button
+                                  type="button"
+                                  onClick={() => onEditSchedule(unit)}
+                                  className="inline-flex items-center justify-center gap-1 rounded border border-border bg-card px-2.5 py-1.5 text-[10px] font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                >
+                                  <CalendarClock className="h-3 w-3" /> รอบล้าง
+                                </button>
+                              )}
+                              {onViewHistory && (
+                                <button
+                                  type="button"
+                                  onClick={() => onViewHistory(unit.id)}
+                                  className="inline-flex items-center justify-center gap-1 rounded border border-border bg-card px-2.5 py-1.5 text-[10px] font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                >
+                                  <Clock className="h-3 w-3" /> ดูประวัติ
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </div>
                       ))}

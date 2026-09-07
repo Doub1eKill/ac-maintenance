@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { QrCode, Snowflake, ClipboardList, Wrench, CheckCircle2, Calendar, User } from "lucide-react";
+import { QrCode, Snowflake, ClipboardList, Wrench, CheckCircle2, Calendar, User, BookMarked } from "lucide-react";
 import { DashboardLayout, NavItem } from "@/components/layout/dashboard-layout";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { QrScanModal } from "@/components/tech/qr-scan-modal";
@@ -161,6 +161,7 @@ export function TechShell({ user, universityName, buildings, badges, children }:
     { id: "my_jobs", label: "งานของฉัน", icon: Wrench, badge: badges.myJobs, group: "เมนูทั่วไป", href: "/tech/my-jobs" },
     { id: "completed", label: "ประวัติ", icon: CheckCircle2, group: "เมนูทั่วไป", href: "/tech/history" },
     { id: "calendar", label: "ปฏิทิน", icon: Calendar, group: "เมนูทั่วไป", href: "/tech/calendar" },
+    { id: "catalogue", label: "ยี่ห้อ/รุ่นแอร์", icon: BookMarked, group: "เมนูทั่วไป", href: "/tech/catalogue" },
     { id: "profile", label: "โปรไฟล์ของฉัน", icon: User, group: "เมนูทั่วไป", href: "/tech/profile" },
   ];
 

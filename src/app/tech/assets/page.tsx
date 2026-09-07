@@ -4,6 +4,6 @@ import { TechAssetsClient } from "./assets-client";
 export const metadata = { title: "แอร์ทั้งหมด | AC Maintenance System" };
 
 export default async function TechAssetsPage() {
-  const { assetList, assetSummary } = await getTechAssetsPageData();
-  return <TechAssetsClient assetList={assetList} assetSummary={assetSummary} />;
+  const { assetList, assetSummary, rooms } = await getTechAssetsPageData();
+  return <TechAssetsClient assetList={assetList} assetSummary={assetSummary} rooms={rooms} />;
 }

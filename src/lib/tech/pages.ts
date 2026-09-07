@@ -3,6 +3,9 @@ import { getOrganisationName } from "@/lib/organisation";
 import { syncOverdueMaintenanceWorkOrders, getTechnicianAssetList } from "@/lib/maintenance";
 import { verifyTechnician } from "@/lib/tech/guards";
 import { techJobInclude, toTechJobRow } from "@/lib/tech/job-rows";
+// The catalogue loader is the admin one. It answers to verifyAssetEditor now,
+// so both roles read the same list through the same query.
+import { getAcMasterData } from "@/lib/admin/master-data";
 
 /**
  * One loader per technician page, matching what the admin side does.
@@ -123,6 +126,62 @@ export async function getHistoryPageData() {
 export async function getTechAssetsPageData() {
   await verifyTechnician();
   await syncOverdueMaintenanceWorkOrders();
-  const { units, summary } = await getTechnicianAssetList();
-  return { assetList: units, assetSummary: summary };
+  // Rooms come from their own query rather than from the units: a technician
+  // registering the first unit in a room could not pick a room that no unit
+  // points at yet, which is exactly the room they are standing in.
+  const [{ units, summary }, rooms] = await Promise.all([
+    getTechnicianAssetList(),
+    listRoomOptions(),
+  ]);
+  return { assetList: units, assetSummary: summary, rooms };
+}
+
+export interface RoomOption {
+  id: string;
+  label: string;
+  buildingName: string;
+}
+
+async function listRoomOptions(): Promise<RoomOption[]> {
+  const buildings = await prisma.building.findMany({
+    select: {
+      name: true,
+      abbreviation: true,
+      rooms: { select: { id: true, name: true, floor: true } },
+    },
+  });
+
+  return buildings
+    .flatMap((building) =>
+      building.rooms.map((room) => ({
+        id: room.id.toString(),
+        // Everything the picker searches on lives in the label, so typing a
+        // building abbreviation, a floor or a room number all narrow the list.
+        label: `${building.name} · ${room.floor === null ? "ไม่ระบุชั้น" : `ชั้น ${room.floor}`} · ห้อง ${room.name}`,
+        buildingName: building.name,
+        sortKey: [building.name, room.floor ?? 9999, room.name] as const,
+      }))
+    )
+    // Sorted here rather than by the database: the names are Thai, and MariaDB's
+    // utf8mb4_unicode_ci puts words starting with a leading vowel at the end.
+    // localeCompare with "th" is the same comparison the rest of the UI uses.
+    .sort((a, b) => {
+      const byBuilding = a.sortKey[0].localeCompare(b.sortKey[0], "th");
+      if (byBuilding !== 0) return byBuilding;
+      if (a.sortKey[1] !== b.sortKey[1]) return Number(a.sortKey[1]) - Number(b.sortKey[1]);
+      return String(a.sortKey[2]).localeCompare(String(b.sortKey[2]), "th");
+    })
+    .map(({ id, label, buildingName }) => ({ id, label, buildingName }));
+}
+
+/**
+ * The brand/model catalogue as the technician page sees it.
+ *
+ * verifyTechnician first so this page is refused to an admin the way every
+ * other /tech loader is — they have their own richer page at
+ * /admin/master-data, with the trash bin this one deliberately lacks.
+ */
+export async function getTechCataloguePageData() {
+  await verifyTechnician();
+  return getAcMasterData();
 }

@@ -286,6 +286,9 @@ export interface TechnicianAssetUnit {
   modelDeleted: boolean;
   lastCleanedAt: string | null;
   isOverdue: boolean;
+  // The active cleaning cycle, so the technician list can show it and offer to
+  // change it without a second round trip per card.
+  schedule: { value: number; unit: string; nextDueDate: string } | null;
   pendingWorkOrder: {
     id: string;
     type: MaintenanceJobType;
@@ -337,6 +340,11 @@ export async function getTechnicianAssetList(): Promise<{
         take: 1,
         select: { id: true, type: true, createdAt: true, priority: true, issueDescription: true },
       },
+      maintenanceSchedules: {
+        where: { isActive: true },
+        take: 1,
+        select: { frequencyValue: true, frequencyUnit: true, nextDueDate: true },
+      },
     },
   });
 
@@ -361,6 +369,13 @@ export async function getTechnicianAssetList(): Promise<{
       floor: u.room.floor,
       lastCleanedAt: lastCleanedAt ? lastCleanedAt.toISOString() : null,
       isOverdue: !!pendingWorkOrder,
+      schedule: u.maintenanceSchedules[0]
+        ? {
+            value: u.maintenanceSchedules[0].frequencyValue,
+            unit: u.maintenanceSchedules[0].frequencyUnit,
+            nextDueDate: u.maintenanceSchedules[0].nextDueDate.toISOString(),
+          }
+        : null,
       pendingWorkOrder: pendingWorkOrder
         ? {
             id: pendingWorkOrder.id.toString(),
