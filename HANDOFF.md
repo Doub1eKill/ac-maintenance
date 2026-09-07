@@ -1,5 +1,23 @@
 # Project Handoff & Technical Summary
 
+# 🧹 เก็บกวาด repo — README กับ python bytecode (7 ก.ย. 2026, DoubleKill)
+
+เจ้าของโปรเจกต์สังเกตว่าหน้า GitHub ยังขึ้นข้อความ *Rebuild entire application from Laravel/PHP/MySQL to Next.js* อยู่หลายไฟล์ · **ตรวจแล้วไม่มีโค้ด Laravel เหลืออยู่เลย** (ไฟล์ `.php` / `composer.json` / `artisan` = 0 จาก 328 ไฟล์ที่ track) · ข้อความนั้นคือ *commit ล่าสุดที่แตะไฟล์นั้น* ไม่ใช่เนื้อหาไฟล์ · ไฟล์อย่าง `postcss.config.mjs` ขึ้นแบบนั้นเพราะไม่มีใครต้องแก้มันอีกเลย ซึ่งปกติ
+
+**เลือกไม่ rewrite history** เพราะ commit `5b97552` มี 204 commit ตามหลัง ถ้าแก้ข้อความ SHA จะเปลี่ยนใหม่หมด แล้ว **HANDOFF.md อ้าง SHA ไว้ 22 ตัว** จะตายทั้งหมด อีกทั้ง repo นี้มี 2 คนเขียน (chokun555phaerngam 105 / Esther03u 103) การ force push จะทำให้ clone ของอีกฝ่ายแตก
+
+## `README.md` — เขียนใหม่ทั้งไฟล์
+
+ของเดิมเป็น boilerplate ของ `create-next-app` เป๊ะๆ ไม่มีคำว่า ac-maintenance สักคำ ชี้ให้แก้ `app/page.tsx` ทั้งที่โปรเจกต์นี้ใช้ `src/app/` และโฆษณา Vercel · ตอนนี้มีบทบาทผู้ใช้ 2 แบบ, stack จริงพร้อมเวอร์ชัน, ขั้นตอนติดตั้ง, คำสั่งที่ใช้บ่อย, โครงสร้างโฟลเดอร์ และลิงก์ไปเอกสารอื่น
+
+เขียนคำเตือนไว้ด้วยว่า `prisma/seed.ts` สั่ง `deleteMany()` ล้างข้อมูลก่อนเสมอ ห้ามรันใส่ฐานข้อมูลจริง · และ seed ต้องเรียกด้วย `npx tsx prisma/seed.ts` เพราะ `prisma.config.ts` ยังไม่มี key `seed`
+
+## `.pyc` 2 ไฟล์ที่ถูก commit ขึ้นไป
+
+`.agents/skills/ui-ux-pro-max/scripts/__pycache__/` มี bytecode ติดขึ้น git ไปด้วย และ `.gitignore` ไม่มี `__pycache__` เลย · เอาออกจาก index แล้ว (ไฟล์บนดิสก์ยังอยู่ ไม่กระทบ skill) พร้อมเพิ่ม `__pycache__/` กับ `*.pyc` ลง `.gitignore`
+
+---
+
 # 🐘 แผนย้ายฐานข้อมูลไป Aiven PostgreSQL — ยังไม่ได้ลงมือ (เขียน 6 ก.ย. 2026, DoubleKill)
 
 > **สถานะ: แผน ไม่ใช่งานที่ทำแล้ว** · เจ้าของโปรเจกต์ตัดสินใจไป PostgreSQL หลังเทียบกับ Aiven MySQL แล้ว โดยมีเงื่อนไขสำคัญข้อเดียวที่ทำให้ทางนี้เป็นไปได้: **ข้อมูลปัจจุบันจะถูกล้างทิ้งทั้งหมดอยู่แล้ว** เพราะจะเปลี่ยนไปใช้ข้อมูลจริง · ถ้าเงื่อนไขนี้เปลี่ยน (ต้องเก็บข้อมูลเดิม) แผนนี้ใช้ไม่ได้ ต้องคุยกันใหม่

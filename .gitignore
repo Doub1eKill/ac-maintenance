@@ -49,3 +49,7 @@ next-env.d.ts
 
 # superpowers subagent-driven-development scratch workspace
 .superpowers/
+
+# python bytecode from the vendored agent skill scripts
+__pycache__/
+*.pyc
