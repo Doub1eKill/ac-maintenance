@@ -87,6 +87,12 @@ export async function updateOrganisationInfoAction(
   return organisationSettings.updateOrganisationInfoAction(...args);
 }
 
+export async function getTechnicianDetail(
+  ...args: Parameters<typeof users.getTechnicianDetail>
+) {
+  return users.getTechnicianDetail(...args);
+}
+
 export async function adminResetUserPasswordAction(
   ...args: Parameters<typeof users.adminResetUserPasswordAction>
 ) {

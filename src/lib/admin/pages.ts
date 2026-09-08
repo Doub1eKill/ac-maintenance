@@ -81,21 +81,20 @@ export async function getAdminShellData() {
   };
 }
 
-/** Technicians who can be assigned work — needed by both modals. */
+/**
+ * Technicians who can be assigned work — needed by both modals.
+ *
+ * Shares userListSelect and toUserRow with the team and approvals lists rather
+ * than spelling the same fields out again: the three had already drifted once,
+ * when the team page started needing avatar_url and this one did not grow it.
+ */
 async function getActiveTechnicians() {
   const rows = await prisma.user.findMany({
     where: { role: "technician", status: "active" },
-    select: { id: true, name: true, email: true, role: true, status: true, createdAt: true },
+    select: userListSelect,
     orderBy: { name: "asc" },
   });
-  return rows.map((u) => ({
-    id: u.id.toString(),
-    name: u.name,
-    email: u.email,
-    role: u.role,
-    status: u.status,
-    createdAt: u.createdAt ? u.createdAt.toISOString() : null,
-  }));
+  return rows.map(toUserRow);
 }
 
 export async function getAdminOverviewData() {
@@ -185,6 +184,7 @@ function toUserRow(u: {
   email: string;
   role: string;
   status: string;
+  avatarUrl: string | null;
   createdAt: Date | null;
 }) {
   return {
@@ -193,6 +193,7 @@ function toUserRow(u: {
     email: u.email,
     role: u.role,
     status: u.status,
+    avatarUrl: u.avatarUrl,
     createdAt: u.createdAt ? u.createdAt.toISOString() : null,
   };
 }
@@ -203,6 +204,10 @@ const userListSelect = {
   email: true,
   role: true,
   status: true,
+  // The team page leads with the photo now. Phone numbers stay out: they live
+  // one query away in user_phones and only the detail panel shows them, so
+  // fetching them for forty people to render none of them is wasted work.
+  avatarUrl: true,
   createdAt: true,
 } as const;
 
