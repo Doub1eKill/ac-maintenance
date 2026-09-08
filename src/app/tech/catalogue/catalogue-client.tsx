@@ -143,14 +143,27 @@ export function TechCatalogueClient({ brands }: { brands: CatalogueBrand[] }) {
               placeholder="ชื่อยี่ห้อ เช่น Carrier"
               className="flex-1 rounded-xl border border-border bg-card px-3 py-2.5 text-xs text-foreground focus:border-primary focus:outline-none"
             />
-            <button
-              type="button"
-              onClick={handleAddBrand}
-              disabled={isPending || !brandName.trim()}
-              className="rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-            >
-              {isPending ? "กำลังบันทึก..." : "บันทึก"}
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setBrandName("");
+                  setAddingBrand(false);
+                }}
+                disabled={isPending}
+                className="flex-1 rounded-xl border border-border px-4 py-2.5 text-xs font-bold text-foreground hover:bg-secondary disabled:opacity-50 sm:flex-none"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={handleAddBrand}
+                disabled={isPending || !brandName.trim()}
+                className="flex-1 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 sm:flex-none"
+              >
+                {isPending ? "กำลังบันทึก..." : "บันทึก"}
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -222,14 +235,28 @@ export function TechCatalogueClient({ brands }: { brands: CatalogueBrand[] }) {
                         placeholder="BTU (ไม่บังคับ)"
                         className="w-full rounded-lg border border-border bg-muted px-3 py-2 text-xs text-foreground focus:border-primary focus:outline-none sm:w-40"
                       />
-                      <button
-                        type="button"
-                        onClick={() => handleAddModel(brand.id)}
-                        disabled={isPending || !modelName.trim()}
-                        className="rounded-lg bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-                      >
-                        {isPending ? "..." : "บันทึก"}
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setModelName("");
+                            setModelBtu("");
+                            setAddingModelFor(null);
+                          }}
+                          disabled={isPending}
+                          className="flex-1 rounded-lg border border-border px-4 py-2 text-xs font-bold text-foreground hover:bg-secondary disabled:opacity-50 sm:flex-none"
+                        >
+                          ยกเลิก
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleAddModel(brand.id)}
+                          disabled={isPending || !modelName.trim()}
+                          className="flex-1 rounded-lg bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 sm:flex-none"
+                        >
+                          {isPending ? "..." : "บันทึก"}
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <button
