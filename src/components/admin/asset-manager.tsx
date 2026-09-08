@@ -95,7 +95,14 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
   
   // Modals state
   const [showAddBuilding, setShowAddBuilding] = useState(false);
-  const [showAddRoom, setShowAddRoom] = useState<{ buildingId: string } | null>(null);
+  // `floor` set means "add a room to this floor" and the field is filled in and
+  // locked; left undefined it means "start a new floor", and the field is open.
+  // There is no floors table — rooms.floor is a column on the room — so a floor
+  // only exists because a room carries its number, and creating one is creating
+  // that first room.
+  const [showAddRoom, setShowAddRoom] = useState<
+    { buildingId: string; floor?: number | null } | null
+  >(null);
   const [showAddAc, setShowAddAc] = useState<{ roomId: string } | null>(null);
   const [showPmSettings, setShowPmSettings] = useState<ACUnit | null>(null);
   const [showQrCode, setShowQrCode] = useState<ACUnit | null>(null);
@@ -215,6 +222,8 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
       else {
         setShowAddRoom(null);
         toast.success("เพิ่มห้องสำเร็จ");
+        // Nothing else to do for a new floor: it appears as soon as the room
+        // that carries its number does.
       }
     });
   }
@@ -345,11 +354,16 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
                 </div>
               </div>
               <div className="flex items-center gap-3">
+                {/* A building opens onto floors, so the button here starts a
+                    floor rather than a room — the old "เพิ่มห้อง" sat one level
+                    above the thing it created and asked which floor as a bare
+                    number field. Adding a room to a floor that already exists
+                    is on that floor's own header. */}
                 <button
                   onClick={(e) => { e.stopPropagation(); setShowAddRoom({ buildingId: b.id }); }}
                   className="inline-flex items-center gap-1 rounded-md bg-card border border-border px-2 py-1 text-[11px] font-bold text-foreground hover:bg-muted shadow-sm transition-colors"
                 >
-                  <Plus className="h-3 w-3" /> เพิ่มห้อง
+                  <Plus className="h-3 w-3" /> เพิ่มชั้น
                 </button>
                 <span className="text-muted-foreground font-bold">
                   {effectiveExpandedBuilding === b.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -364,6 +378,17 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
                   getSubtitle={(floor) =>
                     `${floor.items.length} ห้อง • ${floor.items.reduce((n, r) => n + r.acUnits.length, 0)} แอร์`
                   }
+                  renderExtra={(floor) => (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowAddRoom({ buildingId: b.id, floor: floor.floor });
+                      }}
+                      className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2 py-1 text-[11px] font-bold text-foreground shadow-sm transition-colors hover:bg-muted"
+                    >
+                      <Plus className="h-3 w-3" /> เพิ่มห้อง
+                    </button>
+                  )}
                   renderItems={(floor) => (
                     <div className="space-y-3">
                       {floor.items.map((r) => (
@@ -497,7 +522,11 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-xs p-4">
           <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-xl space-y-4 animate-in fade-in">
             <div className="flex items-center justify-between border-b border-border pb-3">
-              <h3 className="text-base font-bold text-foreground">เพิ่มห้อง</h3>
+              <h3 className="text-base font-bold text-foreground">
+                {showAddRoom.floor === undefined
+                  ? "เพิ่มชั้นใหม่"
+                  : `เพิ่มห้อง (${showAddRoom.floor === null ? "ไม่ระบุชั้น" : `ชั้น ${showAddRoom.floor}`})`}
+              </h3>
               <button onClick={() => setShowAddRoom(null)} className="text-muted-foreground hover:text-foreground">
                 <X className="h-5 w-5" />
               </button>
@@ -509,7 +538,24 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
               </div>
               <div>
                 <label className="mb-1.5 block font-bold text-foreground">ชั้น</label>
-                <input name="floor" type="number" min={0} required placeholder="เช่น 2" className="w-full rounded-xl border border-border px-3.5 py-2.5 text-foreground focus:border-primary focus:outline-none" />
+                <input
+                  name="floor"
+                  type="number"
+                  min={0}
+                  required
+                  placeholder="เช่น 2"
+                  // Filled in and read-only when the floor is already known, so
+                  // the room cannot land on a different floor than the header
+                  // it was opened from says.
+                  defaultValue={showAddRoom.floor ?? undefined}
+                  readOnly={showAddRoom.floor !== undefined && showAddRoom.floor !== null}
+                  className="w-full rounded-xl border border-border px-3.5 py-2.5 text-foreground focus:border-primary focus:outline-none read-only:bg-muted read-only:text-muted-foreground"
+                />
+                {showAddRoom.floor === undefined && (
+                  <p className="mt-1.5 text-[11px] text-muted-foreground">
+                    ชั้นเกิดขึ้นจากห้องที่อยู่บนชั้นนั้น การสร้างชั้นใหม่จึงคือการสร้างห้องแรกของชั้น
+                  </p>
+                )}
               </div>
               <button type="submit" disabled={isPending} className="w-full rounded-xl bg-primary py-2.5 font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
                 {isPending ? "กำลังบันทึก..." : "บันทึกห้อง"}
