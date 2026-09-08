@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Clock, UserCheck, UserX } from "lucide-react";
+import { format } from "date-fns";
+import { CalendarClock, Clock, Phone, UserCheck, UserX } from "lucide-react";
 import {
   Pagination,
   PaginationContent,
@@ -10,21 +11,37 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { ConfirmActionDialog } from "@/components/ui/thai-alert-dialogs";
-import type { PendingUser } from "@/components/admin/types";
+import { UserCard } from "@/components/admin/user-card";
+import type { PendingUserWithContact } from "@/components/admin/types";
 
 interface UserApprovalsPanelProps {
-  pendingUsers: PendingUser[];
+  pendingUsers: PendingUserWithContact[];
   globalSearch: string;
   universityName: string;
   isPending: boolean;
   onUserStatus: (userId: string, status: "active" | "suspended") => void;
 }
 
-const ITEMS_PER_PAGE = 10;
+// Divides by three, so the last row is never a single stranded card.
+const ITEMS_PER_PAGE = 9;
 
-export function UserApprovalsPanel({ pendingUsers, globalSearch, universityName, isPending, onUserStatus }: UserApprovalsPanelProps) {
+/**
+ * The queue of people waiting to be let in, laid out like the team directory.
+ *
+ * Cards rather than a table because approving somebody means looking at what
+ * they sent — the photo above all, which a row of text cannot show. The card is
+ * not clickable here: a pending account has no work history to open, and the
+ * actions that matter are already on it.
+ */
+export function UserApprovalsPanel({
+  pendingUsers,
+  globalSearch,
+  universityName,
+  isPending,
+  onUserStatus,
+}: UserApprovalsPanelProps) {
   const [approvalsPage, setApprovalsPage] = useState(1);
-  const [rejectTarget, setRejectTarget] = useState<PendingUser | null>(null);
+  const [rejectTarget, setRejectTarget] = useState<PendingUserWithContact | null>(null);
 
   function handleConfirmReject() {
     if (!rejectTarget) return;
@@ -49,86 +66,101 @@ export function UserApprovalsPanel({ pendingUsers, globalSearch, universityName,
   );
 
   return (
-    <div className="biz-card p-6 space-y-5 animate-in fade-in">
+    <div className="biz-card animate-in space-y-5 p-6 fade-in">
       <div className="flex items-center justify-between border-b border-border pb-4">
-        <h2 className="text-base font-bold text-foreground flex items-center gap-2">
+        <h2 className="flex items-center gap-2 text-base font-bold text-foreground">
           <Clock className="h-5 w-5 text-warning" />
-          <span>คำขออนุมัติผู้ใช้งานใหม่สำหรับ {universityName} ({pendingUsers.length})</span>
+          <span>
+            คำขออนุมัติผู้ใช้งานใหม่สำหรับ {universityName} ({pendingUsers.length})
+          </span>
         </h2>
       </div>
 
       {filteredPendingUsers.length === 0 ? (
-        <div className="py-12 text-center text-xs text-muted-foreground border border-dashed border-border rounded-2xl">
-          ยังไม่มีคำขอลงทะเบียนผู้ใช้งานสำหรับองค์กรนี้
+        <div className="rounded-2xl border border-dashed border-border py-12 text-center text-xs text-muted-foreground">
+          {pendingUsers.length === 0
+            ? "ยังไม่มีคำขอลงทะเบียนผู้ใช้งานสำหรับองค์กรนี้"
+            : "ไม่พบคำขอที่ตรงกับคำค้นนี้"}
         </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-foreground">
-            <thead className="border-b border-border bg-muted text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-              <tr>
-                <th className="py-3 px-4 rounded-l-xl">ชื่อผู้ใช้</th>
-                <th className="py-3 px-4">อีเมล</th>
-                <th className="py-3 px-4">บทบาท</th>
-                <th className="py-3 px-4">วันที่ขอ</th>
-                <th className="py-3 px-4 text-right rounded-r-xl">จัดการ</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {paginatedApprovals.map((u) => (
-                <tr key={u.id} className="hover:bg-muted transition-colors">
-                  <td className="py-3.5 px-4 font-bold text-foreground">{u.name}</td>
-                  <td className="py-3.5 px-4 font-mono">{u.email}</td>
-                  <td className="py-3.5 px-4 font-bold text-foreground uppercase">{u.role}</td>
-                  <td className="py-3.5 px-4 font-mono">{u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "-"}</td>
-                  <td className="py-3.5 px-4 text-right space-x-2">
-                    <button
-                      onClick={() => onUserStatus(u.id, "active")}
-                      disabled={isPending}
-                      className="rounded-lg bg-success px-3 py-1.5 font-bold text-white hover:bg-success/90 transition-colors disabled:opacity-50 inline-flex items-center gap-1"
-                    >
-                      <UserCheck className="h-3.5 w-3.5" />
-                      อนุมัติ
-                    </button>
-                    <button
-                      onClick={() => setRejectTarget(u)}
-                      disabled={isPending}
-                      className="rounded-lg bg-red-600 px-3 py-1.5 font-bold text-white hover:bg-red-700 transition-colors disabled:opacity-50 inline-flex items-center gap-1"
-                    >
-                      <UserX className="h-3.5 w-3.5" />
-                      ปฏิเสธ
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {totalApprovalsPages > 1 && (
-            <div className="py-4 border-t border-border">
-              <Pagination>
-                <PaginationContent>
-                  <PaginationItem>
-                    <PaginationPrevious
-                      href="#"
-                      onClick={(e) => { e.preventDefault(); setApprovalsPage((p) => Math.max(1, p - 1)); }}
-                      className={approvalsPage === 1 ? "pointer-events-none opacity-50" : ""}
-                    />
-                  </PaginationItem>
-                  <PaginationItem>
-                    <span className="text-xs font-medium text-muted-foreground px-4">
-                      หน้า {approvalsPage} จาก {totalApprovalsPages}
-                    </span>
-                  </PaginationItem>
-                  <PaginationItem>
-                    <PaginationNext
-                      href="#"
-                      onClick={(e) => { e.preventDefault(); setApprovalsPage((p) => Math.min(totalApprovalsPages, p + 1)); }}
-                      className={approvalsPage === totalApprovalsPages ? "pointer-events-none opacity-50" : ""}
-                    />
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
-            </div>
-          )}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {paginatedApprovals.map((u) => (
+            <UserCard
+              key={u.id}
+              user={u}
+              // Everything the person filled in at registration, so the decision
+              // can be made from the card without opening anything.
+              meta={
+                <div className="space-y-1 text-[11px] text-muted-foreground">
+                  <p className="flex items-center gap-1.5">
+                    <Phone className="h-3 w-3 shrink-0" />
+                    {u.phone ?? "ยังไม่ได้ระบุ"}
+                  </p>
+                  <p className="flex items-center gap-1.5">
+                    <CalendarClock className="h-3 w-3 shrink-0" />
+                    ขอเมื่อ{" "}
+                    {u.createdAt ? format(new Date(u.createdAt), "dd/MM/yyyy HH:mm") : "ไม่ทราบ"}
+                  </p>
+                </div>
+              }
+              actions={
+                <>
+                  <button
+                    type="button"
+                    onClick={() => onUserStatus(u.id, "active")}
+                    disabled={isPending}
+                    className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg border border-success/30 bg-success/10 px-2.5 py-1.5 text-[11px] font-bold text-success-foreground transition-colors hover:bg-success/20 disabled:opacity-40"
+                  >
+                    <UserCheck className="h-3 w-3" />
+                    อนุมัติ
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRejectTarget(u)}
+                    disabled={isPending}
+                    className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg border border-destructive/30 bg-destructive/10 px-2.5 py-1.5 text-[11px] font-bold text-destructive transition-colors hover:bg-destructive/20 disabled:opacity-40"
+                  >
+                    <UserX className="h-3 w-3" />
+                    ปฏิเสธ
+                  </button>
+                </>
+              }
+            />
+          ))}
+        </div>
+      )}
+
+      {totalApprovalsPages > 1 && (
+        <div className="border-t border-border py-4">
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setApprovalsPage((p) => Math.max(1, p - 1));
+                  }}
+                  className={approvalsPage === 1 ? "pointer-events-none opacity-50" : ""}
+                />
+              </PaginationItem>
+              <PaginationItem>
+                <span className="px-4 text-xs font-medium text-muted-foreground">
+                  หน้า {approvalsPage} จาก {totalApprovalsPages}
+                </span>
+              </PaginationItem>
+              <PaginationItem>
+                <PaginationNext
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setApprovalsPage((p) => Math.min(totalApprovalsPages, p + 1));
+                  }}
+                  className={approvalsPage === totalApprovalsPages ? "pointer-events-none opacity-50" : ""}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
         </div>
       )}
 

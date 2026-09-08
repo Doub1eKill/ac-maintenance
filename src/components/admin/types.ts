@@ -87,3 +87,14 @@ export interface PendingUser {
   avatarUrl: string | null;
   createdAt: string | null;
 }
+
+/**
+ * A pending user with the contact details they gave at registration.
+ *
+ * Separate from PendingUser rather than an optional field on it, because only
+ * the approvals queue loads phones — a directory of forty people that shows
+ * none of their numbers should not pay to fetch them.
+ */
+export interface PendingUserWithContact extends PendingUser {
+  phone: string | null;
+}

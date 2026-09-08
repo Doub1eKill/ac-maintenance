@@ -3,13 +3,13 @@
 import { UserApprovalsPanel } from "@/components/admin/user-approvals-panel";
 import { useDashboardSearch } from "@/components/layout/dashboard-search";
 import { useUserStatus } from "@/components/admin/use-admin-actions";
-import type { PendingUser } from "@/components/admin/types";
+import type { PendingUserWithContact } from "@/components/admin/types";
 
 export function ApprovalsClient({
   pendingUsers,
   universityName,
 }: {
-  pendingUsers: PendingUser[];
+  pendingUsers: PendingUserWithContact[];
   universityName: string;
 }) {
   const search = useDashboardSearch();

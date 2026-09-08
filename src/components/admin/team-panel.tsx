@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import Image from "next/image";
 import { toast } from "sonner";
-import { Building2, KeyRound, ShieldOff, ShieldCheck, Users, Wrench } from "lucide-react";
+import { KeyRound, ShieldOff, ShieldCheck, Users } from "lucide-react";
 import {
   Pagination,
   PaginationContent,
@@ -13,6 +12,7 @@ import {
 } from "@/components/ui/pagination";
 import { ConfirmActionDialog } from "@/components/ui/thai-alert-dialogs";
 import { adminResetUserPasswordAction } from "@/app/admin/actions";
+import { UserCard } from "@/components/admin/user-card";
 import type { PendingUser } from "@/components/admin/types";
 
 interface TeamPanelProps {
@@ -28,25 +28,6 @@ interface TeamPanelProps {
 // Divides by three, so the last row of the grid is never a single stranded
 // card the way ten items were.
 const ITEMS_PER_PAGE = 9;
-
-function initialsOf(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "US";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[1][0]).toUpperCase();
-}
-
-const STATUS_LABELS: Record<string, string> = {
-  active: "ใช้งานอยู่",
-  pending: "รออนุมัติ",
-  suspended: "ถูกระงับ",
-};
-
-function statusClasses(status: string) {
-  if (status === "active") return "bg-success/20 text-success-foreground border-success/30";
-  if (status === "pending") return "bg-warning/20 text-warning-foreground border-warning/30";
-  return "bg-destructive/10 text-destructive border-destructive/30";
-}
 
 export function TeamPanel({
   allUsers,
@@ -120,79 +101,17 @@ export function TeamPanel({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {paginatedTeam.map((u) => {
           const isSelf = u.id === currentUserId;
-          const RoleIcon = u.role === "technician" ? Wrench : Building2;
-
           return (
-            <div
+            <UserCard
               key={u.id}
-              role={onOpenDetail ? "button" : undefined}
-              tabIndex={onOpenDetail ? 0 : undefined}
-              onClick={() => onOpenDetail?.(u)}
-              onKeyDown={(event) => {
-                if (!onOpenDetail) return;
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  onOpenDetail(u);
-                }
-              }}
-              className={`overflow-hidden rounded-2xl border bg-card text-left transition-colors ${
-                u.status === "pending" ? "border-warning/40" : "border-border"
-              } ${onOpenDetail ? "cursor-pointer hover:border-muted-foreground" : ""}`}
-            >
-              {/* 4:3 rather than the portrait the sketch showed: it still leads
-                  with the photo, but three rows fit on a screen instead of two,
-                  which matters once there are forty of these. */}
-              <div className="relative flex aspect-[4/3] items-center justify-center overflow-hidden bg-primary text-primary-foreground">
-                {u.avatarUrl ? (
-                  <Image
-                    src={u.avatarUrl}
-                    // The name is directly below, so describing the picture
-                    // would only make a screen reader say it twice.
-                    alt=""
-                    fill
-                    sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw"
-                    className="object-cover"
-                  />
-                ) : (
-                  <>
-                    {/* Every seeded account has no picture, and registration
-                        only started requiring one recently — so the fallback is
-                        the common case here, not the exception, and is worth
-                        looking deliberate rather than empty. */}
-                    <RoleIcon className="absolute h-24 w-24 opacity-10" />
-                    <span className="relative text-3xl font-bold">{initialsOf(u.name)}</span>
-                  </>
-                )}
-              </div>
-
-              <div className="space-y-3 p-4">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-bold text-foreground">{u.name}</p>
-                  {/* The login identity, and what the header search matches on —
-                      without it a search that hits nothing visible looks broken. */}
-                  <p className="truncate font-mono text-[11px] text-muted-foreground">{u.email}</p>
-                </div>
-
-                <div className="flex flex-wrap gap-1.5 text-[10px] font-bold">
-                  <span className="inline-flex items-center gap-1 rounded-md border border-border bg-muted px-2 py-0.5 text-foreground">
-                    <RoleIcon className="h-3 w-3" />
-                    {u.role === "technician" ? "ช่างเทคนิค" : "ผู้ดูแลระบบ"}
-                  </span>
-                  <span className={`rounded-md border px-2 py-0.5 ${statusClasses(u.status)}`}>
-                    {STATUS_LABELS[u.status] ?? u.status}
-                  </span>
-                </div>
-
-                {/* Every button stops the click here. The card itself opens the
-                    detail panel, and without this, suspending someone would pop
-                    that panel open behind the confirmation dialog. */}
-                <div className="flex gap-2">
+              user={u}
+              onOpen={onOpenDetail ? () => onOpenDetail(u) : undefined}
+              actions={
+                <>
                   {u.status === "active" ? (
                     <button
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setSuspendTarget(u);
-                      }}
+                      type="button"
+                      onClick={() => setSuspendTarget(u)}
                       disabled={isPending || isSelf}
                       title={isSelf ? "ระงับสิทธิ์บัญชีตัวเองไม่ได้" : undefined}
                       className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg border border-destructive/30 bg-destructive/10 px-2.5 py-1.5 text-[11px] font-bold text-destructive transition-colors hover:bg-destructive/20 disabled:opacity-40"
@@ -202,10 +121,8 @@ export function TeamPanel({
                     </button>
                   ) : (
                     <button
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onUserStatus(u.id, "active");
-                      }}
+                      type="button"
+                      onClick={() => onUserStatus(u.id, "active")}
                       disabled={isPending}
                       className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg border border-success/30 bg-success/10 px-2.5 py-1.5 text-[11px] font-bold text-success-foreground transition-colors hover:bg-success/20 disabled:opacity-40"
                     >
@@ -214,18 +131,16 @@ export function TeamPanel({
                     </button>
                   )}
                   <button
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      setResetTarget(u);
-                    }}
+                    type="button"
+                    onClick={() => setResetTarget(u)}
                     className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg border border-border bg-muted px-2.5 py-1.5 text-[11px] font-bold text-foreground transition-colors hover:bg-secondary"
                   >
                     <KeyRound className="h-3 w-3" />
                     รีเซ็ตรหัสผ่าน
                   </button>
-                </div>
-              </div>
-            </div>
+                </>
+              }
+            />
           );
         })}
       </div>

@@ -216,10 +216,22 @@ export async function getApprovalsPageData() {
   await verifyOrgAdmin();
   const rows = await prisma.user.findMany({
     where: { status: "pending" },
-    select: userListSelect,
+    // Phones are fetched here and not in userListSelect, because this is the
+    // one list that shows them: approving an account means reading back
+    // everything the person typed at registration, and the phone is part of
+    // that. The team directory shows forty people and none of their numbers.
+    select: { ...userListSelect, phones: { select: { phoneNumber: true, isPrimary: true } } },
     orderBy: { createdAt: "desc" },
   });
-  return { pendingUsers: rows.map(toUserRow) };
+
+  return {
+    pendingUsers: rows.map((row) => ({
+      ...toUserRow(row),
+      // The primary number, falling back to whichever exists — registration
+      // only ever writes one, but an account edited afterwards can have more.
+      phone: (row.phones.find((p) => p.isPrimary) ?? row.phones[0])?.phoneNumber ?? null,
+    })),
+  };
 }
 
 export async function getTeamPageData() {
