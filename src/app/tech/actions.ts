@@ -17,6 +17,7 @@ import * as dashboard from "@/lib/tech/dashboard";
 import * as jobs from "@/lib/tech/jobs";
 import * as maintenanceLog from "@/lib/tech/maintenance-log";
 import * as qr from "@/lib/tech/qr";
+import * as pages from "@/lib/tech/pages";
 // The asset catalogue is not duplicated under src/lib/tech: these are the same
 // modules the admin pages call, now behind verifyAssetEditor instead of
 // verifyOrgAdmin. Their rules — retired models filtered out, the first-due-date
@@ -73,6 +74,14 @@ export async function getAcMasterDataAction(
   ...args: Parameters<typeof masterData.getAcMasterData>
 ) {
   return masterData.getAcMasterData(...args);
+}
+
+// --- the header search box ---
+
+export async function getTechSearchIndexAction(
+  ...args: Parameters<typeof pages.getTechSearchIndex>
+) {
+  return pages.getTechSearchIndex(...args);
 }
 
 export async function createAcBrandAction(

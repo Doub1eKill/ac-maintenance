@@ -43,6 +43,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { Separator } from "@/components/ui/separator";
+import { OmniSearch, type OmniSearchEntry } from "@/components/shared/omni-search";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -86,6 +87,11 @@ interface DashboardLayoutProps {
   searchPlaceholder?: string;
   onSearchChange?: (val: string) => void;
   searchValue?: string;
+  // Supplied together, or not at all. With them the box grows a suggestion
+  // dropdown that can jump straight to a unit; without them it stays the plain
+  // filter it has always been, which is what the pages that pass neither want.
+  searchIndexLoader?: () => Promise<OmniSearchEntry[]>;
+  onSearchPick?: (entry: OmniSearchEntry) => void;
   children: React.ReactNode;
 }
 
@@ -99,6 +105,8 @@ export function DashboardLayout({
   searchPlaceholder = "ค้นหารายการ...",
   onSearchChange,
   searchValue = "",
+  searchIndexLoader,
+  onSearchPick,
   children,
 }: DashboardLayoutProps) {
   const roleLabel = user.role === "org_admin" ? "ผู้บริหารองค์กร" : "ช่างซ่อมบำรุง";
@@ -326,18 +334,27 @@ export function DashboardLayout({
           </div>
 
           <div className="ml-auto flex items-center gap-3">
-            {onSearchChange && (
-              <div className="relative w-48 sm:w-64">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                <input
-                  type="text"
-                  placeholder={searchPlaceholder}
+            {onSearchChange &&
+              (searchIndexLoader && onSearchPick ? (
+                <OmniSearch
                   value={searchValue}
-                  onChange={(e) => onSearchChange(e.target.value)}
-                  className="w-full pl-8 pr-3 py-1.5 bg-muted/50 border border-border rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
+                  onChange={onSearchChange}
+                  placeholder={searchPlaceholder}
+                  loadIndex={searchIndexLoader}
+                  onPick={onSearchPick}
                 />
-              </div>
-            )}
+              ) : (
+                <div className="relative w-48 sm:w-64">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                  <input
+                    type="text"
+                    placeholder={searchPlaceholder}
+                    value={searchValue}
+                    onChange={(e) => onSearchChange(e.target.value)}
+                    className="w-full pl-8 pr-3 py-1.5 bg-muted/50 border border-border rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
+                  />
+                </div>
+              ))}
             {onCreateAction && (
               <button
                 onClick={onCreateAction}

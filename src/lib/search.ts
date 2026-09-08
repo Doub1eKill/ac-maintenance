@@ -36,3 +36,40 @@ export function isSameCatalogueName(a: string, b: string): boolean {
   const tidy = (value: string) => value.trim().replace(/\s+/g, " ").toLowerCase();
   return tidy(a) === tidy(b);
 }
+
+/** One run of text, flagged for whether it is part of what the user typed. */
+export interface HighlightPart {
+  text: string;
+  match: boolean;
+}
+
+/**
+ * Splits a label around every occurrence of the query, so a suggestion list can
+ * embolden the part that was typed the way a browser's address bar does.
+ *
+ * Comparison is lowercased, matching matchesQuery, but the slices come off the
+ * original string — so the label keeps its own capitalisation and only the
+ * weight changes. Thai has no case, and the Latin model codes here are ASCII,
+ * so lowercasing cannot shift the offsets.
+ */
+export function highlightMatch(text: string, query: string): HighlightPart[] {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return [{ text, match: false }];
+
+  const haystack = text.toLowerCase();
+  const parts: HighlightPart[] = [];
+  let cursor = 0;
+
+  while (cursor < text.length) {
+    const found = haystack.indexOf(needle, cursor);
+    if (found === -1) {
+      parts.push({ text: text.slice(cursor), match: false });
+      break;
+    }
+    if (found > cursor) parts.push({ text: text.slice(cursor, found), match: false });
+    parts.push({ text: text.slice(found, found + needle.length), match: true });
+    cursor = found + needle.length;
+  }
+
+  return parts;
+}

@@ -9,7 +9,12 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { QrScanModal } from "@/components/tech/qr-scan-modal";
 import { LogActionModal } from "@/components/tech/log-action-modal";
 import { AcHistoryModal } from "@/components/admin/ac-history-modal";
-import { claimWorkOrderAction, logMaintenanceAction, scanQrCodeAction } from "@/app/tech/actions";
+import {
+  claimWorkOrderAction,
+  getTechSearchIndexAction,
+  logMaintenanceAction,
+  scanQrCodeAction,
+} from "@/app/tech/actions";
 import type { Building, TechJobItem } from "@/components/tech/types";
 
 /**
@@ -184,6 +189,12 @@ export function TechShell({ user, universityName, buildings, badges, children }:
         searchValue={search}
         onSearchChange={showFilters ? setSearch : undefined}
         searchPlaceholder="ค้นหารหัสแอร์..."
+        searchIndexLoader={getTechSearchIndexAction}
+        // Picking a unit opens its history wherever the technician happens to
+        // be, rather than navigating: the question behind typing a code into
+        // the header is almost always "what has been done to this one", and the
+        // modal answers it without losing the page underneath.
+        onSearchPick={(entry) => setHistoryAcId(entry.id)}
         onCreateAction={() => setShowQrModal(true)}
         createActionLabel="สแกน QR Code"
       >

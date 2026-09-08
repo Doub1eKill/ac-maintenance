@@ -3,6 +3,7 @@ import { getOrganisationName } from "@/lib/organisation";
 import { syncOverdueMaintenanceWorkOrders, getTechnicianAssetList } from "@/lib/maintenance";
 import { verifyTechnician } from "@/lib/tech/guards";
 import { techJobInclude, toTechJobRow } from "@/lib/tech/job-rows";
+import { formatUnitLocation } from "@/lib/location";
 // The catalogue loader is the admin one. It answers to verifyAssetEditor now,
 // so both roles read the same list through the same query.
 import { getAcMasterData } from "@/lib/admin/master-data";
@@ -184,4 +185,58 @@ async function listRoomOptions(): Promise<RoomOption[]> {
 export async function getTechCataloguePageData() {
   await verifyTechnician();
   return getAcMasterData();
+}
+
+/** One thing the header search box can jump to. */
+export interface SearchIndexEntry {
+  type: "unit";
+  id: string;
+  /** The line the suggestion is titled with, and the first thing matched. */
+  label: string;
+  /** The line under it — matched too, so a building name finds its units. */
+  hint: string;
+}
+
+/**
+ * Everything the technician's search box can offer, fetched once.
+ *
+ * Pulled whole and filtered in the browser rather than queried per keystroke.
+ * A per-keystroke query would need Prisma's `contains`, and `contains` is not
+ * the same comparison on both engines — MySQL's utf8mb4_unicode_ci ignores
+ * case, PostgreSQL's LIKE does not — so the box would quietly start behaving
+ * differently after the database move. Nothing in src/ uses it today, and that
+ * is what made the move mechanical; this keeps it that way.
+ *
+ * Only what a suggestion needs is selected. At the current 73 units the payload
+ * is a few KB. Past a few thousand this stops being sensible and the box has to
+ * become a debounced server query — see the note in HANDOFF.md.
+ */
+export async function getTechSearchIndex(): Promise<SearchIndexEntry[]> {
+  await verifyTechnician();
+
+  const units = await prisma.airConditioner.findMany({
+    where: { deletedAt: null },
+    select: {
+      id: true,
+      acCode: true,
+      brand: true,
+      acBrand: { select: { name: true } },
+      acModel: { select: { name: true } },
+      room: {
+        select: { name: true, floor: true, building: { select: { name: true, abbreviation: true } } },
+      },
+    },
+  });
+
+  return units.map((unit) => ({
+    type: "unit" as const,
+    id: unit.id.toString(),
+    label: unit.acCode,
+    // Brand and place on one line: typing a building name, a room number or a
+    // brand all reach the same unit, which is how people actually describe the
+    // machine they are standing in front of.
+    hint: [unit.acBrand?.name ?? unit.brand, unit.acModel?.name, formatUnitLocation(unit.room)]
+      .filter(Boolean)
+      .join(" · "),
+  }));
 }
