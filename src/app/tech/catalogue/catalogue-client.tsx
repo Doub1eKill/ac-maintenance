@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, Info, Plus, Search, Tag } from "lucide-react";
 import { toast } from "sonner";
 import { createAcBrandAction, createAcModelAction } from "@/app/tech/actions";
@@ -31,7 +31,12 @@ interface CatalogueBrand {
  */
 export function TechCatalogueClient({ brands }: { brands: CatalogueBrand[] }) {
   const router = useRouter();
-  const [query, setQuery] = useState("");
+  const searchParams = useSearchParams();
+  // Seeded from ?model=, which a suggestion in the header search box sets when
+  // it points here. Read once as the initial value rather than synced in an
+  // effect, so it cannot fight what the user types afterwards. A distinct name
+  // from the shell's own ?q= keeps the two from consuming each other's param.
+  const [query, setQuery] = useState(() => searchParams.get("model") ?? "");
   const [openBrandId, setOpenBrandId] = useState<string | null>(null);
   const [addingBrand, setAddingBrand] = useState(false);
   const [brandName, setBrandName] = useState("");

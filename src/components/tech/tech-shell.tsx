@@ -1,10 +1,19 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useState, useTransition } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { QrCode, Snowflake, ClipboardList, Wrench, CheckCircle2, Calendar, User, BookMarked } from "lucide-react";
 import { DashboardLayout, NavItem } from "@/components/layout/dashboard-layout";
+import type { SearchEntry } from "@/lib/search";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { QrScanModal } from "@/components/tech/qr-scan-modal";
 import { LogActionModal } from "@/components/tech/log-action-modal";
@@ -86,11 +95,35 @@ export function TechShell({ user, universityName, buildings, badges, children }:
 
   // Both filters reset when the page changes, for the reason the admin search
   // does: each list searches different text, so a term left over from the
-  // previous page usually matches nothing on the next one.
+  // previous page usually matches nothing on the next one. The exception is a
+  // suggestion for a building or a room, which links to /tech/assets?q=<term>
+  // so the page it lands on arrives already narrowed by that same filter.
+  //
+  // The reset is keyed off a remembered path rather than off the effect firing,
+  // because stripping ?q= below changes searchParams and runs this again — and
+  // an unconditional reset would then wipe the filter the same suggestion had
+  // just applied, which is exactly what a suggestion picked while already on
+  // the asset list did.
+  const lastPathRef = useRef(pathname);
   useEffect(() => {
-    setSearch("");
-    setBuilding("all");
-  }, [pathname]);
+    const term = searchParams.get("q");
+
+    if (term) {
+      setSearch(term);
+      setBuilding("all");
+      lastPathRef.current = pathname;
+      // Stripped straight away, like the ?ac= handler below, so a refresh or a
+      // back navigation does not re-apply a filter the user has since cleared.
+      router.replace(pathname);
+      return;
+    }
+
+    if (lastPathRef.current !== pathname) {
+      lastPathRef.current = pathname;
+      setSearch("");
+      setBuilding("all");
+    }
+  }, [pathname, searchParams, router]);
 
   // Scanning the sticker on a unit links to /tech?ac=<acCode> (see the QR
   // page's button), so the technician lands straight on the log form instead of
@@ -172,6 +205,25 @@ export function TechShell({ user, universityName, buildings, badges, children }:
 
   const showFilters = pathname !== "/tech/calendar" && pathname !== "/tech/profile";
 
+  // The menu itself is searchable, which is what the browser's own address bar
+  // does with bookmarks. Built from navItems rather than a second list, so a
+  // page added to the sidebar becomes findable without anyone remembering to
+  // register it twice.
+  const loadSearchIndex = useCallback(async () => {
+    const pages: SearchEntry[] = navItems.map((item) => ({
+      type: "page" as const,
+      id: item.id,
+      label: item.label,
+      hint: "เมนูในระบบ",
+      href: item.href,
+    }));
+
+    return [...(await getTechSearchIndexAction()), ...pages];
+    // navItems is rebuilt every render but its contents only change with the
+    // badge counts, which do not affect what this returns.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <TechFiltersContext.Provider
       value={{
@@ -189,12 +241,18 @@ export function TechShell({ user, universityName, buildings, badges, children }:
         searchValue={search}
         onSearchChange={showFilters ? setSearch : undefined}
         searchPlaceholder="ค้นหารหัสแอร์..."
-        searchIndexLoader={getTechSearchIndexAction}
-        // Picking a unit opens its history wherever the technician happens to
-        // be, rather than navigating: the question behind typing a code into
-        // the header is almost always "what has been done to this one", and the
-        // modal answers it without losing the page underneath.
-        onSearchPick={(entry) => setHistoryAcId(entry.id)}
+        searchIndexLoader={loadSearchIndex}
+        // A unit opens its history where the technician already is — the
+        // question behind typing a code into the header is almost always "what
+        // has been done to this one", and the modal answers it without losing
+        // the page underneath. Everything else carries a destination.
+        onSearchPick={(entry) => {
+          if (entry.href) {
+            router.push(entry.href);
+            return;
+          }
+          setHistoryAcId(entry.id);
+        }}
         onCreateAction={() => setShowQrModal(true)}
         createActionLabel="สแกน QR Code"
       >

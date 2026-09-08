@@ -4,6 +4,7 @@ import { syncOverdueMaintenanceWorkOrders, getTechnicianAssetList } from "@/lib/
 import { verifyTechnician } from "@/lib/tech/guards";
 import { techJobInclude, toTechJobRow } from "@/lib/tech/job-rows";
 import { formatUnitLocation } from "@/lib/location";
+import type { SearchEntry } from "@/lib/search";
 // The catalogue loader is the admin one. It answers to verifyAssetEditor now,
 // so both roles read the same list through the same query.
 import { getAcMasterData } from "@/lib/admin/master-data";
@@ -187,15 +188,7 @@ export async function getTechCataloguePageData() {
   return getAcMasterData();
 }
 
-/** One thing the header search box can jump to. */
-export interface SearchIndexEntry {
-  type: "unit";
-  id: string;
-  /** The line the suggestion is titled with, and the first thing matched. */
-  label: string;
-  /** The line under it — matched too, so a building name finds its units. */
-  hint: string;
-}
+export type { SearchEntry } from "@/lib/search";
 
 /**
  * Everything the technician's search box can offer, fetched once.
@@ -211,32 +204,97 @@ export interface SearchIndexEntry {
  * is a few KB. Past a few thousand this stops being sensible and the box has to
  * become a debounced server query — see the note in HANDOFF.md.
  */
-export async function getTechSearchIndex(): Promise<SearchIndexEntry[]> {
+export async function getTechSearchIndex(): Promise<SearchEntry[]> {
   await verifyTechnician();
 
-  const units = await prisma.airConditioner.findMany({
-    where: { deletedAt: null },
-    select: {
-      id: true,
-      acCode: true,
-      brand: true,
-      acBrand: { select: { name: true } },
-      acModel: { select: { name: true } },
-      room: {
-        select: { name: true, floor: true, building: { select: { name: true, abbreviation: true } } },
+  const [units, buildings, brands] = await Promise.all([
+    prisma.airConditioner.findMany({
+      where: { deletedAt: null },
+      select: {
+        id: true,
+        acCode: true,
+        brand: true,
+        acBrand: { select: { name: true } },
+        acModel: { select: { name: true } },
+        room: {
+          select: { name: true, floor: true, building: { select: { name: true, abbreviation: true } } },
+        },
       },
-    },
-  });
+    }),
+    prisma.building.findMany({
+      select: {
+        id: true,
+        name: true,
+        abbreviation: true,
+        rooms: {
+          select: { id: true, name: true, floor: true, _count: { select: { airConditioners: true } } },
+        },
+      },
+    }),
+    prisma.acBrand.findMany({
+      where: { deletedAt: null },
+      select: {
+        id: true,
+        name: true,
+        models: { where: { deletedAt: null }, select: { id: true, name: true, defaultBtu: true } },
+      },
+    }),
+  ]);
 
-  return units.map((unit) => ({
-    type: "unit" as const,
-    id: unit.id.toString(),
-    label: unit.acCode,
-    // Brand and place on one line: typing a building name, a room number or a
-    // brand all reach the same unit, which is how people actually describe the
-    // machine they are standing in front of.
-    hint: [unit.acBrand?.name ?? unit.brand, unit.acModel?.name, formatUnitLocation(unit.room)]
-      .filter(Boolean)
-      .join(" · "),
-  }));
+  const entries: SearchEntry[] = [];
+
+  for (const unit of units) {
+    entries.push({
+      type: "unit",
+      id: unit.id.toString(),
+      label: unit.acCode,
+      // Brand and place on one line: typing a building name, a room number or a
+      // brand all reach the same unit, which is how people actually describe
+      // the machine they are standing in front of.
+      hint: [unit.acBrand?.name ?? unit.brand, unit.acModel?.name, formatUnitLocation(unit.room)]
+        .filter(Boolean)
+        .join(" · "),
+      // No href: the shell opens the unit's history in place instead.
+    });
+  }
+
+  for (const building of buildings) {
+    const unitCount = building.rooms.reduce((sum, room) => sum + room._count.airConditioners, 0);
+    entries.push({
+      type: "building",
+      id: building.id.toString(),
+      label: building.name,
+      hint: `${building.abbreviation} · ${building.rooms.length} ห้อง · ${unitCount} เครื่อง`,
+      // Everything below reaches the asset list through ?q=, which the shell
+      // reads into the same filter the box has always driven — so a suggestion
+      // lands on a filtered page rather than needing a second search.
+      href: `/tech/assets?q=${encodeURIComponent(building.name)}`,
+    });
+
+    for (const room of building.rooms) {
+      entries.push({
+        type: "room",
+        id: room.id.toString(),
+        label: `ห้อง ${room.name}`,
+        hint: `${building.name} · ${room.floor === null ? "ไม่ระบุชั้น" : `ชั้น ${room.floor}`} · ${room._count.airConditioners} เครื่อง`,
+        href: `/tech/assets?q=${encodeURIComponent(room.name)}`,
+      });
+    }
+  }
+
+  for (const brand of brands) {
+    for (const model of brand.models) {
+      entries.push({
+        type: "model",
+        id: model.id.toString(),
+        label: model.name,
+        hint: [brand.name, model.defaultBtu ? `${model.defaultBtu.toLocaleString()} BTU` : null]
+          .filter(Boolean)
+          .join(" · "),
+        href: `/tech/catalogue?model=${encodeURIComponent(model.name)}`,
+      });
+    }
+  }
+
+  return entries;
 }

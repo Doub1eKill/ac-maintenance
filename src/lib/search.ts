@@ -73,3 +73,33 @@ export function highlightMatch(text: string, query: string): HighlightPart[] {
 
   return parts;
 }
+
+/**
+ * What a header-search suggestion can point at.
+ *
+ * Defined here rather than beside the component because the server modules that
+ * build the index import it too — one definition, so a new kind of suggestion
+ * cannot be added on one side and forgotten on the other.
+ */
+export type SearchEntryType =
+  | "unit"
+  | "building"
+  | "room"
+  | "model"
+  | "workOrder"
+  | "user"
+  | "page";
+
+export interface SearchEntry {
+  type: SearchEntryType;
+  id: string;
+  /** The suggestion's title, and the first thing matched against. */
+  label: string;
+  /** The line under it — matched too, so a building name finds its units. */
+  hint: string;
+  /**
+   * Where picking it goes. Left unset for suggestions the shell handles itself:
+   * a unit opens its history in place rather than navigating anywhere.
+   */
+  href?: string;
+}

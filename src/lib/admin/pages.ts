@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/prisma";
+import { formatUnitLocation } from "@/lib/location";
+import type { SearchEntry } from "@/lib/search";
 import { format, subDays } from "date-fns";
 import { verifyOrgAdmin } from "@/lib/auth-guards";
 import { syncOverdueMaintenanceWorkOrders } from "@/lib/maintenance";
@@ -301,4 +303,158 @@ export async function getCreateWorkOrderFormData() {
     getActiveTechnicians(),
   ]);
   return { buildings, allAcUnits: flattenUnitOptions(buildings), activeTechnicians };
+}
+
+/**
+ * Everything the admin header search box can jump to.
+ *
+ * The admin's version of getTechSearchIndex, and it works the same way: fetched
+ * once on first focus and filtered in the browser, so no Prisma `contains` is
+ * needed. See the note there for why that matters to the PostgreSQL move.
+ *
+ * Open work orders and people are the two kinds only an admin sees. Both are
+ * bounded — completed work orders are excluded, since "find that job" almost
+ * always means one that is still open — but this is the part of the index most
+ * likely to outgrow the fetch-it-all approach.
+ */
+export async function getAdminSearchIndex(): Promise<SearchEntry[]> {
+  await verifyOrgAdmin();
+
+  const [units, buildings, brands, openWorkOrders, people] = await Promise.all([
+    prisma.airConditioner.findMany({
+      where: { deletedAt: null },
+      select: {
+        id: true,
+        acCode: true,
+        brand: true,
+        acBrand: { select: { name: true } },
+        acModel: { select: { name: true } },
+        room: {
+          select: { name: true, floor: true, building: { select: { name: true, abbreviation: true } } },
+        },
+      },
+    }),
+    prisma.building.findMany({
+      select: {
+        id: true,
+        name: true,
+        abbreviation: true,
+        rooms: {
+          select: { id: true, name: true, floor: true, _count: { select: { airConditioners: true } } },
+        },
+      },
+    }),
+    prisma.acBrand.findMany({
+      where: { deletedAt: null },
+      select: {
+        id: true,
+        name: true,
+        models: { where: { deletedAt: null }, select: { id: true, name: true, defaultBtu: true } },
+      },
+    }),
+    prisma.workOrder.findMany({
+      where: { status: { not: "completed" } },
+      select: {
+        id: true,
+        status: true,
+        type: true,
+        airConditioner: {
+          select: {
+            acCode: true,
+            room: {
+              select: { name: true, floor: true, building: { select: { name: true, abbreviation: true } } },
+            },
+          },
+        },
+      },
+    }),
+    prisma.user.findMany({
+      select: { id: true, name: true, email: true, role: true, status: true },
+    }),
+  ]);
+
+  const entries: SearchEntry[] = [];
+
+  for (const unit of units) {
+    entries.push({
+      type: "unit",
+      id: unit.id.toString(),
+      label: unit.acCode,
+      hint: [unit.acBrand?.name ?? unit.brand, unit.acModel?.name, formatUnitLocation(unit.room)]
+        .filter(Boolean)
+        .join(" · "),
+      href: `/admin/assets?q=${encodeURIComponent(unit.acCode)}`,
+    });
+  }
+
+  for (const workOrder of openWorkOrders) {
+    entries.push({
+      type: "workOrder",
+      id: workOrder.id.toString(),
+      label: workOrder.airConditioner.acCode,
+      hint: [
+        workOrder.type === "repair" ? "งานซ่อม" : "งานล้าง",
+        workOrder.status === "pending" ? "รอรับงาน" : "กำลังดำเนินการ",
+        formatUnitLocation(workOrder.airConditioner.room),
+      ].join(" · "),
+      href: `/admin/work-orders?q=${encodeURIComponent(workOrder.airConditioner.acCode)}`,
+    });
+  }
+
+  for (const building of buildings) {
+    const unitCount = building.rooms.reduce((sum, room) => sum + room._count.airConditioners, 0);
+    entries.push({
+      type: "building",
+      id: building.id.toString(),
+      label: building.name,
+      hint: `${building.abbreviation} · ${building.rooms.length} ห้อง · ${unitCount} เครื่อง`,
+      href: `/admin/assets?q=${encodeURIComponent(building.name)}`,
+    });
+
+    for (const room of building.rooms) {
+      entries.push({
+        type: "room",
+        id: room.id.toString(),
+        label: `ห้อง ${room.name}`,
+        hint: `${building.name} · ${room.floor === null ? "ไม่ระบุชั้น" : `ชั้น ${room.floor}`} · ${room._count.airConditioners} เครื่อง`,
+        href: `/admin/assets?q=${encodeURIComponent(room.name)}`,
+      });
+    }
+  }
+
+  for (const brand of brands) {
+    for (const model of brand.models) {
+      entries.push({
+        type: "model",
+        id: model.id.toString(),
+        label: model.name,
+        hint: [brand.name, model.defaultBtu ? `${model.defaultBtu.toLocaleString()} BTU` : null]
+          .filter(Boolean)
+          .join(" · "),
+        href: "/admin/master-data",
+      });
+    }
+  }
+
+  for (const person of people) {
+    entries.push({
+      type: "user",
+      id: person.id.toString(),
+      label: person.name,
+      hint: [
+        person.email,
+        person.role === "org_admin" ? "ผู้ดูแลระบบ" : "ช่างเทคนิค",
+        person.status === "active" ? null : "รออนุมัติ",
+      ]
+        .filter(Boolean)
+        .join(" · "),
+      // Pending accounts live on the approvals page, not the team list.
+      href:
+        person.status === "active"
+          ? `/admin/team?q=${encodeURIComponent(person.name)}`
+          : "/admin/approvals",
+    });
+  }
+
+  return entries;
 }

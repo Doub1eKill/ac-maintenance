@@ -1,6 +1,7 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { useCallback } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Building2,
   Snowflake,
@@ -18,6 +19,8 @@ import {
   useDashboardSearchControl,
 } from "@/components/layout/dashboard-search";
 import { useCreateWorkOrder } from "@/components/admin/create-work-order-provider";
+import { getAdminSearchIndexAction } from "@/app/admin/actions";
+import type { SearchEntry } from "@/lib/search";
 
 /**
  * The chrome every admin page sits inside: sidebar, header, search box and the
@@ -41,9 +44,13 @@ export interface AdminShellProps {
   children: React.ReactNode;
 }
 
-// Which pages have a search box, and what it says. A page missing from this map
-// gets no box at all — the header used to decide that with a list of tab ids
-// spelled out inline in a ternary.
+// What the box says on each page — the term it filters by is page-specific, so
+// the hint should be too. Every page gets a box now that the box can also jump
+// somewhere: a suggestion for a unit is worth reaching from the settings page
+// as much as from the asset list, and a page that filters nothing still gets
+// the suggestions.
+const DEFAULT_SEARCH_PLACEHOLDER = "ค้นหารหัสแอร์, อาคาร, ใบงาน, ผู้ใช้...";
+
 const SEARCH_PLACEHOLDERS: Record<string, string> = {
   "/admin/work-orders": "ค้นหารหัสแอร์, สถานที่, หรือแบรนด์...",
   "/admin/team": "ค้นหาชื่อ หรืออีเมล...",
@@ -53,6 +60,7 @@ const SEARCH_PLACEHOLDERS: Record<string, string> = {
 
 function AdminShellInner({ user, universityName, badges, children }: AdminShellProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const { search, setSearch } = useDashboardSearchControl();
   const createWorkOrder = useCreateWorkOrder();
 
@@ -82,15 +90,38 @@ function AdminShellInner({ user, universityName, badges, children }: AdminShellP
     { id: "settings", label: "ตั้งค่าระบบ", icon: Settings, group: "บัญชีและการตั้งค่า", href: "/admin/settings" },
   ];
 
-  const placeholder = SEARCH_PLACEHOLDERS[pathname];
+  const placeholder = SEARCH_PLACEHOLDERS[pathname] ?? DEFAULT_SEARCH_PLACEHOLDER;
+
+  // The menu is searchable too, built from navItems so a page added to the
+  // sidebar becomes findable without being registered in a second list.
+  const loadSearchIndex = useCallback(async () => {
+    const menuPages: SearchEntry[] = navItems.map((item) => ({
+      type: "page" as const,
+      id: item.id,
+      label: item.label,
+      hint: item.group ?? "เมนูในระบบ",
+      href: item.href,
+    }));
+
+    return [...(await getAdminSearchIndexAction()), ...menuPages];
+    // navItems is rebuilt every render, but only its badge counts change and
+    // those do not affect what this returns.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <DashboardLayout
       user={{ name: user.name, email: user.email, role: user.role, avatarUrl: user.avatarUrl, universityName }}
       navItems={navItems}
       searchValue={search}
-      onSearchChange={placeholder ? setSearch : undefined}
+      onSearchChange={setSearch}
       searchPlaceholder={placeholder}
+      searchIndexLoader={loadSearchIndex}
+      // Every admin suggestion carries a destination — unlike the technician
+      // shell, this one has no in-place modal to open a unit in.
+      onSearchPick={(entry) => {
+        if (entry.href) router.push(entry.href);
+      }}
       onCreateAction={createWorkOrder.openBlank}
       createActionLabel="+ สร้างใบงานซ่อมบำรุง"
     >

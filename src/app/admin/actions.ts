@@ -29,6 +29,14 @@ import * as schedules from "@/lib/admin/schedules";
 
 // --- work orders ---
 
+// --- the header search box ---
+
+export async function getAdminSearchIndexAction(
+  ...args: Parameters<typeof pages.getAdminSearchIndex>
+) {
+  return pages.getAdminSearchIndex(...args);
+}
+
 export async function createWorkOrderAction(
   ...args: Parameters<typeof workOrders.createWorkOrderAction>
 ) {

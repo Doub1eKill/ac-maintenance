@@ -1,15 +1,42 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, ListFilter, Search, Snowflake } from "lucide-react";
-import { highlightMatch, matchesQuery, type HighlightPart } from "@/lib/search";
+import {
+  Building2,
+  ClipboardList,
+  Compass,
+  DoorOpen,
+  ListFilter,
+  Loader2,
+  Search,
+  Snowflake,
+  Tag,
+  User,
+} from "lucide-react";
+import {
+  highlightMatch,
+  matchesQuery,
+  type HighlightPart,
+  type SearchEntry,
+  type SearchEntryType,
+} from "@/lib/search";
 
-export interface OmniSearchEntry {
-  type: "unit";
-  id: string;
-  label: string;
-  hint: string;
-}
+export type OmniSearchEntry = SearchEntry;
+
+/**
+ * How each kind of suggestion is titled and iconed, and the order the groups
+ * appear in — units first because a technician holding a code is the common
+ * case, pages last because they are the fallback for "where was that screen".
+ */
+const GROUPS: { type: SearchEntryType; label: string; icon: typeof Snowflake }[] = [
+  { type: "unit", label: "เครื่องแอร์", icon: Snowflake },
+  { type: "workOrder", label: "ใบงาน", icon: ClipboardList },
+  { type: "building", label: "อาคาร", icon: Building2 },
+  { type: "room", label: "ห้อง", icon: DoorOpen },
+  { type: "model", label: "ยี่ห้อ/รุ่น", icon: Tag },
+  { type: "user", label: "ผู้ใช้งาน", icon: User },
+  { type: "page", label: "เมนู", icon: Compass },
+];
 
 interface OmniSearchProps {
   /** The filter term. Kept in the parent, because the list below still uses it. */
@@ -27,7 +54,9 @@ interface OmniSearchProps {
 // Below this the list is everything and the dropdown is only in the way.
 const MIN_QUERY_LENGTH = 2;
 // Enough to choose from without turning the panel into its own scrolling list.
-const MAX_SUGGESTIONS = 8;
+const MAX_SUGGESTIONS = 10;
+// Per group, so one kind with hundreds of matches cannot crowd out the others.
+const MAX_PER_GROUP = 4;
 
 function Highlighted({ parts }: { parts: HighlightPart[] }) {
   return (
@@ -72,17 +101,35 @@ export function OmniSearch({
   // focus/blur/focus in quick succession would otherwise start.
   const requestedRef = useRef(false);
 
-  const suggestions = useMemo(() => {
-    if (!entries || value.trim().length < MIN_QUERY_LENGTH) return [];
-    return entries
-      .filter((entry) => matchesQuery(value, entry.label, entry.hint))
-      .slice(0, MAX_SUGGESTIONS);
+  // Grouped for display, but also flattened: the keyboard walks one list, and
+  // the two have to agree on the order or arrowing down would jump about.
+  const { grouped, flat } = useMemo(() => {
+    if (!entries || value.trim().length < MIN_QUERY_LENGTH) {
+      return { grouped: [] as { label: string; icon: typeof Snowflake; items: SearchEntry[] }[], flat: [] as SearchEntry[] };
+    }
+
+    const matches = entries.filter((entry) => matchesQuery(value, entry.label, entry.hint));
+
+    const grouped: { label: string; icon: typeof Snowflake; items: SearchEntry[] }[] = [];
+    const flat: SearchEntry[] = [];
+
+    for (const group of GROUPS) {
+      if (flat.length >= MAX_SUGGESTIONS) break;
+      const items = matches
+        .filter((entry) => entry.type === group.type)
+        .slice(0, Math.min(MAX_PER_GROUP, MAX_SUGGESTIONS - flat.length));
+      if (items.length === 0) continue;
+      grouped.push({ label: group.label, icon: group.icon, items });
+      flat.push(...items);
+    }
+
+    return { grouped, flat };
   }, [entries, value]);
 
   const showPanel = open && value.trim().length >= MIN_QUERY_LENGTH;
   // The filter row is always first and always selectable, so Enter on a term
   // that matches nothing still does the thing the box used to do.
-  const rowCount = suggestions.length + 1;
+  const rowCount = flat.length + 1;
 
   async function ensureIndex() {
     if (requestedRef.current) return;
@@ -136,7 +183,7 @@ export function OmniSearch({
         setOpen(false);
         return;
       }
-      const entry = suggestions[activeIndex - 1];
+      const entry = flat[activeIndex - 1];
       if (entry) {
         onPick(entry);
         setOpen(false);
@@ -198,41 +245,54 @@ export function OmniSearch({
             </div>
           )}
 
-          {!loading && suggestions.length > 0 && (
-            <div className="border-t border-border">
-              <p className="px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                เครื่องแอร์
-              </p>
-              {suggestions.map((entry, index) => (
-                <button
-                  key={entry.id}
-                  type="button"
-                  onMouseEnter={() => setActiveIndex(index + 1)}
-                  onClick={() => {
-                    onPick(entry);
-                    setOpen(false);
-                  }}
-                  className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-xs transition-colors ${
-                    activeIndex === index + 1 ? "bg-secondary" : "hover:bg-secondary"
-                  }`}
-                >
-                  <Snowflake className="h-3.5 w-3.5 shrink-0 text-primary" />
-                  <span className="min-w-0">
-                    <span className="block truncate font-mono text-foreground">
-                      <Highlighted parts={highlightMatch(entry.label, value)} />
-                    </span>
-                    <span className="block truncate text-[10px] text-muted-foreground">
-                      <Highlighted parts={highlightMatch(entry.hint, value)} />
-                    </span>
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
+          {!loading &&
+            grouped.map((group) => {
+              const GroupIcon = group.icon;
+              return (
+                <div key={group.label} className="border-t border-border">
+                  <p className="px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    {group.label}
+                  </p>
+                  {group.items.map((entry) => {
+                    // Position in the flat list, which is what the arrow keys
+                    // move through.
+                    const row = flat.indexOf(entry) + 1;
+                    return (
+                      <button
+                        key={`${entry.type}-${entry.id}`}
+                        type="button"
+                        onMouseEnter={() => setActiveIndex(row)}
+                        onClick={() => {
+                          onPick(entry);
+                          setOpen(false);
+                        }}
+                        className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-xs transition-colors ${
+                          activeIndex === row ? "bg-secondary" : "hover:bg-secondary"
+                        }`}
+                      >
+                        <GroupIcon className="h-3.5 w-3.5 shrink-0 text-primary" />
+                        <span className="min-w-0">
+                          <span
+                            className={`block truncate text-foreground ${entry.type === "unit" ? "font-mono" : ""}`}
+                          >
+                            <Highlighted parts={highlightMatch(entry.label, value)} />
+                          </span>
+                          {entry.hint && (
+                            <span className="block truncate text-[10px] text-muted-foreground">
+                              <Highlighted parts={highlightMatch(entry.hint, value)} />
+                            </span>
+                          )}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            })}
 
-          {!loading && entries !== null && suggestions.length === 0 && (
+          {!loading && entries !== null && flat.length === 0 && (
             <p className="border-t border-border px-3 py-3 text-[11px] text-muted-foreground">
-              ไม่พบเครื่องแอร์ที่ตรงกับคำค้นนี้
+              ไม่พบรายการที่ตรงกับคำค้นนี้
             </p>
           )}
         </div>
