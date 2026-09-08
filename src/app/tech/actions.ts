@@ -96,6 +96,22 @@ export async function createAcModelAction(
   return masterData.createAcModelAction(...args);
 }
 
+// Correcting a name that was typed wrong, which is why these are here and the
+// delete/restore pair still is not: a rename relabels a row that stays, so
+// nothing a unit points at goes missing.
+
+export async function updateAcBrandAction(
+  ...args: Parameters<typeof masterData.updateAcBrandAction>
+) {
+  return masterData.updateAcBrandAction(...args);
+}
+
+export async function updateAcModelAction(
+  ...args: Parameters<typeof masterData.updateAcModelAction>
+) {
+  return masterData.updateAcModelAction(...args);
+}
+
 // --- units ---
 
 export async function createAirConditionerAction(

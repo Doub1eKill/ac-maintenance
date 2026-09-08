@@ -3,8 +3,15 @@
 import { useState, useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { createAcBrandAction, createAcModelAction, deleteAcBrandAction, deleteAcModelAction } from "./actions";
-import { Plus, Check, ChevronDown, ChevronRight, Wind, Trash2 } from "lucide-react";
+import {
+  createAcBrandAction,
+  createAcModelAction,
+  deleteAcBrandAction,
+  deleteAcModelAction,
+  updateAcBrandAction,
+  updateAcModelAction,
+} from "./actions";
+import { Plus, Check, ChevronDown, ChevronRight, Wind, Trash2, Pencil } from "lucide-react";
 import { TrashModal } from "./trash-modal";
 
 export type ModelType = {
@@ -128,6 +135,15 @@ function BrandItem({ brand, isExpanded, onToggle }: { brand: BrandType, isExpand
   const [error, setError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [confirmDeleteModelId, setConfirmDeleteModelId] = useState<string | null>(null);
+  // Renaming, for the case the trash bin was never the answer to: a name
+  // that was simply typed wrong. Technicians correct these from
+  // /tech/catalogue, and an admin looking at the same row should not have to
+  // go there to do it.
+  const [editingBrand, setEditingBrand] = useState(false);
+  const [brandDraft, setBrandDraft] = useState("");
+  const [editingModelId, setEditingModelId] = useState<string | null>(null);
+  const [modelDraft, setModelDraft] = useState("");
+  const [modelBtuDraft, setModelBtuDraft] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
 
   const handleAddModel = (e: React.FormEvent<HTMLFormElement>) => {
@@ -146,6 +162,52 @@ function BrandItem({ brand, isExpanded, onToggle }: { brand: BrandType, isExpand
       }
     });
   };
+
+  function handleRenameBrand() {
+    const name = brandDraft.trim();
+    if (!name) return;
+
+    startTransition(async () => {
+      const formData = new FormData();
+      formData.append("brandId", brand.id);
+      formData.append("name", name);
+      const result = await updateAcBrandAction(formData);
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success(`แก้ชื่อยี่ห้อเป็น "${name}" แล้ว`);
+      setEditingBrand(false);
+      router.refresh();
+    });
+  }
+
+  function startEditModel(model: ModelType) {
+    setEditingModelId(model.id);
+    setModelDraft(model.name);
+    setModelBtuDraft(model.defaultBtu === null ? "" : String(model.defaultBtu));
+    setConfirmDeleteModelId(null);
+  }
+
+  function handleRenameModel(modelId: string) {
+    const name = modelDraft.trim();
+    if (!name) return;
+
+    startTransition(async () => {
+      const formData = new FormData();
+      formData.append("modelId", modelId);
+      formData.append("name", name);
+      formData.append("defaultBtu", modelBtuDraft);
+      const result = await updateAcModelAction(formData);
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success(`แก้ไขรุ่น "${name}" แล้ว`);
+      setEditingModelId(null);
+      router.refresh();
+    });
+  }
 
   function handleDeleteBrand() {
     startTransition(async () => {
@@ -192,6 +254,19 @@ function BrandItem({ brand, isExpanded, onToggle }: { brand: BrandType, isExpand
         </div>
         <div className="flex items-center gap-1">
           <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setBrandDraft(brand.name);
+              setEditingBrand(true);
+              setShowDeleteConfirm(false);
+            }}
+            title="แก้ไขชื่อยี่ห้อนี้"
+            aria-label={`แก้ไขชื่อยี่ห้อ ${brand.name}`}
+            className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          >
+            <Pencil className="h-4 w-4" />
+          </button>
+          <button
             onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm(true); }}
             title="ลบยี่ห้อนี้ลงถังขยะ"
             className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
@@ -203,6 +278,35 @@ function BrandItem({ brand, isExpanded, onToggle }: { brand: BrandType, isExpand
           </div>
         </div>
       </div>
+
+      {editingBrand && (
+        <div className="px-4 pb-4 pt-0 border-t border-border bg-muted/50 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 py-3" onClick={(e) => e.stopPropagation()}>
+          <input
+            value={brandDraft}
+            onChange={(e) => setBrandDraft(e.target.value)}
+            placeholder="ชื่อยี่ห้อ"
+            autoFocus
+            disabled={isPending}
+            className="flex-1 rounded-xl border border-border bg-card px-3.5 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
+          />
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setEditingBrand(false)}
+              disabled={isPending}
+              className="flex-1 rounded-xl border border-border bg-card px-4 py-2 text-xs font-bold text-foreground hover:bg-muted disabled:opacity-50 transition-colors sm:flex-none"
+            >
+              ยกเลิก
+            </button>
+            <button
+              onClick={handleRenameBrand}
+              disabled={isPending || !brandDraft.trim()}
+              className="flex-1 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors sm:flex-none"
+            >
+              {isPending ? "กำลังบันทึก..." : "บันทึก"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {showDeleteConfirm && (
         <div className="px-4 pb-4 pt-0 border-t border-border bg-destructive/5 flex items-center justify-between gap-3 py-3" onClick={(e) => e.stopPropagation()}>
@@ -233,7 +337,42 @@ function BrandItem({ brand, isExpanded, onToggle }: { brand: BrandType, isExpand
           <div className="mt-4 mb-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
             {brand.models.map(model => (
               <div key={model.id} className="bg-card border border-border rounded-lg p-2.5 text-sm">
-                {confirmDeleteModelId === model.id ? (
+                {editingModelId === model.id ? (
+                  <div className="space-y-2">
+                    <input
+                      value={modelDraft}
+                      onChange={(e) => setModelDraft(e.target.value)}
+                      placeholder="ชื่อรุ่น"
+                      autoFocus
+                      disabled={isPending}
+                      className="w-full rounded-md border border-border bg-muted px-2 py-1 text-sm text-foreground focus:border-primary focus:outline-none"
+                    />
+                    <input
+                      value={modelBtuDraft}
+                      onChange={(e) => setModelBtuDraft(e.target.value)}
+                      type="number"
+                      placeholder="BTU มาตรฐาน (ไม่บังคับ)"
+                      disabled={isPending}
+                      className="w-full rounded-md border border-border bg-muted px-2 py-1 text-sm text-foreground focus:border-primary focus:outline-none"
+                    />
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => setEditingModelId(null)}
+                        disabled={isPending}
+                        className="flex-1 rounded-md border border-border bg-card px-2 py-1 text-[10px] font-bold text-foreground hover:bg-muted transition-colors"
+                      >
+                        ยกเลิก
+                      </button>
+                      <button
+                        onClick={() => handleRenameModel(model.id)}
+                        disabled={isPending || !modelDraft.trim()}
+                        className="flex-1 rounded-md bg-primary px-2 py-1 text-[10px] font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                      >
+                        บันทึก
+                      </button>
+                    </div>
+                  </div>
+                ) : confirmDeleteModelId === model.id ? (
                   <div className="space-y-2">
                     <p className="text-[11px] font-bold text-destructive">ลบ &quot;{model.name}&quot; ลงถังขยะ?</p>
                     <div className="flex items-center gap-1.5">
@@ -258,6 +397,14 @@ function BrandItem({ brand, isExpanded, onToggle }: { brand: BrandType, isExpand
                     <span className="font-bold text-foreground">{model.name}</span>
                     <div className="flex items-center gap-1.5">
                       {model.defaultBtu && <span className="text-xs font-bold text-muted-foreground bg-muted px-2 py-0.5 rounded-md border border-border">{model.defaultBtu.toLocaleString()} BTU</span>}
+                      <button
+                        onClick={() => startEditModel(model)}
+                        title="แก้ไขชื่อรุ่น/BTU"
+                        aria-label={`แก้ไขรุ่น ${model.name}`}
+                        className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
                       <button
                         onClick={() => setConfirmDeleteModelId(model.id)}
                         title="ลบรุ่นนี้ลงถังขยะ"

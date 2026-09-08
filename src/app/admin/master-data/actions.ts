@@ -39,6 +39,20 @@ export async function createAcModelAction(
   return masterData.createAcModelAction(...args);
 }
 
+// --- renaming ---
+
+export async function updateAcBrandAction(
+  ...args: Parameters<typeof masterData.updateAcBrandAction>
+) {
+  return masterData.updateAcBrandAction(...args);
+}
+
+export async function updateAcModelAction(
+  ...args: Parameters<typeof masterData.updateAcModelAction>
+) {
+  return masterData.updateAcModelAction(...args);
+}
+
 // --- retiring, restoring and purging brands ---
 
 export async function deleteAcBrandAction(
