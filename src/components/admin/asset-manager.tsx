@@ -336,11 +336,18 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
         {paginatedBuildings.map((b) => (
           <div key={b.id} className="rounded-2xl border border-border bg-muted overflow-hidden">
             <div className="w-full flex items-center justify-between p-4 text-left hover:bg-secondary transition-colors cursor-pointer" onClick={() => setExpandedBuilding(effectiveExpandedBuilding === b.id ? "none" : b.id)}>
-              <div className="flex items-center gap-3">
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-mono text-xs font-bold">
-                  {b.abbreviation}
+              <div className="flex min-w-0 items-center gap-3">
+                {/* An icon, not the abbreviation. This is a fixed 32px box and
+                    the abbreviations in real data are seven characters
+                    ("B467711"), which overflowed it and left what looked like a
+                    stray number. The same badge in BuildingGroupList has always
+                    used this icon; the abbreviation moved to the line below,
+                    where it has room and reads as what it is — the first
+                    segment of every acCode in the building. */}
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                  <Building2 className="h-4 w-4" />
                 </span>
-                <div>
+                <div className="min-w-0">
                   <h3 className="font-bold text-foreground text-sm">{b.name}</h3>
                   {/* Both halves counted off the same (filtered) rooms. Taking
                       the unit half from the server's `unitsCount` instead made
@@ -348,8 +355,9 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
                       แอร์", a room count narrowed to the result next to a unit
                       count for the whole building. Identical when nothing is
                       filtered, which is why it went unnoticed. */}
-                  <p className="text-xs text-muted-foreground">
-                    {b.rooms.length} ห้อง • {b.rooms.reduce((n, r) => n + r.acUnits.length, 0)} แอร์
+                  <p className="truncate text-xs text-muted-foreground">
+                    <span className="font-mono">{b.abbreviation}</span> • {b.rooms.length} ห้อง •{" "}
+                    {b.rooms.reduce((n, r) => n + r.acUnits.length, 0)} แอร์
                   </p>
                 </div>
               </div>
