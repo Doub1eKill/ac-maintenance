@@ -76,29 +76,44 @@ interface FlatACUnit extends ACUnit {
  * last segment, not the third.
  */
 /**
- * The printed sheet: 2 columns x 6 rows of 95 x 43 mm stickers on A4.
+ * The printed sheet: one column of five 194 x 52 mm stickers on A4.
  *
  * Every length is in millimetres because every one of them is a physical
  * constraint, not a layout preference. Pixels would have made the sheet depend
  * on the browser's DPI guess, and a QR code that scans on one machine and not
  * on the next is the one failure this page cannot afford.
  *
- * The 34mm code is what sets the rest. The value encoded is an origin plus
- * /qr/ plus a uuid — around 60 bytes, which at error-correction level H comes
- * out a 45-module symbol, 53 across with its quiet zone. 34mm gives each module
- * 0.64mm, comfortably above the ~0.5mm where phone cameras start failing in
- * the dim plant rooms these end up in. Level H stays (rather than shrinking the
- * symbol) because a sticker on an air conditioner collects dust and damp, and H
- * is what reads through a scuffed corner.
+ * It started at two columns of 95 x 43mm, twelve to a page, with a 34mm code.
+ * That scanned, but read small on the wall, and the owner asked for fewer and
+ * larger instead — the sticker goes on a machine somebody is standing in front
+ * of, and paper is the cheap part.
  *
- * That fixes the sticker at 95 x 43mm and the sheet at 12 per page:
- *   width  210 - 16 margin = 194, minus one 4mm gutter, / 2 = 95mm
- *   height 297 - 16 margin = 281, six rows of 43 plus five 4mm gutters = 278mm
+ * The code is 46mm. The value encoded is an origin plus /qr/ plus a uuid —
+ * around 60 bytes, which at error-correction level H comes out a 45-module
+ * symbol, 53 across with its quiet zone, so each module is 0.87mm. That is well
+ * clear of the ~0.5mm where phone cameras start failing in the dim plant rooms
+ * these end up in, and it now reads from arm's length rather than up close.
+ * Level H stays (rather than shrinking the symbol) because a sticker on an air
+ * conditioner collects dust and damp, and H is what reads through a scuffed
+ * corner.
+ *
+ * The sticker is 150mm wide, not the full 194mm the column offers. Measured on
+ * the rendered sheet, the widest line of ink is the acCode at 68mm and the
+ * longest brand is 60mm; a full-width label would be most of a hand-span of
+ * blank paper stuck to the machine. 150mm leaves the text column 93mm, which is
+ * both comfortably wider than anything in the data today and slack for the real
+ * Phuket brand and model names, whose lengths are not ours to control. The band
+ * left over on the right of the sheet is the deliberate cost: the row count is
+ * set by the page height, so a wider sticker would buy nothing.
+ *
+ * The sheet:
+ *   width  210 - 16 margin = 194mm of column, sticker 150mm centred in it
+ *   height 297 - 16 margin = 281, five rows of 52 plus four 4mm gutters = 276mm
  *
  * Square corners and a solid hairline border, not the dashed rounded box this
  * replaced: the border is a cut line, and scissors follow a straight solid edge.
  */
-const STICKERS_PER_SHEET = 12;
+const STICKERS_PER_SHEET = 5;
 
 const STICKER_SHEET_CSS = `
   @page { size: A4; margin: 8mm; }
@@ -114,42 +129,54 @@ const STICKER_SHEET_CSS = `
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
-  .sheet { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4mm; }
+  .sheet { display: grid; grid-template-columns: 1fr; gap: 4mm; }
   .sticker {
-    height: 43mm;
+    width: 150mm;
+    margin: 0 auto;
+    height: 52mm;
     border: 0.4mm solid #111;
-    padding: 2.5mm;
+    padding: 3mm;
     display: flex;
     align-items: center;
-    gap: 3mm;
+    gap: 5mm;
     background: #fff;
     /* Both spellings: the old one is what Chrome's print path still honours. */
     page-break-inside: avoid;
     break-inside: avoid;
   }
-  .sticker-qr { flex: 0 0 34mm; }
+  .sticker-qr { flex: 0 0 46mm; }
   /* qrcode.react writes px width/height attributes and a viewBox; the viewBox
      is what lets this override them with a physical size. */
-  .sticker-qr svg { display: block; width: 34mm; height: 34mm; }
-  .sticker-body { flex: 1 1 auto; min-width: 0; }
-  .sticker-seq { display: flex; align-items: center; gap: 2mm; }
+  .sticker-qr svg { display: block; width: 46mm; height: 46mm; }
+  /* overflow hidden is a containment guard, not a layout choice: a name longer
+     than the data holds today would otherwise push the last line past the cut
+     border, and a sticker that prints outside its own frame is worse than one
+     that ends in an ellipsis. */
+  .sticker-body { flex: 1 1 auto; min-width: 0; overflow: hidden; }
+  .sticker-seq { display: flex; align-items: center; gap: 3mm; }
   .sticker-seq-num {
     flex: 0 0 auto;
-    width: 7mm; height: 7mm;
+    width: 11mm; height: 11mm;
     border-radius: 50%;
     background: #111; color: #fff;
-    font-size: 4.2mm; font-weight: 700; line-height: 7mm;
+    font-size: 6.5mm; font-weight: 700; line-height: 11mm;
     text-align: center;
   }
-  .sticker-seq-label { font-size: 3mm; color: #444; }
-  .sticker-brand { font-size: 4mm; font-weight: 700; margin-top: 1.5mm; line-height: 1.2; }
-  .sticker-spec { font-size: 3.2mm; margin-top: 0.5mm; line-height: 1.3; }
+  .sticker-seq-label { font-size: 4.2mm; color: #444; }
+  .sticker-brand {
+    font-size: 7mm; font-weight: 700; margin-top: 2mm; line-height: 1.2;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .sticker-spec {
+    font-size: 5mm; margin-top: 1mm; line-height: 1.3;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
   .sticker-code {
     font-family: "Consolas", monospace;
-    font-size: 3.4mm; font-weight: 700; letter-spacing: 0.2mm;
-    margin-top: 1.5mm;
+    font-size: 6mm; font-weight: 700; letter-spacing: 0.3mm;
+    margin-top: 2mm;
   }
-  .sticker-cta { font-size: 2.6mm; color: #555; margin-top: 1mm; }
+  .sticker-cta { font-size: 3.6mm; color: #555; margin-top: 1.5mm; }
 `;
 
 /** The scanned target. One place, so the three call sites cannot drift. */
@@ -173,7 +200,7 @@ function StickerCard({ ac }: { ac: FlatACUnit }) {
   return (
     <div className="sticker">
       <div className="sticker-qr">
-        <QRCodeSVG value={qrTargetUrl(ac.qrCode)} size={160} level="H" includeMargin={true} />
+        <QRCodeSVG value={qrTargetUrl(ac.qrCode)} size={220} level="H" includeMargin={true} />
       </div>
       <div className="sticker-body">
         <div className="sticker-seq">
