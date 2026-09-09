@@ -1,5 +1,87 @@
 # Project Handoff & Technical Summary
 
+# 🧭 เตรียม merge master เข้า feat/postgres — สำรวจแล้ว ยังไม่แตะอะไร (9 ก.ย. 2026, DoubleKill)
+
+เจ้าของโปรเจกต์สั่ง: *"เตรียมไว้ก่อน แต่ยังไม่ต้องลบ Migration หรือโคลนไป"*
+
+**ไม่มี branch ไหนถูกแตะ ไม่มี merge เกิดขึ้น ไม่มีไฟล์ถูกลบหรือคัดลอก** — สำรวจด้วย `git merge-tree --write-tree` ซึ่งคำนวณผลลัพธ์การ merge ใน object database ล้วนๆ **ไม่แตะ working tree และไม่สร้าง commit**
+
+```bash
+git merge-tree --write-tree --name-only feat/postgres master
+```
+
+| | |
+|---|---|
+| merge base | `c411ec9` |
+| `master` | `71fa167` (นำอยู่ **28 commit**) |
+| `feat/postgres` | `967bafd` (นำอยู่ 4 commit) |
+
+## 🟢 ผลลัพธ์: conflict ที่เดียวคือ `HANDOFF.md`
+
+**เบากว่าที่หัวข้อเก่าๆ เตือนไว้มาก** ไฟล์ที่ทั้งสองฝั่งแก้มีแค่ **2 ไฟล์**:
+
+| ไฟล์ | ผล |
+|---|---|
+| `HANDOFF.md` | ⚠️ conflict — แบบเดียวกับทุกรอบ (ต่างฝ่ายต่างแทรกหัวข้อบนสุด) แก้โดยเก็บทั้งสองฝั่ง เรียงล่าสุดขึ้นก่อน |
+| `src/lib/maintenance.ts` | ✅ git รวมให้เองได้ **และรวมถูกด้วย** |
+
+ที่เหลือไม่ทับกันเลย เพราะสองฝั่งแก้คนละไฟล์ทั้งหมด:
+- `feat/postgres` แตะ `prisma.ts` · `db-retry.ts` · `schema.prisma` · migrations · `package.json` · `tech/dashboard.ts` · `tech/maintenance-log.ts` · `admin/error.tsx`
+- `master` แตะไฟล์ UI/lib อีก 40 ไฟล์ **ซึ่งไม่มีตัวไหนอยู่ในรายการข้างบนเลย**
+
+### ตรวจ `maintenance.ts` ที่ auto-merge แล้วทีละบรรทัด
+
+ดึง blob ออกจาก merged tree (`ed021f9`) มา diff กับฝั่ง master:
+
+- **ฝั่ง postgres** แก้ *คอมเมนต์อธิบาย deadlock* ที่บรรทัด ~145 (InnoDB S→X lock → PostgreSQL FOR KEY SHARE, error 1213 → SQLSTATE 40P01)
+- **ฝั่ง master** เพิ่ม *type + query + mapping* ของ `schedule` ที่บรรทัด ~286–380
+
+**คนละโซนสนิท ไม่มีตรงไหนทับกัน** ไฟล์ที่ merge ออกมา = ของ master ทุกบรรทัด + คอมเมนต์ที่เขียนใหม่ของ postgres · ยืนยันว่าเก็บของทั้งสองฝั่งครบ (`FOR KEY SHARE` ✓ `40P01` ✓ `maintenanceSchedules:` ✓)
+
+## 🟢 การ merge นี้ไม่ลบ migration และไม่คัดลอกอะไรไปไหน
+
+ตรงตามที่สั่ง — ตรวจ `prisma/migrations/` ใน merged tree เทียบกับ `feat/postgres` ปัจจุบัน:
+
+```
+merged tree      → 20260907120918_init, migration_lock.toml
+feat/postgres    → 20260907120918_init, migration_lock.toml   (เหมือนกันเป๊ะ)
+```
+
+migration ของ MySQL 13 ใบถูกลบไปแล้วตั้งแต่ commit `620d4d1` บน `feat/postgres` เมื่อ 7 ก.ย. **การ merge ไม่ได้ลบอะไรเพิ่ม** เพราะ master ไม่เคยแตะโฟลเดอร์นี้เลย
+
+## 🟢 โค้ด 28 commit ของ master ปลอดภัยกับ PostgreSQL
+
+ตรวจทั้ง `src/` บน master:
+
+| ตรวจ | ผล |
+|---|---|
+| `contains:` / `mode: "insensitive"` | **0 จุด** ✅ |
+| `$queryRaw` / `$executeRaw` / `queryRawUnsafe` | **0 จุด** ✅ |
+| `NOW()` / `UTC_TIMESTAMP` / SQL ดิบ | **0 จุด** ✅ |
+| แตะ `schema.prisma` / migrations / `prisma.ts` / `db-retry.ts` | **ไม่แตะเลย** ✅ |
+| `.sort(` ที่เรียงข้อความโดยไม่ใช้ `localeCompare(_, "th")` | **0 จุด** ✅ |
+
+`.sort(` ที่เจอทั้งหมด 4 จุด: `team-panel.tsx` และ `tech/pages.ts` ใช้ `localeCompare(_, "th")` ครบ · `compareJobOrder` ใน `maintenance.ts` ก็ใช้ · `dashboard-layout.tsx` เรียงความยาว URL ไม่ใช่ข้อความ
+
+**นี่คือผลตอบแทนของกฎห้ามใช้ `contains`** — งานสองสัปดาห์บน master ข้ามเครื่องยนต์ได้โดยไม่ต้องแก้อะไรสักบรรทัด
+
+## ⚠️ ที่ยังไม่ได้พิสูจน์ และเป็นต้นทุนจริงของขั้นตอนนี้
+
+**git รวมโค้ดได้ ≠ โค้ดรันบน PostgreSQL ได้** — โค้ด 28 commit นั้น **ไม่เคยรันบน PostgreSQL เลยสักครั้ง** ตรวจด้วยตาว่าไม่มี pattern ที่ผูกกับ MySQL เท่านั้น ยังไม่ได้รันจริง
+
+## 📋 ลำดับที่ต้องทำตอนได้ไฟเขียว (ยังไม่ทำ)
+
+1. `git checkout feat/postgres && git merge master` → แก้ conflict `HANDOFF.md` ที่เดียว เก็บทั้งสองฝั่ง
+2. **`npm install` ใหม่ทั้งรอบ** — driver adapter คนละตัว (`@prisma/adapter-mariadb` ↔ `PrismaPg`)
+3. `npx prisma generate` แล้ว **ลบ `.next`**
+4. สลับ `DATABASE_URL` ใน `.env` ไปชี้ PostgreSQL (สลับคอมเมนต์ 2 บรรทัด)
+5. ทดสอบผ่านหน้าจอจริงทั้งชุด โดยเฉพาะของใหม่ที่ยังไม่เคยแตะ PostgreSQL: แก้ชื่อยี่ห้อ/รุ่น · omnibox · หน้าเจ้าหน้าที่ · QR sticker · **การเรียงภาษาไทย** (ICU th-TH เรียงต่างจาก utf8mb4_unicode_ci)
+6. **สลับ `.env` กลับ + `npm install` กลับ** ถ้าจะกลับมาทำงานบน master ต่อ
+
+> ⚠️ ข้อ 2 กับ 6 คือเหตุผลที่ยังไม่ควรทำถ้ายังไม่พร้อมทดสอบยาว — สลับ branch ไป/กลับต้อง `npm install` ใหม่ทุกครั้ง ไม่ใช่แค่ `git checkout`
+
+---
+
 # 🔕 ปุ่มพิมพ์เงียบสนิทเมื่อ pop-up ถูกบล็อก — แก้แล้ว (9 ก.ย. 2026, DoubleKill)
 
 branch `feat/qr-print-popup-guard` ตัดจาก `master` `7a55a02`
