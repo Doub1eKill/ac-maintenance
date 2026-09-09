@@ -75,6 +75,146 @@ interface FlatACUnit extends ACUnit {
  * Room names contain dashes of their own ("6-53142"), so the sequence is the
  * last segment, not the third.
  */
+/**
+ * The printed sheet: 2 columns x 6 rows of 95 x 43 mm stickers on A4.
+ *
+ * Every length is in millimetres because every one of them is a physical
+ * constraint, not a layout preference. Pixels would have made the sheet depend
+ * on the browser's DPI guess, and a QR code that scans on one machine and not
+ * on the next is the one failure this page cannot afford.
+ *
+ * The 34mm code is what sets the rest. The value encoded is an origin plus
+ * /qr/ plus a uuid — around 60 bytes, which at error-correction level H comes
+ * out a 45-module symbol, 53 across with its quiet zone. 34mm gives each module
+ * 0.64mm, comfortably above the ~0.5mm where phone cameras start failing in
+ * the dim plant rooms these end up in. Level H stays (rather than shrinking the
+ * symbol) because a sticker on an air conditioner collects dust and damp, and H
+ * is what reads through a scuffed corner.
+ *
+ * That fixes the sticker at 95 x 43mm and the sheet at 12 per page:
+ *   width  210 - 16 margin = 194, minus one 4mm gutter, / 2 = 95mm
+ *   height 297 - 16 margin = 281, six rows of 43 plus five 4mm gutters = 278mm
+ *
+ * Square corners and a solid hairline border, not the dashed rounded box this
+ * replaced: the border is a cut line, and scissors follow a straight solid edge.
+ */
+const STICKERS_PER_SHEET = 12;
+
+const STICKER_SHEET_CSS = `
+  @page { size: A4; margin: 8mm; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    /* Tahoma and Leelawadee both ship Thai on Windows; the sheet must not fall
+       back to a Latin-only face and drop the labels to boxes. */
+    font-family: "Sarabun", "Leelawadee UI", Tahoma, sans-serif;
+    color: #111;
+    /* Without this the sequence badge prints as an empty ring: browsers strip
+       background fills from printed pages by default. */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .sheet { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4mm; }
+  .sticker {
+    height: 43mm;
+    border: 0.4mm solid #111;
+    padding: 2.5mm;
+    display: flex;
+    align-items: center;
+    gap: 3mm;
+    background: #fff;
+    /* Both spellings: the old one is what Chrome's print path still honours. */
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  .sticker-qr { flex: 0 0 34mm; }
+  /* qrcode.react writes px width/height attributes and a viewBox; the viewBox
+     is what lets this override them with a physical size. */
+  .sticker-qr svg { display: block; width: 34mm; height: 34mm; }
+  .sticker-body { flex: 1 1 auto; min-width: 0; }
+  .sticker-seq { display: flex; align-items: center; gap: 2mm; }
+  .sticker-seq-num {
+    flex: 0 0 auto;
+    width: 7mm; height: 7mm;
+    border-radius: 50%;
+    background: #111; color: #fff;
+    font-size: 4.2mm; font-weight: 700; line-height: 7mm;
+    text-align: center;
+  }
+  .sticker-seq-label { font-size: 3mm; color: #444; }
+  .sticker-brand { font-size: 4mm; font-weight: 700; margin-top: 1.5mm; line-height: 1.2; }
+  .sticker-spec { font-size: 3.2mm; margin-top: 0.5mm; line-height: 1.3; }
+  .sticker-code {
+    font-family: "Consolas", monospace;
+    font-size: 3.4mm; font-weight: 700; letter-spacing: 0.2mm;
+    margin-top: 1.5mm;
+  }
+  .sticker-cta { font-size: 2.6mm; color: #555; margin-top: 1mm; }
+`;
+
+/** The scanned target. One place, so the three call sites cannot drift. */
+function qrTargetUrl(qrCode: string) {
+  return `${typeof window !== "undefined" ? window.location.origin : ""}/qr/${qrCode}`;
+}
+
+/**
+ * One sticker, rendered hidden and then lifted out as innerHTML by the print
+ * handlers.
+ *
+ * Both the single and the batch button go through this same component, which
+ * is the point: they used to be two copies of the markup with two copies of
+ * the CSS, and the single one had drifted far enough that it shipped a
+ * `.replace('class="', 'style="')` to paper over the mismatch.
+ *
+ * Plain `class` names with no styling of their own — every rule lives in
+ * STICKER_SHEET_CSS, which is what gets written into the print window.
+ */
+function StickerCard({ ac }: { ac: FlatACUnit }) {
+  return (
+    <div className="sticker">
+      <div className="sticker-qr">
+        <QRCodeSVG value={qrTargetUrl(ac.qrCode)} size={160} level="H" includeMargin={true} />
+      </div>
+      <div className="sticker-body">
+        <div className="sticker-seq">
+          <span className="sticker-seq-num">{ac.roomSequence ?? "?"}</span>
+          <span className="sticker-seq-label">
+            เครื่องที่ {ac.roomSequence ?? "-"} · ห้อง {ac.roomName}
+          </span>
+        </div>
+        <div className="sticker-brand">{ac.brand}</div>
+        <div className="sticker-spec">
+          {ac.model ?? "ไม่ระบุรุ่น"} · {ac.btu ? `${ac.btu.toLocaleString()} BTU` : "ไม่ระบุ BTU"}
+        </div>
+        <div className="sticker-code">{ac.acCode}</div>
+        <div className="sticker-cta">สแกนเพื่อแจ้งซ่อม / ดูประวัติ</div>
+      </div>
+    </div>
+  );
+}
+
+/** Opens the sheet in its own window and sends it straight to the printer. */
+function openStickerSheet(stickersHtml: string, title: string) {
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) return;
+
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>${title}</title>
+        <style>${STICKER_SHEET_CSS}</style>
+      </head>
+      <body>
+        <div class="sheet">${stickersHtml}</div>
+        <script>
+          window.onload = () => { window.print(); window.close(); }
+        </script>
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+}
+
 function roomSequenceOf(acCode: string): number | null {
   const last = acCode.split("-").pop();
   if (!last || !/^\d+$/.test(last)) return null;
@@ -196,79 +336,9 @@ export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
   };
 
   const handleBatchPrint = () => {
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) return;
     const html = document.getElementById("batch-print-area")?.innerHTML;
-
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>พิมพ์ QR Code (${selectedAcs.length} เครื่อง)</title>
-          <style>
-            body {
-              margin: 0;
-              padding: 0;
-              font-family: sans-serif;
-            }
-            @page {
-              size: A4;
-              margin: 10mm;
-            }
-            .grid {
-              display: grid;
-              grid-template-columns: repeat(3, 1fr);
-              gap: 15px;
-            }
-            .sticker-container {
-              border: 1px dashed #cbd5e1;
-              border-radius: 12px;
-              padding: 15px;
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-              justify-content: center;
-              text-align: center;
-              page-break-inside: avoid;
-              background-color: white;
-            }
-            .ac-code {
-              font-family: monospace;
-              font-size: 18px;
-              font-weight: bold;
-              margin-top: 12px;
-              letter-spacing: 1px;
-              color: #0f172a;
-            }
-            .ac-brand {
-              font-size: 11px;
-              color: #64748b;
-              margin-top: 4px;
-            }
-            .ac-cta {
-              font-size: 11px;
-              color: #0284c7;
-              font-weight: bold;
-              margin-top: 8px;
-              padding: 4px 8px;
-              background-color: #f0f9ff;
-              border-radius: 6px;
-            }
-            svg {
-              border-radius: 8px;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="grid">
-            ${html}
-          </div>
-          <script>
-            window.onload = () => { window.print(); window.close(); }
-          </script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
+    if (!html) return;
+    openStickerSheet(html, `พิมพ์ QR Code (${selectedAcs.length} เครื่อง)`);
   };
 
   return (
@@ -382,24 +452,15 @@ export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
           )}
         />
 
-        {/* Hidden Container for Batch Print Data */}
+        {/* Hidden Container for Batch Print Data.
+            Kept in selection order rather than list order: the ticks are what
+            the person just did, so a sheet that comes out in that order is the
+            one they can check against what they picked. */}
         <div id="batch-print-area" className="hidden">
           {selectedAcs.map((id) => {
-            const ac = allAcs.find(a => a.id === id);
+            const ac = allAcs.find((a) => a.id === id);
             if (!ac) return null;
-            return (
-              <div key={ac.id} className="sticker-container">
-                <QRCodeSVG
-                  value={`${typeof window !== "undefined" ? window.location.origin : ""}/qr/${ac.qrCode}`}
-                  size={120}
-                  level="H"
-                  includeMargin={true}
-                />
-                <div className="ac-code">{ac.acCode}</div>
-                <div className="ac-brand">{ac.brand} {ac.model ? `(${ac.model})` : ""}</div>
-                <div className="ac-cta">สแกนเพื่อแจ้งซ่อม / ดูประวัติ</div>
-              </div>
-            );
+            return <StickerCard key={ac.id} ac={ac} />;
           })}
         </div>
 
@@ -422,12 +483,13 @@ export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
                 <p className="text-xs text-muted-foreground font-medium">สแกนเพื่อดูประวัติการซ่อมบำรุง</p>
               </div>
 
-              <div className="flex justify-center" id="single-qr-print-area">
-                {/* force-light: printed/scanned artifact, stays a plain white
-                    card with dark text regardless of the dashboard's theme. */}
+              <div className="flex justify-center">
+                {/* force-light: a code meant to be scanned off the screen, so
+                    it stays a plain white card with dark marks whatever the
+                    dashboard's theme is. */}
                 <div className="force-light bg-card p-4 rounded-2xl border-2 border-border shadow-sm flex flex-col items-center gap-3">
                   <QRCodeSVG
-                    value={`${typeof window !== "undefined" ? window.location.origin : ""}/qr/${showQrCode.qrCode}`}
+                    value={qrTargetUrl(showQrCode.qrCode)}
                     size={160}
                     level="H"
                     includeMargin={true}
@@ -438,14 +500,18 @@ export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
                     <div className="text-[10px] text-muted-foreground font-medium mt-0.5">
                       {showQrCode.brand} {showQrCode.model ? `(${showQrCode.model})` : ""}
                     </div>
+                    {/* On screen for the same reason it is on the sticker: the
+                        preview should say what comes out of the printer. */}
+                    <div className="text-[10px] text-muted-foreground font-medium">
+                      {showQrCode.btu ? `${showQrCode.btu.toLocaleString()} BTU` : "ไม่ระบุ BTU"}
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Outside single-qr-print-area on purpose: this answers "which
-                  machine am I looking at" while the modal is open, and the
-                  sticker that gets printed carries the same number inside the
-                  acCode already. */}
+              {/* Screen only. The sticker carries the same sequence, but it
+                  has no room for the building and floor, which are what make
+                  "unit 3" mean something while standing at a desk. */}
               <div className="rounded-2xl border border-border bg-muted px-4 py-3 text-center space-y-1">
                 <p className="flex items-center justify-center gap-1.5 text-sm font-bold text-foreground">
                   <Hash className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -467,33 +533,18 @@ export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
                 </p>
               </div>
 
+              {/* The sticker this button prints, rendered hidden so it is
+                  the same component the batch sheet uses. The visible card
+                  above is the on-screen preview; this is the artifact. */}
+              <div id="single-sticker-print-area" className="hidden">
+                <StickerCard ac={showQrCode} />
+              </div>
+
               <button
                 onClick={() => {
-                  const printWindow = window.open("", "_blank");
-                  if (!printWindow) return;
-                  const qrHtml = document.getElementById("single-qr-print-area")?.innerHTML;
-                  printWindow.document.write(`
-                    <html>
-                      <head>
-                        <title>Print QR Code - ${showQrCode.acCode}</title>
-                        <style>
-                          body { display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; font-family: sans-serif; }
-                          .print-container { text-align: center; padding: 20px; border: 2px dashed #ccc; border-radius: 12px; }
-                          .ac-code { font-family: monospace; font-size: 24px; font-weight: bold; margin-top: 15px; letter-spacing: 2px; }
-                          .ac-brand { font-size: 14px; color: #666; margin-top: 5px; }
-                        </style>
-                      </head>
-                      <body>
-                        <div class="print-container">
-                          ${qrHtml?.replace('class="', 'style="')}
-                        </div>
-                        <script>
-                          window.onload = () => { window.print(); window.close(); }
-                        </script>
-                      </body>
-                    </html>
-                  `);
-                  printWindow.document.close();
+                  const html = document.getElementById("single-sticker-print-area")?.innerHTML;
+                  if (!html) return;
+                  openStickerSheet(html, `พิมพ์ QR Code - ${showQrCode.acCode}`);
                 }}
                 className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary py-3 font-bold text-primary-foreground hover:bg-primary/90 transition-colors shadow-md shadow-slate-900/20"
               >
@@ -520,7 +571,10 @@ export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
             </div>
             <div>
               <div className="font-bold text-primary text-sm">เลือกแล้ว {selectedAcs.length} รายการ</div>
-              <div className="text-xs text-primary">พร้อมสำหรับพิมพ์ลงสติ๊กเกอร์ A4</div>
+              <div className="text-xs text-primary">
+                A4 แผ่นละ {STICKERS_PER_SHEET} ดวง · ใช้{" "}
+                {Math.ceil(selectedAcs.length / STICKERS_PER_SHEET)} แผ่น
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-3">
