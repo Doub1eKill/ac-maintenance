@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { QrCode, Printer, X, CheckSquare, Hash } from "lucide-react";
+import { toast } from "sonner";
 import {
   BuildingGroupList,
   FloorGroupList,
@@ -223,7 +224,18 @@ function StickerCard({ ac }: { ac: FlatACUnit }) {
 /** Opens the sheet in its own window and sends it straight to the printer. */
 function openStickerSheet(stickersHtml: string, title: string) {
   const printWindow = window.open("", "_blank");
-  if (!printWindow) return;
+
+  // A blocked pop-up comes back as null, and returning quietly here is what
+  // made the button look broken: nothing opens, nothing is said, and the admin
+  // clicks it again and again. There is no way to print without the window, so
+  // the only useful thing to do is name the cause — the browser blocked it, not
+  // the app — and say what unblocks it.
+  if (!printWindow) {
+    toast.error("เบราว์เซอร์บล็อกหน้าต่างพิมพ์", {
+      description: "กรุณาอนุญาต pop-up ของเว็บนี้ในแถบที่อยู่ แล้วกดพิมพ์อีกครั้ง",
+    });
+    return;
+  }
 
   printWindow.document.write(`
     <html>
@@ -364,7 +376,13 @@ export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
 
   const handleBatchPrint = () => {
     const html = document.getElementById("batch-print-area")?.innerHTML;
-    if (!html) return;
+    // Only reachable if the hidden container failed to render, which is a bug
+    // rather than anything the admin did — but silence would send them looking
+    // at the printer for it.
+    if (!html) {
+      toast.error("เตรียมข้อมูลสำหรับพิมพ์ไม่สำเร็จ กรุณาโหลดหน้าใหม่แล้วลองอีกครั้ง");
+      return;
+    }
     openStickerSheet(html, `พิมพ์ QR Code (${selectedAcs.length} เครื่อง)`);
   };
 
@@ -570,7 +588,10 @@ export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
               <button
                 onClick={() => {
                   const html = document.getElementById("single-sticker-print-area")?.innerHTML;
-                  if (!html) return;
+                  if (!html) {
+                    toast.error("เตรียมข้อมูลสำหรับพิมพ์ไม่สำเร็จ กรุณาโหลดหน้าใหม่แล้วลองอีกครั้ง");
+                    return;
+                  }
                   openStickerSheet(html, `พิมพ์ QR Code - ${showQrCode.acCode}`);
                 }}
                 className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary py-3 font-bold text-primary-foreground hover:bg-primary/90 transition-colors shadow-md shadow-slate-900/20"
