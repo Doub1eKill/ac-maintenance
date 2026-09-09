@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { QrCode, Printer, X, CheckSquare } from "lucide-react";
+import { QrCode, Printer, X, CheckSquare, Hash } from "lucide-react";
 import {
   BuildingGroupList,
   FloorGroupList,
@@ -13,6 +13,7 @@ import {
 } from "@/components/shared/building-groups";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
 import { useEscapeToClose } from "@/hooks/use-escape-to-close";
+import { formatUnitLocation } from "@/lib/location";
 
 interface ACUnit {
   id: string;
@@ -55,6 +56,29 @@ interface FlatACUnit extends ACUnit {
   roomId: string;
   roomName: string;
   floor: number | null;
+  /** Which unit this is inside its room. Null if the code cannot be read. */
+  roomSequence: number | null;
+  /** How many units the room holds, for context under the sequence. */
+  roomUnitsCount: number;
+}
+
+/**
+ * Which unit this is inside its room, read off the code rather than counted
+ * from the list.
+ *
+ * acCode is `[BLDG]-[ROOM]-[NN]` (see createAirConditionerAction) and NN is
+ * assigned once, then printed on the sticker that goes on the machine. Using
+ * the unit's position in the room's list instead would renumber a machine
+ * whenever another one in the same room is removed — the sticker on the wall
+ * would stay where it is and start disagreeing with the screen.
+ *
+ * Room names contain dashes of their own ("6-53142"), so the sequence is the
+ * last segment, not the third.
+ */
+function roomSequenceOf(acCode: string): number | null {
+  const last = acCode.split("-").pop();
+  if (!last || !/^\d+$/.test(last)) return null;
+  return Number(last);
 }
 
 interface QrCodeManagerProps {
@@ -127,6 +151,8 @@ export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
         roomId: r.id,
         roomName: r.name,
         floor: r.floor,
+        roomSequence: roomSequenceOf(ac.acCode),
+        roomUnitsCount: r.acUnits.length,
       }))
     )
   );
@@ -414,6 +440,31 @@ export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
                     </div>
                   </div>
                 </div>
+              </div>
+
+              {/* Outside single-qr-print-area on purpose: this answers "which
+                  machine am I looking at" while the modal is open, and the
+                  sticker that gets printed carries the same number inside the
+                  acCode already. */}
+              <div className="rounded-2xl border border-border bg-muted px-4 py-3 text-center space-y-1">
+                <p className="flex items-center justify-center gap-1.5 text-sm font-bold text-foreground">
+                  <Hash className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  {showQrCode.roomSequence !== null
+                    ? `เครื่องที่ ${showQrCode.roomSequence} ของห้องนี้`
+                    : "ไม่ทราบลำดับในห้อง"}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  {formatUnitLocation(
+                    {
+                      name: showQrCode.roomName,
+                      floor: showQrCode.floor,
+                      building: { name: showQrCode.buildingName },
+                    },
+                    { withFloor: true }
+                  )}
+                  {" · "}
+                  ห้องนี้มีแอร์ในระบบ {showQrCode.roomUnitsCount} เครื่อง
+                </p>
               </div>
 
               <button
