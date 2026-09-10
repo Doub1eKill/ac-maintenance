@@ -32,7 +32,8 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ArrowUpDown, CalendarRange, ChevronDown, Copy, UserPlus } from "lucide-react";
+import { ArrowUpDown, CalendarRange, ChevronDown, Copy, UserPlus, Wrench, Sparkles } from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   BuildingGroupList,
   FloorGroupList,
@@ -328,10 +329,21 @@ interface UpcomingMaintenanceTableProps {
 }
 
 export function UpcomingMaintenanceTable({ data, onViewDetails, onCreateWorkOrder, onBulkAssignWorkOrder }: UpcomingMaintenanceTableProps) {
+  const [filterKind, setFilterKind] = React.useState<"all" | "urgent" | "upcoming">("all");
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = React.useState({});
+
+  const totalCount = data.length;
+  const urgentCount = React.useMemo(() => data.filter((d) => d.kind === "urgent").length, [data]);
+  const upcomingCount = React.useMemo(() => data.filter((d) => d.kind === "upcoming").length, [data]);
+
+  const filteredData = React.useMemo(() => {
+    if (filterKind === "urgent") return data.filter((d) => d.kind === "urgent");
+    if (filterKind === "upcoming") return data.filter((d) => d.kind === "upcoming");
+    return data;
+  }, [data, filterKind]);
 
   // The dashboard revalidates and hands down a fresh `data` array after a
   // bulk assignment (or any other mutation) goes through. Clear ticked rows
@@ -339,10 +351,10 @@ export function UpcomingMaintenanceTable({ data, onViewDetails, onCreateWorkOrde
   // alone would tick whatever rows happen to now sit at those same positions.
   React.useEffect(() => {
     setRowSelection({});
-  }, [data]);
+  }, [data, filterKind]);
 
   const table = useReactTable({
-    data,
+    data: filteredData,
     columns,
     getCoreRowModel: getCoreRowModel(),
     // Only rows with an open work order can be picked, because assignment
@@ -403,56 +415,144 @@ export function UpcomingMaintenanceTable({ data, onViewDetails, onCreateWorkOrde
 
   return (
     <div className="biz-card p-6 space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <h3 className="text-base font-bold text-foreground flex items-center gap-2">
-          <CalendarRange className="w-5 h-5 text-primary" /> รอซ่อมด่วน
-        </h3>
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+              <CalendarRange className="w-5 h-5 text-primary" />
+              {filterKind === "urgent"
+                ? "รายการรอซ่อมด่วน"
+                : filterKind === "upcoming"
+                ? "รายการถึงกำหนดรอบล้าง"
+                : "งานซ่อมบำรุงและกำหนดรอบล้าง"}
+            </h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {filterKind === "urgent"
+                ? `พบ ${urgentCount} รายการที่ต้องดำเนินการซ่อมแซมเร่งด่วน`
+                : filterKind === "upcoming"
+                ? `พบ ${upcomingCount} รายการที่ถึงรอบบำรุงรักษาเชิงป้องกัน`
+                : `ทั้งหมด ${totalCount} รายการ (ซ่อมด่วน ${urgentCount} • รอบล้าง ${upcomingCount})`}
+            </p>
+          </div>
 
-        <div className="flex items-center gap-2">
-          <Input
-            placeholder="ค้นหารหัสแอร์..."
-            value={(table.getColumn("acCode")?.getFilterValue() as string) ?? ""}
-            onChange={(event) =>
-              table.getColumn("acCode")?.setFilterValue(event.target.value)
-            }
-            className="max-w-[200px] h-8 text-xs"
-          />
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="ml-auto h-8 text-xs">
-                คอลัมน์ <ChevronDown className="ml-2 h-3 w-3" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {table
-                .getAllColumns()
-                .filter((column) => column.getCanHide())
-                .map((column) => {
-                  return (
-                    <DropdownMenuCheckboxItem
-                      key={column.id}
-                      className="capitalize text-xs"
-                      checked={column.getIsVisible()}
-                      onCheckedChange={(value) =>
-                        column.toggleVisibility(!!value)
-                      }
-                    >
-                      {column.id === "acCode" ? "รหัสแอร์" :
-                       column.id === "location" ? "สถานที่" :
-                       column.id === "type" ? "ประเภท" :
-                       column.id === "dateInfo" ? "วันที่" : column.id}
-                    </DropdownMenuCheckboxItem>
-                  );
-                })}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex items-center gap-2">
+            <Input
+              placeholder="ค้นหารหัสแอร์..."
+              value={(table.getColumn("acCode")?.getFilterValue() as string) ?? ""}
+              onChange={(event) =>
+                table.getColumn("acCode")?.setFilterValue(event.target.value)
+              }
+              className="max-w-[200px] h-8 text-xs"
+            />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="ml-auto h-8 text-xs">
+                  คอลัมน์ <ChevronDown className="ml-2 h-3 w-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {table
+                  .getAllColumns()
+                  .filter((column) => column.getCanHide())
+                  .map((column) => {
+                    return (
+                      <DropdownMenuCheckboxItem
+                        key={column.id}
+                        className="capitalize text-xs"
+                        checked={column.getIsVisible()}
+                        onCheckedChange={(value) =>
+                          column.toggleVisibility(!!value)
+                        }
+                      >
+                        {column.id === "acCode" ? "รหัสแอร์" :
+                         column.id === "location" ? "สถานที่" :
+                         column.id === "type" ? "ประเภท" :
+                         column.id === "dateInfo" ? "วันที่" : column.id}
+                      </DropdownMenuCheckboxItem>
+                    );
+                  })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+
+        {/* Segmented Filter Control */}
+        <div className="flex items-center p-1 bg-muted/60 rounded-xl border border-border/80 w-fit">
+          <button
+            type="button"
+            onClick={() => setFilterKind("all")}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer",
+              filterKind === "all"
+                ? "bg-card text-foreground shadow-xs"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            ทั้งหมด
+            <span
+              className={cn(
+                "px-1.5 py-0.2 rounded-full text-[10px] font-bold",
+                filterKind === "all" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+              )}
+            >
+              {totalCount}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterKind("urgent")}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer",
+              filterKind === "urgent"
+                ? "bg-card text-destructive shadow-xs"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Wrench className="w-3.5 h-3.5" />
+            รอซ่อมด่วน
+            <span
+              className={cn(
+                "px-1.5 py-0.2 rounded-full text-[10px] font-bold",
+                filterKind === "urgent" ? "bg-destructive/15 text-destructive" : "bg-muted text-muted-foreground"
+              )}
+            >
+              {urgentCount}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterKind("upcoming")}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer",
+              filterKind === "upcoming"
+                ? "bg-card text-amber-600 dark:text-amber-400 shadow-xs"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            ถึงรอบล้าง
+            <span
+              className={cn(
+                "px-1.5 py-0.2 rounded-full text-[10px] font-bold",
+                filterKind === "upcoming" ? "bg-amber-500/15 text-amber-700 dark:text-amber-400" : "bg-muted text-muted-foreground"
+              )}
+            >
+              {upcomingCount}
+            </span>
+          </button>
         </div>
       </div>
 
       <BuildingGroupList
         groups={groups}
         getSubtitle={(group) => `${group.items.length} รายการ`}
-        emptyMessage="ไม่มีงานซ่อมด่วนหรือกำหนดล้างในขณะนี้"
+        emptyMessage={
+          filterKind === "urgent"
+            ? "ไม่มีรายการแจ้งซ่อมด่วนในขณะนี้"
+            : filterKind === "upcoming"
+            ? "ไม่มีรายการถึงกำหนดรอบล้างในขณะนี้"
+            : "ไม่มีงานซ่อมด่วนหรือกำหนดล้างในขณะนี้"
+        }
         // Collapsing back to the first building when the search changes, the
         // same way the technician lists do.
         resetKey={(table.getColumn("acCode")?.getFilterValue() as string) ?? ""}

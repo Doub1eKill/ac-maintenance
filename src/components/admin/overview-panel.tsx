@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import dynamic from "next/dynamic";
 import { Clock } from "lucide-react";
 import { AnimatedIcon } from "@/components/ui/animated-icon";
+import { OverviewMetricsGrid } from "@/components/admin/overview-metrics-grid";
 import { UpcomingMaintenanceTable, type MaintenanceRow, type UrgentMaintenanceAC } from "@/components/admin/upcoming-maintenance-table";
 import type { BuildingItem, WorkOrderItem } from "@/components/admin/types";
 import { formatUnitLocation } from "@/lib/location";
@@ -153,6 +154,9 @@ export function OverviewPanel({
 
   return (
     <div className="space-y-6 animate-in fade-in">
+      {/* Executive KPI Metrics Grid */}
+      <OverviewMetricsGrid metrics={metrics} />
+
       <div className="w-full">
         <MaintenanceAnalyticsDonut
           workOrders={workOrders}

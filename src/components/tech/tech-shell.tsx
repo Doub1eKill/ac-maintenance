@@ -17,6 +17,7 @@ import type { SearchEntry } from "@/lib/search";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { QrScanModal } from "@/components/tech/qr-scan-modal";
 import { LogActionModal } from "@/components/tech/log-action-modal";
+import { TechBottomNav } from "@/components/tech/tech-bottom-nav";
 import { AcHistoryModal } from "@/components/admin/ac-history-modal";
 import {
   claimWorkOrderAction,
@@ -292,7 +293,14 @@ export function TechShell({ user, universityName, buildings, badges, children }:
           </div>
         </div>
 
-        {children}
+        <div className="pb-20 md:pb-0">
+          {children}
+        </div>
+
+        <TechBottomNav
+          badges={badges}
+          onScanQr={() => setShowQrModal(true)}
+        />
 
         <QrScanModal
           open={showQrModal}
