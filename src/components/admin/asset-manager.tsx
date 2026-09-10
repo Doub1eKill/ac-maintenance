@@ -3,7 +3,7 @@
 import { useState, useTransition, useEffect } from "react";
 import { toast } from "sonner";
 import {
-  Building2, Plus, ChevronDown, ChevronUp, X, QrCode, CalendarClock, Printer, Clock, Pencil
+  Building2, Plus, ChevronDown, ChevronUp, X, QrCode, CalendarClock, Printer, Clock, Pencil, Hash
 } from "lucide-react";
 import {
   createBuildingAction,
@@ -16,6 +16,13 @@ import {
 import { QRCodeSVG } from "qrcode.react";
 import { AcHistoryModal } from "@/components/admin/ac-history-modal";
 import { useEscapeToClose } from "@/hooks/use-escape-to-close";
+import {
+  StickerCard,
+  openStickerSheet,
+  roomSequenceOf,
+  qrTargetUrl,
+} from "@/components/shared/qr-sticker";
+import { formatUnitLocation } from "@/lib/location";
 import {
   NativeSelect,
   NativeSelectOption,
@@ -47,6 +54,14 @@ interface ACUnit {
     frequencyUnit: string;
     nextDueDate: string;
   } | null;
+}
+
+interface QrModalData extends ACUnit {
+  buildingName: string;
+  roomName: string;
+  floor: number | null;
+  roomSequence: number | null;
+  roomUnitsCount: number;
 }
 
 interface RoomItem {
@@ -105,7 +120,7 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
   >(null);
   const [showAddAc, setShowAddAc] = useState<{ roomId: string } | null>(null);
   const [showPmSettings, setShowPmSettings] = useState<ACUnit | null>(null);
-  const [showQrCode, setShowQrCode] = useState<ACUnit | null>(null);
+  const [showQrCode, setShowQrCode] = useState<QrModalData | null>(null);
   const [showHistoryFor, setShowHistoryFor] = useState<string | null>(null);
   const [showEditAc, setShowEditAc] = useState<ACUnit | null>(null);
 
@@ -443,7 +458,16 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
                               {ac.maintenanceSchedule ? `ล้างทุก ${ac.maintenanceSchedule.frequencyValue} ${ac.maintenanceSchedule.frequencyUnit === 'days' ? 'วัน' : ac.maintenanceSchedule.frequencyUnit === 'months' ? 'เดือน' : 'ปี'}` : 'ตั้งค่าล้างแอร์'}
                             </button>
                             <button
-                              onClick={() => setShowQrCode(ac)}
+                              onClick={() =>
+                                setShowQrCode({
+                                  ...ac,
+                                  buildingName: b.name,
+                                  roomName: r.name,
+                                  floor: r.floor,
+                                  roomSequence: roomSequenceOf(ac.acCode),
+                                  roomUnitsCount: r.acUnits.length,
+                                })
+                              }
                               className="rounded border border-border bg-card py-1.5 text-[10px] font-bold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors text-center"
                             >
                               QR Code
@@ -805,65 +829,79 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
       {showQrCode && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-xs p-4">
           <div className="w-full max-w-sm rounded-3xl border border-border bg-card p-6 shadow-2xl space-y-6 animate-in fade-in zoom-in-95 relative">
-            <button onClick={() => setShowQrCode(null)} className="absolute right-4 top-4 text-muted-foreground hover:text-foreground bg-secondary p-1.5 rounded-full transition-colors">
+            <button
+              onClick={() => setShowQrCode(null)}
+              className="absolute right-4 top-4 text-muted-foreground hover:text-foreground bg-secondary p-1.5 rounded-full transition-colors"
+            >
               <X className="h-4 w-4" />
             </button>
-            
+
             <div className="text-center space-y-1 pt-2">
               <h3 className="text-lg font-bold text-foreground tracking-tight flex items-center justify-center gap-2">
                 <QrCode className="w-5 h-5 text-foreground" />
-                QR ประจำเครื่อง
+                ตัวอย่าง QR ประจำเครื่อง
               </h3>
               <p className="text-xs text-muted-foreground font-medium">สแกนเพื่อดูประวัติการซ่อมบำรุง</p>
             </div>
 
-            <div className="flex justify-center" id="qr-code-print-area">
+            <div className="flex justify-center">
               {/* force-light: this box is what gets printed/scanned, so it stays
                   a plain white card with dark text no matter the dashboard's
-                  active theme — a QR code and its label are meant to look the
-                  same on the sticker as they do here. */}
+                  active theme. */}
               <div className="force-light bg-card p-4 rounded-2xl border-2 border-border shadow-sm flex flex-col items-center gap-3">
                 <QRCodeSVG
-                  value={`${typeof window !== 'undefined' ? window.location.origin : ''}/qr/${showQrCode.qrCode}`}
-                  size={180}
+                  value={qrTargetUrl(showQrCode.qrCode)}
+                  size={160}
                   level="H"
                   includeMargin={true}
                   className="rounded-lg"
                 />
                 <div className="text-center">
                   <div className="font-mono font-bold text-foreground text-sm tracking-widest">{showQrCode.acCode}</div>
-                  <div className="text-[10px] text-muted-foreground font-medium mt-0.5">{showQrCode.brand} {showQrCode.model ? `(${showQrCode.model})` : ''}</div>
+                  <div className="text-[10px] text-muted-foreground font-medium mt-0.5">
+                    {showQrCode.brand} {showQrCode.model ? `(${showQrCode.model})` : ""}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground font-medium">
+                    {showQrCode.btu ? `${showQrCode.btu.toLocaleString()} BTU` : "ไม่ระบุ BTU"}
+                  </div>
                 </div>
               </div>
             </div>
 
-            <button 
+            <div className="rounded-2xl border border-border bg-muted px-4 py-3 text-center space-y-1">
+              <p className="flex items-center justify-center gap-1.5 text-sm font-bold text-foreground">
+                <Hash className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                {showQrCode.roomSequence !== null
+                  ? `เครื่องที่ ${showQrCode.roomSequence} ของห้องนี้`
+                  : "ไม่ทราบลำดับในห้อง"}
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                {formatUnitLocation(
+                  {
+                    name: showQrCode.roomName,
+                    floor: showQrCode.floor,
+                    building: { name: showQrCode.buildingName },
+                  },
+                  { withFloor: true }
+                )}
+                {" · "}
+                ห้องนี้มีแอร์ในระบบ {showQrCode.roomUnitsCount} เครื่อง
+              </p>
+            </div>
+
+            {/* Hidden sticker artifact lifted by the print button */}
+            <div id="asset-single-sticker-print-area" className="hidden">
+              <StickerCard ac={showQrCode} />
+            </div>
+
+            <button
               onClick={() => {
-                const printWindow = window.open('', '_blank');
-                if (!printWindow) return;
-                const qrHtml = document.getElementById('qr-code-print-area')?.innerHTML;
-                printWindow.document.write(`
-                  <html>
-                    <head>
-                      <title>Print QR Code - ${showQrCode.acCode}</title>
-                      <style>
-                        body { display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; font-family: sans-serif; }
-                        .print-container { text-align: center; padding: 20px; border: 2px dashed #ccc; border-radius: 10px; }
-                        .ac-code { font-family: monospace; font-size: 24px; font-weight: bold; margin-top: 15px; letter-spacing: 2px; }
-                        .ac-brand { font-size: 14px; color: #666; margin-top: 5px; }
-                      </style>
-                    </head>
-                    <body>
-                      <div class="print-container">
-                        ${qrHtml?.replace('class="', 'style="')}
-                      </div>
-                      <script>
-                        window.onload = () => { window.print(); window.close(); }
-                      </script>
-                    </body>
-                  </html>
-                `);
-                printWindow.document.close();
+                const html = document.getElementById("asset-single-sticker-print-area")?.innerHTML;
+                if (!html) {
+                  toast.error("เตรียมข้อมูลสำหรับพิมพ์ไม่สำเร็จ กรุณาโหลดหน้าใหม่แล้วลองอีกครั้ง");
+                  return;
+                }
+                openStickerSheet(html, `พิมพ์ QR Code - ${showQrCode.acCode}`);
               }}
               className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary py-3 font-bold text-primary-foreground hover:bg-primary/90 transition-colors shadow-md shadow-slate-900/20"
             >
