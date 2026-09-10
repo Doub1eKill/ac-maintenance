@@ -43,6 +43,8 @@ import {
   groupByRoom,
 } from "@/components/shared/building-groups";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
+import { MotionActivePill, MotionFade } from "@/components/ui/motion";
+import { motion, AnimatePresence } from "motion/react";
 
 export interface UpcomingMaintenanceAC {
   id: string;
@@ -482,12 +484,18 @@ export function UpcomingMaintenanceTable({ data, onViewDetails, onCreateWorkOrde
             type="button"
             onClick={() => setFilterKind("all")}
             className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer",
+              "relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer",
               filterKind === "all"
-                ? "bg-card text-foreground shadow-xs"
+                ? "text-foreground"
                 : "text-muted-foreground hover:text-foreground"
             )}
           >
+            {filterKind === "all" && (
+              <MotionActivePill
+                layoutId="maintenance-filter-pill"
+                className="absolute inset-0 bg-card rounded-lg shadow-xs -z-10"
+              />
+            )}
             ทั้งหมด
             <span
               className={cn(
@@ -502,12 +510,18 @@ export function UpcomingMaintenanceTable({ data, onViewDetails, onCreateWorkOrde
             type="button"
             onClick={() => setFilterKind("urgent")}
             className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer",
+              "relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer",
               filterKind === "urgent"
-                ? "bg-card text-destructive shadow-xs"
+                ? "text-destructive"
                 : "text-muted-foreground hover:text-foreground"
             )}
           >
+            {filterKind === "urgent" && (
+              <MotionActivePill
+                layoutId="maintenance-filter-pill"
+                className="absolute inset-0 bg-card rounded-lg shadow-xs -z-10"
+              />
+            )}
             <Wrench className="w-3.5 h-3.5" />
             รอซ่อมด่วน
             <span
@@ -523,12 +537,18 @@ export function UpcomingMaintenanceTable({ data, onViewDetails, onCreateWorkOrde
             type="button"
             onClick={() => setFilterKind("upcoming")}
             className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer",
+              "relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer",
               filterKind === "upcoming"
-                ? "bg-card text-amber-600 dark:text-amber-400 shadow-xs"
+                ? "text-amber-600 dark:text-amber-400"
                 : "text-muted-foreground hover:text-foreground"
             )}
           >
+            {filterKind === "upcoming" && (
+              <MotionActivePill
+                layoutId="maintenance-filter-pill"
+                className="absolute inset-0 bg-card rounded-lg shadow-xs -z-10"
+              />
+            )}
             <Sparkles className="w-3.5 h-3.5" />
             ถึงรอบล้าง
             <span

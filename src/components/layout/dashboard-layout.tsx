@@ -5,6 +5,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
+import { motion } from "motion/react";
+import { MotionFade } from "@/components/ui/motion";
 import {
   Zap,
   Building2,
@@ -356,19 +358,23 @@ export function DashboardLayout({
                 </div>
               ))}
             {onCreateAction && (
-              <button
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.96 }}
                 onClick={onCreateAction}
-                className="flex items-center gap-1.5 bg-primary text-primary-foreground px-3.5 py-1.5 rounded-xl text-xs font-bold hover:opacity-90 transition-opacity shadow-xs shrink-0"
+                className="flex items-center gap-1.5 bg-primary text-primary-foreground px-3.5 py-1.5 rounded-xl text-xs font-bold hover:opacity-90 transition-opacity shadow-xs shrink-0 cursor-pointer"
               >
                 <Plus className="h-3.5 w-3.5" />
                 <span>{createActionLabel}</span>
-              </button>
+              </motion.button>
             )}
           </div>
         </header>
 
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-6">
-          {children}
+          <MotionFade key={pathname}>
+            {children}
+          </MotionFade>
         </main>
       </SidebarInset>
     </SidebarProvider>
