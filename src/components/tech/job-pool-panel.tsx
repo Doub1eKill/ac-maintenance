@@ -16,6 +16,8 @@ import type { TechJobItem } from "@/components/tech/types";
 import { filterJobs } from "@/components/tech/types";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
 import { JobTypeBadge } from "@/components/tech/job-type-badge";
+import { MotionCard } from "@/components/ui/motion";
+import { motion, AnimatePresence } from "motion/react";
 
 interface JobPoolPanelProps {
   jobPool: TechJobItem[];
@@ -78,67 +80,65 @@ export function JobPoolPanel({ jobPool, searchQuery, selectedBuilding, isPending
                   renderItems={(room) => (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {room.items.map((job) => (
-                        <div key={job.id} className="biz-card p-5 space-y-4 hover:border-muted-foreground transition-all relative overflow-hidden">
-                          {job.priority === "critical" ? (
-                            <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1 shadow-sm">
-                              <AlertTriangle className="w-3 h-3" /> ด่วนที่สุด
-                            </div>
-                          ) : job.priority === "high" ? (
-                            <div className="absolute top-0 right-0 bg-orange-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1 shadow-sm">
-                              <AlertTriangle className="w-3 h-3" /> ด่วน
-                            </div>
-                          ) : isUrgent(job.createdAt) ? (
-                            // Priority takes the corner when set; this waiting-time flag
-                            // (unclaimed 3+ days) only shows up when there's no priority
-                            // to display, so the two concepts never compete for the same
-                            // badge. Worded "รอนาน" (not "ด่วน") so it can't be mistaken
-                            // for a priority signal.
-                            <div className="absolute top-0 right-0 bg-amber-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1 shadow-sm">
-                              <Clock className="w-3 h-3" /> รอนาน
-                            </div>
-                          ) : null}
-                          <div className="pr-8 space-y-1">
-                            <div className="flex items-center gap-2">
-                              <Checkbox
-                                checked={selectedPoolIds.includes(job.id)}
-                                onCheckedChange={() => togglePoolSelection(job.id)}
-                                aria-label={`เลือก ${job.acCode}`}
-                              />
-                                </div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono text-xs font-bold text-muted-foreground">{job.acCode}</span>
-                              <span className="rounded-md bg-secondary px-2 py-0.5 text-[10px] font-bold text-foreground">
-                                {job.brand} {job.btu ? `(${job.btu} BTU)` : ""}
-                                <CatalogueMark
-                                  brandDeleted={job.brandDeleted}
-                                  modelDeleted={job.modelDeleted}
-                                  className="ml-1"
+                        <MotionCard
+                          key={job.id}
+                          className="biz-card p-5 space-y-4 hover:border-muted-foreground transition-all relative overflow-hidden flex flex-col justify-between"
+                        >
+                          <div>
+                            {job.priority === "critical" ? (
+                              <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1 shadow-sm">
+                                <AlertTriangle className="w-3 h-3" /> ด่วนที่สุด
+                              </div>
+                            ) : job.priority === "high" ? (
+                              <div className="absolute top-0 right-0 bg-orange-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1 shadow-sm">
+                                <AlertTriangle className="w-3 h-3" /> ด่วน
+                              </div>
+                            ) : isUrgent(job.createdAt) ? (
+                              <div className="absolute top-0 right-0 bg-amber-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1 shadow-sm">
+                                <Clock className="w-3 h-3" /> รอนาน
+                              </div>
+                            ) : null}
+                            <div className="pr-8 space-y-1">
+                              <div className="flex items-center gap-2">
+                                <Checkbox
+                                  checked={selectedPoolIds.includes(job.id)}
+                                  onCheckedChange={() => togglePoolSelection(job.id)}
+                                  aria-label={`เลือก ${job.acCode}`}
                                 />
-                              </span>
-                              {/* Matters most here of the three lists: this is
-                                  the one where a job is picked up, and claiming
-                                  a clean when you packed for a repair is a
-                                  wasted trip. */}
-                              <JobTypeBadge type={job.type} />
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-xs font-bold text-muted-foreground">{job.acCode}</span>
+                                <span className="rounded-md bg-secondary px-2 py-0.5 text-[10px] font-bold text-foreground">
+                                  {job.brand} {job.btu ? `(${job.btu} BTU)` : ""}
+                                  <CatalogueMark
+                                    brandDeleted={job.brandDeleted}
+                                    modelDeleted={job.modelDeleted}
+                                    className="ml-1"
+                                  />
+                                </span>
+                                <JobTypeBadge type={job.type} />
+                              </div>
                             </div>
                           </div>
 
-                          <div className="pt-2 flex items-center justify-between text-xs border-t border-border">
+                          <div className="pt-2 flex items-center justify-between text-xs border-t border-border mt-3">
                             <div className="flex flex-col">
                               <span className="text-[11px] font-bold text-warning-foreground">รอรับงาน</span>
                               <span className="text-[10px] text-muted-foreground mt-1">
                                 {job.createdAt ? `แจ้งเมื่อ: ${format(new Date(job.createdAt), "dd/MM/yyyy")}` : ""}
                               </span>
                             </div>
-                            <button
+                            <motion.button
+                              whileHover={{ scale: 1.04 }}
+                              whileTap={{ scale: 0.94 }}
                               onClick={() => onClaim(job.id)}
                               disabled={isPending}
-                              className="rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-all shadow-sm active:scale-95"
+                              className="rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-all shadow-sm cursor-pointer disabled:opacity-50"
                             >
                               รับงาน
-                            </button>
+                            </motion.button>
                           </div>
-                        </div>
+                        </MotionCard>
                       ))}
                     </div>
               )}
@@ -148,45 +148,42 @@ export function JobPoolPanel({ jobPool, searchQuery, selectedBuilding, isPending
           )}
         />
 
-        {selectedPoolIds.length > 0 && (
-          // Follows the screen along its bottom edge. Jobs are ticked across
-          // several floors and rooms of a four-level tree, so a bar that stays
-          // where it was rendered is long gone before the last box is checked.
-          // Along the bottom rather than the top: that is where a thumb already
-          // is, and it leaves the top edge to the group headers.
-          //
-          // Rendered last, which is what makes bottom-0 work at all — a sticky
-          // element is only ever displaced within its own flow position, so one
-          // rendered above the list has nothing to hold it down here.
-          //
-          // The sticky wrapper carries the opaque background rather than the
-          // card itself: the card is deliberately translucent, which is fine
-          // sitting still and unreadable with the list sliding underneath it.
-          <div className="sticky bottom-0 z-30 bg-background/95 py-2 backdrop-blur-sm">
-            <div className="biz-card p-4 flex items-center justify-between gap-3 bg-secondary/40 border-dashed">
-              <span className="text-xs font-bold text-foreground">เลือกแล้ว {selectedPoolIds.length} งาน</span>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setSelectedPoolIds([])}
-                  className="rounded-xl border border-border px-3 py-1.5 text-xs font-bold text-foreground hover:bg-muted transition-all"
-                >
-                  ยกเลิกการเลือก
-                </button>
-                <button
-                  onClick={async () => {
-                    if (selectedPoolIds.length === 0) return;
-                    const success = await onBulkClaim(selectedPoolIds);
-                    if (success) setSelectedPoolIds([]);
-                  }}
-                  disabled={isPending}
-                  className="rounded-xl bg-primary px-4 py-1.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-all shadow-sm active:scale-95 disabled:opacity-50"
-                >
-                  รับงานที่เลือก ({selectedPoolIds.length})
-                </button>
+        <AnimatePresence>
+          {selectedPoolIds.length > 0 && (
+            <motion.div
+              initial={{ y: 24, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 24, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 350, damping: 25 }}
+              className="sticky bottom-0 z-30 bg-background/95 py-2 backdrop-blur-sm"
+            >
+              <div className="biz-card p-4 flex items-center justify-between gap-3 bg-secondary/40 border-dashed">
+                <span className="text-xs font-bold text-foreground">เลือกแล้ว {selectedPoolIds.length} งาน</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setSelectedPoolIds([])}
+                    className="rounded-xl border border-border px-3 py-1.5 text-xs font-bold text-foreground hover:bg-muted transition-all cursor-pointer"
+                  >
+                    ยกเลิกการเลือก
+                  </button>
+                  <motion.button
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={async () => {
+                      if (selectedPoolIds.length === 0) return;
+                      const success = await onBulkClaim(selectedPoolIds);
+                      if (success) setSelectedPoolIds([]);
+                    }}
+                    disabled={isPending}
+                    className="rounded-xl bg-primary px-4 py-1.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-all shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    รับงานที่เลือก ({selectedPoolIds.length})
+                  </motion.button>
+                </div>
               </div>
-            </div>
-          </div>
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

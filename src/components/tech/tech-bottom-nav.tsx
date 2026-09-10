@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ClipboardList, Wrench, QrCode, Calendar, User } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { MotionActivePill } from "@/components/ui/motion";
+import { motion } from "motion/react";
 
 interface TechBottomNavProps {
   badges: {
@@ -32,6 +34,12 @@ export function TechBottomNav({ badges, onScanQr }: TechBottomNavProps) {
               : "text-muted-foreground hover:text-foreground"
           )}
         >
+          {pathname === "/tech" && (
+            <MotionActivePill
+              layoutId="tech-bottom-nav-pill"
+              className="absolute inset-x-1 inset-y-1 bg-primary/10 rounded-xl -z-10"
+            />
+          )}
           <div className="relative">
             <ClipboardList className="w-5 h-5" />
             {badges.jobPool > 0 && (
@@ -53,6 +61,12 @@ export function TechBottomNav({ badges, onScanQr }: TechBottomNavProps) {
               : "text-muted-foreground hover:text-foreground"
           )}
         >
+          {pathname === "/tech/my-jobs" && (
+            <MotionActivePill
+              layoutId="tech-bottom-nav-pill"
+              className="absolute inset-x-1 inset-y-1 bg-primary/10 rounded-xl -z-10"
+            />
+          )}
           <div className="relative">
             <Wrench className="w-5 h-5" />
             {badges.myJobs > 0 && (
@@ -66,14 +80,17 @@ export function TechBottomNav({ badges, onScanQr }: TechBottomNavProps) {
 
         {/* 3. Center QR Scan Button */}
         <div className="flex flex-col items-center justify-center -mt-5">
-          <button
+          <motion.button
             type="button"
             onClick={onScanQr}
-            className="w-12 h-12 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center shadow-lg border-4 border-card hover:scale-105 active:scale-95 transition-transform"
+            whileHover={{ scale: 1.08 }}
+            whileTap={{ scale: 0.92 }}
+            transition={{ type: "spring", stiffness: 400, damping: 20 }}
+            className="w-12 h-12 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center shadow-lg border-4 border-card cursor-pointer"
             aria-label="สแกน QR Code"
           >
             <QrCode className="w-6 h-6" />
-          </button>
+          </motion.button>
           <span className="text-[10px] font-bold text-foreground mt-0.5">สแกน QR</span>
         </div>
 
@@ -81,12 +98,18 @@ export function TechBottomNav({ badges, onScanQr }: TechBottomNavProps) {
         <Link
           href="/tech/calendar"
           className={cn(
-            "flex flex-col items-center justify-center gap-0.5 w-full h-full text-[10px] font-medium transition-colors",
+            "flex flex-col items-center justify-center gap-0.5 w-full h-full text-[10px] font-medium transition-colors relative",
             pathname === "/tech/calendar"
               ? "text-primary font-bold"
               : "text-muted-foreground hover:text-foreground"
           )}
         >
+          {pathname === "/tech/calendar" && (
+            <MotionActivePill
+              layoutId="tech-bottom-nav-pill"
+              className="absolute inset-x-1 inset-y-1 bg-primary/10 rounded-xl -z-10"
+            />
+          )}
           <Calendar className="w-5 h-5" />
           <span>ปฏิทิน</span>
         </Link>
@@ -95,12 +118,18 @@ export function TechBottomNav({ badges, onScanQr }: TechBottomNavProps) {
         <Link
           href="/tech/profile"
           className={cn(
-            "flex flex-col items-center justify-center gap-0.5 w-full h-full text-[10px] font-medium transition-colors",
+            "flex flex-col items-center justify-center gap-0.5 w-full h-full text-[10px] font-medium transition-colors relative",
             pathname === "/tech/profile"
               ? "text-primary font-bold"
               : "text-muted-foreground hover:text-foreground"
           )}
         >
+          {pathname === "/tech/profile" && (
+            <MotionActivePill
+              layoutId="tech-bottom-nav-pill"
+              className="absolute inset-x-1 inset-y-1 bg-primary/10 rounded-xl -z-10"
+            />
+          )}
           <User className="w-5 h-5" />
           <span>โปรไฟล์</span>
         </Link>

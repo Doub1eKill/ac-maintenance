@@ -19,6 +19,8 @@ import { QrScanModal } from "@/components/tech/qr-scan-modal";
 import { LogActionModal } from "@/components/tech/log-action-modal";
 import { TechBottomNav } from "@/components/tech/tech-bottom-nav";
 import { AcHistoryModal } from "@/components/admin/ac-history-modal";
+import { MotionFade } from "@/components/ui/motion";
+import { motion } from "motion/react";
 import {
   claimWorkOrderAction,
   getTechSearchIndexAction,
@@ -283,19 +285,21 @@ export function TechShell({ user, universityName, buildings, badges, children }:
               </NativeSelect>
             )}
 
-            <button
+            <motion.button
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.96 }}
               onClick={() => setShowQrModal(true)}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-all shadow-md shrink-0"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-all shadow-md shrink-0 cursor-pointer"
             >
               <QrCode className="h-4 w-4 text-primary-foreground" />
               <span className="hidden sm:inline">สแกน QR Code</span>
-            </button>
+            </motion.button>
           </div>
         </div>
 
-        <div className="pb-20 md:pb-0">
+        <MotionFade key={pathname} className="pb-20 md:pb-0">
           {children}
-        </div>
+        </MotionFade>
 
         <TechBottomNav
           badges={badges}
