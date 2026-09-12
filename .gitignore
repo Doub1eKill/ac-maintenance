@@ -53,3 +53,6 @@ next-env.d.ts
 # python bytecode from the vendored agent skill scripts
 __pycache__/
 *.pyc
+
+# user uploads (avatars, before/after photos) - per-machine data, written by src/lib/upload.ts which mkdir -p's the folder itself
+/public/uploads/
