@@ -1,5 +1,77 @@
 # Project Handoff & Technical Summary
 
+# 🎞️ motion primitives ทุกตัวลงจอดเองได้แม้ไม่มี frame — รอบสอง (13 ก.ย. 2026, DoubleKill)
+
+branch `fix/motion-settle-without-frames` ตัดจาก `master` `03464b6` · ต่อจากหัวข้อ "🩹 `MotionNumber` ค้างเลขกลางทาง" — เจ้าของโปรเจกต์สั่ง *"แก้เลย"* กับข้อสังเกต 4 ข้อที่จดไว้ท้ายหัวข้อนั้น แก้ครบทั้ง 4
+
+## `MotionNumber` เขียนใหม่เป็นแบบ idiomatic ของ motion (ข้อ 2, 3, 4)
+
+`<motion.span>{label}</motion.span>` โดย `label` เป็น `MotionValue<string>` — motion เขียน `textContent` ให้ตรงๆ ทุกครั้งที่ค่าเปลี่ยน **ไม่ re-render React** · ตรวจใน `motion-dom/render/dom/DOMVisualElement.mjs` แล้วว่า `children.on("change", latest => this.current.textContent = latest)` **เป็น sync** ไม่ผ่าน frame loop — นี่คือคุณสมบัติที่ทำให้ `label.set()` ใน `settle()` ไปถึง DOM ได้ทั้งที่ rAF ตาย
+
+> ⚠️ **ห้ามใช้ `useTransform` มาแปลงเลขเป็นข้อความ** — `useCombineMotionValues` ข้างในมัน schedule ผ่าน `frame.preRender` = rAF · ค่าที่แปลงจะไม่ไปถึง DOM ในแท็บที่ซ่อน ทำลายทุกอย่างที่แก้มา · ใช้ MotionValue สตริงตัวเดียวแล้ว `.set(format(n))` ใน `onUpdate` แทน
+
+| ข้อ | เดิม | ใหม่ | พิสูจน์ (harness เคส 4) |
+|---|---|---|---|
+| 2 flash 1 frame ตอน mount | `useState(value)` → paint "73" → frame แรกดึงลง 0 | `useLayoutEffect` เซ็ต label เป็นจุดเริ่มก่อน paint (SSR ยังเป็น 73 สำหรับ no-JS/hydration ช้า) | before first frame: เก่า `"73"` → ใหม่ `"0"` |
+| 3 `value` เปลี่ยนกลางทาง | `prevValueRef` เก็บ*เป้าเก่า* → กระโดด | `positionRef` อัปเดตทุก frame → วิ่งต่อจากที่อยู่ | 63→**83**→95 (กระโดด 17) vs 66→**77**→87→95 (ต่อเนื่อง) |
+| 4 `setState` ทุก frame × 5 ตัว | ~300 re-render/วิ | 0 re-render ระหว่าง animate | — |
+
+3 เส้นทางกู้ (onComplete / visibilitychange / timer backstop) ยังอยู่ครบ — harness เคส 1–3 ผลเท่ารอบแรก · `useLayoutEffect` ปลอดภัยเพราะ React 19 ไม่เตือน SSR แล้ว และ motion mount child subscription ใน **ref callback** (`use-motion-ref.mjs`) ซึ่งมาก่อน layout effect ของเรา
+
+## ครอบครัว fade ทั้งหมดได้ `useSettleWithoutFrames` (ข้อ 1)
+
+`MotionFade` · `MotionStagger` · `MotionStaggerItem` · `MotionModalContainer` — ทุกตัวที่ `initial={{ opacity: 0 }}` ตอน mount · `MotionCard`/`MotionActivePill` ไม่มี mount animation ไม่ต้อง
+
+hook ตัวใหม่ `src/components/ui/motion/use-settle-without-frames.ts` ใช้ 3 เส้นทางเดียวกับ `MotionNumber` แล้วเขียน `opacity: 1; transform: none` ลง inline style · **แต่แค่นั้นไม่พอ** เจอของจริง 2 ชั้นระหว่างทดสอบ:
+
+### 🔴 ชั้นที่ 1: motion ใช้ Web Animations API — inline style แพ้ WAAPI ใน cascade
+
+motion วิ่ง opacity/transform ผ่าน `element.animate()` (WAAPI) เมื่อทำได้ · **animation ที่กำลัง running มีลำดับความสำคัญสูงกว่า inline style** · เขียน `opacity: 1` ไปก็ไม่เปลี่ยนอะไร — วัดได้ inline `opacity: 1` แต่ computed `0.069`
+
+ต้อง **`el.getAnimations().forEach(a => a.finish())`** — sync ไม่ต้องรอ frame และ motion ได้ finish event ไป commit ค่าของตัวเอง · wrap `try` เพราะ animation แบบ infinite `finish()` ไม่ได้ (ของเราไม่มี)
+
+### 🔴 ชั้นที่ 2: motion *สร้าง* animation บน frame ไม่ใช่ตอน mount
+
+ถ้า settle วิ่งตอน rAF ตาย (mount ตอนซ่อน → `setTimeout(settle, 0)`) `getAnimations()` ยังว่าง — animation ยังไม่ถูกสร้าง · พอ frame มาทีหลัง (screenshot ปลุก 1 frame) motion สร้าง WAAPI **เริ่มจาก opacity 0** ทับ inline ของเราแล้วค้าง · วัดได้ `startTime: 8354ms` = สร้างหลัง load 8 วินาที
+
+**`onAnimationStart` ของ motion ช่วยไม่ได้** — มันยิงตอน*ขอ* animation ใน effect เดียวกัน ก่อน frame ที่สร้างจริง · ลองแล้วไม่ทำงาน
+
+ทางออก: ถ้า settle ไม่เจออะไรให้ finish → **เฝ้าด้วย `setInterval` 200ms นาน 10 วิ** finish ทันทีที่โผล่ · หยุดเมื่อ `onAnimationComplete` (mount animation จบแล้วโดยทางใดก็ตาม) · **หลังจากนั้นไม่แตะ element อีก** exit animation จึงยังเล่นตามปกติ
+
+> เคส "frame กลับมาหลัง 10 วิ" ปล่อยไว้ — ในเบราว์เซอร์จริง frame กลับมาพร้อมแท็บแล้ว animation ก็เล่นจนจบเอง · เคสนี้มีแค่ใน pane ที่ได้ frame เดี่ยวๆ จาก screenshot
+
+## ทดสอบใน pane ที่ rAF ตายจริง (สภาพที่เจอบั๊ก)
+
+reload ตอน pane ซ่อน → screenshot ที่ ~7 วิ (ปลุก 1 frame) → อ่านที่ 11 วิ
+
+| | ก่อน | หลัง |
+|---|---|---|
+| element ที่ motion ใส่ style | 7 | 7 |
+| computed opacity < 1 | **1** (wrapper ทั้งหน้าใน `dashboard-layout` ค้าง 0.40 + WAAPI running) | **0** |
+| WAAPI running ค้าง | 1 | **0** |
+| KPI | `73 · 24 · 27 · 4` | `73 · 24 · 27 · 4` |
+| screenshot แถว KPI | **มืดทั้งแถว** | **เห็นครบ** |
+
+`rafAlive: false` ตลอดการวัด · ตรวจซ้ำที่ 27 วิ: element ที่ dim = 0, animation running = 0
+
+harness jsdom (เคส 1–4, เก่า/v1/v2) รันแล้วผลตามตารางข้างบน · jsdom ติดตั้ง `--no-save` แล้วถอด ไม่แตะ `package.json`/lock
+
+`tsc --noEmit` 0 error · eslint **50 (31/19)** เท่า baseline · ไม่แตะ DB
+
+## ไฟล์ที่แตะ
+
+| ไฟล์ | ทำอะไร |
+|---|---|
+| `ui/motion/motion-number.tsx` | เขียนใหม่ — MotionValue สตริง + `useLayoutEffect` + `positionRef` |
+| `ui/motion/use-settle-without-frames.ts` | **ใหม่** — hook + `GENTLE_SPRING_SETTLE_MS` |
+| `ui/motion/motion-fade.tsx` | `MotionFade`/`MotionStagger`/`MotionStaggerItem` ใช้ hook · ref + spread `onAnimationComplete` |
+| `ui/motion/motion-modal.tsx` | `MotionModalContainer` ใช้ hook |
+| `ui/motion/index.ts` | export hook |
+
+> ⚠️ **spread `{...settle}` ต้องอยู่ก่อน `{...props}`** — ถ้าวันหนึ่งมีคนส่ง `onAnimationComplete` มาเอง จะทับของ hook และ element นั้นจะไม่รู้ว่า mount animation จบ (watch จะวิ่งจนครบ 10 วิแล้วหยุดเอง ไม่พังแต่เสียฟีเจอร์) · วันนี้ไม่มี caller ไหนส่ง
+
+---
+
 # 🩹 `MotionNumber` ค้างเลขกลางทางเมื่อแท็บถูกซ่อน — แก้แล้ว (13 ก.ย. 2026, DoubleKill)
 
 branch `fix/motion-number-hidden-tab` ตัดจาก `master` `466bfbe` · แก้กับดักที่จดไว้ในหัวข้อ "🧹 pull งานของ Esther03u" ด้านล่าง
