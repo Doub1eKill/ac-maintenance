@@ -1,7 +1,13 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
-import { animate, useReducedMotion, type AnimationPlaybackControls } from "motion/react";
+import React, { useLayoutEffect, useRef } from "react";
+import {
+  animate,
+  motion,
+  useMotionValue,
+  useReducedMotion,
+  type AnimationPlaybackControls,
+} from "motion/react";
 
 export interface MotionNumberProps {
   value: number;
@@ -11,23 +17,41 @@ export interface MotionNumberProps {
   className?: string;
 }
 
+function formatNumber(n: number, prefix: string, suffix: string) {
+  return `${prefix}${Math.round(n).toLocaleString()}${suffix}`;
+}
+
 /**
  * A number that counts up to its value.
  *
- * The count is driven by motion's frame loop, which runs on
+ * The text is a MotionValue rendered as the span's child, which motion writes
+ * straight into the text node on every change — no React render per frame,
+ * and (checked in motion-dom's DOMVisualElement) the write is synchronous, not
+ * frame-scheduled. That second property is what the rest of this relies on.
+ *
+ * The count itself is driven by motion's frame loop, which runs on
  * requestAnimationFrame — and browsers stop rAF outright in a tab that is not
- * visible. Left to itself, a counter that started while the tab was showing
- * and lost visibility part-way would sit on whatever frame it last drew, and
- * that frame is a plausible-looking number rather than an obvious blank: the
- * overview was read as "29 เครื่อง" against a database holding 73. So every
- * path that can stop the frame loop has a path that does not need it:
+ * visible. Left to itself, a counter that lost visibility part-way would sit
+ * on whatever frame it last drew, and that frame is a plausible-looking number
+ * rather than an obvious blank: the overview was read as "29 เครื่อง" against a
+ * database holding 73. So every path that can stop the frame loop has a path
+ * that does not need it:
  *
  * - `onComplete` writes the exact target, not the last rounded frame.
  * - `visibilitychange` to hidden stops the animation and writes the target.
  * - A timer set for just past the animation's end writes the target anyway;
- *   timers are throttled in hidden tabs, but unlike rAF they still fire.
+ *   timers are throttled in hidden tabs, but unlike rAF they still fire. This
+ *   is the path that matters for an occluded window, which can lose rAF while
+ *   visibilityState still says "visible".
  * - A tab that is already hidden at mount, or a user who has asked for reduced
  *   motion, gets the target straight away and no animation at all.
+ *
+ * Two smaller things the layout effect buys. The text server-renders as the
+ * real value, so a slow hydration shows the right number rather than a zero;
+ * jumping it to the count's starting point before first paint means there is
+ * no one-frame flash of the target before the count begins. And the count
+ * starts from where it visibly is, so a value that changes mid-count continues
+ * from the current figure instead of snapping to the previous target first.
  */
 export function MotionNumber({
   value,
@@ -36,15 +60,18 @@ export function MotionNumber({
   suffix = "",
   className = "",
 }: MotionNumberProps) {
-  const [displayValue, setDisplayValue] = useState<number>(value);
-  const prevValueRef = useRef<number>(0);
+  const label = useMotionValue(formatNumber(value, prefix, suffix));
+  // Where the count visibly is right now. Starts at zero so the first mount
+  // counts up from nothing, the way a dashboard metric is expected to.
+  const positionRef = useRef(0);
   const reduceMotion = useReducedMotion();
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     let controls: AnimationPlaybackControls | null = null;
     const settle = () => {
       controls?.stop();
-      setDisplayValue(value);
+      positionRef.current = value;
+      label.set(formatNumber(value, prefix, suffix));
     };
 
     // Only perform when somebody can watch it. A hidden tab would freeze the
@@ -52,14 +79,18 @@ export function MotionNumber({
     const shouldAnimate = !reduceMotion && document.visibilityState !== "hidden";
 
     if (shouldAnimate) {
-      controls = animate(prevValueRef.current, value, {
+      // Before first paint: show the starting figure, not the target.
+      label.set(formatNumber(positionRef.current, prefix, suffix));
+      controls = animate(positionRef.current, value, {
         duration,
         ease: [0.16, 1, 0.3, 1],
-        onUpdate: (latest) => setDisplayValue(Math.round(latest)),
+        onUpdate: (latest) => {
+          positionRef.current = latest;
+          label.set(formatNumber(latest, prefix, suffix));
+        },
         onComplete: settle,
       });
     }
-    prevValueRef.current = value;
 
     const onVisibilityChange = () => {
       if (document.visibilityState === "hidden") settle();
@@ -77,13 +108,7 @@ export function MotionNumber({
       document.removeEventListener("visibilitychange", onVisibilityChange);
       window.clearTimeout(deadline);
     };
-  }, [value, duration, reduceMotion]);
+  }, [value, duration, prefix, suffix, reduceMotion, label]);
 
-  return (
-    <span className={className}>
-      {prefix}
-      {displayValue.toLocaleString()}
-      {suffix}
-    </span>
-  );
+  return <motion.span className={className}>{label}</motion.span>;
 }
