@@ -1,5 +1,79 @@
 # Project Handoff & Technical Summary
 
+# 🧹 pull งานของ Esther03u 7 commit + เก็บกวาดสิ่งที่ตกหล่น (13 ก.ย. 2026, DoubleKill)
+
+branch `chore/post-pull-cleanup` ตัดจาก `master` `4735636`
+
+## งานที่ pull มา (11 ก.ย. 2026, Esther03u) — ไม่ได้บันทึกลง HANDOFF จึงจดให้ที่นี่
+
+**7 commit นี้ไม่แตะ `HANDOFF.md` เลย** ผิดกฎ "บันทึกงานลง HANDOFF ทุกครั้ง" · ผู้เขียนใช้ `docs/superpowers/specs/` + `docs/superpowers/plans/` แทน (มี spec/plan วันที่ 2026-09-11 อยู่ 4 ไฟล์) · ใครอ่าน HANDOFF อย่างเดียวจะไม่รู้ว่ามีของพวกนี้
+
+| commit | งาน |
+|---|---|
+| `e5db123` | **โดนัทสถิติซ่อมบำรุง** บนหน้าภาพรวม (`maintenance-analytics-donut.tsx`) · **แยก `StickerCard` / `openStickerSheet` / `STICKER_SHEET_CSS` / `roomSequenceOf` / `qrTargetUrl` / `STICKERS_PER_SHEET` ออกจาก `qr-code-manager.tsx` ไปเป็น `src/components/shared/qr-sticker.tsx`** · `asset-manager.tsx` เรียกใช้สติกเกอร์ตัวเดียวกันด้วย |
+| `4a55122` | KPI cards แบบผู้บริหาร (`overview-metrics-grid.tsx`) · ฟิลเตอร์ตารางงานใกล้ถึงรอบ · **bottom nav มือถือฝั่งช่าง** (`tech-bottom-nav.tsx`) |
+| `823b1e3` `4c7919e` | spec + plan ระบบ motion |
+| `59ed3af` | motion primitives ใน `src/components/ui/motion/` — `MotionCard` · `MotionFade` · `MotionNumber` · `MotionModal` · `MotionActivePill` · `motion-tokens.ts` (ใช้ package `motion` ที่มีอยู่แล้ว ไม่มี dependency ใหม่) |
+| `a0a0276` `4735636` | ใส่ animation เข้าหน้าแอดมิน (metrics, tabs, tables) และฝั่งช่าง (job pool, bottom nav, shell) |
+
+### ✅ งาน QR sticker ของ 9 ก.ย. รอด refactor มาครบ
+
+ย้ายไฟล์แต่**ไม่เปลี่ยนค่าใดๆ** — `150mm` / `52mm` / `46mm` / `STICKERS_PER_SHEET = 5` / toast กัน pop-up ยังอยู่ทั้งหมดใน `qr-sticker.tsx` · ทดสอบหน้าจอจริงแล้ว โมดัลและเอกสารพิมพ์ยังตรงกับที่จดไว้ทุกอย่าง
+
+> ⚠️ **คอมเมนต์อธิบายเหตุผลของขนาด (34→46mm, ทำไม 150 ไม่ใช่ 194) ยังอยู่ใน `qr-code-manager.tsx` บรรทัด ~95–120 ขณะที่ค่าคงที่ย้ายไป `qr-sticker.tsx` แล้ว** — ถ้าแก้ตัวเลขในไฟล์ใหม่ต้องไปแก้คอมเมนต์ในไฟล์เก่าด้วย ไม่งั้นจะโกหก
+
+## 🔴 ตัวเลข KPI นับขึ้นด้วย requestAnimationFrame — อ่านผ่าน automation ตอนแท็บซ่อนจะได้เลขผิด
+
+`MotionNumber` วิ่ง count-up จาก 0 ด้วย rAF · **แท็บที่ไม่ visible เบราว์เซอร์หยุด rAF** → เลขค้างกลางทาง
+
+เจอจริงรอบนี้: หน้าภาพรวมอ่านได้ `29 เครื่อง · 9 · 11 · 2 คน` ทั้งที่ DB คือ `73 · 24 · 27 · 4` — ทุกตัวค้างที่ ~40% พอดี · พอสั่ง screenshot (บังคับให้ pane แสดง) แล้วอ่านซ้ำได้ `73 · 24 · 27 · 4` ถูกต้อง
+
+**กฎสำหรับ QA/automation:** ก่อน assert ตัวเลขบนหน้าภาพรวม ต้องให้แท็บ visible แล้วรอ animation จบ (~2 วินาที) ไม่งั้นจะรายงานบั๊กผี · สำหรับผู้ใช้จริงไม่มีปัญหา เพราะ animation กลับมาวิ่งต่อทันทีที่สลับมาดูแท็บ
+
+## เก็บกวาดที่ทำ
+
+### 1. `public/uploads/` หลุดเข้า git
+
+commit `e5db123` พ่วงรูป 2 ไฟล์มาด้วย (`1786677077680-S__17113110.jpg`, `…816-…jpg` 108 KB ต่อไฟล์ เนื้อหาเดียวกัน) · เป็นรูปจากเครื่องของอีกคน **ไม่มี row ไหนใน DB ของเราอ้างถึง** (เช็ค `users.avatar_url` และ `maintenance_logs` แล้ว) · หลุดมาเพราะโฟลเดอร์ไม่อยู่ใน `.gitignore` — ถ้าปล่อยไว้ รูปทุกใบที่ใครอัปโหลดตอน dev จะไหลเข้า repo
+
+- เพิ่ม `/public/uploads/` ลง `.gitignore`
+- `git rm --cached` ทั้ง 2 ไฟล์ (ยังอยู่บนดิสก์ แค่เลิก track)
+- **ไม่ต้องมี `.gitkeep`** เพราะ `src/lib/upload.ts` ทำ `fs.mkdir(dir, { recursive: true })` เองก่อนเขียนทุกครั้ง
+
+> ⚠️ รูป 2 ไฟล์นี้**ยังอยู่ใน history** (`e5db123`) ไม่ได้ rewrite — ตามหลักเดิมที่ตัดสินใจไว้ 8 ก.ย. ว่าไม่ rewrite history เพราะ SHA ใน HANDOFF จะตายและมี 2 คนเขียน repo
+
+### 2. eslint 54 → กลับเป็น 50 baseline เดิม
+
+ของใหม่จาก 7 commit นั้นทำให้ warning ขึ้นจาก 19 เป็น 23 (error 31 เท่าเดิม) · หาตัวใหม่ด้วยการรัน `eslint --format json` ทั้งก่อนและหลัง แล้ว diff เป็น set — ได้ 4 ตัวพอดี:
+
+| ไฟล์ | ปัญหา | แก้ |
+|---|---|---|
+| `upcoming-maintenance-table.tsx` | import `MotionFade`, `motion`, `AnimatePresence` แต่ไม่ได้ใช้ | ลบ import |
+| `overview-panel.tsx` | prop `weeklyActivity` รับมาแต่ไม่ได้ใช้ | ลบ **ทั้งสาย** |
+
+**`weeklyActivity` ตายทั้งสายไม่ใช่แค่ prop** — `e5db123` ถอด widget "งานสัปดาห์นี้" ที่เป็นผู้อ่านคนเดียวออกไปแล้วแทนด้วยโดนัท แต่ทิ้ง plumbing ไว้: `getAdminOverviewData` ยังยิง `maintenanceLog.findMany` ย้อน 7 วัน → fold เป็นรายวัน → ส่งผ่าน `page.tsx` → `overview-client.tsx` → `OverviewPanel` ที่ไม่อ่าน · **นั่นคือ 1 query ต่อการเปิดหน้าภาพรวม 1 ครั้ง เพื่อตัวเลขที่ไม่มีใครแสดง** · ถอดออกทั้ง 4 ไฟล์ + `import { format, subDays } from "date-fns"` ที่เหลือค้าง · spec/plan ของ 11 ก.ย. ไม่ได้พูดถึง weekly เลย ถ้าจะเอากลับดูได้จาก `git show 65b1620:src/lib/admin/pages.ts`
+
+## ทดสอบ
+
+| ทดสอบ | ผล |
+|---|---|
+| หน้าภาพรวมหลังถอด `weeklyActivity` | ✅ KPI ครบ `73 · 24 · 27 · 4` โดนัท 50 ใบงาน ไม่มี console error |
+| กระดานใบงาน | ✅ ไม่มี console error |
+| `/admin/qr-codes` หลัง refactor ของอีกคน | ✅ โมดัล + เอกสารพิมพ์ยังมี `150mm`/`46mm` ครบ |
+| `tsc --noEmit` | ✅ 0 error |
+| eslint | ✅ **50 (31 error / 19 warning) = baseline ก่อน 11 ก.ย. เป๊ะ** |
+| `git check-ignore public/uploads/…` | ✅ ถูก ignore โดย `.gitignore:58` |
+
+ไม่แตะ DB — baseline `users 5 · phones 7 · buildings 5 · rooms 32 · acs 73 · models 189 · logs 230 · audit max 34 · pending 0` ตรงเป๊ะตอนเช็คก่อนเริ่ม
+
+## สภาพแวดล้อม
+
+รีเครื่องอีกรอบ (วันที่ข้ามจาก 9 → 13 ก.ย.) — **mysqld ตายอีก ปลุกผ่าน WMI แล้ว** ตามสูตร · dev server ที่ preview เปิดไว้ก็หายไปด้วย ต้องเปิดใหม่ · PostgreSQL ขึ้นเองตามปกติ
+
+`feat/postgres` ตามหลัง `master` **38 commit** แล้ว — แต่ 7 ตัวของ Esther03u + ของผมรอบนี้ แตะแค่ `src/components/` · `src/app/admin/` · `src/lib/admin/pages.ts` · `docs/` · `.gitignore` **ไม่แตะ prisma/schema/prisma.ts/db-retry.ts** ผลสำรวจ merge เมื่อ 9 ก.ย. ยังใช้ได้ (conflict ที่ `HANDOFF.md` ที่เดียว) · ควรรัน `git merge-tree --write-tree --name-only feat/postgres master` ซ้ำอีกรอบก่อนลงมือเพื่อความชัวร์
+
+---
+
 # 🧭 เตรียม merge master เข้า feat/postgres — สำรวจแล้ว ยังไม่แตะอะไร (9 ก.ย. 2026, DoubleKill)
 
 เจ้าของโปรเจกต์สั่ง: *"เตรียมไว้ก่อน แต่ยังไม่ต้องลบ Migration หรือโคลนไป"*
