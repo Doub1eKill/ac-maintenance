@@ -1,5 +1,51 @@
 # Project Handoff & Technical Summary
 
+# 🐞 สถานะบั๊กที่รู้แล้ว ณ 13 ก.ย. 2026 — ยังไม่แก้ทั้งหมด (DoubleKill)
+
+เจ้าของโปรเจกต์ถาม *"ยังมีบัคอีกมั้ย"* — เช็คซ้ำบน `master` `bbf7533` แล้วจดไว้ที่นี่ก่อนลงมือ · **ไม่มีการแก้โค้ดในหัวข้อนี้** เป็น snapshot ของ backlog
+
+## 🔴 บั๊กที่รู้แล้ว ยังอยู่ (ค้างมาตั้งแต่ 8 ก.ย.)
+
+| # | บั๊ก | ที่อยู่ | ผลกระทบ |
+|---|---|---|---|
+| 1 | หน้า login ยังมีป้าย **"Multi-Tenant Campus Platform"** ทั้งที่ถอด multi-tenancy ไปตั้งแต่ 11 ส.ค. | `src/components/auth/auth-layout.tsx:33` | ผู้ใช้ทุกคนเห็นทุกครั้งที่เข้าระบบ · แก้ 1 บรรทัด |
+| 2 | หน้าสมัครสำเร็จพาดหัว **"ลงทะเบียนสำเร็จ (Pending)" ตายตัว** ทั้งที่อีเมล `.ac.th`/`.edu`/`.edu.th` ได้ `active` ทันที | `src/components/auth/register-form.tsx:82` | จอเดียวขัดกันเอง — บอก pending แต่ล็อกอินได้เลย |
+| 3 | `prisma.config.ts` **ไม่มี key `seed`** → `npx prisma db seed` ใช้ไม่ได้ | `prisma.config.ts` | dev เท่านั้น · ใช้ `npx tsx prisma/seed.ts` ไปก่อน |
+
+## 🟠 eslint 31 error — มีของจริงปน ไม่ใช่แค่สไตล์
+
+baseline **50 (31 error / 19 warning)** ไม่มีใครเพิ่มตั้งแต่ 8 ก.ย. แต่ไม่มีใครลดด้วย · แยกตาม rule:
+
+| จำนวน | rule | ความหมายจริง | ไฟล์ |
+|---|---|---|---|
+| **17** | `react-hooks/set-state-in-effect` | React Compiler ชี้ `setState` ใน effect body → cascading re-render · ส่วนใหญ่เป็น "sync state จาก props" ที่ควรเป็น derived value หรือ `key` remount · **ไม่พัง แต่ render เกินจำเป็น** | `trash-modal:75` · `ac-history-modal:115` · `asset-manager:153` · `create-work-order-modal:49` · `settings-panel:234,252` · `team-panel:66` · `user-approvals-panel:53` · `work-order-detail-dialog:54` · `dashboard-search:44` · `building-groups:275` · `profile-panel:404` · `job-pool-panel:44,50` · `qr-scan-modal:24` · `tech-shell:115` · `hooks/use-mobile:14` |
+| **10** | `no-explicit-any` | type hole · **น่าห่วงสุด 3 จุด**: `lib/auth.config.ts:67-68` (callbacks JWT/session = ทางเข้า auth) และ `lib/tech/maintenance-log.ts:128` (เขียน DB) | + `api/admin/maintenance-schedules/route.ts:118` · `upcoming-maintenance-table:282` · `log-action-modal:23-24` · `qr-scan-modal:20` · `option-wheel:66` · `lib/admin/air-conditioners.ts:92` |
+| 3 | `react-hooks/refs` ×2 + `immutability` | อ่าน/แก้ ref ระหว่าง render | ทั้งหมดใน `ui/option-wheel.tsx:83,84,144` |
+| 1 | `prefer-const` | | `lib/admin/air-conditioners.ts:92` (บรรทัดเดียวกับ `any`) |
+
+> วิธีดึงรายการนี้ใหม่: `npx eslint src --format json -o /tmp/eslint.json` แล้ว group ตาม `ruleId` ที่ `severity === 2` · **อย่าใช้ `--max-warnings`** ใช้ไม่ได้บน Next 16
+
+## 🟡 ของค้างจากงานในเซสชัน 9–13 ก.ย.
+
+- `FlatACUnit.location` ใน `admin/qr-code-manager.tsx` — field ตาย ประกอบสตริงทุก render ไม่มีใครอ่าน
+- คอมเมนต์อธิบายขนาดสติกเกอร์ (34→46mm, ทำไม 150 ไม่ใช่ 194) ยังอยู่ใน `qr-code-manager.tsx` ~บรรทัด 95–120 ขณะที่ค่าคงที่ย้ายไป `shared/qr-sticker.tsx` แล้ว — **แก้เลขในไฟล์ใหม่ต้องแก้คอมเมนต์ในไฟล์เก่าด้วย**
+- `useSettleWithoutFrames` เคส "frame กลับมาหลัง 10 วิ" ปล่อยไว้โดยตั้งใจ — มีแค่ใน Browser pane ที่ได้ frame เดี่ยวจาก screenshot
+- **7 commit ของ Esther03u (11 ก.ย.) ผ่านแค่ `tsc` + eslint + เปิดหน้าดู** — ยังไม่เคยทดสอบ interaction: ฟิลเตอร์ตารางงานใกล้ถึงรอบ · bottom nav มือถือฝั่งช่าง · โดนัทสถิติ · job pool animation
+
+## ⚪ ที่ยังไม่รู้ — เพราะยังไม่มีใครหา
+
+โปรเจกต์ **ไม่มี test framework** (ไม่มี vitest/jest/playwright ใน deps) · การทดสอบทั้งหมดคือคน/AI กดผ่านเบราว์เซอร์ทีละหน้า · ฟีเจอร์ที่ทำ 8–13 ก.ย. ทดสอบเฉพาะ happy path + เคสที่นึกออก
+
+**ไม่เคยแตะเลยตั้งแต่ 11 ก.ย.:** ฝั่งช่างทั้งหมด (job pool, บันทึกงาน, สแกน QR) · reset password + SMTP · อัปโหลดรูป · ใบงาน/มอบหมายงาน · การเรียงภาษาไทยกับข้อมูลจริง
+
+## ขั้นต่อไปที่เสนอ (รอเจ้าของตัดสิน)
+
+1. **รัน `/anthropic-skills:qa-tester`** — ขับ Chromium จริง ล็อกอิน 2 บทบาท หาบั๊ก/permission bypass ทั้งระบบ เขียนรายงานพร้อมหลักฐาน · เหมาะตอนนี้ที่มีโค้ดจาก 2 คนเข้ามาโดยไม่มี test คุม
+2. เก็บ 🔴 3 ตัวก่อน — ใช้เวลาไม่นาน
+3. ลด `no-explicit-any` 3 จุดใน auth/maintenance-log ก่อนตัวอื่น
+
+---
+
 # 🎞️ motion primitives ทุกตัวลงจอดเองได้แม้ไม่มี frame — รอบสอง (13 ก.ย. 2026, DoubleKill)
 
 branch `fix/motion-settle-without-frames` ตัดจาก `master` `03464b6` · ต่อจากหัวข้อ "🩹 `MotionNumber` ค้างเลขกลางทาง" — เจ้าของโปรเจกต์สั่ง *"แก้เลย"* กับข้อสังเกต 4 ข้อที่จดไว้ท้ายหัวข้อนั้น แก้ครบทั้ง 4
