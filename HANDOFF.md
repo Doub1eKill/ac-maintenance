@@ -1,5 +1,69 @@
 # Project Handoff & Technical Summary
 
+# 🩹 `MotionNumber` ค้างเลขกลางทางเมื่อแท็บถูกซ่อน — แก้แล้ว (13 ก.ย. 2026, DoubleKill)
+
+branch `fix/motion-number-hidden-tab` ตัดจาก `master` `466bfbe` · แก้กับดักที่จดไว้ในหัวข้อ "🧹 pull งานของ Esther03u" ด้านล่าง
+
+## สาเหตุที่แท้จริง
+
+`animate()` ของ `motion` ขับด้วย frame loop บน `requestAnimationFrame` · **เบราว์เซอร์หยุด rAF สนิทในแท็บที่ไม่ visible** (ไม่ใช่ช้าลง — หยุด) · component เดิมผูก DOM กับ React state ที่อัปเดต**เฉพาะจาก `onUpdate`** ไม่มีทางอื่นที่ค่าสุดท้ายจะไปถึงหน้าจอ
+
+```
+mount → animate(0 → 73) → frame 1..N ผ่าน rAF → [แท็บซ่อน] → ไม่มี frame N+1 → ค้างที่ 29 ตลอดไป
+```
+
+ค่าที่ค้าง**เป็นตัวเลขจริงที่ดูน่าเชื่อถือ** (29 เครื่อง) ไม่ใช่ 0 หรือ "—" นี่คือสิ่งที่ทำให้มันอันตราย — ผมเองยังไปไล่ `pages.ts` เสียเวลาทั้งที่ DB ให้ 73 ถูกต้องตลอด
+
+## 🔴 ค้นพบระหว่างทาง: มีเคสที่ `visibilitychange` ไม่ยิงแต่ rAF ตายอยู่ดี
+
+ใน Browser pane ของ Claude วัดได้ `document.visibilityState === "visible"` แต่ `requestAnimationFrame` **ไม่ยิงเลยแม้แต่ครั้งเดียวใน 3 วินาที** · Chromium หยุด rAF ให้หน้าต่างที่ถูกบัง (occluded) โดยไม่จำเป็นต้องเปลี่ยน `visibilityState` · แปลว่า**ฟัง `visibilitychange` อย่างเดียวไม่พอ** ต้องมีทางที่ไม่พึ่งทั้ง rAF และ event
+
+ผลข้างเคียงในสภาพนั้น: **`MotionFade` ค้างที่ opacity 0** — KPI cards ทั้งแถวมองไม่เห็นในหน้าต่างที่ถูกบัง (เห็นใน screenshot) · หายเองทันทีที่ rAF กลับมา จึงไม่ใช่เลขผิดแบบ `MotionNumber` ยังไม่ได้แก้ตัวนั้น
+
+## ที่แก้ — 3 เส้นทางที่ไม่พึ่ง frame loop ไปถึงค่าจริง
+
+| เส้นทาง | ครอบคลุม |
+|---|---|
+| `onComplete: settle` | จบปกติ → เขียน `value` ตรงๆ ไม่ใช่ `Math.round(latest)` ของ frame สุดท้าย |
+| `visibilitychange` → hidden → `settle()` | แท็บซ่อนกลางทาง (เคสที่เจอจริง) |
+| `setTimeout(settle, duration*1000 + 200)` | **rAF ตายแต่ไม่มี event** — timer โดน throttle ในแท็บซ่อน (≥1 วิ) แต่**ยังยิง** ต่างจาก rAF ที่หยุดสนิท |
+| mount ตอนซ่อนอยู่ / `prefers-reduced-motion` | ไม่ animate เลย · `setTimeout(settle, 0)` |
+
+`settle = () => { controls?.stop(); setDisplayValue(value) }` · **ไม่มี `setState` ใน body ของ effect** ทุกจุดอยู่ใน callback จึงไม่ชน `react-hooks/set-state-in-effect` ที่เป็น error ในโปรเจกต์นี้ · เพิ่ม `useReducedMotion()` จาก `motion/react` เข้า deps
+
+## พิสูจน์ด้วย harness ที่คุม rAF เอง — เทียบของเก่ากับของใหม่
+
+**Browser pane ทดสอบเรื่องนี้ไม่ได้** เพราะ rAF ไม่ยิงเลย animation ไม่มีวันเริ่ม · และ**ทุกอย่างในหน้าเดียวกันติดไปด้วย**: frame loop ของ motion เป็น global — พอ rAF แรกไม่กลับมา มันจะไม่ขอ frame ใหม่อีกเลยตลอดอายุหน้า (ตรวจแล้วเป็นแบบนี้จริงทั้งใน pane และใน harness)
+
+จึงเขียน harness ด้วย jsdom (ติดตั้ง `--no-save` แล้วถอดออก ไม่แตะ `package.json`/lock) ที่ **rAF เป็นของเรา**: วิ่งบน timer 16ms จนสั่งให้หยุด = สิ่งที่เบราว์เซอร์ทำกับแท็บที่เสียโฟกัสพอดี · **แต่ละเคสรันคนละ process** ด้วยเหตุผลข้างบน
+
+| เคส | เก่า `4735636` | ใหม่ |
+|---|---|---|
+| **1** ซ่อนกลางทาง + `visibilitychange` ยิง | วิ่งถึง 61 → หยุด rAF → **ค้าง 64 ตลอด** แม้ event มาแล้ว | 61 → 64 → event → **73 ทันที** |
+| **2** rAF ตาย **ไม่มี event** (หน้าต่างถูกบัง) | **ค้าง 61 เลยเวลาจบ animation ไปแล้วก็ยังค้าง** (t=1150ms) | 63 ค้างจน backstop ที่ 1000ms → **73** |
+| **3** ซ่อนอยู่ตั้งแต่ mount | 73 (บังเอิญถูก เพราะ `useState(value)`) · ขอ frame 0 ครั้ง | 73 · ขอ frame 0 ครั้ง — เท่ากัน ไม่ได้อ้างว่าดีขึ้น |
+
+เคส 2 คือสภาพของ Browser pane เป๊ะ และเป็นเคสที่ **`visibilitychange` listener อย่างเดียวช่วยไม่ได้** — timer backstop คือตัวที่รอด
+
+`tsc --noEmit` 0 error · eslint **50 (31/19) เท่า baseline** · ไม่แตะ DB
+
+## ที่สังเกตแต่ไม่ได้แก้ (นอก scope)
+
+- **flash 1 frame ตอน mount**: `useState(value)` แสดง 73 ก่อน แล้ว frame แรกของ animation ดึงลง 0 แล้วนับขึ้น — เห็นไม่ชัดที่ 60Hz แต่มีจริง · ของเดิมของ Esther03u ไม่ใช่กับดักที่ถาม
+- **`value` เปลี่ยนกลางทาง**: `prevValueRef` เก็บ*เป้าหมายเก่า*ไม่ใช่ค่าที่แสดงอยู่ → animation ใหม่กระโดดไปเป้าเก่าก่อนแล้วค่อยวิ่ง — แก้ได้ด้วย `prevValueRef.current = latest` ใน `onUpdate`
+- **`setState` ทุก frame** × 5 ตัวนับ ≈ 300 re-render/วิ ตลอด 0.8 วิ — วิธี idiomatic ของ motion คือ `useMotionValue` + `useTransform` + `<motion.span>` ที่เขียน DOM ตรงโดยไม่ re-render · ถ้าวันหนึ่ง refactor ต้องคง 3 เส้นทางข้างบนไว้เพราะ rAF ตายเหมือนกัน
+- **`MotionFade` ค้าง opacity 0** ในหน้าต่างที่ถูกบัง (ข้างบน) — เหมือนกันทุก `motion.*` ที่ animate ตอน mount
+
+## กฎสำหรับ QA/automation (ยังใช้)
+
+ก่อน assert ตัวเลขบนหน้าภาพรวม ให้แท็บ visible + รอ ~1.2 วิ (duration 0.8 + backstop 0.2 + เผื่อ) · ตอนนี้ต่อให้แท็บซ่อน เลขก็จะถูกภายใน ~1 วิ (timer throttle) แต่ยังไม่ควรพึ่ง
+
+## ไฟล์ที่แตะ
+
+`src/components/ui/motion/motion-number.tsx` ไฟล์เดียว · harness อยู่ใน scratchpad ของ session ไม่ได้ commit (โปรเจกต์ยังไม่มี test framework — ถ้าวันหนึ่งมี vitest + jsdom เอาเคส 1–3 ข้างบนไปเป็น test ได้เลย)
+
+---
+
 # 🧹 pull งานของ Esther03u 7 commit + เก็บกวาดสิ่งที่ตกหล่น (13 ก.ย. 2026, DoubleKill)
 
 branch `chore/post-pull-cleanup` ตัดจาก `master` `4735636`
