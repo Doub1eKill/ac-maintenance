@@ -35,7 +35,6 @@ interface OverviewPanelProps {
     pendingWorkOrders: number;
     activeTechsCount: number;
   };
-  weeklyActivity: Array<{ day: string; repairs: number }>;
   urgentUnits: UrgentMaintenanceAC[];
   buildings: BuildingItem[];
   workOrders: WorkOrderItem[];
@@ -46,7 +45,6 @@ interface OverviewPanelProps {
 
 export function OverviewPanel({
   metrics,
-  weeklyActivity,
   urgentUnits,
   buildings,
   workOrders,

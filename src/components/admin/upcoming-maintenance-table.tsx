@@ -43,8 +43,7 @@ import {
   groupByRoom,
 } from "@/components/shared/building-groups";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
-import { MotionActivePill, MotionFade } from "@/components/ui/motion";
-import { motion, AnimatePresence } from "motion/react";
+import { MotionActivePill } from "@/components/ui/motion";
 
 export interface UpcomingMaintenanceAC {
   id: string;

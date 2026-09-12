@@ -10,14 +10,12 @@ import type { UrgentMaintenanceAC } from "@/components/admin/upcoming-maintenanc
 
 export function OverviewClient({
   metrics,
-  weeklyActivity,
   urgentUnits,
   buildings,
   workOrders,
   activeTechnicians,
 }: {
   metrics: React.ComponentProps<typeof OverviewPanel>["metrics"];
-  weeklyActivity: Array<{ day: string; repairs: number }>;
   urgentUnits: UrgentMaintenanceAC[];
   buildings: BuildingItem[];
   workOrders: WorkOrderItem[];
@@ -31,7 +29,6 @@ export function OverviewClient({
     <>
       <OverviewPanel
         metrics={metrics}
-        weeklyActivity={weeklyActivity}
         urgentUnits={urgentUnits}
         buildings={buildings}
         workOrders={workOrders}

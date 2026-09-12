@@ -1,7 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { formatUnitLocation } from "@/lib/location";
 import type { SearchEntry } from "@/lib/search";
-import { format, subDays } from "date-fns";
 import { verifyOrgAdmin } from "@/lib/auth-guards";
 import { syncOverdueMaintenanceWorkOrders } from "@/lib/maintenance";
 import { getOrganisationName, getOrganisationInfo, getDefaultMaintenanceFrequency } from "@/lib/organisation";
@@ -101,7 +100,7 @@ export async function getAdminOverviewData() {
   await verifyOrgAdmin();
   await syncOverdueMaintenanceWorkOrders();
 
-  const [buildingRows, pendingJobs, workOrdersRaw, logsLast7Days, activeTechsCount, activeTechnicians] =
+  const [buildingRows, pendingJobs, workOrdersRaw, activeTechsCount, activeTechnicians] =
     await Promise.all([
       prisma.building.findMany({ select: buildingTreeSelect, orderBy: { name: "asc" } }),
       getPendingJobsByAcId(),
@@ -110,24 +109,11 @@ export async function getAdminOverviewData() {
         orderBy: workOrderBoardOrderBy,
         take: WORK_ORDER_PAGE_SIZE,
       }),
-      prisma.maintenanceLog.findMany({
-        where: { performedAt: { gte: subDays(new Date(), 7) } },
-        select: { performedAt: true },
-      }),
       prisma.user.count({ where: { role: "technician", status: "active" } }),
       getActiveTechnicians(),
     ]);
 
   const { buildings, urgentUnits, unitCounts } = shapeBuildingTree(buildingRows, pendingJobs);
-
-  const weeklyActivity = Array.from({ length: 7 }).map((_, i) => ({
-    day: format(subDays(new Date(), 6 - i), "EEE"),
-    repairs: 0,
-  }));
-  logsLast7Days.forEach((log) => {
-    const day = weeklyActivity.find((d) => d.day === format(log.performedAt, "EEE"));
-    if (day) day.repairs += 1;
-  });
 
   return {
     metrics: {
@@ -135,7 +121,6 @@ export async function getAdminOverviewData() {
       pendingWorkOrders: pendingJobs.size,
       activeTechsCount,
     },
-    weeklyActivity,
     urgentUnits,
     buildings,
     workOrders: workOrdersRaw.map(toWorkOrderBoardRow),
