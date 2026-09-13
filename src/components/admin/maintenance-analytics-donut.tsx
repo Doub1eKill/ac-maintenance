@@ -94,7 +94,17 @@ export function MaintenanceAnalyticsDonut({
       else if (wo.status === "pending") pending++;
       else if (wo.status === "cancelled") cancelled++;
 
-      if (wo.priority === "urgent" || wo.priority === "high") urgent++;
+      // Priority is low / high / critical (createWorkOrderSchema); this used
+      // to test for "urgent", a value that never existed, and missed
+      // "critical". Only open orders: a completed critical job is not a
+      // fire any more, and the footer's number is meant to be what needs
+      // attention now.
+      if (
+        (wo.priority === "critical" || wo.priority === "high") &&
+        (wo.status === "pending" || wo.status === "claimed")
+      ) {
+        urgent++;
+      }
       if (wo.type === "cleaning") cleaning++;
       else if (wo.type === "repair") repair++;
     }
@@ -318,7 +328,7 @@ export function MaintenanceAnalyticsDonut({
             <div className="rounded-xl border border-border/60 bg-secondary/40 px-3.5 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
               <div className="flex items-center gap-1.5">
                 <Flame className="w-3.5 h-3.5 text-rose-500" />
-                <span>งานด่วน (Urgent):</span>
+                <span>ใบงานความสำคัญสูง/วิกฤต ที่เปิดอยู่:</span>
                 <span className="font-bold text-rose-600 dark:text-rose-400 font-mono">
                   {counts.urgent}
                 </span>

@@ -111,9 +111,9 @@ export function OverviewMetricsGrid({ metrics }: OverviewMetricsGridProps) {
           </div>
 
           <div className="mt-4 pt-3 border-t border-border/60 flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">รอบบำรุงรักษาเชิงป้องกัน</span>
+            <span className="text-muted-foreground">เครื่องที่ค้างล้าง</span>
             <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
-              ตามกำหนดรอบ
+              ค้างล้าง
             </span>
           </div>
         </MotionCard>

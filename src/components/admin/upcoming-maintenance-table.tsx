@@ -337,12 +337,29 @@ export function UpcomingMaintenanceTable({ data, onViewDetails, onCreateWorkOrde
   const [rowSelection, setRowSelection] = React.useState({});
 
   const totalCount = data.length;
-  const urgentCount = React.useMemo(() => data.filter((d) => d.kind === "urgent").length, [data]);
-  const upcomingCount = React.useMemo(() => data.filter((d) => d.kind === "upcoming").length, [data]);
+  // The two filters split rows by jobTypeOf, not by `kind`: an "urgent" row
+  // is a repair or an overdue clean, and the "รอซ่อมด่วน" pill used to count
+  // both — 52 against the KPI card's 25 for the same word on the same screen
+  // (QA 20260913-1742, BUG-007). Repairs alone are what the card counts;
+  // every cleaning row, overdue or scheduled, sits under the other pill,
+  // and the subtitle spells out the split so each number matches a badge.
+  const { urgentCount, overdueCleaningCount, scheduledCount } = React.useMemo(() => {
+    let urgentCount = 0;
+    let overdueCleaningCount = 0;
+    let scheduledCount = 0;
+    for (const d of data) {
+      const t = jobTypeOf(d);
+      if (t === "repair") urgentCount += 1;
+      else if (t === "overdueCleaning") overdueCleaningCount += 1;
+      else scheduledCount += 1;
+    }
+    return { urgentCount, overdueCleaningCount, scheduledCount };
+  }, [data]);
+  const upcomingCount = overdueCleaningCount + scheduledCount;
 
   const filteredData = React.useMemo(() => {
-    if (filterKind === "urgent") return data.filter((d) => d.kind === "urgent");
-    if (filterKind === "upcoming") return data.filter((d) => d.kind === "upcoming");
+    if (filterKind === "urgent") return data.filter((d) => jobTypeOf(d) === "repair");
+    if (filterKind === "upcoming") return data.filter((d) => jobTypeOf(d) !== "repair");
     return data;
   }, [data, filterKind]);
 
@@ -424,15 +441,15 @@ export function UpcomingMaintenanceTable({ data, onViewDetails, onCreateWorkOrde
               {filterKind === "urgent"
                 ? "รายการรอซ่อมด่วน"
                 : filterKind === "upcoming"
-                ? "รายการถึงกำหนดรอบล้าง"
+                ? "รายการงานล้างแอร์"
                 : "งานซ่อมบำรุงและกำหนดรอบล้าง"}
             </h3>
             <p className="text-xs text-muted-foreground mt-0.5">
               {filterKind === "urgent"
-                ? `พบ ${urgentCount} รายการที่ต้องดำเนินการซ่อมแซมเร่งด่วน`
+                ? `พบ ${urgentCount} เครื่องที่แจ้งเสีย/ชำรุด รอซ่อมแซม`
                 : filterKind === "upcoming"
-                ? `พบ ${upcomingCount} รายการที่ถึงรอบบำรุงรักษาเชิงป้องกัน`
-                : `ทั้งหมด ${totalCount} รายการ (ซ่อมด่วน ${urgentCount} • รอบล้าง ${upcomingCount})`}
+                ? `พบ ${upcomingCount} รายการ (ค้างล้าง ${overdueCleaningCount} • กำหนดล้าง ${scheduledCount})`
+                : `ทั้งหมด ${totalCount} รายการ (ซ่อมด่วน ${urgentCount} • ค้างล้าง ${overdueCleaningCount} • กำหนดล้าง ${scheduledCount})`}
             </p>
           </div>
 
@@ -549,7 +566,7 @@ export function UpcomingMaintenanceTable({ data, onViewDetails, onCreateWorkOrde
               />
             )}
             <Sparkles className="w-3.5 h-3.5" />
-            ถึงรอบล้าง
+            งานล้างแอร์
             <span
               className={cn(
                 "px-1.5 py-0.2 rounded-full text-[10px] font-bold",
@@ -569,7 +586,7 @@ export function UpcomingMaintenanceTable({ data, onViewDetails, onCreateWorkOrde
           filterKind === "urgent"
             ? "ไม่มีรายการแจ้งซ่อมด่วนในขณะนี้"
             : filterKind === "upcoming"
-            ? "ไม่มีรายการถึงกำหนดรอบล้างในขณะนี้"
+            ? "ไม่มีรายการค้างล้างหรือถึงกำหนดรอบล้างในขณะนี้"
             : "ไม่มีงานซ่อมด่วนหรือกำหนดล้างในขณะนี้"
         }
         // Collapsing back to the first building when the search changes, the
