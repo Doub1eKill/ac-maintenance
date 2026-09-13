@@ -109,6 +109,13 @@ export async function createAirConditionerAction(formData: FormData) {
       
       dbData.acBrandId = model.brandId;
       dbData.acModelId = model.id;
+      // The admin form shows no BTU field on this branch — the size is the
+      // model's — so btu arrives null. It used to be stored that way, and
+      // every unit registered from the catalogue printed "ไม่ระบุ BTU" on
+      // its sticker and had no size on the board (QA 20260913-1742,
+      // BUG-005). The model's default is the unit's size unless the form
+      // sent one of its own (the technician's form has a field).
+      dbData.btu = data.btu ?? model.defaultBtu;
     } else {
       dbData.brand = data.customBrand;
       dbData.model = data.customModel;
@@ -185,7 +192,9 @@ export async function createAirConditionerAction(formData: FormData) {
       newValues: {
         acCode: created.acCode,
         roomId: room.id.toString(),
-        btu: data.btu,
+        // What was stored, not what the form sent — the two differ for a
+        // catalogue model (see above).
+        btu: dbData.btu,
         installedAt: installedAt?.toISOString() ?? null,
       },
       ipAddress: "server_action",
@@ -305,12 +314,20 @@ export async function updateAirConditionerAction(formData: FormData) {
             // createAirConditionerAction.
             const model = await prisma.acModel.findFirst({
               where: { id: BigInt(data.acModelId!), deletedAt: null, brand: { deletedAt: null } },
-              select: { id: true, brandId: true },
+              select: { id: true, brandId: true, defaultBtu: true },
             });
             if (!model) return null;
-            return { acBrandId: model.brandId, acModelId: model.id, brand: null, model: null };
+            return {
+              acBrandId: model.brandId,
+              acModelId: model.id,
+              brand: null,
+              model: null,
+              // Same rule as createAirConditionerAction: a catalogue model
+              // chosen without a size takes the model's default.
+              btu: data.btu ?? model.defaultBtu,
+            };
           })()
-        : { acBrandId: null, acModelId: null, brand: data.customBrand, model: data.customModel ?? null };
+        : { acBrandId: null, acModelId: null, brand: data.customBrand, model: data.customModel ?? null, btu: data.btu };
 
     if (!brandFields) return { error: "ไม่พบรุ่นแอร์ที่เลือก" };
 
@@ -318,7 +335,6 @@ export async function updateAirConditionerAction(formData: FormData) {
       where: { id: acId },
       data: {
         ...brandFields,
-        btu: data.btu,
         // Both left out of the update entirely when the form did not send them,
         // rather than written as null. See the schema comment above.
         ...(data.status !== undefined ? { status: data.status } : {}),
@@ -340,7 +356,7 @@ export async function updateAirConditionerAction(formData: FormData) {
       },
       newValues: {
         status: data.status ?? existing.status,
-        btu: data.btu,
+        btu: brandFields.btu,
         installedAt:
           data.installedAt !== undefined
             ? data.installedAt || null
