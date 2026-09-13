@@ -89,6 +89,22 @@ function QrScanModalBody({ isPending, onClose, onClaim, onLogWork, onScanError }
   // Guards against a second lookup while one is running: the detector keeps
   // firing on every frame the code stays in view.
   const lookupRef = useRef(false);
+  // The last camera read the server did not recognise, and when. The
+  // detector reports the same code on every frame it stays in view, so
+  // without this a sticker from another system (or any poster) raised a
+  // "ไม่พบ" toast four times a second until the phone was moved. A typed
+  // value is never held back — that is the user asking again on purpose.
+  const rejectedRef = useRef<{ value: string; at: number } | null>(null);
+  const REJECT_COOLDOWN_MS = 5000;
+
+  // Read through a ref so lookUp — and the camera effect that depends on
+  // it — keep their identity when tech-shell re-renders with a fresh inline
+  // arrow. Otherwise every parent render would tear the stream down and
+  // ask for the camera again.
+  const onScanErrorRef = useRef(onScanError);
+  useEffect(() => {
+    onScanErrorRef.current = onScanError;
+  }, [onScanError]);
 
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -97,9 +113,15 @@ function QrScanModalBody({ isPending, onClose, onClaim, onLogWork, onScanError }
   }, []);
 
   const lookUp = useCallback(
-    async (scanned: string) => {
+    async (scanned: string, source: "camera" | "typed") => {
       const value = scanned.trim();
       if (!value || lookupRef.current) return;
+      if (source === "camera") {
+        const rejected = rejectedRef.current;
+        if (rejected && rejected.value === value && Date.now() - rejected.at < REJECT_COOLDOWN_MS) {
+          return;
+        }
+      }
       lookupRef.current = true;
       setLookingUp(true);
       try {
@@ -109,14 +131,15 @@ function QrScanModalBody({ isPending, onClose, onClaim, onLogWork, onScanError }
           setCamera("idle");
           setQrResult(res);
         } else {
-          onScanError(res.error);
+          if (source === "camera") rejectedRef.current = { value, at: Date.now() };
+          onScanErrorRef.current(res.error);
         }
       } finally {
         lookupRef.current = false;
         setLookingUp(false);
       }
     },
-    [onScanError, stopCamera]
+    [stopCamera]
   );
 
   // Camera lifecycle. Starts on mount and again after "สแกนเครื่องใหม่"
@@ -132,17 +155,21 @@ function QrScanModalBody({ isPending, onClose, onClaim, onLogWork, onScanError }
 
     let cancelled = false;
     let timer: number | undefined;
+    let detector: BarcodeDetectorLike | null = null;
 
     // Desktop Chrome on Windows and Linux defines BarcodeDetector but
     // supports no formats on it, so the constructor being present is not
     // enough — ask before opening the camera, and fall back to typing if
-    // QR is not on the list.
+    // QR is not on the list. The detector is built here too, before the
+    // stream exists: if construction throws there is nothing to leave
+    // running behind the "ใช้กล้องไม่ได้" message.
     const formats = Detector.getSupportedFormats?.() ?? Promise.resolve(["qr_code"]);
     formats
       .then((list) => {
         if (!list.includes("qr_code")) {
           throw new DOMException("qr_code not supported", "NotSupportedError");
         }
+        detector = new Detector({ formats: ["qr_code"] });
         return navigator.mediaDevices.getUserMedia({
           video: { facingMode: { ideal: "environment" } },
           audio: false,
@@ -162,15 +189,14 @@ function QrScanModalBody({ isPending, onClose, onClaim, onLogWork, onScanError }
         video.play().catch(() => {});
         setCamera("scanning");
 
-        const detector = new Detector({ formats: ["qr_code"] });
         const tick = async () => {
-          if (cancelled || !streamRef.current) return;
+          if (cancelled || !streamRef.current || !detector) return;
           if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && !lookupRef.current) {
             try {
               const codes = await detector.detect(video);
               const hit = codes.find((c) => c.rawValue.trim());
               if (hit) {
-                await lookUp(hit.rawValue);
+                await lookUp(hit.rawValue, "camera");
               }
             } catch {
               // A frame the detector could not read; the next one may be
@@ -212,7 +238,7 @@ function QrScanModalBody({ isPending, onClose, onClaim, onLogWork, onScanError }
 
   function handleTypedSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    void lookUp(typedCode);
+    void lookUp(typedCode, "typed");
   }
 
   function handleClaimFromQr() {
