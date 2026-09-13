@@ -175,6 +175,8 @@ export function RegisterUnitModal({ rooms, onClose }: RegisterUnitModalProps) {
                 <input
                   type="number"
                   inputMode="numeric"
+                  min="1"
+                  step="1"
                   value={btu}
                   onChange={(e) => setBtu(e.target.value)}
                   placeholder="เช่น 18000"

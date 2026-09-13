@@ -655,7 +655,7 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
                   </div>
                   <div>
                     <label className="mb-1.5 block font-bold text-foreground">ขนาด BTU (ไม่บังคับ)</label>
-                    <input name="btu" type="number" placeholder="เช่น 18000" className="w-full rounded-xl border border-border px-3.5 py-2.5 text-foreground focus:border-primary focus:outline-none" />
+                    <input name="btu" type="number" min="1" step="1" placeholder="เช่น 18000" className="w-full rounded-xl border border-border px-3.5 py-2.5 text-foreground focus:border-primary focus:outline-none" />
                   </div>
                 </>
               )}
@@ -738,7 +738,7 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
                   </div>
                   <div>
                     <label className="mb-1.5 block font-bold text-foreground">ขนาด BTU (ไม่บังคับ)</label>
-                    <input name="btu" type="number" defaultValue={showEditAc.btu ?? ""} placeholder="เช่น 18000" className="w-full rounded-xl border border-border px-3.5 py-2.5 text-foreground focus:border-primary focus:outline-none" />
+                    <input name="btu" type="number" min="1" step="1" defaultValue={showEditAc.btu ?? ""} placeholder="เช่น 18000" className="w-full rounded-xl border border-border px-3.5 py-2.5 text-foreground focus:border-primary focus:outline-none" />
                   </div>
                 </>
               )}

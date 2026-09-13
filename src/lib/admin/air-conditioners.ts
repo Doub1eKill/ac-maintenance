@@ -24,6 +24,20 @@ function isUniqueConflict(error: unknown): boolean {
 // How many times to recompute the sequence number before giving up.
 const MAX_AC_CODE_ATTEMPTS = 5;
 
+// Blank means "not given"; anything else must be a whole positive number.
+// The column is UnsignedInt, and MariaDB clamps a negative to 0 without a
+// word — "-5" typed into the form came back as a 0 BTU unit (QA
+// 20260913-1742, BUG-006); PostgreSQL would have stored the -5. Checked here
+// so both forms and both branches get the same answer.
+const btuField = z
+  .string()
+  .nullable()
+  .transform((val) => (val ? parseInt(val, 10) : null))
+  .refine(
+    (v) => v === null || (Number.isInteger(v) && v > 0),
+    "ขนาด BTU ต้องเป็นจำนวนเต็มมากกว่า 0"
+  );
+
 // Registering and editing an air conditioner. The longest of the five asset
 // modules, because creating a unit also mints its QR code and opens its first
 // maintenance schedule.
@@ -33,7 +47,7 @@ const acSchema = z.object({
   acModelId: z.string().optional(),
   customBrand: z.string().optional(),
   customModel: z.string().optional(),
-  btu: z.string().transform(val => val ? parseInt(val, 10) : null).nullable(),
+  btu: btuField,
   // Optional: an empty field means "today", handled below. Only the shape is
   // checked here so the error message can name the field.
   installedAt: z
@@ -239,7 +253,7 @@ const updateAcSchema = z.object({
   acModelId: z.string().optional(),
   customBrand: z.string().optional(),
   customModel: z.string().optional(),
-  btu: z.string().transform((val) => (val ? parseInt(val, 10) : null)).nullable(),
+  btu: btuField,
   // status and installedAt are optional so a form can edit only what it shows.
   // Absent means "leave it alone"; an empty installedAt still means "clear it".
   // formData.get() gives null for a field that is not in the DOM and "" for one
