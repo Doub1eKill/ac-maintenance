@@ -11,6 +11,11 @@ export type RegisterState = {
   success?: boolean;
   error?: string;
   message?: string;
+  // Which of the two outcomes this was. The message above already says,
+  // but prose is for reading, not branching: the success screen used to
+  // title itself "(Pending)" and show an approval notice to an account
+  // the same message had just called active.
+  status?: "active" | "pending";
 } | null;
 
 const registerSchema = z.object({
@@ -159,12 +164,14 @@ export async function registerUser(
     if (initialStatus === "active") {
       return {
         success: true,
+        status: "active",
         message: `ลงทะเบียนสำเร็จ! บัญชีของคุณได้รับการอนุมัติและเปิดใช้งานสิทธิ์เข้าสู่ระบบทันทีเนื่องจากเป็นอีเมลสถาบัน (${cleanEmail})`,
       };
     }
 
     return {
       success: true,
+      status: "pending",
       message:
         "ลงทะเบียนสำเร็จ! บัญชีของคุณอยู่ระหว่างรอการตรวจสอบและอนุมัติสิทธิ์จากผู้ดูแลระบบ (Pending Approval)",
     };

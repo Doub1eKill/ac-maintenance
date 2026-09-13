@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { registerUser, type RegisterState } from "@/app/register/actions";
 import { avatarRejectionReason } from "@/lib/avatar";
-import { Wrench, Building2, Eye, EyeOff, AlertTriangle, Clock, ArrowLeft, UserPlus, Camera, Phone, User } from "lucide-react";
+import { Wrench, Building2, Eye, EyeOff, AlertTriangle, Clock, CheckCircle2, ArrowLeft, UserPlus, Camera, Phone, User } from "lucide-react";
 import { AnimatedIcon } from "@/components/ui/animated-icon";
 import {
   Alert,
@@ -72,28 +72,53 @@ export function RegisterForm() {
   };
 
   if (state?.success) {
+    // An institutional address is active the moment it is registered; a
+    // public one waits for an admin. The screen has to say which, because
+    // the message underneath already does, and a heading that always read
+    // "(Pending)" contradicted it for every .ac.th sign-up.
+    const activeNow = state.status === "active";
     return (
       <div className="space-y-6 text-center">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 border border-amber-200 text-amber-600 shadow-2xs">
-          <Clock className="h-7 w-7 text-amber-600" />
+        <div
+          className={`mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border shadow-2xs ${
+            activeNow
+              ? "bg-emerald-50 border-emerald-200 text-emerald-600"
+              : "bg-amber-50 border-amber-200 text-amber-600"
+          }`}
+        >
+          {activeNow ? <CheckCircle2 className="h-7 w-7" /> : <Clock className="h-7 w-7" />}
         </div>
 
         <div className="space-y-1">
-          <h3 className="text-xl font-extrabold text-slate-950">ลงทะเบียนสำเร็จ (Pending)</h3>
+          <h3 className="text-xl font-extrabold text-slate-950">
+            {activeNow ? "ลงทะเบียนสำเร็จ" : "ลงทะเบียนสำเร็จ (รออนุมัติ)"}
+          </h3>
           <p className="text-xs text-slate-600 leading-relaxed max-w-sm mx-auto">
             {state.message}
           </p>
         </div>
 
-        <Alert className="border-amber-200 bg-amber-50">
-          <Clock className="h-4 w-4 text-amber-600" />
-          <AlertTitle className="font-bold text-amber-950">
-            สถานะบัญชี: รอการอนุมัติสิทธิ์ (Pending Approval)
-          </AlertTitle>
-          <AlertDescription className="text-slate-700 text-[11px] leading-relaxed">
-            ผู้ดูแลระบบสถาบัน (Org Admin) จะทำการตรวจสอบและอนุมัติสิทธิ์เข้าใช้งานของคุณก่อนเริ่มใช้งานระบบ
-          </AlertDescription>
-        </Alert>
+        {activeNow ? (
+          <Alert className="border-emerald-200 bg-emerald-50">
+            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+            <AlertTitle className="font-bold text-emerald-950">
+              สถานะบัญชี: เปิดใช้งานแล้ว (Active)
+            </AlertTitle>
+            <AlertDescription className="text-slate-700 text-[11px] leading-relaxed">
+              อีเมลสถาบันได้รับการอนุมัติอัตโนมัติ เข้าสู่ระบบด้วยอีเมลและรหัสผ่านที่ตั้งไว้ได้ทันที
+            </AlertDescription>
+          </Alert>
+        ) : (
+          <Alert className="border-amber-200 bg-amber-50">
+            <Clock className="h-4 w-4 text-amber-600" />
+            <AlertTitle className="font-bold text-amber-950">
+              สถานะบัญชี: รอการอนุมัติสิทธิ์ (Pending Approval)
+            </AlertTitle>
+            <AlertDescription className="text-slate-700 text-[11px] leading-relaxed">
+              ผู้ดูแลระบบสถาบัน (Org Admin) จะทำการตรวจสอบและอนุมัติสิทธิ์เข้าใช้งานของคุณก่อนเริ่มใช้งานระบบ
+            </AlertDescription>
+          </Alert>
+        )}
 
         <div className="pt-2">
           <Link
