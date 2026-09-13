@@ -15,7 +15,7 @@ import { QrCode, Snowflake, ClipboardList, Wrench, CheckCircle2, Calendar, User,
 import { DashboardLayout, NavItem } from "@/components/layout/dashboard-layout";
 import type { SearchEntry } from "@/lib/search";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
-import { QrScanModal } from "@/components/tech/qr-scan-modal";
+import { QrScanModal, type QrScanResult } from "@/components/tech/qr-scan-modal";
 import { LogActionModal } from "@/components/tech/log-action-modal";
 import { TechBottomNav } from "@/components/tech/tech-bottom-nav";
 import { AcHistoryModal } from "@/components/admin/ac-history-modal";
@@ -59,6 +59,36 @@ const TechFiltersContext = createContext<TechFiltersValue>({
 
 export function useTechFilters() {
   return useContext(TechFiltersContext);
+}
+
+/**
+ * The log form wants a job; a scan produces a unit. This is the bridge, used
+ * both by the ?ac= arrival from the public QR page and by the in-app scanner
+ * when the unit has no open job — the two ways a technician reaches the form
+ * for work nobody has reported yet.
+ */
+function jobFromScan(res: QrScanResult): TechJobItem {
+  return {
+    id: res.pendingJobId ?? "",
+    acCode: res.acDetails.acCode,
+    brand: res.acDetails.brand,
+    brandDeleted: res.acDetails.brandDeleted,
+    modelDeleted: res.acDetails.modelDeleted,
+    btu: res.acDetails.btu,
+    status: res.acDetails.status,
+    location: res.acDetails.location,
+    // The scan result has no building or room of its own to group under,
+    // so the room line is the full location here.
+    roomLocation: res.acDetails.location,
+    roomId: "",
+    roomName: "",
+    floor: null,
+    // scanQrCodeAction does not return a building — this synthetic job only
+    // feeds the log form, which does not group by building.
+    buildingId: "",
+    buildingName: "",
+    airConditionerId: res.acDetails.id,
+  };
 }
 
 const PAGE_TITLES: Record<string, string> = {
@@ -144,25 +174,7 @@ export function TechShell({ user, universityName, buildings, badges, children }:
         toast.error(res.error);
         return;
       }
-      setJobForLog({
-        id: res.pendingJobId ?? "",
-        acCode: res.acDetails.acCode,
-        brand: res.acDetails.brand,
-        btu: res.acDetails.btu,
-        status: res.acDetails.status,
-        location: res.acDetails.location,
-        // The scan result has no building or room of its own to group under,
-        // so the room line is the full location here.
-        roomLocation: res.acDetails.location,
-        roomId: "",
-        roomName: "",
-        floor: null,
-        // scanQrCodeAction does not return a building — this synthetic job only
-        // feeds the log form, which does not group by building.
-        buildingId: "",
-        buildingName: "",
-        airConditionerId: res.acDetails.id,
-      });
+      setJobForLog(jobFromScan(res));
     });
     // Runs once for the ?ac= present on arrival; after router.replace() strips
     // it, re-running would no-op anyway.
@@ -311,10 +323,7 @@ export function TechShell({ user, universityName, buildings, badges, children }:
           isPending={isPending}
           onClose={() => setShowQrModal(false)}
           onClaim={claim}
-          onPlaceholderCreated={() => {
-            toast.success("สร้างใบงานบำรุงรักษาเรียบร้อย (จำลอง)");
-            setShowQrModal(false);
-          }}
+          onLogWork={(res) => setJobForLog(jobFromScan(res))}
           onScanError={(message) => toast.error(message)}
         />
 
