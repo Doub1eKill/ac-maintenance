@@ -117,9 +117,16 @@ export async function registerUser(
     const isVerifiedDomain = isInstitutionalDomain(emailDomain);
     
     // Enterprise Auto-Approval Rule:
-    // Institutional/university emails (.ac.th, .edu) auto-activate.
-    // Public webmail (gmail/hotmail) remains pending for manual Org Admin verification.
-    const initialStatus = isVerifiedDomain ? "active" : "pending";
+    // Institutional/university emails (.ac.th, .edu) auto-activate a
+    // technician. Public webmail (gmail/hotmail) remains pending for manual
+    // Org Admin verification.
+    //
+    // An org_admin request always waits for a person, whatever the domain.
+    // The role arrives from a hidden input the browser controls, so the
+    // domain alone used to be enough for anyone with a .ac.th address to
+    // pick "แอดมินสถาบัน" and walk straight into /admin.
+    const initialStatus =
+      role === "technician" && isVerifiedDomain ? "active" : "pending";
 
     // Hash password with bcrypt
     const hashedPassword = await bcrypt.hash(password, 10);
