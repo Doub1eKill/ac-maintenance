@@ -1,5 +1,27 @@
 # Project Handoff & Technical Summary
 
+# 🧾 แก้บั๊ก 🟡 ข้อมูลจาก QA run `20260913-1742` — #5 BTU แคตตาล็อก · #7 BTU ติดลบ · #6 ใบงานซ้ำ (13 ก.ย. 2026, DoubleKill)
+
+ต่อจากชุด 🔴 — เจ้าของโปรเจกต์ให้ทำต่อตามที่แนะนำ (#5 → #7 → #6) บน branch `fix/qa-data-bugs` → ff-merge เข้า `master` · 1 commit ต่อ 1 บั๊ก · ทดสอบผ่านเบราว์เซอร์จริงด้วย demo-role sign-in (admin) · DB คืน baseline ครบ (acs 73 · schedules 73 · WO 62 · audit max 34 — **หมายเหตุ: id ของ work_orders ไม่ต่อเนื่อง baseline max id = 128** ลบของทดสอบด้วย `id > 128` ไม่ใช่ `> 62`) · `tsc` ผ่าน · eslint `src` 24 error / 19 warning เท่าเดิม
+
+| # | บั๊ก | commit | ไฟล์ | สิ่งที่เปลี่ยน |
+|---|---|---|---|---|
+| 5 | ลงทะเบียนจากแคตตาล็อก `btu = NULL` | `bdff6d4` | `src/lib/admin/air-conditioners.ts` | create **และ** update: เลือกรุ่นจากแคตตาล็อกโดยฟอร์มไม่ส่ง BTU → `btu = model.defaultBtu` (ฟอร์มช่างที่มีช่องส่งมาชนะ) · audit CREATE บันทึกค่าที่เก็บจริง · **แถม:** ฟอร์มแก้ไขของแอดมินสาขาแคตตาล็อกไม่มีช่อง BTU เคยล้าง BTU เป็น NULL ทุกครั้งที่กดบันทึก — หายไปด้วย |
+| 7 | BTU `-5` → MariaDB เก็บ 0 เงียบๆ | `2f7b8b5` | `air-conditioners.ts`, `asset-manager.tsx`, `register-unit-modal.tsx`, `unit-catalogue-panel.tsx` | `btuField` ตัวเดียวใช้ทั้ง 2 schema: ว่าง หรือจำนวนเต็ม > 0 ("ขนาด BTU ต้องเป็นจำนวนเต็มมากกว่า 0") · input BTU ทั้ง 4 จุด `min="1" step="1"` |
+| 6 | สร้างใบงานซ้ำให้เครื่องที่มี pending | `fd20f3e` | `src/lib/admin/work-orders.ts` | มีใบงาน**ประเภทเดียวกัน** ค้าง (pending/claimed) → ปฏิเสธพร้อมบอกสถานะ ("รอช่างรับงาน"/"กำลังดำเนินการ") · ซ่อม+ล้างอยู่พร้อมกันได้ · เช็ค+insert ใน `$transaction` เดียวกัน |
+
+## ทดสอบ
+
+- #5 แอดมิน `/admin/assets` → ห้อง 6-357199 → ลงทะเบียนแอร์ รุ่น AA-9268 (24000) → DB `btu 24000` · เปิดแก้ไขแล้วกดบันทึกเฉยๆ → ยัง 24000 (เดิมจะกลายเป็น NULL)
+- #7 กำหนดเอง BTU -5 → เบราว์เซอร์กันด้วย `min` ก่อน · ถอด attribute แล้วส่ง → toast ข้อความไทยจาก Zod ไม่มี row · 9000 ผ่านปกติ
+- #6 เครื่อง 1 (มีล้าง pending) + ล้าง → ปฏิเสธ · + ซ่อม → ผ่าน · เครื่อง 3 (ว่าง) + ซ่อม → ผ่าน · + ซ่อมอีก → ปฏิเสธ
+- ลบของทดสอบ: acs 199/200 + schedules · WO id > 128 · audit id > 34 · คืน status เครื่อง 3 = normal
+
+## ที่ยังเปิด
+
+- #8 "ด่วน" 3 นิยามบน `/admin` · #9 ของใหม่ตกหน้า 2 · #10–12 🟢 · ข้อความ validation ชั้น/BTU ติดลบที่เบราว์เซอร์ยังเป็นภาษาอังกฤษ (#10 — native `min`)
+- race ของ #6: MariaDB default isolation REPEATABLE READ — `findFirst` ใน transaction ไม่ lock row จึงยังมีช่องแคบๆ ถ้าสองคน submit ภายใน ms เดียวกัน ถ้าต้องกันเด็ดขาดต้องใช้ unique partial index (Postgres) หรือ `SELECT … FOR UPDATE` (ห้าม `$queryRaw` ตามกติกา → ยังไม่ทำ)
+
 # 🔐 แก้บั๊ก 🔴 จาก QA run `20260913-1742` ครบ 4 เรื่อง — register / login ×2 / QR scan จริง (13 ก.ย. 2026, DoubleKill)
 
 เจ้าของโปรเจกต์สั่งแก้บั๊ก #1–#4 (🔴 ทั้งหมด) จากรายงาน QA ทีละเรื่อง 1 commit ต่อ 1 บั๊ก บน branch `fix/qa-critical-auth-qr` → ff-merge เข้า `master` แล้ว ทุกข้อทดสอบผ่านเบราว์เซอร์จริง (Playwright Chromium, ช่างบน Pixel 7 profile) · DB คืน baseline ครบ (users 5 · phones 7 · acs 73 · logs 230 · WO 62 · audit max 34 · pending 0) · `tsc` ผ่าน · eslint `src` เหลือ **24 error / 19 warning** (ไม่มีของใหม่จากงานนี้)
