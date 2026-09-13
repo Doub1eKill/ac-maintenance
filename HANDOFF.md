@@ -1,5 +1,50 @@
 # Project Handoff & Technical Summary
 
+# 🧪 QA sweep เต็มระบบด้วย Playwright — run `20260913-1742` (13 ก.ย. 2026, DoubleKill)
+
+เจ้าของโปรเจกต์สั่ง `/qa-tester` ไม่ระบุขอบเขต → **full sweep** ผ่านเบราว์เซอร์จริง (Chromium · admin บน Desktop Chrome · ช่างบน Pixel 7) เน้น 7 commit ของ 11 ก.ย. (KPI, upcoming filter, bottom nav, donut, job pool) และงาน QR/catalogue สัปดาห์นี้ · ~155 check · PASS ≈ 125 · **บั๊กจริง 12** · BLOCKED 6 · DB คืนค่า baseline ครบ
+
+**รายงานเต็ม:** `C:\Project\ac-maintenance-qa\runs\20260913-1742\QA-REPORT.md` (สำเนาใน `qa/runs/20260913-1742/` — gitignored) · หลักฐาน ~160 ไฟล์ png/txt + `ledger.md` โฟลเดอร์เดียวกัน
+
+## บั๊กที่พบ (เรียงตามลำดับที่ควรแก้)
+
+| # | ระดับ | เรื่อง | หลักฐาน | root cause |
+|---|---|---|---|---|
+| 1 | 🔴 Critical | **สมัคร org_admin ด้วยอีเมล .ac.th ได้ active ทันที** เข้า /admin ได้เลย | `setup-register-admin.png` · DB id 37 | `register/actions.ts` ดู domain อย่างเดียว ไม่ดู role (role มาจาก hidden input) |
+| 2 | 🔴 High | กด Sign In ก่อน hydrate → native GET → **รหัสผ่านอยู่ใน URL** | `login-get-leak.txt` | `<form>` ไม่มี method/action |
+| 3 | 🔴 High | pending / suspended / password NULL ได้ข้อความ "อีเมลหรือรหัสผ่านไม่ถูกต้อง" ทั้งหมด | `login-pending.png`, `login-nullpw.png`, `team-suspended-login.png` | `login-form.tsx:108` อ่าน `result.error` (= "CredentialsSignin" เสมอ) ต้องอ่าน `result.code` |
+| 4 | 🔴 High | โมดัลสแกน QR ของช่าง**เป็นของจำลอง** — พิมพ์ acCode เอง, ปุ่ม "สร้างใบงาน PM ใหม่" แค่ toast "(จำลอง)", วาง uuid จากสติกเกอร์ = ไม่พบ | `qrscan-*.png` | `tech-shell.tsx:315`, `qr-scan-modal.tsx` |
+| 5 | 🟡 Medium | ลงทะเบียนเครื่องจากแคตตาล็อก **btu = NULL** → สติกเกอร์ "ไม่ระบุ BTU" บอร์ดไม่มีขนาด | DB 197 · `wo-board-filtered.png` | `createAirConditionerAction` ใส่ btu เฉพาะ custom |
+| 6 | 🟡 Medium | สร้างใบซ่อมซ้ำให้เครื่องที่มี pending อยู่ได้ | `wo-board-filtered.png` | ไม่มี dup check |
+| 7 | 🟡 Medium | BTU -5 ผ่านฟอร์ม → MariaDB เก็บ 0 เงียบๆ (Postgres จะเก็บ -5) | `assets-unit-negative-btu.png` | Zod ไม่มี min · input ไม่มี min |
+| 8 | 🟡 Medium | "ด่วน" 3 ค่าบนจอเดียว: KPI 25 · pill 52 · โดนัท 0 | `upcoming-filter.png` | นิยามคนละอย่าง (units broken / rows / WO priority) |
+| 9 | 🟡 Medium | ของที่เพิ่งสร้างตกหน้า 2 (5/หน้า) โดยไม่มีสัญญาณ — อาคาร/ใบงาน/pool | `assets-building-created.png` | เรียงไม่ใช่ล่าสุดก่อน |
+| 10 | 🟢 Low | validation ชั้น -3 เป็นภาษาอังกฤษของเบราว์เซอร์ | `assets-room-negative-floor.png` | native `min=0` |
+| 11 | 🟢 Low | ทุกหน้า admin มี `<main>` 2 อัน | ledger strict-mode | sidebar-inset + page |
+| 12 | 🟢 Low | `upload.ts` เก็บไฟล์ที่ sharp decode ไม่ได้ทั้งดิบ (comment บอกเอง) | `upload-fake-jpg.png` | server path ยังไม่ได้ exercise |
+
+**ผ่าน:** route/API guard ครบ 15 หน้า × 3 บทบาท · `/qr` รับเฉพาะ uuid (ac_code/junk → 404) · claim double-click = 1 POST · **race 2 ช่างกดพร้อมกัน → 1 ชนะ อีกคนได้ "ใบงานนี้ถูกรับไปแล้ว"** · บันทึกงาน + 2 รูป → ประวัติ → บอร์ดแอดมิน → DB + ไฟล์ 200 · catalogue rename ทั้ง 2 บทบาท · approvals · team ระงับ/คืน · settings rename/trash · QR print 150/46mm + toast กันป็อปอัป · calendar · omnibox · ทุกหน้าไม่มี console error
+
+## harness — วิธีใช้รอบหน้า
+
+```
+QA_RUN=$(date +%Y%m%d-%H%M) npx playwright test --config qa/playwright.config.ts --project=setup
+npx playwright test --config qa/playwright.config.ts --project=public   # หรือ admin / tech
+```
+
+- ไฟล์: `qa/playwright.config.ts` · `qa/lib.ts` (fixture, ledger, shot, hydrated, loginViaForm, registerViaForm, ค่าคงที่ `QA`) · `qa/specs/auth.setup.ts` + `public/` `admin/` `tech/` · `qa/.run` เก็บ RUN ล่าสุด · `@playwright/test` 1.63 เป็น devDependency (chromium ติดตั้งแล้ว)
+- **output ทั้งหมดอยู่นอก repo** ที่ `C:\Project\ac-maintenance-qa\` (`runs/<RUN>/`, `artifacts/`, `auth/`) — เขียนไฟล์ใต้ repo ระหว่างรัน = Next dev reload หน้าทุกครั้ง (เจอ `/login` reload 12 รอบก่อนย้าย)
+- **บัญชี seed ไม่มีใน DB นี้** (ทุก user `password = NULL`, ห้ามรัน seed) → `auth.setup.ts` สมัคร 4 บัญชี `@qa-run.ac.th` ผ่านฟอร์มจริงแล้วล็อกอิน · ลบทิ้งตอนจบ (users id > 6)
+- `storageState` ไม่มี sessionStorage → `BrowserSessionGuard` sign out ทุก context; fixture ใน `lib.ts` ใส่ `ac-maintenance.browser-session` ผ่าน `addInitScript`
+- `hydrated(page, sel)` รอ key `__reactFiber$` บน DOM ก่อนกดฟอร์ม — ไม่งั้นเจอบั๊ก #2 เอง
+- selector: หน้า admin ใช้ `main.last()` · omnibox = `header input[type=text]` (placeholder ต่างกันทุกหน้า) · toast = `[data-sonner-toaster] li` · โมดัล WO/trash ไม่ใช่ `role=dialog` ใช้ `div.fixed.inset-0` + ข้อความหัว · ฟอร์มเครื่องโหมด catalogue ไม่มีช่อง BTU ต้องเลือก "กำหนดเอง" · ปุ่มเพิ่มห้องคือ "เพิ่มชั้น"
+- `/admin` cold compile > 45 วิ → setup มี warm-up test · KPI นับด้วย rAF รอ ~3 วิ · dev server ช้าลงเรื่อยๆ หลังรันหลายรอบ restart ช่วย
+- "N" bubble ทับ bottom nav = `<nextjs-portal>` dev indicator ไม่ใช่บั๊ก
+
+**คืนค่า DB แล้ว:** users 5 · phones 7 · buildings 5 · rooms 32 · acs 73 · brands 5 (Panasonic/LG คืนชื่อ) · models 189 · logs 230 · WO 62 · schedules 73 · audit max 34 · pending 0 · รูป QA ใน `public/uploads/` ลบแล้ว
+
+---
+
 # ✅ เก็บ backlog ตามลำดับความสำคัญ — 5 รายการ (13 ก.ย. 2026, DoubleKill)
 
 branch `fix/known-bugs-2026-09-13` ตัดจาก `master` `a9f184a` · เจ้าของโปรเจกต์สั่ง *"วางแผนและทำทีละอย่างตามความสำคัญ"* กับหัวข้อ "🐞 สถานะบั๊กที่รู้แล้ว" ด้านล่าง · ทำ 🔴 ทั้ง 3 → `any` บนทาง auth/DB → ของค้าง QR · **1 commit ต่อ 1 เรื่อง**
