@@ -18,9 +18,16 @@ declare module "next-auth" {
   }
 }
 
-declare module "next-auth/jwt" {
+// The token's interface lives in @auth/core/jwt; next-auth/jwt only
+// re-exports it with `export *`, and an augmentation aimed at a re-export never
+// reaches the original declaration. Augmenting "next-auth/jwt" here compiled
+// without complaint and did nothing: token.role stayed `unknown` in the
+// session callback, which is where the `as any` casts came from.
+declare module "@auth/core/jwt" {
   interface JWT {
     role: UserRole;
     status: UserStatus;
+    // Stamped once at sign-in by the jwt callback; see auth.config.ts.
+    expiresAt?: number;
   }
 }

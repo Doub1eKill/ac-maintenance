@@ -125,7 +125,7 @@ export async function logMaintenanceAction(formData: FormData) {
       // 2. Update Air Conditioner status — likewise before the insert.
       await tx.airConditioner.update({
         where: { id: acId },
-        data: { status: acStatus as any },
+        data: { status: acStatus },
       });
 
       // 3. Create Multiple Maintenance Logs (one for each action checked)

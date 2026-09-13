@@ -64,8 +64,8 @@ export const authConfig = {
         session.expires = new Date(token.expiresAt).toISOString() as typeof session.expires;
       }
       session.user.id = token.sub as string;
-      session.user.role = token.role as any;
-      session.user.status = token.status as any;
+      session.user.role = token.role;
+      session.user.status = token.status;
       return session;
     },
     authorized({ auth, request }) {

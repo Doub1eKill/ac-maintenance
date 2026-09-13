@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@/generated/prisma/client";
 import { logAudit } from "@/lib/audit";
 import { businessDateToday, businessDateFrom, addMaintenanceInterval } from "@/lib/maintenance";
 import { getDefaultMaintenanceFrequency } from "@/lib/organisation";
@@ -89,7 +90,8 @@ export async function createAirConditionerAction(formData: FormData) {
       ? businessDateFrom(data.installedAt)
       : businessDateToday();
 
-    let dbData: any = {
+    // acCode and qrCode are added at the insert, once the sequence is known.
+    const dbData: Omit<Prisma.AirConditionerUncheckedCreateInput, "acCode" | "qrCode"> = {
       roomId: room.id,
       btu: data.btu,
       installedAt,
