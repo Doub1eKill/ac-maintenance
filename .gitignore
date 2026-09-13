@@ -56,3 +56,8 @@ __pycache__/
 
 # user uploads (avatars, before/after photos) - per-machine data, written by src/lib/upload.ts which mkdir -p's the folder itself
 /public/uploads/
+
+# QA harness output (playwright) - per-run artifacts, never committed
+qa/artifacts/
+qa/runs/
+qa/.auth/
