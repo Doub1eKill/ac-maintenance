@@ -36,17 +36,45 @@ export async function createWorkOrderAction(formData: FormData) {
     const acId = BigInt(parsed.data.airConditionerId);
     const assignTo = parsed.data.assignToUserId ? BigInt(parsed.data.assignToUserId) : null;
 
-    // Create Work Order
-    const workOrder = await prisma.workOrder.create({
-      data: {
-        airConditionerId: acId,
-        status: assignTo ? "claimed" : "pending",
-        type: parsed.data.type,
-        priority: parsed.data.priority,
-        claimedBy: assignTo,
-        claimedAt: assignTo ? new Date() : null,
-      },
+    // One open job of a kind per unit. Two admins reporting the same fault
+    // used to produce two identical rows on the board, and whichever
+    // technician claimed the second found the work already done (QA
+    // 20260913-1742, BUG-004). A repair and a cleaning may coexist — they
+    // are different work — so the check is per type. Looked up inside the
+    // transaction that inserts, so two simultaneous submissions cannot both
+    // pass the check before either row exists.
+    const outcome = await prisma.$transaction(async (tx) => {
+      const open = await tx.workOrder.findFirst({
+        where: {
+          airConditionerId: acId,
+          type: parsed.data.type,
+          status: { in: ["pending", "claimed"] },
+        },
+        select: { id: true, status: true },
+      });
+      if (open) return { open };
+
+      const workOrder = await tx.workOrder.create({
+        data: {
+          airConditionerId: acId,
+          status: assignTo ? "claimed" : "pending",
+          type: parsed.data.type,
+          priority: parsed.data.priority,
+          claimedBy: assignTo,
+          claimedAt: assignTo ? new Date() : null,
+        },
+      });
+      return { workOrder };
     });
+
+    if (outcome.open) {
+      const kind = parsed.data.type === "repair" ? "ใบงานซ่อม" : "ใบงานล้างแอร์";
+      const state = outcome.open.status === "claimed" ? "กำลังดำเนินการ" : "รอช่างรับงาน";
+      return {
+        error: `เครื่องนี้มี${kind}ที่ยังเปิดอยู่ (${state}) — ปิดหรือยกเลิกใบงานเดิมก่อนออกใบใหม่`,
+      };
+    }
+    const workOrder = outcome.workOrder;
 
     await logAudit({
       userId: BigInt(session.user.id!),
