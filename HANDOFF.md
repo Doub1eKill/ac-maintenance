@@ -1,5 +1,39 @@
 # Project Handoff & Technical Summary
 
+# 🔐 แก้บั๊ก 🔴 จาก QA run `20260913-1742` ครบ 4 เรื่อง — register / login ×2 / QR scan จริง (13 ก.ย. 2026, DoubleKill)
+
+เจ้าของโปรเจกต์สั่งแก้บั๊ก #1–#4 (🔴 ทั้งหมด) จากรายงาน QA ทีละเรื่อง 1 commit ต่อ 1 บั๊ก บน branch `fix/qa-critical-auth-qr` → ff-merge เข้า `master` แล้ว ทุกข้อทดสอบผ่านเบราว์เซอร์จริง (Playwright Chromium, ช่างบน Pixel 7 profile) · DB คืน baseline ครบ (users 5 · phones 7 · acs 73 · logs 230 · WO 62 · audit max 34 · pending 0) · `tsc` ผ่าน · eslint `src` เหลือ **24 error / 19 warning** (ไม่มีของใหม่จากงานนี้)
+
+## ที่แก้
+
+| # | บั๊ก | commit | ไฟล์ | สิ่งที่เปลี่ยน |
+|---|---|---|---|---|
+| 1 | สมัคร `org_admin` ด้วย `.ac.th` ได้ active ทันที | `696a74a` | `src/app/register/actions.ts` | `initialStatus = role === "technician" && isVerifiedDomain ? "active" : "pending"` — auto-approve เหลือเฉพาะช่าง ทุก role อื่น pending เสมอไม่ว่า domain ใด |
+| 2 | กด Sign In ก่อน hydrate → รหัสผ่านใน URL | `22d7735` + `b41e61a` | `src/components/login-form.tsx` | ปุ่ม submit `disabled` ใน SSR HTML จนกว่า hydrate (ผ่าน `useSyncExternalStore` — ไม่ setState ใน effect) + `<form method="post">` เป็นชั้นที่สอง |
+| 3 | pending / suspended / password NULL ได้ข้อความรหัสผิดหมด | `9dd3841` | `login-form.tsx`, `src/lib/auth.ts`, **ใหม่** `src/lib/sign-in-codes.ts` | อ่าน `result.code ?? result.error` · รหัสทั้ง 3 เป็น `SignInCode` ใช้ type ทั้ง subclass ใน `auth.ts` และ `ERROR_MESSAGES` — เพิ่ม code ใหม่โดยไม่มีข้อความ = compile error |
+| 4 | โมดัลสแกน QR เป็นของจำลอง | `fb801a5` | `src/lib/tech/qr.ts`, `src/components/tech/qr-scan-modal.tsx` (เขียนใหม่), `tech-shell.tsx` | ดูหัวข้อถัดไป |
+
+## QR scanner ของจริง (บั๊ก #4) — สิ่งที่ควรรู้
+
+- `scanQrCodeAction(scanned)` รับได้ 3 แบบผ่าน `resolveScannedUnit()`: ลิงก์เต็มจากสติกเกอร์ `…/qr/<uuid>` · uuid เปล่า · `acCode` (ทางเดิมของ `/qr → /tech?ac=` ยังใช้ได้) · `success: true as const` เพื่อให้ narrow ได้ ไม่ต้อง `any`
+- โมดัลเปิด**กล้องหลัง** (`getUserMedia facingMode environment`) แล้ว poll `BarcodeDetector.detect(video)` ทุก 250ms · เจอแล้วหยุด stream ทันที · ปิดโมดัล / "สแกนเครื่องใหม่" = unmount body → cleanup stream เอง
+- เช็ค `BarcodeDetector.getSupportedFormats()` ต้องมี `qr_code` ก่อนเปิดกล้อง — **Chrome บน Windows/Linux มี class แต่ไม่รองรับ format ใด** จึงตกไปโหมดพิมพ์รหัส (label "หรือพิมพ์รหัสเครื่อง / วางลิงก์จากสติกเกอร์") พร้อมข้อความเหลืองบอกเหตุผล · permission ถูกปฏิเสธก็มีข้อความของตัวเอง · **กล้องจริงใช้ได้บน Android Chrome (Pixel 7 ของช่าง) — ยังไม่ได้ทดสอบบนเครื่องจริง** ทดสอบผ่าน fake device + stub `BarcodeDetector` ใน Playwright เท่านั้น
+- ปุ่ม "สร้างใบงาน PM ใหม่ (จำลอง)" **ถูกถอด** · เครื่องที่ไม่มีใบงานค้างจะได้ปุ่ม "บันทึกงานซ่อมบำรุงเครื่องนี้" → เปิด `LogActionModal` ผ่าน `onLogWork → jobFromScan()` (helper ใหม่ใน `tech-shell.tsx` ใช้ร่วมกับ `?ac=`) · ไม่มี string "(จำลอง)" เหลือใน `src/`
+- iOS Safari ไม่มี `BarcodeDetector` → ได้โหมดพิมพ์รหัสเช่นกัน ถ้าต้องรองรับ iPhone ต้องใส่ decoder JS (เช่น `jsQR`/`zxing-wasm`) — ยังไม่ทำ
+
+## วิธีทดสอบที่ใช้ (script อยู่นอก repo ใน scratchpad ของ session — ไม่ได้เก็บ)
+
+- #1 สมัคร `fix1.admin@qa-fix.ac.th` role org_admin → หน้าเหลือง "รออนุมัติ" DB `pending` · สมัคร technician `.ac.th` → active ตามเดิม · ลบ users id > 6 + phones + `public/uploads/*avatar.jpg` แล้ว
+- #2 `javaScriptEnabled:false`: ปุ่ม `disabled` · Enter ไม่ทำอะไร · บังคับ submit = `POST /login` body (URL สะอาด) · เปิด JS login ปกติไป `/tech`
+- #3 pending → `/pending-approval?email=` · suspended (UPDATE status ชั่วคราวแล้วคืน) → "ถูกระงับ…" · `houston16@example.net` (password NULL) → "ตั้งรหัสผ่านใหม่ก่อน…" · ผิดรหัส/ไม่มีบัญชี → ข้อความเดิม
+- #4 uuid / URL / acCode ของ `B572921-6-357199-01` (มี pending → "รับงานทันที") และ `B572921-7-946577-01` (ไม่มี → ปุ่มบันทึกงาน → LogActionModal โชว์รหัสถูก) · junk → toast "ไม่พบ" · Chromium `--use-fake-device-for-media-stream` + stub `BarcodeDetector` คืนลิงก์สติกเกอร์ → ผลขึ้นเองโดยไม่พิมพ์ · track `ended` หลังปิดโมดัล
+
+## ข้อสังเกตที่ยังไม่แก้ (เพิ่มจากรอบนี้)
+
+- `auth.ts` เช็ค status **ก่อน** เทียบรหัสผ่าน → ใส่รหัสผิดกับบัญชี pending ก็ถูกส่งไป `/pending-approval` (บอกได้ว่าอีเมลนี้มีบัญชี pending) — ออกแบบเดิม ไม่ได้แตะ ถ้าห่วง enumeration ให้ย้าย `bcrypt.compare` ขึ้นก่อน 3 throw
+- `tech-shell.tsx:145` `setSearch` ใน effect = eslint error เดิม (อยู่ใน 24) ไม่ใช่ของใหม่
+- backlog 🟡/🟢 #5–#12 จาก QA ยังเปิดตามรายงาน `C:\Project\ac-maintenance-qa\runs\20260913-1742\QA-REPORT.md`
+
 # 🧪 QA sweep เต็มระบบด้วย Playwright — run `20260913-1742` (13 ก.ย. 2026, DoubleKill)
 
 เจ้าของโปรเจกต์สั่ง `/qa-tester` ไม่ระบุขอบเขต → **full sweep** ผ่านเบราว์เซอร์จริง (Chromium · admin บน Desktop Chrome · ช่างบน Pixel 7) เน้น 7 commit ของ 11 ก.ย. (KPI, upcoming filter, bottom nav, donut, job pool) และงาน QR/catalogue สัปดาห์นี้ · ~155 check · PASS ≈ 125 · **บั๊กจริง 12** · BLOCKED 6 · DB คืนค่า baseline ครบ
