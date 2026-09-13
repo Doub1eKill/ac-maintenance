@@ -7,6 +7,11 @@ export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {
     path: "prisma/migrations",
+    // What `prisma db seed` runs. tsx rather than ts-node: the seed imports
+    // src/lib/prisma, which needs the path alias and the generated client
+    // resolved the way the app does it. Note the seed wipes and refills the
+    // whole database — see the top of prisma/seed.ts before running it.
+    seed: "npx tsx prisma/seed.ts",
   },
   datasource: {
     url: process.env["DATABASE_URL"],
