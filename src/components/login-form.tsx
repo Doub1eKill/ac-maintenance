@@ -48,6 +48,15 @@ export function LoginForm() {
   const [emailInput, setEmailInput] = useState("");
   const [passwordInput, setPasswordInput] = useState("");
 
+  // False in the server-rendered HTML, true once React has attached the
+  // submit handler below. Until then the submit button stays disabled, so a
+  // click or an Enter press that lands before hydration (a slow connection,
+  // a dev-server compile) cannot fall through to the browser's own submit.
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
+
   // Marks this browser session as one that has been through the login page, so
   // BrowserSessionGuard does not read the redirect straight after signing in as
   // a session left over from a previous run of the browser and undo it.
@@ -152,7 +161,12 @@ export function LoginForm() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      {/* method="post" is the second guard for the same case: should a
+          submit ever reach the browser's default path, it goes in the body
+          rather than as ?email=…&password=… in the address bar, browser
+          history and the server's access log. The form used to omit it,
+          and a click before hydration did exactly that. */}
+      <form onSubmit={handleSubmit} method="post" className="space-y-4">
         {error && (
           <Alert variant="destructive" className="border-red-200 bg-red-50">
             <AlertTriangle className="h-4 w-4" />
@@ -216,7 +230,7 @@ export function LoginForm() {
         {/* Submit Button */}
         <button
           type="submit"
-          disabled={isSubmitting}
+          disabled={isSubmitting || !hydrated}
           className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-950 py-3 font-bold text-xs text-white hover:bg-slate-800 disabled:opacity-50 transition-all shadow-md active:scale-[0.99] mt-2 group"
         >
           <span>{isSubmitting ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ (Sign In)"}</span>
