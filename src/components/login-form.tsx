@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { signIn } from "next-auth/react";
 import { BROWSER_SESSION_KEY } from "@/lib/session-expiry";
 import type { SignInCode } from "@/lib/sign-in-codes";
@@ -53,10 +53,13 @@ export function LoginForm() {
   // submit handler below. Until then the submit button stays disabled, so a
   // click or an Enter press that lands before hydration (a slow connection,
   // a dev-server compile) cannot fall through to the browser's own submit.
-  const [hydrated, setHydrated] = useState(false);
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
+  // useSyncExternalStore's server snapshot is what makes this a hydration
+  // fact rather than state set from an effect.
+  const hydrated = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
 
   // Marks this browser session as one that has been through the login page, so
   // BrowserSessionGuard does not read the redirect straight after signing in as
