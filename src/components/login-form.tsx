@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { signIn } from "next-auth/react";
 import { BROWSER_SESSION_KEY } from "@/lib/session-expiry";
+import type { SignInCode } from "@/lib/sign-in-codes";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff, AlertTriangle, Building2, Wrench, ArrowRight } from "lucide-react";
@@ -12,7 +13,7 @@ import {
   AlertDescription,
 } from "@/components/ui/alert";
 
-const ERROR_MESSAGES: Record<string, string> = {
+const ERROR_MESSAGES: Record<SignInCode | "CredentialsSignin", string> = {
   "account-pending": "บัญชีผู้ใช้ของคุณอยู่ระหว่างรอการอนุมัติสิทธิ์จากผู้ดูแลระบบมหาวิทยาลัย (Pending)",
   "account-suspended": "บัญชีผู้ใช้ของคุณถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบมหาวิทยาลัย",
   "password-reset-required": "คุณต้องตั้งรหัสผ่านใหม่ก่อนเข้าใช้งานระบบเป็นครั้งแรก",
@@ -115,11 +116,17 @@ export function LoginForm() {
     setIsSubmitting(false);
 
     if (result?.error) {
-      if (result.error === "account-pending") {
+      // Auth.js v5 reports a refused sign-in as error "CredentialsSignin"
+      // every time; the reason a CredentialsSignin subclass carries (see
+      // auth.ts) arrives separately as result.code. This used to read
+      // result.error, so pending, suspended and password-less accounts all
+      // got the wrong-password message.
+      const reason = (result.code ?? result.error) as SignInCode | "CredentialsSignin";
+      if (reason === "account-pending") {
         router.push(`/pending-approval?email=${encodeURIComponent(email)}`);
         return;
       }
-      setError(ERROR_MESSAGES[result.error] ?? ERROR_MESSAGES.CredentialsSignin);
+      setError(ERROR_MESSAGES[reason] ?? ERROR_MESSAGES.CredentialsSignin);
       return;
     }
 

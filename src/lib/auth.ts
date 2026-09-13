@@ -4,20 +4,24 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { authConfig } from "@/lib/auth.config";
 import { prisma } from "@/lib/prisma";
+import type { SignInCode } from "@/lib/sign-in-codes";
 
 const credentialsSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
 });
 
+// Each code is typed against the shared list, so adding a refusal here
+// without a message in the login form is a compile error, not a silent
+// fallback to the wrong-password text.
 class AccountPendingApproval extends CredentialsSignin {
-  code = "account-pending";
+  code: SignInCode = "account-pending";
 }
 class AccountSuspended extends CredentialsSignin {
-  code = "account-suspended";
+  code: SignInCode = "account-suspended";
 }
 class PasswordResetRequired extends CredentialsSignin {
-  code = "password-reset-required";
+  code: SignInCode = "password-reset-required";
 }
 
 const passwordProvider = Credentials({
