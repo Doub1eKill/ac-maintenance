@@ -28,6 +28,16 @@
 - #3 pending → `/pending-approval?email=` · suspended (UPDATE status ชั่วคราวแล้วคืน) → "ถูกระงับ…" · `houston16@example.net` (password NULL) → "ตั้งรหัสผ่านใหม่ก่อน…" · ผิดรหัส/ไม่มีบัญชี → ข้อความเดิม
 - #4 uuid / URL / acCode ของ `B572921-6-357199-01` (มี pending → "รับงานทันที") และ `B572921-7-946577-01` (ไม่มี → ปุ่มบันทึกงาน → LogActionModal โชว์รหัสถูก) · junk → toast "ไม่พบ" · Chromium `--use-fake-device-for-media-stream` + stub `BarcodeDetector` คืนลิงก์สติกเกอร์ → ผลขึ้นเองโดยไม่พิมพ์ · track `ended` หลังปิดโมดัล
 
+## รอบ review หลัง merge — `764233e` (โมดัลกล้องอย่างเดียว)
+
+`/code-review fa53f9e..master high` เจอ 3 จุดใน `qr-scan-modal.tsx` แก้แล้วใน commit เดียว:
+
+- **โค้ดที่ไม่รู้จักค้างหน้ากล้อง = toast รัวทุก 250ms** → จำค่าที่ server ปฏิเสธไว้ 5 วิ (`rejectedRef`) แล้วข้าม เฉพาะที่มาจากกล้อง — พิมพ์เองไม่หน่วง · ทดสอบ: ค้าง 3 วิ = 1 call / 1 toast (เดิม ~10)
+- `lookUp` + effect กล้องผูก identity กับ `onScanError` ที่ tech-shell ส่งเป็น inline arrow → parent re-render จะ restart กล้อง → อ่านผ่าน `onScanErrorRef`
+- สร้าง `BarcodeDetector` **ก่อน** `getUserMedia` — constructor throw จะไม่ทิ้ง stream ค้างหลังข้อความ "ใช้กล้องไม่ได้"
+
+ทดสอบด้วย demo-role sign-in (ไม่เขียน DB) · DB ยัง baseline
+
 ## ข้อสังเกตที่ยังไม่แก้ (เพิ่มจากรอบนี้)
 
 - `auth.ts` เช็ค status **ก่อน** เทียบรหัสผ่าน → ใส่รหัสผิดกับบัญชี pending ก็ถูกส่งไป `/pending-approval` (บอกได้ว่าอีเมลนี้มีบัญชี pending) — ออกแบบเดิม ไม่ได้แตะ ถ้าห่วง enumeration ให้ย้าย `bcrypt.compare` ขึ้นก่อน 3 throw
