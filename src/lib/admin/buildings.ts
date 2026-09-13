@@ -42,7 +42,7 @@ export async function createBuildingAction(formData: FormData) {
 
     if (existing) return { error: "มีชื่อหรือตัวย่ออาคารนี้ในระบบแล้ว" };
 
-    await prisma.building.create({
+    const building = await prisma.building.create({
       data: {
         name: parsed.data.name,
         abbreviation: parsed.data.abbreviation
@@ -50,7 +50,9 @@ export async function createBuildingAction(formData: FormData) {
     });
     
     revalidatePath("/admin", "layout");
-    return { success: true };
+    // The id comes back so the asset page can open the new building on the
+    // page it lands on; the list is alphabetical and five to a page.
+    return { success: true, id: building.id.toString() };
   } catch (error) {
     console.error(error);
     return { error: "เกิดข้อผิดพลาดในการบันทึกอาคาร" };

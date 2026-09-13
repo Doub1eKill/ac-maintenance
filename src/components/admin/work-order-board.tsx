@@ -12,6 +12,7 @@ import {
   groupByRoom,
 } from "@/components/shared/building-groups";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
+import { useCreateWorkOrder } from "@/components/admin/create-work-order-provider";
 import type { WorkOrderItem, WorkOrderPageInfo } from "@/components/admin/types";
 
 interface WorkOrderBoardProps {
@@ -144,6 +145,15 @@ export function WorkOrderBoard({
 
   const groups = useMemo(() => groupByBuilding(filtered), [filtered]);
 
+  // The order raised a moment ago from the shell's modal: open its building
+  // on whichever page it sits, instead of leaving the admin to find it.
+  const { lastCreated } = useCreateWorkOrder();
+  const focus = useMemo(() => {
+    if (!lastCreated) return null;
+    const row = workOrders.find((wo) => wo.airConditionerId === lastCreated.airConditionerId);
+    return row ? { buildingId: row.buildingId, token: lastCreated.token } : null;
+  }, [lastCreated, workOrders]);
+
   return (
     <div className="space-y-6 animate-in fade-in">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -178,6 +188,7 @@ export function WorkOrderBoard({
 
       <BuildingGroupList
         groups={groups}
+        focus={focus}
         resetKey={`${globalSearch}::${statusFilter}`}
         getSubtitle={(group) => `${group.items.length} ใบงาน`}
         emptyMessage="ไม่พบข้อมูลใบงาน"

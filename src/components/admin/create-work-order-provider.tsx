@@ -21,11 +21,17 @@ import type { BuildingItem, PendingUser } from "@/components/admin/types";
 interface CreateWorkOrderContextValue {
   openBlank: () => void;
   openForUnit: (acId: string) => void;
+  // The unit the last order was raised for, with a token that changes per
+  // creation. The board reads it to show and open the building the new row
+  // sits in — the modal lives up here in the shell, so the board cannot
+  // learn it any other way.
+  lastCreated: { airConditionerId: string; token: number } | null;
 }
 
 const CreateWorkOrderContext = createContext<CreateWorkOrderContextValue>({
   openBlank: () => {},
   openForUnit: () => {},
+  lastCreated: null,
 });
 
 export function useCreateWorkOrder() {
@@ -42,6 +48,7 @@ export function CreateWorkOrderProvider({ children }: { children: React.ReactNod
   const [open, setOpen] = useState(false);
   const [defaultAcId, setDefaultAcId] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormData | null>(null);
+  const [lastCreated, setLastCreated] = useState<CreateWorkOrderContextValue["lastCreated"]>(null);
   const [isPending, startTransition] = useTransition();
 
   const load = useCallback(async () => {
@@ -85,13 +92,14 @@ export function CreateWorkOrderProvider({ children }: { children: React.ReactNod
         toast.error(res.error);
       } else {
         toast.success("ออกใบงานซ่อมบำรุงด่วนเรียบร้อยแล้ว");
+        setLastCreated({ airConditionerId: String(body.get("airConditionerId")), token: Date.now() });
         setOpen(false);
       }
     });
   }
 
   return (
-    <CreateWorkOrderContext.Provider value={{ openBlank, openForUnit }}>
+    <CreateWorkOrderContext.Provider value={{ openBlank, openForUnit, lastCreated }}>
       {children}
       {open && formData && (
         <CreateWorkOrderModal

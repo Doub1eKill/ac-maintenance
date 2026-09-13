@@ -246,6 +246,14 @@ interface BuildingGroupListProps<T> {
   // this replaces).
   resetKey?: string | number;
   buildingsPerPage?: number;
+  // Something the caller just created lives in this building: show the page
+  // it is on and open it, once. The buildings are alphabetical and five to a
+  // page, so a new row for "Library Building" landed on page 2 behind a
+  // success toast and "หน้า 1 จาก 2" — and read as lost (QA 20260913-1742,
+  // BUG-008). `token` distinguishes one creation from the next so the same
+  // building can be focused twice; the user's own paging or picking ends the
+  // focus, and a building no longer in `groups` (a filter change) ignores it.
+  focus?: { buildingId: string; token: number } | null;
 }
 
 // Groups items by building into collapsible sections (all collapsed on mount,
@@ -261,6 +269,7 @@ export function BuildingGroupList<T>({
   renderItems,
   resetKey,
   buildingsPerPage = 5,
+  focus = null,
 }: BuildingGroupListProps<T>) {
   // Starts with every building collapsed: the header row already carries the
   // count and the status badges, so the list reads as an overview until the
@@ -270,6 +279,10 @@ export function BuildingGroupList<T>({
   // from "nothing chosen yet", or the sole building would reopen itself.
   const [picked, setPicked] = useState<string | null | "none">(null);
   const [page, setPage] = useState(1);
+  // The focus token the user has already paged or clicked past. Derived
+  // rather than copied into `page`/`picked` by an effect, so a focus is
+  // honoured on the very render the fresh data arrives in.
+  const [consumedFocus, setConsumedFocus] = useState<number | null>(null);
 
   useEffect(() => {
     setPage(1);
@@ -284,8 +297,22 @@ export function BuildingGroupList<T>({
     );
   }
 
+  const focusIndex =
+    focus && focus.token !== consumedFocus
+      ? groups.findIndex((g) => g.buildingId === focus.buildingId)
+      : -1;
+  const focusActive = focusIndex >= 0;
+  // Called from every handler that moves the list by hand. The focused page
+  // becomes the current one first, so a click on a neighbour of the new row
+  // does not snap the list back to page 1.
+  const endFocus = () => {
+    if (focus) setConsumedFocus(focus.token);
+    setPage(currentPage);
+  };
+
   const totalPages = Math.ceil(groups.length / buildingsPerPage);
-  const paginatedGroups = groups.slice((page - 1) * buildingsPerPage, page * buildingsPerPage);
+  const currentPage = focusActive ? Math.floor(focusIndex / buildingsPerPage) + 1 : page;
+  const paginatedGroups = groups.slice((currentPage - 1) * buildingsPerPage, currentPage * buildingsPerPage);
   // Falls back to "nothing open" rather than clinging to a building that
   // scrolled off after a filter change — see resetKey above for the same
   // idea applied to the page number.
@@ -293,8 +320,9 @@ export function BuildingGroupList<T>({
   // a single collapsed bar; the tree is four levels now and every click that
   // can be spared is worth sparing.
   const soleBuildingId = groups.length === 1 ? groups[0].buildingId : null;
-  const effectiveExpandedId =
-    picked === "none"
+  const effectiveExpandedId = focusActive
+    ? groups[focusIndex].buildingId
+    : picked === "none"
       ? null
       : picked !== null && groups.some((g) => g.buildingId === picked)
         ? picked
@@ -308,7 +336,10 @@ export function BuildingGroupList<T>({
           <div key={group.buildingId} className="rounded-2xl border border-border bg-muted overflow-hidden">
             <div
               className="w-full flex items-center justify-between p-4 text-left hover:bg-secondary transition-colors cursor-pointer"
-              onClick={() => setPicked(isExpanded ? "none" : group.buildingId)}
+              onClick={() => {
+                endFocus();
+                setPicked(isExpanded ? "none" : group.buildingId);
+              }}
             >
               <div className="flex items-center gap-3 min-w-0">
                 <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shrink-0">
@@ -340,14 +371,15 @@ export function BuildingGroupList<T>({
                   href="#"
                   onClick={(e) => {
                     e.preventDefault();
-                    setPage((p) => Math.max(1, p - 1));
+                    endFocus();
+                    setPage(Math.max(1, currentPage - 1));
                   }}
-                  className={page === 1 ? "pointer-events-none opacity-50" : ""}
+                  className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
                 />
               </PaginationItem>
               <PaginationItem>
                 <span className="text-xs font-medium text-muted-foreground px-4">
-                  หน้า {page} จาก {totalPages}
+                  หน้า {currentPage} จาก {totalPages}
                 </span>
               </PaginationItem>
               <PaginationItem>
@@ -355,9 +387,10 @@ export function BuildingGroupList<T>({
                   href="#"
                   onClick={(e) => {
                     e.preventDefault();
-                    setPage((p) => Math.min(totalPages, p + 1));
+                    endFocus();
+                    setPage(Math.min(totalPages, currentPage + 1));
                   }}
-                  className={page === totalPages ? "pointer-events-none opacity-50" : ""}
+                  className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
                 />
               </PaginationItem>
             </PaginationContent>

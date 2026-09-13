@@ -142,6 +142,13 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
   const [editAcLoadFailed, setEditAcLoadFailed] = useState(false);
 
   const [buildingsPage, setBuildingsPage] = useState(1);
+  // The building created a moment ago. Alphabetical order and five to a
+  // page meant a new one usually landed on page 2 behind "เพิ่มอาคารสำเร็จ"
+  // and "หน้า 1 จาก 2" (QA 20260913-1742, BUG-008). While set, the page and
+  // the open building are derived from it; the user's own paging or click
+  // clears it. Kept as a token so the same effect works for a second
+  // building created in the same visit.
+  const [focusBuilding, setFocusBuilding] = useState<{ id: string; token: number } | null>(null);
   const BUILDINGS_PER_PAGE = 5;
 
   // Only the QR preview. The add/edit forms in this file deliberately keep
@@ -202,17 +209,31 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
   // one, since a tenant with one building would otherwise pay a click on every
   // visit that no other page charges.
   const soleBuildingId = filteredBuildings.length === 1 ? filteredBuildings[0].id : null;
+  const focusIndex = focusBuilding ? filteredBuildings.findIndex((b) => b.id === focusBuilding.id) : -1;
   const effectiveExpandedBuilding =
-    expandedBuilding === "none"
-      ? null
-      : filteredBuildings.some((b) => b.id === expandedBuilding)
-        ? expandedBuilding
-        : globalSearch.trim()
-          ? filteredBuildings[0]?.id ?? null
-          : soleBuildingId;
+    focusIndex >= 0
+      ? filteredBuildings[focusIndex].id
+      : expandedBuilding === "none"
+        ? null
+        : filteredBuildings.some((b) => b.id === expandedBuilding)
+          ? expandedBuilding
+          : globalSearch.trim()
+            ? filteredBuildings[0]?.id ?? null
+            : soleBuildingId;
 
   const totalBuildingsPages = Math.ceil(filteredBuildings.length / BUILDINGS_PER_PAGE);
-  const paginatedBuildings = filteredBuildings.slice((buildingsPage - 1) * BUILDINGS_PER_PAGE, buildingsPage * BUILDINGS_PER_PAGE);
+  const currentBuildingsPage =
+    focusIndex >= 0 ? Math.floor(focusIndex / BUILDINGS_PER_PAGE) + 1 : buildingsPage;
+  const paginatedBuildings = filteredBuildings.slice(
+    (currentBuildingsPage - 1) * BUILDINGS_PER_PAGE,
+    currentBuildingsPage * BUILDINGS_PER_PAGE
+  );
+  // Every hand-driven change to the list goes through here first, so the
+  // focused page stays where it is rather than snapping back.
+  function endFocus() {
+    setFocusBuilding(null);
+    setBuildingsPage(currentBuildingsPage);
+  }
 
   async function handleAddBuilding(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -223,6 +244,7 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
       else {
         setShowAddBuilding(false);
         toast.success("เพิ่มอาคารสำเร็จ");
+        if (res.id) setFocusBuilding({ id: res.id, token: Date.now() });
       }
     });
   }
@@ -350,7 +372,7 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
       <div className="space-y-3">
         {paginatedBuildings.map((b) => (
           <div key={b.id} className="rounded-2xl border border-border bg-muted overflow-hidden">
-            <div className="w-full flex items-center justify-between p-4 text-left hover:bg-secondary transition-colors cursor-pointer" onClick={() => setExpandedBuilding(effectiveExpandedBuilding === b.id ? "none" : b.id)}>
+            <div className="w-full flex items-center justify-between p-4 text-left hover:bg-secondary transition-colors cursor-pointer" onClick={() => { endFocus(); setExpandedBuilding(effectiveExpandedBuilding === b.id ? "none" : b.id); }}>
               <div className="flex min-w-0 items-center gap-3">
                 {/* An icon, not the abbreviation. This is a fixed 32px box and
                     the abbreviations in real data are seven characters
@@ -501,20 +523,20 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
               <PaginationItem>
                 <PaginationPrevious 
                   href="#" 
-                  onClick={(e) => { e.preventDefault(); setBuildingsPage(p => Math.max(1, p - 1)); }} 
-                  className={buildingsPage === 1 ? "pointer-events-none opacity-50" : ""}
+                  onClick={(e) => { e.preventDefault(); endFocus(); setBuildingsPage(Math.max(1, currentBuildingsPage - 1)); }} 
+                  className={currentBuildingsPage === 1 ? "pointer-events-none opacity-50" : ""}
                 />
               </PaginationItem>
               <PaginationItem>
                 <span className="text-xs font-medium text-muted-foreground px-4">
-                  หน้า {buildingsPage} จาก {totalBuildingsPages}
+                  หน้า {currentBuildingsPage} จาก {totalBuildingsPages}
                 </span>
               </PaginationItem>
               <PaginationItem>
                 <PaginationNext 
                   href="#" 
-                  onClick={(e) => { e.preventDefault(); setBuildingsPage(p => Math.min(totalBuildingsPages, p + 1)); }}
-                  className={buildingsPage === totalBuildingsPages ? "pointer-events-none opacity-50" : ""}
+                  onClick={(e) => { e.preventDefault(); endFocus(); setBuildingsPage(Math.min(totalBuildingsPages, currentBuildingsPage + 1)); }}
+                  className={currentBuildingsPage === totalBuildingsPages ? "pointer-events-none opacity-50" : ""}
                 />
               </PaginationItem>
             </PaginationContent>

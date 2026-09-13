@@ -57,7 +57,17 @@ export function JobPoolPanel({ jobPool, searchQuery, selectedBuilding, isPending
   }
 
   const filteredPool = filterJobs(jobPool, searchQuery, selectedBuilding);
-  const groups = groupByBuilding(filteredPool);
+  // Buildings ordered by their newest open job rather than by name: the pool
+  // is where a technician looks for what has just come in, and five
+  // alphabetical buildings to a page put a fresh order for "Library
+  // Building" on page 2 with nothing to say so (QA 20260913-1742, BUG-008).
+  // jobPool arrives newest-first, so the first item of each group is its
+  // newest and the groups keep that order once stably sorted by it.
+  const newest = (items: typeof filteredPool) =>
+    items.reduce((max, j) => (j.createdAt && j.createdAt > max ? j.createdAt : max), "");
+  const groups = groupByBuilding(filteredPool).sort((a, b) =>
+    newest(b.items).localeCompare(newest(a.items))
+  );
 
   return (
     <div className="animate-in fade-in">
