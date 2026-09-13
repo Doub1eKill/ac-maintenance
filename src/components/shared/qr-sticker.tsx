@@ -18,6 +18,41 @@ export interface QrStickerUnit {
 
 /**
  * The printed sheet: one column of five 150 x 52 mm stickers on A4.
+ *
+ * Every length is in millimetres because every one of them is a physical
+ * constraint, not a layout preference. Pixels would have made the sheet depend
+ * on the browser's DPI guess, and a QR code that scans on one machine and not
+ * on the next is the one failure this page cannot afford.
+ *
+ * It started at two columns of 95 x 43mm, twelve to a page, with a 34mm code.
+ * That scanned, but read small on the wall, and the owner asked for fewer and
+ * larger instead — the sticker goes on a machine somebody is standing in front
+ * of, and paper is the cheap part.
+ *
+ * The code is 46mm. The value encoded is an origin plus /qr/ plus a uuid —
+ * around 60 bytes, which at error-correction level H comes out a 45-module
+ * symbol, 53 across with its quiet zone, so each module is 0.87mm. That is well
+ * clear of the ~0.5mm where phone cameras start failing in the dim plant rooms
+ * these end up in, and it now reads from arm's length rather than up close.
+ * Level H stays (rather than shrinking the symbol) because a sticker on an air
+ * conditioner collects dust and damp, and H is what reads through a scuffed
+ * corner.
+ *
+ * The sticker is 150mm wide, not the full 194mm the column offers. Measured on
+ * the rendered sheet, the widest line of ink is the acCode at 68mm and the
+ * longest brand is 60mm; a full-width label would be most of a hand-span of
+ * blank paper stuck to the machine. 150mm leaves the text column 93mm, which is
+ * both comfortably wider than anything in the data today and slack for the real
+ * Phuket brand and model names, whose lengths are not ours to control. The band
+ * left over on the right of the sheet is the deliberate cost: the row count is
+ * set by the page height, so a wider sticker would buy nothing.
+ *
+ * The sheet:
+ *   width  210 - 16 margin = 194mm of column, sticker 150mm centred in it
+ *   height 297 - 16 margin = 281, five rows of 52 plus four 4mm gutters = 276mm
+ *
+ * Square corners and a solid hairline border, not the dashed rounded box this
+ * replaced: the border is a cut line, and scissors follow a straight solid edge.
  */
 export const STICKERS_PER_SHEET = 5;
 
