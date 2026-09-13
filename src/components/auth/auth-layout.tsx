@@ -30,7 +30,7 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
         <div className="relative z-10 my-auto space-y-6 max-w-md">
           <div className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-3.5 py-1 text-xs font-bold text-slate-800 shadow-2xs">
             <span className="flex h-2 w-2 rounded-full bg-emerald-500" />
-            Multi-Tenant Campus Platform
+            Campus Maintenance Platform
           </div>
 
           <h2 className="text-3xl font-extrabold tracking-tight text-slate-950 leading-tight">
