@@ -1,5 +1,54 @@
 # Project Handoff & Technical Summary
 
+# ✅ เก็บ backlog ตามลำดับความสำคัญ — 5 รายการ (13 ก.ย. 2026, DoubleKill)
+
+branch `fix/known-bugs-2026-09-13` ตัดจาก `master` `a9f184a` · เจ้าของโปรเจกต์สั่ง *"วางแผนและทำทีละอย่างตามความสำคัญ"* กับหัวข้อ "🐞 สถานะบั๊กที่รู้แล้ว" ด้านล่าง · ทำ 🔴 ทั้ง 3 → `any` บนทาง auth/DB → ของค้าง QR · **1 commit ต่อ 1 เรื่อง**
+
+| # | commit | เรื่อง | ทดสอบ |
+|---|---|---|---|
+| 1 | `5bf33a2` | ป้าย "Multi-Tenant Campus Platform" → "Campus Maintenance Platform" | ✅ หน้า login ไม่มีคำว่า Multi-Tenant แล้ว |
+| 2 | `78f6304` | หน้าสมัครสำเร็จแยก active/pending | ✅ สมัครจริง 2 บัญชี (ล่าง) |
+| 3 | `41730e7` | `prisma.config.ts` มี `migrations.seed` | ✅ `prisma validate` โหลด config ผ่าน · **ไม่ได้รัน `db seed` จริง** เพราะมันล้าง DB ทั้งก้อน |
+| 4 | `cd38f75` | ถอด `any` 4 จุด + `prefer-const` 1 จุด | ✅ ล็อกอินช่างจริง session มี role/status/id/expires · `/tech` เข้าได้ `/admin` เด้ง |
+| 5 | `c4dfc38` | ย้ายคอมเมนต์สติกเกอร์ไปอยู่กับค่าคงที่ + ลบ `FlatACUnit.location` | ✅ `/admin/qr-codes` โหลดปกติ |
+
+eslint **50 → 45 (31 → 26 error / 19 warning)** · `tsc` 0 error ทุก commit
+
+## #2 — `RegisterState` ได้ field `status` เพราะ prose ไม่ใช่สิ่งที่เอามา branch
+
+`registerUser` ส่ง `message` กลับมาบอกอยู่แล้วว่า active หรือ pending แต่หน้าจอไม่ได้อ่าน — พาดหัวเป็น "(Pending)" ตายตัว และกล่องเตือนบอกว่าแอดมินจะมาตรวจ **อยู่ใต้ข้อความที่เพิ่งบอกว่าบัญชีเปิดใช้งานแล้ว** · เพิ่ม `status?: "active" | "pending"` ให้ทั้งสอง return แล้ว `register-form.tsx` branch จากมัน: เขียว/`CheckCircle2`/"เปิดใช้งานแล้ว (Active)" กับ เหลือง/`Clock`/"รออนุมัติ"
+
+**ทดสอบผ่านฟอร์มจริง** — ฟอร์มบังคับรูปโปรไฟล์ ใส่ผ่าน `DataTransfer` + canvas PNG ใน JS:
+
+| อีเมล | หน้าจอ | DB `users.status` |
+|---|---|---|
+| `qa.active@pkru.ac.th` | เขียว "ลงทะเบียนสำเร็จ" + Active | `active` (id 25) |
+| `qa.pending@gmail.com` | เหลือง "ลงทะเบียนสำเร็จ (รออนุมัติ)" + Pending | `pending` (id 26) |
+
+**คืนค่าแล้ว** — ลบ users 25, 26 + `user_phones` 47, 48 + รูป 2 ไฟล์ใน `public/uploads/` · baseline `users 5 · phones 7 · pending 0 · audit max 34` ตรง (สมัครไม่เขียน audit)
+
+## #4 — 🔴 augmentation ของ JWT ไม่เคยทำงานเลย นี่คือที่มาของ `as any`
+
+`src/types/next-auth.d.ts` เขียน `declare module "next-auth/jwt"` — แต่ `next-auth/jwt.d.ts` มีแค่ `export * from "@auth/core/jwt"` · **augmentation ที่ชี้ไป re-export ไม่ไปถึง interface ตัวจริง** · คอมไพล์ผ่านเงียบๆ แล้วไม่มีผลอะไร → `token.role` เป็น `unknown` ใน session callback → คนก่อนแปะ `as any`
+
+แก้เป็น `declare module "@auth/core/jwt"` + ใส่ `expiresAt?: number` ที่ jwt callback stamp ไว้ · `as any` 2 จุดใน `auth.config.ts` หายไปโดยไม่ต้อง cast อะไรเลย
+
+อีก 2 จุด: `maintenance-log.ts:128` zod enum กับ Prisma enum เป็น 3 สตริงเดียวกัน ถ้าวันหนึ่งไม่ตรงคอมไพเลอร์ควรเป็นคนบอก · `air-conditioners.ts:92` `let dbData: any` → `const dbData: Omit<Prisma.AirConditionerUncheckedCreateInput, "acCode" | "qrCode">` (สองฟิลด์นั้นใส่ตอน insert หลังได้เลขลำดับ)
+
+## กับดักที่เจอระหว่างทำ
+
+- **รีเครื่องอีกแล้ว** mysqld + dev server ตายทั้งคู่ ปลุกตามสูตรเดิม
+- ฟอร์มสมัครใช้ `input[type=file]` บังคับ — Browser pane ไม่มี file chooser · ใส่ไฟล์ด้วย `new DataTransfer()` + `canvas.toBlob()` แล้ว `input.files = dt.files` + dispatch `change` ได้ (จดไว้สำหรับ QA)
+- `prefer-const` กับ `no-explicit-any` ที่ `air-conditioners.ts:92` เป็นบรรทัดเดียวกัน แก้ครั้งเดียวหายสองตัว
+
+## ที่เหลือใน backlog (ยังไม่แตะ)
+
+- eslint 26 error: `set-state-in-effect` ×17 (15 ไฟล์) · `no-explicit-any` ×6 (`api/.../route.ts:118` · `upcoming-maintenance-table:282` · `log-action-modal:23-24` · `qr-scan-modal:20` · `option-wheel:66`) · `option-wheel` refs/immutability ×3
+- 7 commit ของ Esther03u ยังไม่ทดสอบ interaction
+- `qa-tester` ยังไม่ได้รัน
+
+---
+
 # 🐞 สถานะบั๊กที่รู้แล้ว ณ 13 ก.ย. 2026 — ยังไม่แก้ทั้งหมด (DoubleKill)
 
 เจ้าของโปรเจกต์ถาม *"ยังมีบัคอีกมั้ย"* — เช็คซ้ำบน `master` `bbf7533` แล้วจดไว้ที่นี่ก่อนลงมือ · **ไม่มีการแก้โค้ดในหัวข้อนี้** เป็น snapshot ของ backlog
