@@ -1,5 +1,36 @@
 # Project Handoff & Technical Summary
 
+# ✅ A3 — full sweep รอบสอง run `20260914-2013`: 79 test ผ่านหมด, บั๊กเดิม 0/12 กลับมา (14 ก.ย. 2026, DoubleKill)
+
+แผน A ข้อสาม · branch `qa/sweep-followups` → ff-merge `master` · commit `5af77eb` · รายงานเต็ม `C:\Projectc-maintenance-qauns60914-2013\QA-REPORT.md` (สำเนา `qa/runs/…` gitignored) · หลักฐาน 193 ไฟล์
+
+| | `20260913-1742` | `20260914-2013` |
+|---|---|---|
+| Playwright tests | 66 | **79** (public 31 · admin 32 · tech 16) ผ่านทั้งหมด |
+| ledger checks (unique) | ~155 | **189** |
+| PASS / FAIL / BLOCKED | ≈125 / 12 บั๊กจริง / 6 | **182 / 2 / 1** |
+| บั๊กเดิม reproduce ได้ | — | **0 / 12** |
+
+## ที่ต้องแก้ใน harness ระหว่างสวีป (ไม่ใช่ regression ของแอป) — `admin/workflows.spec.ts`, `auth.setup.ts`
+- pill เปลี่ยนชื่อ "ถึงรอบล้าง" → "งานล้างแอร์" (#8) · เช็คกระดานหลังออกใบงานต้องเข้าผ่าน sidebar (client nav) ถึงจะได้ focus ของ #9 — `page.goto` เต็มหน้าลืม focus โดยตั้งใจ (`d26018f`) · regex `[\s\S]` ใน string ธรรมดากลายเป็น `[sS]` (spec เดิมพังเงียบ) → `String.raw` · นับแถวจาก pill + subtitle `<p>N รายการ</p>` (list group ตามอาคาร collapsed) · "ลบลงถังขยะแล้ว" ตัดสินจาก toast เพราะ audit log ด้านล่างยังมีชื่อยี่ห้อ · setup ซ้ำในรอบเดียวกัน = skipped-PASS ไม่ใช่ BLOCKED
+
+## FAIL/BLOCKED ที่เหลือ (ไม่ใช่ของใหม่)
+- **OPEN-1 (Medium) logout → Back ยังเห็น dashboard ช่าง** จาก bfcache/router cache — session หายแล้วแต่หน้าเก่ายังโชว์ (`logout-back.png`) → แผน B4: `Cache-Control: no-store` หน้า auth และ/หรือ `BrowserSessionGuard` เช็ค session ตอน `pageshow` (`event.persisted`)
+- **OPEN-2 (Low) รายชื่อยี่ห้อในตั้งค่า 5/หน้า** ยี่ห้อใหม่ที่เรียงหลัง Panasonic สร้างแล้วไม่เห็น (แบบเดียวกับ #9) → ใช้กลไก focus จาก `5ba6e08`
+- OPEN-3 (Info) `<nextjs-portal>` ทับ bottom nav = dev indicator · OPEN-4 (Info) test "work order: create for the QA unit…" ล้ม 1 ครั้งตอนรันเดี่ยวด้วย `--grep` หลัง restore แต่ผ่านทุกครั้งเมื่อรันทั้งโปรเจกต์ (3 รอบ) — order-dependent, artifacts ถูกรอบถัดไปทับ ยังไม่ได้ไล่ · demo-role panel ต้อง prod build ถึงพิสูจน์ว่าหาย (BLOCKED เดิม)
+
+## วิธีรัน (ที่ใช้จริง)
+```
+node qa/baseline.mjs snapshot
+QA_RUN=$(date +%Y%m%d-%H%M) npx playwright test --config qa/playwright.config.ts --project=public
+npx playwright test --config qa/playwright.config.ts --project=admin ; node qa/baseline.mjs restore
+npx playwright test --config qa/playwright.config.ts --project=admin --grep "assets: create building|work order: create for the QA unit"   # tech workflows ต้องมี QA unit + ใบงาน
+npx playwright test --config qa/playwright.config.ts --project=tech  ; node qa/baseline.mjs restore
+```
+- ทั้งชุด ~35 นาที (setup ~3 นาทีต่อโปรเจกต์เพราะ dependency; public 12 นาที, admin 9 นาที, tech 6 นาที) · Playwright ล้าง `artifacts/` ทุกครั้งที่รัน — เก็บหลักฐาน failure ก่อนรันรอบถัดไป · ledger สะสมทุก rerun ในรอบเดียวกัน ตัวเลข unique ในรายงานเอาผลล่าสุดต่อ check
+
+**ถัดไป:** A4 กล้องบน Android จริง (ต้องใช้มือถือ — มีขั้นตอนใน entry ถัดไป)
+
 # 🛡️ A1 — regression spec ครอบบั๊ก 12 ข้อของ QA run `20260913-1742` (14 ก.ย. 2026, DoubleKill)
 
 แผน A ข้อสอง · branch `qa/regression-specs` → ff-merge `master` · commit `d4f8660` · **27 check PASS ทั้งหมด** บน master (run `20260914-1952`) · DB คืน baseline ด้วย `qa/baseline.mjs restore`
