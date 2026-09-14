@@ -17,12 +17,20 @@ function uploadDir() {
 }
 
 /**
- * Writes an uploaded file to public/uploads and returns its public path.
+ * Writes an uploaded image to public/uploads and returns its public path.
  *
  * Lived in tech/actions.ts until profile pictures needed it from admin/
  * actions.ts too; moved here rather than copied so both callers keep the same
- * resizing and EXIF behaviour. Returns null instead of throwing — a failed
- * photo should not take the maintenance log it belongs to down with it.
+ * resizing and EXIF behaviour. Returns null instead of throwing; callers
+ * decide what a missing picture means for the record it belongs to.
+ *
+ * Only what sharp can decode is stored, and always re-encoded as JPEG. It used
+ * to fall back to writing the original bytes under the original name when
+ * decoding failed, "rather than losing the evidence" — but bytes sharp cannot
+ * read are not evidence of anything, and public/uploads is served by
+ * extension: a file called photo.html with a claimed image/* type would have
+ * come back as a page (QA 20260913-1742, BUG-012). The one thing the
+ * re-encode guarantees is that whatever sits in that folder is a picture.
  *
  * Do not call this inside a database transaction: it does file I/O, and a
  * transaction held open across a multi-megabyte write keeps its row locks the
@@ -37,32 +45,23 @@ export async function saveUpload(file: File | null): Promise<string | null> {
     const dir = uploadDir();
     await fs.mkdir(dir, { recursive: true });
 
-    if (file.type?.startsWith("image/")) {
-      try {
-        const { default: sharp } = await import("sharp");
-        const processed = await sharp(buffer)
-          // withoutEnlargement: a photo already smaller than the cap is left
-          // at its own size rather than being upscaled into a bigger file.
-          .rotate() // honour EXIF orientation before stripping metadata
-          .resize(MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION, {
-            fit: "inside",
-            withoutEnlargement: true,
-          })
-          .jpeg({ quality: IMAGE_QUALITY, mozjpeg: true })
-          .toBuffer();
+    // The claimed MIME type is the browser's guess from the extension and is
+    // not checked here: sharp reads the bytes, and a file it cannot decode is
+    // refused whatever it was called.
+    const { default: sharp } = await import("sharp");
+    const processed = await sharp(buffer)
+      // withoutEnlargement: a photo already smaller than the cap is left
+      // at its own size rather than being upscaled into a bigger file.
+      .rotate() // honour EXIF orientation before stripping metadata
+      .resize(MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION, {
+        fit: "inside",
+        withoutEnlargement: true,
+      })
+      .jpeg({ quality: IMAGE_QUALITY, mozjpeg: true })
+      .toBuffer();
 
-        const filename = `${Date.now()}-${safeName.replace(/\.[^.]+$/, "")}.jpg`;
-        await fs.writeFile(path.join(dir, filename), processed);
-        return `${UPLOAD_URL_PREFIX}${filename}`;
-      } catch (imageError) {
-        // Corrupt/unsupported image, or sharp unavailable on this platform —
-        // fall through and store the original rather than losing the evidence.
-        console.error("Image processing failed, storing original:", imageError);
-      }
-    }
-
-    const filename = `${Date.now()}-${safeName}`;
-    await fs.writeFile(path.join(dir, filename), buffer);
+    const filename = `${Date.now()}-${safeName.replace(/\.[^.]+$/, "")}.jpg`;
+    await fs.writeFile(path.join(dir, filename), processed);
     return `${UPLOAD_URL_PREFIX}${filename}`;
   } catch (error) {
     console.error("Failed to save file:", error);

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { logAudit } from "@/lib/audit";
 import { withDeadlockRetry } from "@/lib/db-retry";
-import { saveUpload } from "@/lib/upload";
+import { saveUpload, deleteUpload } from "@/lib/upload";
 import { businessDateToday, addMaintenanceInterval } from "@/lib/maintenance";
 import { MaintenanceAction } from "@/generated/prisma/client";
 import { verifyTechnician } from "@/lib/tech/guards";
@@ -68,6 +68,16 @@ export async function logMaintenanceAction(formData: FormData) {
 
     const beforePhotoUrl = await saveUpload(beforePhotoFile);
     const afterPhotoUrl = await saveUpload(afterPhotoFile);
+    // A picture that was attached but could not be stored — not an image, or
+    // one sharp cannot decode — stops the log. It used to be dropped without
+    // a word, and the technician believed the evidence had gone in.
+    if (beforePhotoFile && beforePhotoFile.size > 0 && !beforePhotoUrl) {
+      return { error: "รูปก่อนซ่อมไม่ใช่ไฟล์รูปภาพที่อ่านได้ กรุณาเลือกรูปใหม่" };
+    }
+    if (afterPhotoFile && afterPhotoFile.size > 0 && !afterPhotoUrl) {
+      if (beforePhotoUrl) await deleteUpload(beforePhotoUrl);
+      return { error: "รูปหลังซ่อมไม่ใช่ไฟล์รูปภาพที่อ่านได้ กรุณาเลือกรูปใหม่" };
+    }
 
     const performedAt = new Date();
 
