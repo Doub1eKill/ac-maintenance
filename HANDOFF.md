@@ -2,7 +2,7 @@
 
 # ✅ A3 — full sweep รอบสอง run `20260914-2013`: 79 test ผ่านหมด, บั๊กเดิม 0/12 กลับมา (14 ก.ย. 2026, DoubleKill)
 
-แผน A ข้อสาม · branch `qa/sweep-followups` → ff-merge `master` · commit `5af77eb` · รายงานเต็ม `C:\Project\ac-maintenance-qauns60914-2013\QA-REPORT.md` (สำเนา `qa/runs/…` gitignored) · หลักฐาน 193 ไฟล์
+แผน A ข้อสาม · branch `qa/sweep-followups` → ff-merge `master` · commit `5af77eb` · รายงานเต็ม `C:\Project\ac-maintenance-qa\runs\20260914-2013\QA-REPORT.md` (สำเนา `qa/runs/…` gitignored) · หลักฐาน 193 ไฟล์
 
 | | `20260913-1742` | `20260914-2013` |
 |---|---|---|
