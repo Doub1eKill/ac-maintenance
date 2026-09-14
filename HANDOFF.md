@@ -1,5 +1,31 @@
 # Project Handoff & Technical Summary
 
+# 🧹 ปิด backlog QA run `20260913-1742` ครบ — #8 นิยาม "ด่วน" · #9 ของใหม่ตกหน้า 2 · #10–12 🟢 (14 ก.ย. 2026, DoubleKill)
+
+ชุดสุดท้ายจากรายงาน QA (ต่อจาก 🔴 ×4 และ 🟡 ×3) บน branch `fix/qa-ux-bugs` → ff-merge `master` · 1 commit/บั๊ก · ทดสอบผ่านเบราว์เซอร์จริง (demo-role sign-in) · DB คืน baseline ครบ · `tsc` ผ่าน · eslint `src` 24/19 เท่าเดิม · **บั๊กจาก QA ทั้ง 12 ข้อปิดหมดแล้ว**
+
+| # | บั๊ก | commit | สิ่งที่เปลี่ยน |
+|---|---|---|---|
+| 8 | "ด่วน" 3 ค่าบน `/admin` | `ecb737a` | `upcoming-maintenance-table.tsx` filter แยกด้วย `jobTypeOf`: pill "รอซ่อมด่วน" = repair เท่านั้น (= KPI card) · pill "งานล้างแอร์" = ค้างล้าง + กำหนดล้าง · subtitle บอกครบ 3 ตัวเลข · KPI card 3 footer "ค้างล้าง" · โดนัท: เดิมนับ `priority === "urgent"` (ค่าที่ไม่มีอยู่จริง — schema คือ low/high/critical) ตอนนี้นับ high/critical **ที่ยังเปิด** และ relabel "ใบงานความสำคัญสูง/วิกฤต ที่เปิดอยู่" |
+| 9 | ของใหม่ตกหน้า 2 | `5ba6e08` | `BuildingGroupList` รับ prop `focus={{buildingId, token}}` → แสดงหน้าที่อาคารนั้นอยู่ + เปิดอาคาร (derived ไม่ใช่ effect) จนกว่าผู้ใช้กดเอง · `CreateWorkOrderProvider` จำ `lastCreated` → กระดานใบงาน map เป็น building · `createBuildingAction` คืน `id` → `/admin/assets` เปิดหน้าที่มีอาคารใหม่ · **job pool ช่าง** เรียงอาคารตามงานใหม่สุดแทนชื่อ |
+| 10 | validation ภาษาอังกฤษ | `4a12f18` | **ใหม่** `src/lib/native-validity.ts` — `{...nativeValidity({valueMissing, rangeUnderflow, stepMismatch, badInput})}` ใส่ที่ input ชั้น + BTU แอดมิน 2 จุด (ฟอร์มช่างไม่ใช่ `<form>` native validation ไม่ทำงานอยู่แล้ว) |
+| 11 | `<main>` 2 อัน | `fabd949` | `SidebarInset` ใน `ui/sidebar.tsx` เป็น `<div>` — `<main>` ตัวเดียวคือของ `dashboard-layout` (QA harness ใช้ `page.locator("main").last()` ยังใช้ได้) |
+| 12 | `upload.ts` เก็บไฟล์ decode ไม่ได้ทั้งดิบ | `007a116` | ทุกไฟล์ต้องผ่าน sharp และเก็บเป็น `.jpg` เสมอ decode ไม่ได้ = `null` (ไม่มี fallback เก็บดิบอีก — เดิม `x.html` type image/* จะถูกเสิร์ฟเป็นหน้าเว็บ) · `logMaintenanceAction` ตอบ error ระบุรูปก่อน/หลัง แทนที่จะบันทึกงานโดยไม่มีรูปเงียบๆ (ลบรูปก่อนที่เก็บไปแล้วถ้ารูปหลังถูกปฏิเสธ) |
+
+## ทดสอบ
+
+- #8 `/admin`: KPI 24 = pill 24 · KPI 27 = ค้างล้าง 27 · subtitle "ซ่อมด่วน 24 • ค้างล้าง 27 • กำหนดล้าง 22" = 73 แถว
+- #9 seed อาคารที่ 6 "ZZ QA…" ทาง SQL → ออกใบงานให้ → กระดานเปิดหน้า 2 พร้อมแถว · Previous ไปหน้า 1 ปกติ · เพิ่มอาคาร "ZZZ…" → `/admin/assets` "หน้า 2 จาก 2" เปิดอยู่ · pool ช่างอาคารที่มีงานใหม่ขึ้นก่อน · ลบ seed ครบ (buildings id>5, rooms>32, acs>73, WO>128)
+- #10 ชั้น -3 / ว่าง / BTU -5 / 1.5 → ข้อความไทยทั้งหมด
+- #11 `querySelectorAll("main").length` = 1 ทั้ง `/admin` และ `/tech`
+- #12 โปรไฟล์ช่าง: fake.jpg (ข้อความ) → "บันทึกไม่สำเร็จ" ไม่มีไฟล์ · PNG จริง → เก็บเป็น `.jpg` (ลบไฟล์ + คืน avatar NULL แล้ว) · **flow บันทึกงาน+รูปไม่ได้ทดสอบซ้ำ** (เขียน DB หลายตาราง) — path เดียวกับโปรไฟล์
+
+## หมายเหตุ
+
+- เครื่องรีสตาร์ทระหว่างงาน: mysqld ปลุกด้วย WMI ตาม HANDOFF ได้ปกติ (`Invoke-CimMethod Win32_Process Create … mysqld.exe --defaults-file=…\my.ini --standalone` หลังลบ `mysql.pid`)
+- เห็นระหว่างทาง ยังไม่แก้: sidebar "กระดานใบงาน 48/49" กับโดนัท "รวมทั้งหมด 50 ใบงาน / รอดำเนินการ 47" นับคนละชุดกับ DB (WO 62) — น่าจะเป็น scope/limit ของ analytics ต่างกัน
+- flow โปรไฟล์เปลี่ยนไปจากตอน QA: เลือกรูปแล้วต้องกด "บันทึกรูปโปรไฟล์" อีกครั้ง (`qa/specs/tech/upload.spec.ts` ต้องอัปเดตถ้ารันรอบหน้า)
+
 # 🧾 แก้บั๊ก 🟡 ข้อมูลจาก QA run `20260913-1742` — #5 BTU แคตตาล็อก · #7 BTU ติดลบ · #6 ใบงานซ้ำ (13 ก.ย. 2026, DoubleKill)
 
 ต่อจากชุด 🔴 — เจ้าของโปรเจกต์ให้ทำต่อตามที่แนะนำ (#5 → #7 → #6) บน branch `fix/qa-data-bugs` → ff-merge เข้า `master` · 1 commit ต่อ 1 บั๊ก · ทดสอบผ่านเบราว์เซอร์จริงด้วย demo-role sign-in (admin) · DB คืน baseline ครบ (acs 73 · schedules 73 · WO 62 · audit max 34 — **หมายเหตุ: id ของ work_orders ไม่ต่อเนื่อง baseline max id = 128** ลบของทดสอบด้วย `id > 128` ไม่ใช่ `> 62`) · `tsc` ผ่าน · eslint `src` 24 error / 19 warning เท่าเดิม
