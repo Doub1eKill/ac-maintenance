@@ -1,5 +1,28 @@
 # Project Handoff & Technical Summary
 
+# 📱 A4 — กล้อง QR บน Android จริง ผ่านครบ 5 ข้อ (14 ก.ย. 2026, DoubleKill)
+
+แผน A ข้อสุดท้าย · branch `chore/dev-lan-origins` → ff-merge `master` · commit `7d5482f` · ทดสอบโดยเจ้าของโปรเจกต์บนมือถือ Android Chrome 151 (`151.0.7922.169`) ผ่าน LAN `http://192.168.1.92:3000` — ผมยืนยันจาก server log ของ dev server
+
+| # | สิ่งที่ทดสอบ | ผล |
+|---|---|---|
+| 1 | กด "สแกน QR" → ขอสิทธิ์กล้อง → เห็นภาพกล้องหลัง + เลเซอร์ + "เล็งกล้องไปที่ QR Code บนสติกเกอร์" | ผ่าน |
+| 2 | สแกน QR ของเครื่องจริง (`B572921-6-357199-01` render จาก uuid ใน DB เป็นหน้า HTML บนจอคอม) → ผลขึ้นเองไม่ต้องพิมพ์ | ผ่าน — log: `scanQrCodeAction("http://192.168.1.92:3000/qr/d8df0abf-…")` |
+| 3 | เล็ง barcode/QR ที่ไม่ใช่ของระบบ → toast "ไม่พบ" ครั้งเดียว ไม่รัว | ผ่าน — log เห็น lookup ค่า `\|083554400496201…` (บาร์โค้ดบิล) **ครั้งเดียว** ระหว่างค้างหน้ากล้อง = cooldown 5 วิทำงาน |
+| 4 | ปิดโมดัล → ไฟกล้องดับ | ผ่าน |
+| 5 | ปฏิเสธสิทธิ์กล้อง → ข้อความ "ไม่ได้รับอนุญาตให้ใช้กล้อง…" + ช่องพิมพ์รหัส | ผ่าน |
+
+## สิ่งที่ต้องรู้เวลาทดสอบบนมือถือรอบหน้า
+- **`next.config.ts` มี `allowedDevOrigins: ["192.168.*.*", "10.*.*.*", "172.16.*.*"]`** — Next 16 dev บล็อก `/_next/*` จาก origin ที่ไม่ใช่ localhost → มือถือได้ HTML แต่ไม่ได้ JS ปุ่มกดไม่ติด (อาการที่เจอ) · `next build` ไม่สนค่านี้
+- `getUserMedia` ต้องการ secure context: บนมือถือตั้ง `chrome://flags/#unsafely-treat-insecure-origin-as-secure` = `http://<IP>:3000` แล้ว Relaunch (หรือใช้ https ผ่าน ngrok/cloudflared) · เครื่องคอมอยู่ที่ `192.168.1.92` (Ethernet) — เช็คด้วย `ipconfig`
+- **Playwright ปิด dev server ทิ้งหลังรันเสร็จ** ถ้ามันเป็นคนเปิดเอง (`webServer.reuseExistingServer`) → หลังสวีปต้องเปิด `npm run dev` ใหม่ก่อนทดสอบมือ (เจอ "เข้าไม่ได้" ครั้งแรกเพราะเหตุนี้ ไม่ใช่ firewall)
+- QR ทดสอบ: render ด้วย `qrcode.react` ผ่าน `react-dom/server` จาก uuid ใน DB (script ชั่วคราว ไม่ได้เก็บ) — ค่าที่ encode ต้องเป็น `<origin>/qr/<uuid>` เหมือน `qrTargetUrl()`; resolver รับได้ทุก origin เพราะดึงเฉพาะ uuid
+
+## สรุปแผน A ทั้ง 4 ข้อ — เสร็จ
+A2 harness ตาม flow ใหม่ + `baseline.mjs` (`da97e96`) · A1 regression spec 12 บั๊ก (`f3b506f`) · A3 full sweep 79 test ผ่าน 0/12 กลับมา (`670f85d`) · A4 กล้องจริง (`7d5482f`)
+
+**ถัดไป (แผน B):** B1 โดนัทนับจาก `take: 50` ไม่ใช่ DB · B2 `auth.ts` เทียบรหัสก่อนเช็ค status (enumeration) · B4 logout+Back bfcache (OPEN-1 ของสวีป) · OPEN-2 รายชื่อยี่ห้อ 5/หน้า · B3 ถามเจ้าของ: ฟอร์มสมัครสาธารณะควรมี org_admin ไหม
+
 # ✅ A3 — full sweep รอบสอง run `20260914-2013`: 79 test ผ่านหมด, บั๊กเดิม 0/12 กลับมา (14 ก.ย. 2026, DoubleKill)
 
 แผน A ข้อสาม · branch `qa/sweep-followups` → ff-merge `master` · commit `5af77eb` · รายงานเต็ม `C:\Project\ac-maintenance-qa\runs\20260914-2013\QA-REPORT.md` (สำเนา `qa/runs/…` gitignored) · หลักฐาน 193 ไฟล์
