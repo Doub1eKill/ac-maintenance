@@ -6,12 +6,12 @@ import { syncOverdueMaintenanceWorkOrders } from "@/lib/maintenance";
 import { getOrganisationName, getOrganisationInfo, getDefaultMaintenanceFrequency } from "@/lib/organisation";
 import { getAcMasterData } from "@/lib/admin/master-data";
 import {
-  WORK_ORDER_PAGE_SIZE,
   WORK_ORDER_BOARD_LIMIT,
   workOrderBoardSelect,
   workOrderBoardOrderBy,
   toWorkOrderBoardRow,
 } from "@/lib/admin/work-order-board";
+import { getWorkOrderStats } from "@/lib/admin/work-order-stats";
 import {
   buildingTreeSelect,
   shapeBuildingTree,
@@ -100,15 +100,14 @@ export async function getAdminOverviewData() {
   await verifyOrgAdmin();
   await syncOverdueMaintenanceWorkOrders();
 
-  const [buildingRows, pendingJobs, workOrdersRaw, activeTechsCount, activeTechnicians] =
+  // The analytics donut is fed an aggregate over every work order, not the
+  // board's first page: fifty rows made "รวมทั้งหมด" read 50 whatever the
+  // table held. Nothing else on the overview needed the rows.
+  const [buildingRows, pendingJobs, workOrderStats, activeTechsCount, activeTechnicians] =
     await Promise.all([
       prisma.building.findMany({ select: buildingTreeSelect, orderBy: { name: "asc" } }),
       getPendingJobsByAcId(),
-      prisma.workOrder.findMany({
-        select: workOrderBoardSelect,
-        orderBy: workOrderBoardOrderBy,
-        take: WORK_ORDER_PAGE_SIZE,
-      }),
+      getWorkOrderStats(),
       prisma.user.count({ where: { role: "technician", status: "active" } }),
       getActiveTechnicians(),
     ]);
@@ -123,7 +122,7 @@ export async function getAdminOverviewData() {
     },
     urgentUnits,
     buildings,
-    workOrders: workOrdersRaw.map(toWorkOrderBoardRow),
+    workOrderStats,
     allAcUnits: flattenUnitOptions(buildings),
     activeTechnicians,
   };

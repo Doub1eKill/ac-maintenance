@@ -183,8 +183,15 @@ test.describe.serial("work orders", () => {
   test("BUG-007: the dashboard's urgent figures agree with each other", async ({ page }) => {
     await page.goto("/admin");
     await page.locator("main").last().waitFor({ timeout: 120_000 });
-    await page.waitForTimeout(3500);
-    const t = (await body(page)).replace(/\s+/g, " ");
+    // The KPI and analytics numbers count up (MotionNumber, spring); read
+    // the page only once two reads a second apart agree.
+    let t = "";
+    for (let i = 0; i < 20; i++) {
+      await page.waitForTimeout(1000);
+      const next = (await body(page)).replace(/\s+/g, " ");
+      if (next === t) break;
+      t = next;
+    }
     const n = (re: RegExp) => Number(t.match(re)?.[1] ?? -1);
     const kpiRepair = n(/รอซ่อมด่วน\s*(\d+)\s*รายการ/);
     const kpiCleaning = n(/ถึงรอบล้างแอร์\s*(\d+)\s*รายการ/);
@@ -198,6 +205,13 @@ test.describe.serial("work orders", () => {
     const donut = t.match(/ใบงานความสำคัญสูง\/วิกฤต ที่เปิดอยู่:\s*(\d+)\s*ใบ/);
     const [[dbUrgent]] = db("select count(*) from work_orders where priority in ('high','critical') and status in ('pending','claimed')");
     ledger("Dashboard", `analytics footer ${donut?.[1] ?? "(missing)"} open high/critical orders = DB ${dbUrgent}`, "DB", donut && donut[1] === dbUrgent ? "PASS" : "FAIL", "runs/" + process.env.QA_RUN + "/reg-dashboard-figures.png");
+
+    // The donut counts every order, not the board's first fifty (plan B1).
+    const donutTotal = t.match(/รวมทั้งหมด:\s*(\d+)\s*ใบงาน/)?.[1];
+    const pendingCard = t.match(/รอดำเนินการ\s*(\d+)\s*\d+%\s*รอการมอบหมาย/)?.[1];
+    const [[dbTotal, dbPending]] = db("select count(*), sum(status='pending') from work_orders");
+    const badge = t.match(/กระดานใบงาน\s*(\d+)/)?.[1];
+    ledger("Dashboard", `analytics total ${donutTotal} = DB ${dbTotal}; pending card ${pendingCard} = DB ${dbPending} = sidebar badge ${badge}`, "DB", donutTotal === dbTotal && pendingCard === dbPending && badge === dbPending ? "PASS" : "FAIL", "runs/" + process.env.QA_RUN + "/reg-dashboard-figures.png");
   });
 
   test("BUG-008: a building that sorts last is shown, expanded, on the page it lands on", async ({ page }) => {

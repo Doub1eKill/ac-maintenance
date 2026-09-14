@@ -6,7 +6,8 @@ import { Clock } from "lucide-react";
 import { AnimatedIcon } from "@/components/ui/animated-icon";
 import { OverviewMetricsGrid } from "@/components/admin/overview-metrics-grid";
 import { UpcomingMaintenanceTable, type MaintenanceRow, type UrgentMaintenanceAC } from "@/components/admin/upcoming-maintenance-table";
-import type { BuildingItem, WorkOrderItem } from "@/components/admin/types";
+import type { BuildingItem } from "@/components/admin/types";
+import type { WorkOrderStats } from "@/lib/admin/work-order-stats";
 import { formatUnitLocation } from "@/lib/location";
 
 const MaintenanceAnalyticsDonut = dynamic(
@@ -37,7 +38,7 @@ interface OverviewPanelProps {
   };
   urgentUnits: UrgentMaintenanceAC[];
   buildings: BuildingItem[];
-  workOrders: WorkOrderItem[];
+  workOrderStats: WorkOrderStats;
   onViewDetails: (acCode: string) => void;
   onCreateWorkOrder: (acId: string) => void;
   onBulkAssignWorkOrder: (workOrderIds: string[]) => void;
@@ -47,7 +48,7 @@ export function OverviewPanel({
   metrics,
   urgentUnits,
   buildings,
-  workOrders,
+  workOrderStats,
   onViewDetails,
   onCreateWorkOrder,
   onBulkAssignWorkOrder,
@@ -148,7 +149,7 @@ export function OverviewPanel({
     upcomingRows.sort((a, b) => dueTime(a) - dueTime(b));
 
     return [...urgentRows, ...upcomingRows];
-  }, [urgentUnits, buildings, workOrders]);
+  }, [urgentUnits, buildings]);
 
   return (
     <div className="space-y-6 animate-in fade-in">
@@ -157,7 +158,7 @@ export function OverviewPanel({
 
       <div className="w-full">
         <MaintenanceAnalyticsDonut
-          workOrders={workOrders}
+          stats={workOrderStats}
           title="ภาพรวมสถิติการซ่อมบำรุง (Maintenance Analytics)"
           description="สัดส่วนสถานะงานซ่อมบำรุงและอัตราความสำเร็จของทีมช่าง"
         />

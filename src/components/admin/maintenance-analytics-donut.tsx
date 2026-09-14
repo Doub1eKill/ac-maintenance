@@ -29,7 +29,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
-import type { WorkOrderItem } from "@/components/admin/types";
+import type { WorkOrderStats } from "@/lib/admin/work-order-stats";
 
 const chartConfig = {
   count: { label: "จำนวนใบสั่งงาน" },
@@ -52,74 +52,34 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 interface MaintenanceAnalyticsDonutProps {
-  workOrders?: WorkOrderItem[];
+  stats?: WorkOrderStats;
   title?: string;
   description?: string;
 }
+
+const EMPTY_STATS: WorkOrderStats = {
+  total: 0,
+  completed: 0,
+  claimed: 0,
+  pending: 0,
+  cancelled: 0,
+  cleaning: 0,
+  repair: 0,
+  urgentOpen: 0,
+};
 
 /**
  * ReUI c-chart-20 based Donut Chart with center completion rate and status breakdown.
  * Visualizes maintenance operational performance based on live Work Orders.
  */
 export function MaintenanceAnalyticsDonut({
-  workOrders = [],
+  stats,
   title = "สถิติสถานะใบสั่งงานซ่อมบำรุง (Work Order Analytics)",
   description = "สัดส่วนสถานะงานซ่อมบำรุงและอัตราความสำเร็จของทีมช่าง",
 }: MaintenanceAnalyticsDonutProps) {
-  const counts = React.useMemo(() => {
-    if (!workOrders || workOrders.length === 0) {
-      return {
-        completed: 0,
-        claimed: 0,
-        pending: 0,
-        cancelled: 0,
-        total: 0,
-        urgent: 0,
-        cleaning: 0,
-        repair: 0,
-      };
-    }
-
-    let completed = 0;
-    let claimed = 0;
-    let pending = 0;
-    let cancelled = 0;
-    let urgent = 0;
-    let cleaning = 0;
-    let repair = 0;
-
-    for (const wo of workOrders) {
-      if (wo.status === "completed") completed++;
-      else if (wo.status === "claimed") claimed++;
-      else if (wo.status === "pending") pending++;
-      else if (wo.status === "cancelled") cancelled++;
-
-      // Priority is low / high / critical (createWorkOrderSchema); this used
-      // to test for "urgent", a value that never existed, and missed
-      // "critical". Only open orders: a completed critical job is not a
-      // fire any more, and the footer's number is meant to be what needs
-      // attention now.
-      if (
-        (wo.priority === "critical" || wo.priority === "high") &&
-        (wo.status === "pending" || wo.status === "claimed")
-      ) {
-        urgent++;
-      }
-      if (wo.type === "cleaning") cleaning++;
-      else if (wo.type === "repair") repair++;
-    }
-
-    return {
-      completed,
-      claimed,
-      pending,
-      cancelled,
-      total: workOrders.length,
-      urgent,
-      cleaning,
-      repair,
-    };
-  }, [workOrders]);
+  // Counted server-side over every work order (getWorkOrderStats); the
+  // donut used to tally the board's first fifty rows and call that the total.
+  const counts = stats ?? EMPTY_STATS;
 
   const completionRate = counts.total > 0 ? Math.round((counts.completed / counts.total) * 100) : 0;
 
@@ -330,7 +290,7 @@ export function MaintenanceAnalyticsDonut({
                 <Flame className="w-3.5 h-3.5 text-rose-500" />
                 <span>ใบงานความสำคัญสูง/วิกฤต ที่เปิดอยู่:</span>
                 <span className="font-bold text-rose-600 dark:text-rose-400 font-mono">
-                  {counts.urgent}
+                  {counts.urgentOpen}
                 </span>
                 <span>ใบ</span>
               </div>

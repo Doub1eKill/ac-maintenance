@@ -2,7 +2,7 @@ import { getAdminOverviewData } from "@/lib/admin/pages";
 import { OverviewClient } from "./overview-client";
 
 export default async function AdminOverviewPage() {
-  const { metrics, urgentUnits, buildings, workOrders, activeTechnicians } =
+  const { metrics, urgentUnits, buildings, workOrderStats, activeTechnicians } =
     await getAdminOverviewData();
 
   return (
@@ -10,7 +10,7 @@ export default async function AdminOverviewPage() {
       metrics={metrics}
       urgentUnits={urgentUnits}
       buildings={buildings}
-      workOrders={workOrders}
+      workOrderStats={workOrderStats}
       activeTechnicians={activeTechnicians}
     />
   );
