@@ -1,4 +1,5 @@
 import { test as base, type Page } from "@playwright/test";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import zlib from "node:zlib";
@@ -154,6 +155,45 @@ export async function loginViaForm(page: Page, email: string, password: string) 
   }
   await page.waitForTimeout(300);
   return page.url();
+}
+
+/**
+ * Read (or, sparingly, write) the database directly — the "DB" method in the
+ * ledger. Same client and flags as qa/baseline.mjs; override with QA_MYSQL.
+ * Rows come back as arrays of strings, NULL as null. Never logs the query.
+ */
+export function db(query: string): (string | null)[][] {
+  const argv = (process.env.QA_MYSQL ?? "C:\\xampp\\mysql\\bin\\mysql.exe -h 127.0.0.1 -P 3306 -u root ac_maintenance").split(" ");
+  const r = spawnSync(argv[0], [...argv.slice(1), "-N", "-B"], { input: query, encoding: "utf8" });
+  if (r.error) throw r.error;
+  if (r.status !== 0) throw new Error(`mysql exited ${r.status}: ${r.stderr}`);
+  return r.stdout
+    .split(/\r?\n/)
+    .filter((l) => l.length)
+    .map((l) => l.split("\t").map((v) => (v === "NULL" ? null : v)));
+}
+
+/** Toast text, if one shows within a few seconds. */
+export async function toastText(page: Page, timeout = 8000) {
+  const items = page.locator("[data-sonner-toaster] li");
+  await items.first().waitFor({ timeout }).catch(() => {});
+  await page.waitForTimeout(300);
+  return (await items.allInnerTexts().catch(() => [])).join(" | ");
+}
+
+/**
+ * Wait for the toasts on screen to go away so the next click is not
+ * intercepted by one, and so the next toastText() reads a fresh one. Waits
+ * rather than removing the nodes: sonner owns that DOM, and pulling an <li>
+ * out from under React made its next insert throw ("insertBefore ... not a
+ * child of this node") and took the whole page down.
+ */
+export async function clearToasts(page: Page) {
+  await page
+    .locator("[data-sonner-toaster] li")
+    .first()
+    .waitFor({ state: "detached", timeout: 8000 })
+    .catch(() => {});
 }
 
 /** Register through the real form. Returns the visible outcome text. */

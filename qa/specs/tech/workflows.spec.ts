@@ -83,37 +83,12 @@ test.describe("technician on a phone", () => {
     ledger("Job pool", "claimed order no longer in the pool", "UI", !t1.includes(CODE1) ? "PASS" : "FAIL", await shot(page, "pool-after-claim"));
   });
 
-  test("QR scan modal: typed code finds the unit; 'สร้างใบงาน PM ใหม่' is a placeholder", async ({ page }) => {
+  test("header scan button is reachable by name on Pixel 7", async ({ page }) => {
+    // The scanner itself is covered by tech/regressions.spec.ts (BUG-002):
+    // the typed-code mock this test used to describe is gone since fb801a5.
     await page.goto("/tech"); await page.locator("main").last().waitFor({ timeout: 90_000 }); await hydrated(page, "main");
     const headerScan = page.getByRole("button", { name: "สแกน QR Code" }).first();
     ledger("A11y", "header scan button has an accessible name on Pixel 7", "UI", (await headerScan.count()) ? "PASS" : "FAIL", await shot(page, "tech-header-scan-button"));
-    await headerScan.click();
-    const dlg = page.locator("div.fixed.inset-0").filter({ hasText: /สแกนรหัส QR/ }).first();
-    await dlg.waitFor({ timeout: 10_000 });
-    const dt = await dlg.innerText();
-    ledger("QR scan", "modal is a typed-code lookup labelled 'จำลองการสแกน' — no camera/scanner wired", "UI", /จำลองการสแกน/.test(dt) ? "FAIL" : "PASS", await shot(page, "qrscan-modal"));
-    await dlg.locator("input").first().fill(`${QA.building.abbr}-${QA.room}-02`);
-    await dlg.getByRole("button", { name: /^ยืนยัน$/ }).first().click();
-    await page.waitForTimeout(2500);
-    const after = await dlg.innerText();
-    ledger("QR scan", "unit -02 (no pending job) resolves and offers 'สร้างใบงาน PM ใหม่'", "UI", /ไม่พบใบงานแจ้งซ่อมค้างอยู่/.test(after) ? "PASS" : "FAIL", await shot(page, "qrscan-unit02"));
-    const before = await page.request.get("/api/tech/units").then((r) => r.text()).catch(() => "");
-    await dlg.getByRole("button", { name: /สร้างใบงาน PM ใหม่/ }).click();
-    const tt = await toast(page);
-    ledger("QR scan", `'สร้างใบงาน PM ใหม่' shows success toast "${tt.slice(0, 60)}" but creates nothing (simulated)`, "UI", /จำลอง/.test(tt) ? "FAIL" : "BLOCKED", await shot(page, "qrscan-placeholder"));
-    void before;
-    // the QR sticker encodes the qr_code uuid, the modal looks up ac_code
-    await page.keyboard.press("Escape").catch(() => {});
-    await page.waitForTimeout(500);
-    if (!(await page.locator("div.fixed.inset-0").filter({ hasText: /สแกนรหัส QR/ }).first().isVisible().catch(() => false))) await headerScan.click();
-    const dlg2 = page.locator("div.fixed.inset-0").filter({ hasText: /สแกนรหัส QR/ }).first();
-    await dlg2.waitFor({ timeout: 10_000 });
-    await dlg2.locator("input").first().fill("d8df0abf-de82-4a99-97d4-b48c4615fbe2");
-    await dlg2.getByRole("button", { name: /^ยืนยัน$/ }).first().click();
-    await page.waitForTimeout(2000);
-    const tt2 = await toast(page);
-    const dt2 = await dlg2.innerText().catch(() => "");
-    ledger("QR scan", "pasting a sticker's uuid (what the QR actually encodes) is not found by the modal", "UI", /ไม่พบ/.test(tt2 + dt2) ? "FAIL" : "BLOCKED", await shot(page, "qrscan-uuid"));
   });
 
   test("record work with before/after photos on the claimed order; history + admin see it", async ({ page, browser }) => {

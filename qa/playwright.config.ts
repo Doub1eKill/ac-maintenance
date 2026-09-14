@@ -24,7 +24,18 @@ export default defineConfig({
     { name: "setup", testMatch: /auth\.setup\.ts/ },
     { name: "public", use: { ...devices["Desktop Chrome"] }, testMatch: /public\/.*\.spec\.ts/, dependencies: ["setup"] },
     { name: "admin", use: { ...devices["Desktop Chrome"], storageState: path.join(OUT, "auth", "admin.json") }, dependencies: ["setup"], testMatch: /admin\/.*\.spec\.ts/ },
-    { name: "tech", use: { ...devices["Pixel 7"], storageState: path.join(OUT, "auth", "tech.json") }, dependencies: ["setup"], testMatch: /tech\/.*\.spec\.ts/ },
+    {
+      name: "tech",
+      use: {
+        ...devices["Pixel 7"],
+        storageState: path.join(OUT, "auth", "tech.json"),
+        // A synthetic camera, granted without a prompt, so the QR scanner's
+        // camera path can run headless (tech/regressions.spec.ts).
+        launchOptions: { args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"] },
+      },
+      dependencies: ["setup"],
+      testMatch: /tech\/.*\.spec\.ts/,
+    },
   ],
   webServer: {
     command: "npm run dev",
