@@ -1,0 +1,156 @@
+// Snapshot and restore the database baseline around a QA run.
+//
+//   node qa/baseline.mjs snapshot   # before a run: record what "clean" looks like
+//   node qa/baseline.mjs restore    # after a run: put it back
+//   node qa/baseline.mjs check      # print the counts the project rules quote
+//
+// The rule is that every test that writes to the database leaves it exactly as
+// it found it (users 5 · phones 7 · buildings 5 · rooms 32 · acs 73 · brands 5 ·
+// models 189 · logs 230 · WO 62 · schedules 73 · audit max 34 · pending 0).
+// Run 20260913-1742 did that by hand, table by table, and it took longer than
+// the sweep. This does the same thing mechanically:
+//
+//   - rows the run inserted are recognised by id: every table here has an
+//     auto-increment id, so anything above the snapshot's max is the run's;
+//   - rows the run changed in place (a unit marked broken by a new order, an
+//     avatar replaced, a brand renamed, a schedule advanced by a logged visit)
+//     are put back from the snapshot's copy of the few mutable columns;
+//   - files the run added under public/uploads are removed.
+//
+// Nothing here runs the Prisma seed — that wipes the restored data. The
+// snapshot lives outside the repo (next to the run output), because a file
+// written inside it makes Next dev reload every open page.
+//
+// Connection: the same mysql client and flags the HANDOFF uses. Override with
+// QA_MYSQL="path/to/mysql -h ... -u ... db" if yours differ. DATABASE_URL is
+// never read or printed.
+
+import { spawnSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const repo = path.resolve(here, "..");
+const OUT = process.env.QA_OUT ?? path.resolve(repo, "..", "ac-maintenance-qa");
+const SNAPSHOT = path.join(OUT, "baseline.json");
+const UPLOADS = path.join(repo, "public", "uploads");
+
+const MYSQL = (process.env.QA_MYSQL ?? "C:\\xampp\\mysql\\bin\\mysql.exe -h 127.0.0.1 -P 3306 -u root ac_maintenance").split(" ");
+
+function sql(query) {
+  // Fed on stdin rather than -e: a restore is a few hundred UPDATEs, well past
+  // what a Windows command line can carry.
+  const r = spawnSync(MYSQL[0], [...MYSQL.slice(1), "-N", "-B"], { input: query, encoding: "utf8" });
+  if (r.error) throw r.error;
+  if (r.status !== 0) throw new Error(`mysql exited ${r.status}: ${r.stderr || r.stdout}`);
+  return r.stdout
+    .split(/\r?\n/)
+    .filter((l) => l.length)
+    .map((l) => l.split("\t").map((v) => (v === "NULL" ? null : v)));
+}
+
+// Tables the run can only ever add to, deepest child first so the deletes
+// below never trip a foreign key. Everything with an auto-increment id.
+const GROWTH_TABLES = [
+  "system_audit_logs",
+  "maintenance_logs",
+  "work_orders",
+  "maintenance_schedules",
+  "air_conditioners",
+  "rooms",
+  "buildings",
+  "user_phones",
+  "users",
+  "ac_models",
+  "ac_brands",
+];
+
+// The columns a run changes on rows that already existed. Restored verbatim.
+const MUTABLE = {
+  air_conditioners: ["status", "btu", "ac_brand_id", "ac_model_id", "brand", "model", "deleted_at"],
+  users: ["status", "name", "avatar_url", "password"],
+  user_phones: ["phone_number", "is_primary"],
+  ac_brands: ["name", "deleted_at"],
+  ac_models: ["name", "default_btu", "deleted_at"],
+  maintenance_schedules: ["last_performed_at", "next_due_date", "is_active", "frequency_value", "frequency_unit"],
+  work_orders: ["status", "claimed_by", "claimed_at", "completed_at", "priority", "resolution_notes", "assigned_to_id", "assigned_at"],
+  rooms: ["name", "floor"],
+  buildings: ["name", "abbreviation"],
+  system_settings: ["default_frequency_value", "default_frequency_unit", "organisation_name", "organisation_address", "organisation_phone"],
+};
+
+const COUNTS = `select
+  (select count(*) from users),(select count(*) from user_phones),(select count(*) from buildings),
+  (select count(*) from rooms),(select count(*) from air_conditioners),(select count(*) from ac_brands),
+  (select count(*) from ac_models),(select count(*) from maintenance_logs),(select count(*) from work_orders),
+  (select count(*) from maintenance_schedules),(select max(id) from system_audit_logs),
+  (select count(*) from users where status='pending')`;
+const COUNT_LABELS = ["users", "phones", "buildings", "rooms", "acs", "brands", "models", "logs", "WO", "schedules", "audit max", "pending"];
+
+function check() {
+  const [row] = sql(COUNTS);
+  console.log(COUNT_LABELS.map((l, i) => `${l} ${row[i]}`).join(" · "));
+  return row;
+}
+
+function snapshot() {
+  const maxIds = Object.fromEntries(GROWTH_TABLES.map((t) => [t, Number(sql(`select coalesce(max(id),0) from ${t}`)[0][0])]));
+  const rows = {};
+  for (const [table, cols] of Object.entries(MUTABLE)) {
+    rows[table] = sql(`select id, ${cols.join(", ")} from ${table}`);
+  }
+  const uploads = fs.existsSync(UPLOADS) ? fs.readdirSync(UPLOADS) : [];
+  fs.mkdirSync(OUT, { recursive: true });
+  fs.writeFileSync(SNAPSHOT, JSON.stringify({ takenAt: new Date().toISOString(), maxIds, rows, uploads }, null, 1));
+  console.log(`snapshot → ${SNAPSHOT}`);
+  check();
+}
+
+function quote(v) {
+  if (v === null) return "NULL";
+  return `'${String(v).replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
+}
+
+function restore() {
+  if (!fs.existsSync(SNAPSHOT)) throw new Error(`no snapshot at ${SNAPSHOT} — run "snapshot" before the sweep`);
+  const snap = JSON.parse(fs.readFileSync(SNAPSHOT, "utf8"));
+
+  // 1. Rows the run added.
+  const statements = ["SET FOREIGN_KEY_CHECKS=0"];
+  for (const t of GROWTH_TABLES) statements.push(`delete from ${t} where id > ${snap.maxIds[t]}`);
+
+  // 2. Rows the run changed. One UPDATE per row; the tables are small.
+  for (const [table, cols] of Object.entries(MUTABLE)) {
+    for (const row of snap.rows[table]) {
+      const [id, ...values] = row;
+      const sets = cols.map((c, i) => `${c} = ${quote(values[i])}`).join(", ");
+      statements.push(`update ${table} set ${sets} where id = ${id}`);
+    }
+  }
+  statements.push("SET FOREIGN_KEY_CHECKS=1");
+  sql(statements.join(";\n"));
+
+  // 3. Files the run added.
+  let removed = 0;
+  if (fs.existsSync(UPLOADS)) {
+    const keep = new Set(snap.uploads);
+    for (const f of fs.readdirSync(UPLOADS)) {
+      if (!keep.has(f)) {
+        fs.rmSync(path.join(UPLOADS, f));
+        removed += 1;
+      }
+    }
+  }
+  console.log(`restored from ${snap.takenAt}; removed ${removed} upload(s)`);
+  check();
+}
+
+const cmd = process.argv[2];
+if (cmd === "snapshot") snapshot();
+else if (cmd === "restore") restore();
+else if (cmd === "check") check();
+else {
+  console.error("usage: node qa/baseline.mjs snapshot | restore | check");
+  process.exit(2);
+}

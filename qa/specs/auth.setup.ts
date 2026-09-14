@@ -8,7 +8,9 @@ const AUTH = path.join(OUT_ROOT, "auth");
 // database (every user has password = NULL — the data was restored from a dump,
 // not seeded, and the seed would wipe it). So the QA accounts are registered
 // through the real form. That is also the first test: an institutional address
-// that asks for org_admin should NOT come out active.
+// that asks for org_admin must come out pending (BUG-001, fixed 696a74a) —
+// the admin session below is then earned the real way: the seeded admin
+// approves the request on /admin/approvals and the QA admin logs in.
 
 setup("register QA accounts through the form", async ({ page }) => {
   // technician on an institutional domain → active immediately (by design)
@@ -23,19 +25,21 @@ setup("register QA accounts through the form", async ({ page }) => {
   art = await shot(page, "setup-register-tech2");
   ledger("Register", "second technician registers", "UI", /ลงทะเบียนสำเร็จ|เรียบร้อยแล้ว/.test(out) ? "PASS" : "FAIL", art);
 
-  // org_admin on an institutional domain — the escalation probe
+  // org_admin on an institutional domain — the escalation probe (BUG-001)
   out = await registerViaForm(page, { name: "QA_TEST_USER_ADMIN", email: QA.admin, phone: "081-000-1003", password: QA.password, role: "org_admin" });
   art = await shot(page, "setup-register-admin");
   const adminActive = /เปิดใช้งานแล้ว \(Active\)/.test(out);
-  const adminExists = /เรียบร้อยแล้ว/.test(out);
+  const adminPending = /รออนุมัติ|Pending/.test(out);
+  const adminExists = /ถูกลงทะเบียนในระบบเรียบร้อยแล้ว/.test(out);
   note("setup-register-admin.txt", out);
   ledger(
     "Register",
-    "org_admin requested on .ac.th address must NOT be active without approval",
+    "org_admin requested on .ac.th address lands pending, never active (BUG-001)",
     "UI",
-    adminActive ? "FAIL" : adminExists ? "BLOCKED" : "PASS",
+    adminActive ? "FAIL" : adminPending || adminExists ? "PASS" : "FAIL",
     art
   );
+  expect(adminActive, out).toBeFalsy();
 
   // public domain → pending (by design)
   out = await registerViaForm(page, { name: "QA_TEST_USER_PENDING", email: QA.pending, phone: "081-000-1004", password: QA.password, role: "technician" });
@@ -58,21 +62,47 @@ setup("second technician session", async ({ page }) => {
   await page.context().storageState({ path: path.join(AUTH, "tech2.json") });
 });
 
-setup("admin session via the login form", async ({ page }) => {
-  // If the escalation is closed, this account is pending and the login is
-  // refused; fall back to the dev-only demo-role button and say so.
+setup("admin session: pending refusal, approval by the seeded admin, then login", async ({ page, browser }) => {
+  // 1. Still pending: the login form must send the account to
+  //    /pending-approval rather than "อีเมลหรือรหัสผ่านไม่ถูกต้อง" (BUG-003).
   let url = await loginViaForm(page, QA.admin, QA.password);
-  if (/\/admin|#signed-in/.test(url)) {
-    ledger("Login", "QA org_admin (registered via form) logs in to /admin", "UI", "PASS", await shot(page, "setup-login-admin"));
-  } else {
-    ledger("Login", "QA org_admin refused (pending) — using demo-role for admin session", "UI", "BLOCKED", await shot(page, "setup-login-admin-refused"));
-    await page.goto("/login");
-    await hydrated(page);
-    await page.getByRole("button", { name: /ผู้บริหารองค์กร/ }).click();
-    await page.waitForURL(/\/admin/, { timeout: 30_000 });
-    url = page.url();
+  const refusedRight = /\/pending-approval\?email=/.test(url);
+  const alreadyActive = /\/admin|#signed-in/.test(url);
+  ledger(
+    "Login",
+    "pending org_admin is sent to /pending-approval, not told the password is wrong (BUG-003)",
+    "UI",
+    refusedRight ? "PASS" : alreadyActive ? "BLOCKED" : "FAIL",
+    await shot(page, "setup-login-admin-pending")
+  );
+
+  // 2. The seeded org_admin approves the request. The demo-role button is the
+  //    dev-only way into that account (it has no password).
+  if (!alreadyActive) {
+    const ctx = await browser.newContext();
+    await ctx.addInitScript(() => sessionStorage.setItem("ac-maintenance.browser-session", "1"));
+    const admin = await ctx.newPage();
+    await admin.goto("/login");
+    await hydrated(admin);
+    await admin.getByRole("button", { name: /ผู้บริหารองค์กร/ }).click();
+    await admin.waitForURL(/\/admin/, { timeout: 60_000 });
+    await admin.goto("/admin/approvals");
+    await admin.locator("main").waitFor({ timeout: 120_000 });
+    await hydrated(admin, "main");
+    const card = admin.locator("main").locator("div").filter({ hasText: QA.admin }).filter({ has: admin.getByRole("button", { name: /^อนุมัติ$/ }) }).last();
+    const listed = await card.count();
+    ledger("Approvals", "the pending org_admin request is listed with role ผู้ดูแลระบบ", "UI", listed && /ผู้ดูแลระบบ/.test(await card.innerText()) ? "PASS" : "FAIL", await shot(admin, "setup-approvals-admin-card"));
+    expect(listed, "QA admin card on /admin/approvals").toBeTruthy();
+    await card.getByRole("button", { name: /^อนุมัติ$/ }).click();
+    await admin.waitForTimeout(2500);
+    await ctx.close();
   }
-  expect(/\/admin/.test(url), url).toBeTruthy();
+
+  // 3. Now it can log in — and this is the admin session the suite runs as.
+  url = await loginViaForm(page, QA.admin, QA.password);
+  const ok = /\/admin|#signed-in/.test(url);
+  ledger("Login", "approved org_admin logs in to /admin", "UI", ok ? "PASS" : "FAIL", await shot(page, "setup-login-admin"));
+  expect(ok, url).toBeTruthy();
   await page.context().storageState({ path: path.join(AUTH, "admin.json") });
 });
 
