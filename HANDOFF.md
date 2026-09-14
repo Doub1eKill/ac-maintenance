@@ -1,5 +1,14 @@
 # Project Handoff & Technical Summary
 
+# 🕘 ผลสแกน QR มีปุ่ม "ดูประวัติเครื่องนี้" (14 ก.ย. 2026, DoubleKill)
+
+จากการทดสอบบนมือถือจริง (A4) เจ้าของโปรเจกต์ชี้ว่าสแกนแล้ว**ไม่เห็นประวัติแอร์** — ผลสแกนเดิมมีแค่รหัส/ที่ตั้ง/ยี่ห้อ/สถานะ/วันที่ซ่อมล่าสุด ส่วนประวัติเต็มมีเฉพาะหน้า `/qr/<uuid>` สาธารณะกับ `AcHistoryModal` ที่เปิดจาก omnibox
+
+- `qr-scan-modal.tsx`: ปุ่ม "ดูประวัติเครื่องนี้" (icon `History`) คู่กับ "สแกนเครื่องใหม่" → prop ใหม่ `onViewHistory(airConditionerId)` แล้วปิด scanner
+- `tech-shell.tsx`: `onViewHistory={setHistoryAcId}` → ใช้ `AcHistoryModal` ตัวเดิม (ช่างแก้ได้เฉพาะรายการของตัวเอง ตามกฎเดิม)
+- regression: `tech/regressions.spec.ts` เพิ่ม check "ดูประวัติเครื่องนี้ → scanner ปิด + โมดัลประวัติของเครื่องนั้นเปิด" (PASS) · DB คืน baseline
+- ยังไม่ทำ: แสดงประวัติ 2–3 รายการล่าสุดในผลสแกนเลยโดยไม่ต้องกด — ถ้าอยากได้ต้องขยาย `scanQrCodeAction` ให้คืน logs เพิ่ม
+
 # 📱 A4 — กล้อง QR บน Android จริง ผ่านครบ 5 ข้อ (14 ก.ย. 2026, DoubleKill)
 
 แผน A ข้อสุดท้าย · branch `chore/dev-lan-origins` → ff-merge `master` · commit `7d5482f` · ทดสอบโดยเจ้าของโปรเจกต์บนมือถือ Android Chrome 151 (`151.0.7922.169`) ผ่าน LAN `http://192.168.1.92:3000` — ผมยืนยันจาก server log ของ dev server
