@@ -20,6 +20,10 @@
 - #11 `querySelectorAll("main").length` = 1 ทั้ง `/admin` และ `/tech`
 - #12 โปรไฟล์ช่าง: fake.jpg (ข้อความ) → "บันทึกไม่สำเร็จ" ไม่มีไฟล์ · PNG จริง → เก็บเป็น `.jpg` (ลบไฟล์ + คืน avatar NULL แล้ว) · **flow บันทึกงาน+รูปไม่ได้ทดสอบซ้ำ** (เขียน DB หลายตาราง) — path เดียวกับโปรไฟล์
 
+## รอบ review หลัง merge — `d26018f` (focus ของ #9)
+
+`/code-review 116f7d5..master high` เจอ 2 จุด แก้แล้ว: (1) `lastCreated` อยู่ใน provider ระดับ layout ไม่เคยถูกล้าง → กระดานเด้งไปอาคารเดิมทุกครั้งที่กลับมาเข้าหน้า → เพิ่ม `clearLastCreated` (เรียกจาก `onFocusEnd` ของ `BuildingGroupList`) + `keepLastCreated`/`releaseLastCreated` คู่ mount/unmount — release หน่วง 1 tick และ mount ยกเลิก เพราะ StrictMode dev จะ unmount/remount จำลองตอน mount (2) `/admin/assets` effect ของ `globalSearch` ล้าง `focusBuilding` ด้วย ไม่งั้นล้างคำค้นแล้วเด้งกลับหน้าอาคารใหม่
+
 ## หมายเหตุ
 
 - เครื่องรีสตาร์ทระหว่างงาน: mysqld ปลุกด้วย WMI ตาม HANDOFF ได้ปกติ (`Invoke-CimMethod Win32_Process Create … mysqld.exe --defaults-file=…\my.ini --standalone` หลังลบ `mysql.pid`)
