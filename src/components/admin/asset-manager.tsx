@@ -164,6 +164,10 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
     // suppress the search's own auto-open and answer with a page that looks
     // empty — which is the bug the auto-open was added to fix.
     setExpandedBuilding(null);
+    // And the focus on a just-created building, for the same reason: a
+    // search that hid it would otherwise let it snap the list back to its
+    // page the moment the search was cleared, overriding the reset above.
+    setFocusBuilding(null);
   }, [globalSearch]);
 
   // Matches what the header box says it searches — "ค้นหารหัสแอร์, สถานที่,

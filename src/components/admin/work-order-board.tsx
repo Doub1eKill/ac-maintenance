@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Ban, CheckCircle2, ClipboardList, Clock, Sparkles, Wrench } from "lucide-react";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import {
@@ -147,12 +147,20 @@ export function WorkOrderBoard({
 
   // The order raised a moment ago from the shell's modal: open its building
   // on whichever page it sits, instead of leaving the admin to find it.
-  const { lastCreated } = useCreateWorkOrder();
+  const { lastCreated, clearLastCreated, keepLastCreated, releaseLastCreated } = useCreateWorkOrder();
   const focus = useMemo(() => {
     if (!lastCreated) return null;
     const row = workOrders.find((wo) => wo.airConditionerId === lastCreated.airConditionerId);
     return row ? { buildingId: row.buildingId, token: lastCreated.token } : null;
   }, [lastCreated, workOrders]);
+  // A focus is for the visit it was created in. Leaving the board forgets
+  // it, so coming back later opens the list normally rather than on the
+  // building of an order raised an hour ago. See the provider for why the
+  // release is deferred and the mount cancels it.
+  useEffect(() => {
+    keepLastCreated();
+    return releaseLastCreated;
+  }, [keepLastCreated, releaseLastCreated]);
 
   return (
     <div className="space-y-6 animate-in fade-in">
@@ -189,6 +197,7 @@ export function WorkOrderBoard({
       <BuildingGroupList
         groups={groups}
         focus={focus}
+        onFocusEnd={clearLastCreated}
         resetKey={`${globalSearch}::${statusFilter}`}
         getSubtitle={(group) => `${group.items.length} ใบงาน`}
         emptyMessage="ไม่พบข้อมูลใบงาน"

@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useState, useTransition } from "react";
+import { createContext, useCallback, useContext, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { createWorkOrderAction, getCreateWorkOrderFormData } from "@/app/admin/actions";
 import { CreateWorkOrderModal } from "@/components/admin/create-work-order-modal";
@@ -26,12 +26,26 @@ interface CreateWorkOrderContextValue {
   // sits in — the modal lives up here in the shell, so the board cannot
   // learn it any other way.
   lastCreated: { airConditionerId: string; token: number } | null;
+  // The board calls this once the user has paged or clicked past the focus.
+  clearLastCreated: () => void;
+  // The board's mount/unmount pair. The provider lives in the admin layout,
+  // so a focus would otherwise be handed to every later mount of the board
+  // for the rest of the session. releaseLastCreated clears on the next tick
+  // rather than at once, and keepLastCreated cancels that: React's dev-mode
+  // StrictMode unmounts and remounts every component once on mount, and an
+  // immediate clear in that simulated unmount would drop the focus before
+  // the real board ever showed it.
+  keepLastCreated: () => void;
+  releaseLastCreated: () => void;
 }
 
 const CreateWorkOrderContext = createContext<CreateWorkOrderContextValue>({
   openBlank: () => {},
   openForUnit: () => {},
   lastCreated: null,
+  clearLastCreated: () => {},
+  keepLastCreated: () => {},
+  releaseLastCreated: () => {},
 });
 
 export function useCreateWorkOrder() {
@@ -49,6 +63,21 @@ export function CreateWorkOrderProvider({ children }: { children: React.ReactNod
   const [defaultAcId, setDefaultAcId] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormData | null>(null);
   const [lastCreated, setLastCreated] = useState<CreateWorkOrderContextValue["lastCreated"]>(null);
+  const clearLastCreated = useCallback(() => setLastCreated(null), []);
+  const pendingRelease = useRef<number | null>(null);
+  const keepLastCreated = useCallback(() => {
+    if (pendingRelease.current !== null) {
+      window.clearTimeout(pendingRelease.current);
+      pendingRelease.current = null;
+    }
+  }, []);
+  const releaseLastCreated = useCallback(() => {
+    keepLastCreated();
+    pendingRelease.current = window.setTimeout(() => {
+      pendingRelease.current = null;
+      setLastCreated(null);
+    }, 0);
+  }, [keepLastCreated]);
   const [isPending, startTransition] = useTransition();
 
   const load = useCallback(async () => {
@@ -99,7 +128,7 @@ export function CreateWorkOrderProvider({ children }: { children: React.ReactNod
   }
 
   return (
-    <CreateWorkOrderContext.Provider value={{ openBlank, openForUnit, lastCreated }}>
+    <CreateWorkOrderContext.Provider value={{ openBlank, openForUnit, lastCreated, clearLastCreated, keepLastCreated, releaseLastCreated }}>
       {children}
       {open && formData && (
         <CreateWorkOrderModal

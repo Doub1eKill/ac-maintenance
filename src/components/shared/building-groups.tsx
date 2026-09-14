@@ -254,6 +254,11 @@ interface BuildingGroupListProps<T> {
   // building can be focused twice; the user's own paging or picking ends the
   // focus, and a building no longer in `groups` (a filter change) ignores it.
   focus?: { buildingId: string; token: number } | null;
+  // Fired when the user pages or clicks past an active focus, so the owner
+  // of `focus` can forget it. Without this a focus held above this list
+  // (in a layout-level provider, say) outlives the list and reapplies
+  // itself every time the list mounts again.
+  onFocusEnd?: () => void;
 }
 
 // Groups items by building into collapsible sections (all collapsed on mount,
@@ -270,6 +275,7 @@ export function BuildingGroupList<T>({
   resetKey,
   buildingsPerPage = 5,
   focus = null,
+  onFocusEnd,
 }: BuildingGroupListProps<T>) {
   // Starts with every building collapsed: the header row already carries the
   // count and the status badges, so the list reads as an overview until the
@@ -307,6 +313,7 @@ export function BuildingGroupList<T>({
   // does not snap the list back to page 1.
   const endFocus = () => {
     if (focus) setConsumedFocus(focus.token);
+    if (focusActive) onFocusEnd?.();
     setPage(currentPage);
   };
 
