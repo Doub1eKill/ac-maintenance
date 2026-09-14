@@ -11,6 +11,11 @@ const credentialsSchema = z.object({
   password: z.string().min(1),
 });
 
+// A real bcrypt hash of nothing in particular, made once at startup and
+// compared against when the address is unknown, so that a miss costs the
+// same ~100ms as a wrong password and the timing does not say which it was.
+const DUMMY_HASH = bcrypt.hashSync("no-such-account", 10);
+
 // Each code is typed against the shared list, so adding a refusal here
 // without a message in the login form is a compile error, not a silent
 // fallback to the wrong-password text.
@@ -53,23 +58,35 @@ const passwordProvider = Credentials({
       });
 
       if (!user) {
+        await bcrypt.compare(parsed.data.password, DUMMY_HASH);
         return null;
       }
 
+      // No password on the row means the account has never set one (see the
+      // schema comment on User.password): the only useful answer is "set
+      // one first", and there is nothing to compare against anyway.
       if (user.password === null) {
         throw new PasswordResetRequired();
       }
+
+      // The password is checked before the account's status, not after. The
+      // status used to come first, so anyone could type a wrong password
+      // against any address and learn from the reply whether that address
+      // was pending, suspended, or in use — the wrong-password message
+      // appeared only for accounts in good standing. Now the specific
+      // messages are reserved for someone who has proved they hold the
+      // password; everyone else gets the generic one.
+      const passwordMatches = await bcrypt.compare(parsed.data.password, user.password);
+
+      if (!passwordMatches) {
+        return null;
+      }
+
       if (user.status === "suspended") {
         throw new AccountSuspended();
       }
       if (user.status === "pending") {
         throw new AccountPendingApproval();
-      }
-
-      const passwordMatches = await bcrypt.compare(parsed.data.password, user.password);
-
-      if (!passwordMatches) {
-        return null;
       }
 
       return {

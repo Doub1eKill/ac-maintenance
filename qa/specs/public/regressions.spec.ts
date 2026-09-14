@@ -43,6 +43,18 @@ test("BUG-003: an account with no password gets the reset message, not 'wrong pa
   ledger("Login", `NULL-password account: "${msg}"`, "UI", /ตั้งรหัสผ่านใหม่ก่อน/.test(msg) ? "PASS" : "FAIL", await shot(page, "reg-login-nullpw"));
 });
 
+test("B2: a wrong password never reveals that an account is pending", async ({ page }) => {
+  // QA.pending is registered pending by auth.setup and approved only later,
+  // by the admin project. Before B2 the status was checked first, so any
+  // password at all was answered with the pending redirect.
+  await loginViaForm(page, QA.pending, "not-the-password");
+  const t = await page.evaluate(() => document.body.innerText);
+  const generic = /อีเมลหรือรหัสผ่านไม่ถูกต้อง/.test(t) && !page.url().includes("/pending-approval");
+  ledger("Login", "pending account + wrong password → generic message, no /pending-approval", "UI", generic ? "PASS" : "FAIL", await shot(page, "reg-login-pending-wrongpw"));
+  const url = await loginViaForm(page, QA.pending, QA.password);
+  ledger("Login", "pending account + right password → /pending-approval", "UI", /\/pending-approval/.test(url) ? "PASS" : "FAIL", await shot(page, "reg-login-pending-rightpw"));
+});
+
 test("BUG-003: an unknown address still gets the generic message", async ({ page }) => {
   await loginViaForm(page, "nobody-" + Date.now() + "@qa-run.ac.th", "whatever123");
   const t = await page.evaluate(() => document.body.innerText);
