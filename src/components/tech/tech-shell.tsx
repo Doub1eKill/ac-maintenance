@@ -324,6 +324,7 @@ export function TechShell({ user, universityName, buildings, badges, children }:
           onClose={() => setShowQrModal(false)}
           onClaim={claim}
           onLogWork={(res) => setJobForLog(jobFromScan(res))}
+          onViewHistory={setHistoryAcId}
           onScanError={(message) => toast.error(message)}
         />
 

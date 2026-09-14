@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { format } from "date-fns";
-import { QrCode, X, CheckCircle2, AlertTriangle, Camera, CameraOff, ClipboardPen, Loader2 } from "lucide-react";
+import { QrCode, X, CheckCircle2, AlertTriangle, Camera, CameraOff, ClipboardPen, History, Loader2 } from "lucide-react";
 import { scanQrCodeAction } from "@/app/tech/actions";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
 
@@ -21,6 +21,10 @@ interface QrScanModalProps {
   // "สร้างใบงาน PM ใหม่" button that only ever showed a toast — it created
   // nothing, and a technician in the field had no way to tell.
   onLogWork: (result: QrScanResult) => void;
+  // The unit's maintenance history, in the same modal the header search
+  // opens. A technician at the machine wants to know what was done to it
+  // last time before deciding anything; the scan result only had the date.
+  onViewHistory: (airConditionerId: string) => void;
   onScanError: (message: string) => void;
 }
 
@@ -73,7 +77,7 @@ export function QrScanModal(props: QrScanModalProps) {
   return <QrScanModalBody {...props} />;
 }
 
-function QrScanModalBody({ isPending, onClose, onClaim, onLogWork, onScanError }: QrScanModalProps) {
+function QrScanModalBody({ isPending, onClose, onClaim, onLogWork, onViewHistory, onScanError }: QrScanModalProps) {
   const supported = useSyncExternalStore(noSubscribe, readCameraSupport, () => false);
 
   const [typedCode, setTypedCode] = useState("");
@@ -402,12 +406,24 @@ function QrScanModalBody({ isPending, onClose, onClaim, onLogWork, onScanError }
               </div>
             )}
 
-            <button
-              onClick={scanAgain}
-              className="w-full border border-border bg-card text-foreground text-xs font-bold px-3 py-2 rounded-lg hover:bg-muted"
-            >
-              สแกนเครื่องใหม่
-            </button>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => {
+                  onViewHistory(qrResult.acDetails.id);
+                  onClose();
+                }}
+                className="inline-flex items-center justify-center gap-1.5 border border-border bg-card text-foreground text-xs font-bold px-3 py-2 rounded-lg hover:bg-muted"
+              >
+                <History className="h-3.5 w-3.5" />
+                ดูประวัติเครื่องนี้
+              </button>
+              <button
+                onClick={scanAgain}
+                className="border border-border bg-card text-foreground text-xs font-bold px-3 py-2 rounded-lg hover:bg-muted"
+              >
+                สแกนเครื่องใหม่
+              </button>
+            </div>
           </div>
         )}
       </div>

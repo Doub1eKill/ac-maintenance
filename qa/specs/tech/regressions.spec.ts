@@ -67,9 +67,18 @@ test("BUG-002: the scanner is real — no mock label, sticker uuid and URL resol
   const dlg2 = await openScanner(page);
   t = await lookUp(page, dlg2, u.pendingCode);
   ledger("QR scan", `typed acCode ${u.pendingCode} still resolves`, "UI", t.includes(u.pendingCode) ? "PASS" : "FAIL", await shot(page, "reg-qr-accode"));
-  await dlg2.getByRole("button", { name: "สแกนเครื่องใหม่" }).click();
+
+  // The result offers the unit's history (added after the handset test: the
+  // technician at the machine wanted to see what was done last time).
+  await dlg2.getByRole("button", { name: /ดูประวัติเครื่องนี้/ }).click();
+  await page.waitForTimeout(2500);
+  const hist = (await body(page)).replace(/\s+/g, " ");
+  ledger("QR scan", "'ดูประวัติเครื่องนี้' closes the scanner and opens the unit's history modal", "UI", /ประวัติการซ่อมบำรุง/.test(hist) && hist.includes(u.pendingCode) && !/สแกนรหัส QR เครื่องปรับอากาศ/.test(hist) ? "PASS" : "FAIL", await shot(page, "reg-qr-history"));
+  await page.locator("div.fixed.inset-0").filter({ hasText: /ประวัติการซ่อมบำรุง/ }).first().locator("button:has(svg.lucide-x)").first().click().catch(() => {});
   await page.waitForTimeout(400);
-  await lookUp(page, dlg2, "QA-NOT-A-REAL-CODE");
+
+  const dlg3 = await openScanner(page);
+  await lookUp(page, dlg3, "QA-NOT-A-REAL-CODE");
   const tt = await toastText(page, 3000);
   ledger("QR scan", `unknown code → "${tt}"`, "UI", /ไม่พบข้อมูลเครื่องปรับอากาศ/.test(tt) ? "PASS" : "FAIL", await shot(page, "reg-qr-unknown"));
 });
