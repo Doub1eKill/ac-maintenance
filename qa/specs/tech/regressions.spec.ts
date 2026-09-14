@@ -47,7 +47,25 @@ test("BUG-002: the scanner is real — no mock label, sticker uuid and URL resol
   ledger("QR scan", "without a usable camera the modal explains and offers the typed field", "UI", /พิมพ์รหัสเครื่อง|วางลิงก์จากสติกเกอร์/.test(first) && (await dlg.locator("#qr-typed-code").count()) ? "PASS" : "FAIL", "runs/" + process.env.QA_RUN + "/reg-qr-modal.png");
 
   let t = await lookUp(page, dlg, u.pendingUuid);
-  ledger("QR scan", `bare uuid → ${u.pendingCode} with 'รับงานทันที'`, "UI", t.includes(u.pendingCode) && /รับงานทันที/.test(t) ? "PASS" : "FAIL", await shot(page, "reg-qr-uuid"));
+  ledger("QR scan", `bare uuid → ${u.pendingCode} with 'รับงานทันที' and 'รับงานและบันทึกเลย'`, "UI", t.includes(u.pendingCode) && /รับงานทันที/.test(t) && /รับงานและบันทึกเลย/.test(t) ? "PASS" : "FAIL", await shot(page, "reg-qr-uuid"));
+
+  // One step from the machine: claim the open job and land in the log form
+  // for it. The claim is real (the DB row moves to claimed); the form is not
+  // submitted, and qa/baseline.mjs restore puts the job back to pending.
+  await dlg.getByRole("button", { name: /รับงานและบันทึกเลย/ }).click();
+  await page.locator("[data-sonner-toaster] li").first().waitFor({ timeout: 10_000 }).catch(() => {});
+  await page.waitForTimeout(2000);
+  const afterClaim = (await body(page)).replace(/\s+/g, " ");
+  const formJob = await page.locator('input[name="workOrderId"]').inputValue().catch(() => "");
+  const [[claimedStatus]] = db(`select status from work_orders where id=${Number(formJob) || 0}`).concat([[null]]);
+  ledger("QR scan", `'รับงานและบันทึกเลย' claims job ${formJob || "?"} (${claimedStatus}) and opens the log form for ${u.pendingCode}`, "DB", /บันทึกประวัติการซ่อม/.test(afterClaim) && afterClaim.includes(u.pendingCode) && claimedStatus === "claimed" ? "PASS" : "FAIL", await shot(page, "reg-qr-claim-and-log"));
+  await page.locator("div.fixed.inset-0").filter({ hasText: /บันทึกประวัติการซ่อม/ }).first().locator("button:has(svg.lucide-x)").first().click().catch(() => {});
+  await page.waitForTimeout(400);
+  // Put the job back so the rest of this file still sees a pending unit.
+  if (formJob) db(`update work_orders set status='pending', claimed_by=NULL, claimed_at=NULL where id=${Number(formJob)}`);
+  await page.getByRole("button", { name: "สแกน QR Code" }).first().click();
+  await dlg.waitFor({ timeout: 10_000 });
+  await lookUp(page, dlg, u.pendingUuid);
 
   await dlg.getByRole("button", { name: "สแกนเครื่องใหม่" }).click();
   await page.waitForTimeout(400);

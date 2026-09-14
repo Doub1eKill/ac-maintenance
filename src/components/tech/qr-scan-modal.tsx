@@ -16,6 +16,10 @@ interface QrScanModalProps {
   isPending: boolean;
   onClose: () => void;
   onClaim: (workOrderId: string) => void;
+  // Claim the unit's open job and go straight to the log form for it — one
+  // step for the technician already standing at the machine, instead of
+  // claim → งานของฉัน → บันทึกและปิดงาน.
+  onClaimAndLog: (result: QrScanResult) => void;
   // The unit has no open job: hand it to the log form, which is where a
   // technician records work on a unit nobody has reported. This replaced a
   // "สร้างใบงาน PM ใหม่" button that only ever showed a toast — it created
@@ -77,7 +81,7 @@ export function QrScanModal(props: QrScanModalProps) {
   return <QrScanModalBody {...props} />;
 }
 
-function QrScanModalBody({ isPending, onClose, onClaim, onLogWork, onViewHistory, onScanError }: QrScanModalProps) {
+function QrScanModalBody({ isPending, onClose, onClaim, onClaimAndLog, onLogWork, onViewHistory, onScanError }: QrScanModalProps) {
   const supported = useSyncExternalStore(noSubscribe, readCameraSupport, () => false);
 
   const [typedCode, setTypedCode] = useState("");
@@ -379,18 +383,31 @@ function QrScanModalBody({ isPending, onClose, onClaim, onLogWork, onViewHistory
             </div>
 
             {qrResult.pendingJobId ? (
-              <div className="bg-warning/10 border border-warning/30 p-3 rounded-xl flex items-center justify-between">
+              <div className="bg-warning/10 border border-warning/30 p-3 rounded-xl space-y-2">
                 <div>
                   <div className="text-xs font-bold text-warning-foreground">มีใบงานค้างอยู่!</div>
-                  <div className="text-[10px] text-warning-foreground">ต้องการรับงานนี้หรือไม่?</div>
+                  <div className="text-[10px] text-warning-foreground">รับงานนี้ หรือรับแล้วบันทึกผลงานต่อเลย</div>
                 </div>
-                <button
-                  onClick={handleClaimFromQr}
-                  disabled={isPending}
-                  className="bg-amber-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-amber-700 shadow-sm"
-                >
-                  รับงานทันที
-                </button>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={handleClaimFromQr}
+                    disabled={isPending}
+                    className="border border-amber-600/40 bg-card text-amber-700 dark:text-amber-400 text-xs font-bold px-3 py-2 rounded-lg hover:bg-amber-500/10 disabled:opacity-50"
+                  >
+                    รับงานทันที
+                  </button>
+                  <button
+                    onClick={() => {
+                      onClaimAndLog(qrResult);
+                      onClose();
+                    }}
+                    disabled={isPending}
+                    className="inline-flex items-center justify-center gap-1.5 bg-amber-600 text-white text-xs font-bold px-3 py-2 rounded-lg hover:bg-amber-700 shadow-sm disabled:opacity-50"
+                  >
+                    <ClipboardPen className="h-3.5 w-3.5" />
+                    รับงานและบันทึกเลย
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="bg-success/10 border border-success/30 p-3 rounded-xl">

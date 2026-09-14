@@ -196,6 +196,29 @@ export function TechShell({ user, universityName, buildings, badges, children }:
     [router]
   );
 
+  // Claim, then open the log form for the same job. The claim is the same
+  // status=pending guarded update the pool uses, so a job another technician
+  // took a moment earlier is refused rather than logged twice; on success the
+  // form opens with the job id, and saving it closes the job.
+  const claimAndLog = useCallback(
+    (res: QrScanResult) => {
+      const workOrderId = res.pendingJobId;
+      if (!workOrderId) return;
+      startTransition(async () => {
+        const claimed = await claimWorkOrderAction(workOrderId);
+        if (claimed.error) {
+          toast.error(claimed.error);
+          return;
+        }
+        toast.success("รับงานแล้ว — บันทึกผลงานได้เลย");
+        setJobForLog(jobFromScan(res));
+        // The pool and "งานของฉัน" badges move with the claim.
+        router.refresh();
+      });
+    },
+    [router]
+  );
+
   function handleLogSubmit(formData: FormData) {
     startTransition(async () => {
       const res = await logMaintenanceAction(formData);
@@ -323,6 +346,7 @@ export function TechShell({ user, universityName, buildings, badges, children }:
           isPending={isPending}
           onClose={() => setShowQrModal(false)}
           onClaim={claim}
+          onClaimAndLog={claimAndLog}
           onLogWork={(res) => setJobForLog(jobFromScan(res))}
           onViewHistory={setHistoryAcId}
           onScanError={(message) => toast.error(message)}
