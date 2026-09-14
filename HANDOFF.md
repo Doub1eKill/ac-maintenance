@@ -1,5 +1,17 @@
 # Project Handoff & Technical Summary
 
+# 🧪 A2 — harness ตาม flow ใหม่ + `qa/baseline.mjs` คืน DB อัตโนมัติ (14 ก.ย. 2026, DoubleKill)
+
+แผน A (ทำให้ของที่แก้ "อยู่") ข้อแรก · branch `qa/harness-regressions` → ff-merge `master` · commit `5fc0417`
+
+- `qa/specs/auth.setup.ts`: สมัคร org_admin `.ac.th` ต้องได้ **pending** (BUG-001) → login แล้วต้องไป `/pending-approval` (BUG-003) → demo-role admin **อนุมัติจริง** ที่ `/admin/approvals` (การ์ดที่มีอีเมล QA admin, role "ผู้ดูแลระบบ") → QA admin login เข้า `/admin` = admin session ของ suite (ไม่ใช้ demo-role เป็น session หลักอีก)
+- `qa/specs/tech/upload.spec.ts`: กด "บันทึกรูปโปรไฟล์" หลังเลือกไฟล์ · อ่านหัว alert ("บันทึกไม่สำเร็จ"/"บันทึกแล้ว") ไม่ใช่ข้อความ hint · ตรวจหลัง reload ว่าเก็บจริงไหม (`main img` src ผ่าน `/_next/image?url=%2Fuploads%2F…jpg`) · เพิ่มเคส HTML ชื่อ `.html` type image/png → ต้องถูกปฏิเสธ (BUG-012) และ PNG จริง → `.jpg`
+- **ใหม่ `qa/baseline.mjs`** — `node qa/baseline.mjs snapshot` ก่อนรัน · `restore` หลังรัน · `check` พิมพ์ตัวเลข baseline · เก็บ snapshot ที่ `C:\Projectc-maintenance-qaaseline.json` (นอก repo) · ลบ id > max ของ 11 ตารางที่โตได้ + คืนคอลัมน์ที่เปลี่ยนได้ (status/btu/brand/model ของเครื่อง, status/avatar/password ของ user, ชื่อ brand/model + deleted_at, schedule dates, WO status/claimed, ห้อง/อาคาร, system_settings) + ลบไฟล์ใหม่ใน `public/uploads` · ส่ง SQL ทาง stdin (command line Windows รับไม่พอ) · ไม่แตะ `DATABASE_URL` · **ไม่ใช่ seed**
+- ทดสอบ: setup 5/5 ผ่าน (ledger #1–#8 PASS) · upload spec PASS ทั้ง 5 check · `restore` คืน baseline ครบ (ลอง dirty: อาคารเพิ่ม, unit 1 เปลี่ยน status/btu, brand rename, audit row, ไฟล์ — คืนหมด)
+- หมายเหตุ: `AUTO_INCREMENT` ของ audit อยู่ที่ ~78 แม้ max id = 34 — ปกติ ไม่ต้องรีเซ็ต · หลัง `restore` ไฟล์ `auth/*.json` ของ harness ใช้ไม่ได้ (user ถูกลบ) ต้องรัน `--project=setup` ใหม่ทุกรอบ · Auth.js พิมพ์ stack trace `CredentialsSignin` ใน console dev ตอน login ของบัญชี pending — เป็น log ปกติของ v5 ไม่ใช่ error
+
+**ถัดไป:** A1 regression spec ครอบบั๊ก 12 ข้อ → A3 full sweep → A4 กล้องบน Android จริง
+
 # 🧹 ปิด backlog QA run `20260913-1742` ครบ — #8 นิยาม "ด่วน" · #9 ของใหม่ตกหน้า 2 · #10–12 🟢 (14 ก.ย. 2026, DoubleKill)
 
 ชุดสุดท้ายจากรายงาน QA (ต่อจาก 🔴 ×4 และ 🟡 ×3) บน branch `fix/qa-ux-bugs` → ff-merge `master` · 1 commit/บั๊ก · ทดสอบผ่านเบราว์เซอร์จริง (demo-role sign-in) · DB คืน baseline ครบ · `tsc` ผ่าน · eslint `src` 24/19 เท่าเดิม · **บั๊กจาก QA ทั้ง 12 ข้อปิดหมดแล้ว**
