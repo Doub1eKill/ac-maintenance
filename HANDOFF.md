@@ -1,5 +1,15 @@
 # Project Handoff & Technical Summary
 
+# 🔒 B2 — `auth.ts` เทียบรหัสผ่านก่อนเช็คสถานะบัญชี (15 ก.ย. 2026, DoubleKill)
+
+แผน B ข้อสอง · branch `fix/auth-order` → ff-merge `master`
+
+- **ปัญหา:** `authorize()` เช็ค `suspended`/`pending` ก่อน `bcrypt.compare` → ใครก็ได้พิมพ์รหัสมั่วใส่อีเมลใดๆ แล้วรู้จากคำตอบว่าอีเมลนั้น pending / ถูกระงับ / มีอยู่ (ข้อความ "รหัสผิด" ขึ้นเฉพาะบัญชีปกติ) — พบตอนแก้ #3
+- **แก้:** เทียบรหัสก่อน — ผิด = generic เสมอ; ข้อความ suspended/pending สงวนให้คนที่พิสูจน์ว่ารู้รหัส · อีเมลที่ไม่มีในระบบ `bcrypt.compare` กับ `DUMMY_HASH` (hash จริง สร้างครั้งเดียวตอนโหลดโมดูล) ให้เวลาตอบใกล้เคียงรหัสผิด (timing side channel)
+- **คงเดิมโดยตั้งใจ:** บัญชี `password = NULL` ยังได้ "ตั้งรหัสผ่านใหม่ก่อน…" ทันที (ไม่มี hash ให้เทียบ และเป็น design ตาม comment ใน schema) — เป็น enumeration เล็กน้อยสำหรับบัญชี legacy ที่ยังไม่ตั้งรหัส ถ้า production ตั้งรหัสครบแล้วไม่มีผล
+- ทดสอบเบราว์เซอร์ (สมัคร 2 บัญชีชั่วคราวแล้ว restore): pending+รหัสผิด → generic · pending+รหัสถูก → `/pending-approval` · suspended+รหัสผิด → generic · suspended+รหัสถูก → "ถูกระงับ" · ไม่มีบัญชี → generic · เวลาตอบทุกเคส ~2.2–2.4 วิ (รวม navigation)
+- regression: `public/regressions.spec.ts` เพิ่ม "B2: pending + wrong password → generic; + right password → /pending-approval" (ใช้ `QA.pending` ที่ setup สมัครไว้ ก่อน admin project จะอนุมัติ) PASS · `auth.setup` / `public/auth.spec` เดิมยังผ่าน (ใช้รหัสถูก)
+
 # 📊 B1 — โดนัท analytics นับจาก DB ทั้งหมด ไม่ใช่ 50 แถวแรกของกระดาน (14 ก.ย. 2026, DoubleKill)
 
 แผน B ข้อแรก · branch `fix/analytics-counts` → ff-merge `master`
