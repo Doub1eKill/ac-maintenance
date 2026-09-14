@@ -1,5 +1,25 @@
 # Project Handoff & Technical Summary
 
+# 🛡️ A1 — regression spec ครอบบั๊ก 12 ข้อของ QA run `20260913-1742` (14 ก.ย. 2026, DoubleKill)
+
+แผน A ข้อสอง · branch `qa/regression-specs` → ff-merge `master` · commit `d4f8660` · **27 check PASS ทั้งหมด** บน master (run `20260914-1952`) · DB คืน baseline ด้วย `qa/baseline.mjs restore`
+
+| ไฟล์ | บั๊กที่กัน |
+|---|---|
+| `qa/specs/public/regressions.spec.ts` | BUG-009 (JS ปิด: ปุ่ม disabled / Enter เฉย / บังคับ submit = POST URL สะอาด) · BUG-003 (password NULL → "ตั้งรหัสผ่านใหม่", ไม่มีบัญชี → generic) · BUG-011 หน้า public |
+| `qa/specs/admin/regressions.spec.ts` | BUG-005 (แคตตาล็อก → default BTU + แก้ไข-บันทึกยังอยู่) · BUG-006/010 (-5, 1.5 โดนทั้ง browser ไทยและ Zod ไทย; ชั้น -3/ว่าง) · BUG-004 (ซ้ำชนิดเดียวกันปฏิเสธ, ต่างชนิดผ่าน, DB นับ 2) · BUG-007 (KPI = pill = subtitle, ค้างล้าง = KPI, ผลรวม = total, footer = DB) · BUG-008 (อาคารใหม่ท้ายสุด → หน้า 2 เปิด; ใบงานในอาคารนั้น → กระดานเปิดหน้า 2; เข้าใหม่ → หน้า 1) · BUG-011 หน้า admin |
+| `qa/specs/tech/regressions.spec.ts` | BUG-002 (ไม่มีคำว่า "จำลอง"; uuid / ลิงก์สติกเกอร์ / acCode หาเจอ; pending → รับงานทันที; ว่าง → เปิด LogActionModal จริงแล้วปิด scanner; unknown → 1 toast) + **เส้นทางกล้อง** ด้วย `--use-fake-device-for-media-stream` + stub `BarcodeDetector` (unknown ค้าง 3 วิ → 1 lookup/1 toast; สติกเกอร์ → ผลขึ้นเอง) · BUG-011 หน้า tech |
+| `qa/specs/auth.setup.ts` (A2) | BUG-001, BUG-003 (pending → `/pending-approval`) |
+| `qa/specs/tech/upload.spec.ts` (A2) | BUG-012 |
+
+- `qa/lib.ts` เพิ่ม `db(sql)` (mysql CLI ทาง stdin — method "DB" ใน ledger), `toastText()`, `clearToasts()` — **อย่าลบ `<li>` ของ sonner เอง**: ทำแล้ว React โยน `insertBefore … not a child` ทั้งหน้าล่ม (เจอระหว่างเขียน) ตอนนี้ `clearToasts` แค่รอ toast หายเอง
+- `qa/playwright.config.ts`: project `tech` เพิ่ม `launchOptions.args` fake camera
+- test QR เดิมใน `tech/workflows.spec.ts` (บรรยาย mock) ถูกลดเหลือ a11y check
+- spec ใช้ข้อมูล baseline (อาคารแรกตามชื่อ, รุ่นที่ `default_btu` สูงสุด, เครื่องที่มี/ไม่มี WO ค้าง) ไม่พึ่ง QA_TEST_* ของ workflow spec → รันเดี่ยวได้: `npx playwright test --config qa/playwright.config.ts --project=admin --grep BUG-`
+- วิธีรันรอบหน้า: `node qa/baseline.mjs snapshot` → `QA_RUN=... --project=setup` → public/admin/tech → `node qa/baseline.mjs restore`
+
+**ถัดไป:** A3 full sweep เทียบ `20260913-1742` → A4 กล้อง Android จริง
+
 # 🧪 A2 — harness ตาม flow ใหม่ + `qa/baseline.mjs` คืน DB อัตโนมัติ (14 ก.ย. 2026, DoubleKill)
 
 แผน A (ทำให้ของที่แก้ "อยู่") ข้อแรก · branch `qa/harness-regressions` → ff-merge `master` · commit `5fc0417`
