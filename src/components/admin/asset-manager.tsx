@@ -16,6 +16,7 @@ import {
 import { QRCodeSVG } from "qrcode.react";
 import { AcHistoryModal } from "@/components/admin/ac-history-modal";
 import { useEscapeToClose } from "@/hooks/use-escape-to-close";
+import { nativeValidity } from "@/lib/native-validity";
 import {
   StickerCard,
   openStickerSheet,
@@ -598,6 +599,12 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
                   min={0}
                   required
                   placeholder="เช่น 2"
+                  {...nativeValidity({
+                    valueMissing: "กรุณาระบุชั้น",
+                    rangeUnderflow: "ชั้นต้องเป็น 0 ขึ้นไป",
+                    stepMismatch: "ชั้นต้องเป็นจำนวนเต็ม",
+                    badInput: "ชั้นต้องเป็นตัวเลข",
+                  })}
                   // Filled in and read-only when the floor is already known, so
                   // the room cannot land on a different floor than the header
                   // it was opened from says.
@@ -677,7 +684,7 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
                   </div>
                   <div>
                     <label className="mb-1.5 block font-bold text-foreground">ขนาด BTU (ไม่บังคับ)</label>
-                    <input name="btu" type="number" min="1" step="1" placeholder="เช่น 18000" className="w-full rounded-xl border border-border px-3.5 py-2.5 text-foreground focus:border-primary focus:outline-none" />
+                    <input name="btu" type="number" min="1" step="1" placeholder="เช่น 18000" {...nativeValidity({ rangeUnderflow: "ขนาด BTU ต้องมากกว่า 0", stepMismatch: "ขนาด BTU ต้องเป็นจำนวนเต็ม", badInput: "ขนาด BTU ต้องเป็นตัวเลข" })} className="w-full rounded-xl border border-border px-3.5 py-2.5 text-foreground focus:border-primary focus:outline-none" />
                   </div>
                 </>
               )}
@@ -760,7 +767,7 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
                   </div>
                   <div>
                     <label className="mb-1.5 block font-bold text-foreground">ขนาด BTU (ไม่บังคับ)</label>
-                    <input name="btu" type="number" min="1" step="1" defaultValue={showEditAc.btu ?? ""} placeholder="เช่น 18000" className="w-full rounded-xl border border-border px-3.5 py-2.5 text-foreground focus:border-primary focus:outline-none" />
+                    <input name="btu" type="number" min="1" step="1" defaultValue={showEditAc.btu ?? ""} placeholder="เช่น 18000" {...nativeValidity({ rangeUnderflow: "ขนาด BTU ต้องมากกว่า 0", stepMismatch: "ขนาด BTU ต้องเป็นจำนวนเต็ม", badInput: "ขนาด BTU ต้องเป็นตัวเลข" })} className="w-full rounded-xl border border-border px-3.5 py-2.5 text-foreground focus:border-primary focus:outline-none" />
                   </div>
                 </>
               )}
