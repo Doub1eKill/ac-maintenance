@@ -171,21 +171,25 @@ test.describe("admin workflows", () => {
     await settle(page, 3000);
     ledger("Work orders", "create work order via header modal", "UI", /สำเร็จ|สร้าง/.test(t) || !(await dlg.isVisible().catch(() => false)) ? "PASS" : "FAIL", await shot(page, "wo-created"));
 
-    await page.reload(); await page.locator("main").last().waitFor({ timeout: 60_000 }); await page.waitForTimeout(3500);
+    // The board first, by the sidebar (a client navigation): the shell
+    // remembers the order it just raised and opens the board on the building
+    // it landed in, whichever page that is (BUG-008 fix). A full reload would
+    // forget that, which is also by design (review fix d26018f).
+    await page.getByRole("link", { name: /กระดานใบงาน/ }).first().click();
+    await page.waitForURL(/work-orders/, { timeout: 60_000 });
+    await page.locator("main").last().waitFor({ timeout: 60_000 }); await page.waitForTimeout(2500);
+    const board0 = await body(page);
+    const pager0 = board0.match(/หน้า \d+ จาก \d+/)?.[0] ?? "(no pager)";
+    ledger("Work orders", `board opened from the shell shows the new order's building (${pager0})`, "UI", board0.includes(QA.building.name) && board0.includes(`${QA.building.abbr}-${QA.room}`) ? "PASS" : "FAIL", await shot(page, "wo-board"));
+    await filterAssets(page, QA.building.abbr);
+    const board = await body(page);
+    const grp = board.match(new RegExp(QA.building.name + String.raw`[\s\S]{0,80}?(\d+) ใบงาน`));
+    ledger("Work orders", `board filtered by the building shows its group with ${grp?.[1] ?? "?"} order(s)`, "UI", grp && Number(grp[1]) >= 1 ? "PASS" : "FAIL", await shot(page, "wo-board-filtered"));
+
+    await page.goto("/admin"); await page.locator("main").last().waitFor({ timeout: 60_000 }); await page.waitForTimeout(3500);
     const after = await kpi(page);
     note("admin-kpi-after-wo.json", JSON.stringify({ before, after }));
     ledger("Dashboard", `รอซ่อมด่วน counter moved ${before.repair} → ${after.repair} after a repair order`, "UI", after.repair === before.repair + 1 ? "PASS" : "FAIL", await shot(page, "admin-dashboard-after-wo"));
-
-    await page.goto("/admin/work-orders");
-    await page.locator("main").last().waitFor({ timeout: 60_000 }); await page.waitForTimeout(2500);
-    const board0 = await body(page);
-    ledger("Work orders", "new order's building is on page 1 of the board (grouped, 5 buildings/page)", "UI", board0.includes(QA.building.name) ? "PASS" : "FAIL", await shot(page, "wo-board"));
-    await filterAssets(page, QA.building.abbr);
-    const main2 = page.locator("main").last();
-    const board = await body(page);
-    const grp = board.match(new RegExp(QA.building.name + "[\s\S]{0,80}?(\d+) ใบงาน"));
-    ledger("Work orders", `board filtered by the building shows its group with ${grp?.[1] ?? "?"} order(s)`, "UI", grp && Number(grp[1]) >= 1 ? "PASS" : "FAIL", await shot(page, "wo-board-filtered"));
-    void main2;
 
     // cross-side: technician pool must show it without a restart
     const ctx = await browser.newContext({ ...require("@playwright/test").devices["Pixel 7"], storageState: path.join(OUT_ROOT, "auth", "tech.json") });
@@ -205,23 +209,32 @@ test.describe("admin workflows", () => {
   test("upcoming maintenance table: filter pills change the rows", async ({ page }) => {
     await page.goto("/admin");
     await page.locator("main").last().waitFor({ timeout: 120_000 }); await page.waitForTimeout(3000);
-    const rows = async () => (await body(page)).split("\n").filter((l) => /^[A-Z]\d{6}-/.test(l.trim())).length;
-    const all = await rows();
+    // The list groups by building (collapsed on load, five buildings a page),
+    // so rows are counted from the pills and the group subtitles, not from
+    // visible unit codes.
+    const pill = async (re: RegExp) => Number((await body(page)).replace(/\s+/g, " ").match(re)?.[1] ?? -1);
+    // Group subtitles are <p>"N รายการ"</p>; the KPI cards say "รายการ" too but not in a <p> of their own.
+    const shown = async () => (await page.locator("main p").filter({ hasText: /^\d+ รายการ$/ }).allInnerTexts()).map((m) => parseInt(m, 10)).reduce((a, b) => a + b, 0);
+    const all = await pill(/ทั้งหมด (\d+) รอซ่อมด่วน/);
+    const urgent = await pill(/รอซ่อมด่วน (\d+) งานล้างแอร์/);
+    const upcoming = await pill(/งานล้างแอร์ (\d+)/);
     await page.getByRole("button", { name: /^รอซ่อมด่วน/ }).click(); await page.waitForTimeout(800);
-    const urgent = await rows();
+    const urgentShown = await shown();
     const urgentText = await body(page);
-    await page.getByRole("button", { name: /^ถึงรอบล้าง/ }).click(); await page.waitForTimeout(800);
-    const upcoming = await rows();
+    await page.getByRole("button", { name: /^งานล้างแอร์/ }).click(); await page.waitForTimeout(800);
+    const upcomingShown = await shown();
     await page.getByRole("button", { name: /^ทั้งหมด/ }).click(); await page.waitForTimeout(800);
-    const back = await rows();
-    note("upcoming-filter.txt", `all=${all} urgent=${urgent} upcoming=${upcoming} back=${back}`);
-    ledger("Upcoming table", `filter pills: all=${all} urgent=${urgent} upcoming=${upcoming} back=${back}`, "UI", all > 0 && urgent <= all && upcoming <= all && back === all && (urgent + upcoming >= all - 1) ? "PASS" : "FAIL", await shot(page, "upcoming-filter"));
-    ledger("Upcoming table", "urgent view shows no 'ถึงรอบล้าง' rows", "UI", /ถึงรอบล้าง.*\n/.test(urgentText.split("รอซ่อมด่วน").slice(2).join("")) ? "BLOCKED" : "PASS", "runs/" + process.env.QA_RUN + "/upcoming-filter.png");
+    const backShown = await shown();
+    note("upcoming-filter.txt", `pills all=${all} urgent=${urgent} upcoming=${upcoming}; page-1 group rows urgent=${urgentShown} upcoming=${upcomingShown} all=${backShown}`);
+    ledger("Upcoming table", `pills all=${all} = urgent ${urgent} + cleaning ${upcoming}; filtered page-1 groups hold ${urgentShown}/${upcomingShown} rows`, "UI", all > 0 && urgent + upcoming === all && urgentShown > 0 && urgentShown <= urgent && upcomingShown > 0 && upcomingShown <= upcoming && backShown > 0 ? "PASS" : "FAIL", await shot(page, "upcoming-filter"));
+    // Only repair rows under the urgent pill (BUG-007): no cleaning badge may
+    // appear in the list below the pills.
+    ledger("Upcoming table", "urgent view lists only ซ่อมด่วน rows (no ค้างล้าง/กำหนดล้าง badges)", "UI", /(ค้างล้าง|กำหนดล้าง) \d/.test(urgentText.split("งานล้างแอร์").slice(1).join("")) ? "FAIL" : "PASS", "runs/" + process.env.QA_RUN + "/upcoming-filter.png");
     const search = page.getByPlaceholder(/ค้นหารหัสแอร์\.\.\./);
     await search.fill("ZZZZ-NO-MATCH"); await page.waitForTimeout(800);
-    const none = await rows();
+    const none = await shown();
     await search.fill(""); await page.waitForTimeout(500);
-    ledger("Upcoming table", "no-match search shows zero rows and recovers", "UI", none === 0 && (await rows()) === all ? "PASS" : "FAIL", await shot(page, "upcoming-search-nomatch"));
+    ledger("Upcoming table", "no-match search shows zero rows and recovers", "UI", none === 0 && (await shown()) === backShown ? "PASS" : "FAIL", await shot(page, "upcoming-search-nomatch"));
   });
 
   test("approvals: pending QA user is listed with the requested role; reject/approve work", async ({ page, browser }) => {
@@ -301,16 +314,28 @@ test.describe("admin workflows", () => {
     // trash: create a brand, delete it, re-create same name → must be told to restore
     await page.locator('input[name="name"]').first().fill("QA_TEST_BRAND");
     await page.getByRole("button", { name: /^เพิ่มยี่ห้อ$/ }).first().click();
-    await settle(page, 2500);
+    const tCreate = await toastText(page); await settle(page, 2500);
     const afterCreate = await body(page);
     const alreadyInTrash = /อยู่ในถังขยะ/.test(afterCreate);
-    const created = alreadyInTrash || afterCreate.includes("QA_TEST_BRAND");
+    const created = alreadyInTrash || afterCreate.includes("QA_TEST_BRAND") || /เพิ่มยี่ห้อ.*(สำเร็จ|เรียบร้อย)/.test(tCreate);
+    let tTrash = "";
+    // The brand list pages five at a time in name order, so a sixth brand
+    // sorting after "Panasonic" is created but not in view — the same shape
+    // as BUG-008 on the asset and board lists, still open here.
+    ledger("Catalogue", `new brand is in view right after creation (${afterCreate.includes("QA_TEST_BRAND") ? "yes" : "no — on the next page"})`, "UI", alreadyInTrash || afterCreate.includes("QA_TEST_BRAND") ? "PASS" : "FAIL", await shot(page, "settings-brand-created"));
     if (!alreadyInTrash) {
+      if (!afterCreate.includes("QA_TEST_BRAND")) {
+        await page.getByRole("link", { name: /next|ถัดไป/i }).last().click().catch(() => {});
+        await page.waitForTimeout(800);
+      }
       await page.getByRole("button", { name: /ลบยี่ห้อนี้ลงถังขยะ/ }).last().click();
       await page.getByRole("button", { name: /ยืนยันลบ/ }).click();
+      tTrash = await toastText(page);
       await settle(page, 2500);
     }
-    const trashed = alreadyInTrash || !(await body(page)).includes("QA_TEST_BRAND");
+    // Judged by the toast, not by the name vanishing from the page: the audit
+    // log panel below the catalogue keeps mentioning the brand.
+    const trashed = alreadyInTrash || /ไปถังขยะแล้ว/.test(tTrash);
     await page.locator('input[name="name"]').first().fill("qa_test_brand");
     await page.getByRole("button", { name: /^เพิ่มยี่ห้อ$/ }).first().click();
     await page.getByText(/อยู่ในถังขยะ/).first().waitFor({ timeout: 8000 }).catch(() => {});
@@ -318,6 +343,8 @@ test.describe("admin workflows", () => {
     ledger("Catalogue", "create → trash → re-create same name (case variant) is redirected to the trash bin", "UI", created && trashed && /ถังขยะ/.test(again) ? "PASS" : "FAIL", await shot(page, "settings-trash-recreate"));
     await page.getByRole("button", { name: "ถังขยะ", exact: true }).click();
     const dlg = page.locator("div.fixed.inset-0").filter({ hasText: /ถังขยะ/ }).first(); await dlg.waitFor({ timeout: 10_000 });
+    // The bin's contents load after the modal opens.
+    await dlg.getByText("QA_TEST_BRAND").first().waitFor({ timeout: 8000 }).catch(() => {});
     const inTrash = (await dlg.innerText()).includes("QA_TEST_BRAND");
     ledger("Catalogue", "trash modal lists the deleted brand", "UI", inTrash ? "PASS" : "FAIL", await shot(page, "settings-trash-modal"));
     // permanently delete to clean up
