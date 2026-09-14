@@ -301,9 +301,14 @@ function SidebarRail({ className, ...props }: React.ComponentProps<"button">) {
   )
 }
 
-function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
+// A <div>, not the <main> the shadcn original renders: the dashboard layout
+// puts its own <main> around the page content inside this, and two main
+// landmarks on every admin and technician page is a duplicate for screen
+// readers and for anything that selects `main` (QA 20260913-1742, BUG-011).
+// The inner one is the right landmark — it excludes the header.
+function SidebarInset({ className, ...props }: React.ComponentProps<"div">) {
   return (
-    <main
+    <div
       data-slot="sidebar-inset"
       className={cn(
         "relative flex w-full flex-1 flex-col bg-background md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-2xl md:peer-data-[variant=inset]:shadow-sm md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2",
