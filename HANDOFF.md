@@ -1,5 +1,15 @@
 # Project Handoff & Technical Summary
 
+# 📊 B1 — โดนัท analytics นับจาก DB ทั้งหมด ไม่ใช่ 50 แถวแรกของกระดาน (14 ก.ย. 2026, DoubleKill)
+
+แผน B ข้อแรก · branch `fix/analytics-counts` → ff-merge `master`
+
+- **สาเหตุ:** `getAdminOverviewData` ส่ง `workOrders` = `findMany({ take: WORK_ORDER_PAGE_SIZE /* 50 */ })` ให้ `MaintenanceAnalyticsDonut` นับเอง → "รวมทั้งหมด: 50 ใบงาน" คือ page size, "รอดำเนินการ 47" ไม่ตรง sidebar 48 (พบตอน #8, บันทึกไว้เป็น B1) — comment ใน `overview-panel.tsx` เคยอธิบายกับดัก 50 แถวนี้ไว้แล้วสำหรับอาการอื่น (ปุ่มมอบหมายช่าง 0)
+- **ใหม่ `src/lib/admin/work-order-stats.ts`** — `getWorkOrderStats()`: `groupBy status` + `groupBy type` + `count(priority in high/critical & status open)` → `WorkOrderStats {total, completed, claimed, pending, cancelled, cleaning, repair, urgentOpen}`
+- `pages.ts`: overview เลิก fetch 50 แถว ส่ง `workOrderStats` แทน (overview ไม่ได้ใช้แถวทำอย่างอื่น) · `page.tsx` / `overview-client.tsx` / `overview-panel.tsx` เปลี่ยน prop `workOrders` → `workOrderStats` · donut รับ `stats` ไม่มี useMemo นับเองอีก · `WORK_ORDER_PAGE_SIZE` ยัง export อยู่แต่ไม่มีใครใช้แล้ว
+- ทดสอบ `/admin`: รวม **62** = DB · เสร็จสิ้น 6 · กำลังดำเนินการ 6 · รอดำเนินการ **48** = sidebar badge 48 · ยกเลิก 2 · ล้างแอร์ 50 · แจ้งซ่อม 12 · footer 0 = DB
+- regression: `admin/regressions.spec.ts` BUG-007 เพิ่ม check "analytics total = DB, pending card = DB = sidebar badge" (PASS) และอ่านตัวเลขหลัง MotionNumber นิ่ง (อ่าน 2 ครั้งห่าง 1 วิจนเท่ากัน — spring overshoot ทำให้ค่าระหว่าง animate ไม่ตรง)
+
 # ⚡ สแกนแล้ว "รับงานและบันทึกเลย" — ขั้นเดียวสำหรับเครื่องที่มีใบงานค้าง (14 ก.ย. 2026, DoubleKill)
 
 เจ้าของโปรเจกต์ถามว่า flow "สแกนแล้วเพิ่มประวัติได้ง่าย" หายไปไหม — ไม่หาย แต่เครื่องที่**มีใบงานค้าง**เดิมได้แค่ "รับงานทันที" แล้วต้องไป "งานของฉัน" → "บันทึกและปิดงาน" อีก 2 ขั้น (เครื่องที่ไม่มีใบงานค้างมี "บันทึกงานซ่อมบำรุงเครื่องนี้" อยู่แล้ว, ทาง `/qr/<uuid>` → "บันทึกงานซ่อมบำรุง" ก็ยังอยู่)
