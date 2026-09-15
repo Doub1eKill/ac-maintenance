@@ -1,5 +1,36 @@
 # Project Handoff & Technical Summary
 
+# 🐘 D2 — full sweep บน PostgreSQL 16 ผ่าน: 190 check · 188 PASS · harness รู้จักสอง engine (15 ก.ย. 2026, DoubleKill)
+
+แผน D ข้อสอง · harness commit `756263f` บน **master** (engine-neutral) · `feat/postgres` rebase ทับแล้ว = master + 5 commit (`962f74c`) · ทำใน worktree `C:\Project\ac-maintenance-pg` (:3001, PostgreSQL local) ขณะ master/:3000/MariaDB ไม่ถูกแตะ
+
+## ของใหม่ใน `qa/` (ใช้ได้ทั้ง MariaDB และ PostgreSQL)
+- **`qa/copy-mariadb-to-postgres.mjs`** — เท baseline จาก MariaDB ลง PostgreSQL (truncate → `\\copy` ต่อตาราง เรียงตาม FK → setval sequence) · อ่านคอลัมน์จาก information_schema ของ Postgres แล้ว select จาก MariaDB ในลำดับเดียวกัน (ชื่อคอลัมน์ตรงกันหมด ต่างแค่ลำดับ) · ไม่แปลงค่าเลยเพราะ mysql `-B` escape (\\t \\n \\\\) = COPY text format, NULL เป็นคำว่า NULL, tinyint 0/1 → boolean ได้ · **พิสูจน์:** counts ตรง baseline ทุกตัว, md5 ของ issue_description+notes ทุกแถวเท่ากันสองฝั่ง (ภาษาไทย byte-identical, ต้อง `--default-character-set=utf8mb4`)
+- **`qa/lib.ts db()` + `qa/baseline.mjs`** เลือก client จาก `.env` ของ repo: `DATABASE_URL` เป็น postgres:// → `psql -X -q -At -F <tab> -P null=NULL -v ON_ERROR_STOP=1 -d <url>` (`QA_PSQL` เปลี่ยน path) ไม่งั้น mysql เหมือนเดิม (`QA_MYSQL`) · URL ไม่ถูก print · `PGCLIENTENCODING=UTF8`
+- **`restore()` เรียงใหม่: UPDATE แถวเดิมก่อน แล้วค่อย DELETE แถวใหม่** — แถว baseline อาจชี้ไปแถวของ run ผ่าน FK RESTRICT (WO ที่ QA tech claim, เครื่องที่ย้ายไปยี่ห้อ QA) Postgres ไม่มี `FOREIGN_KEY_CHECKS=0` และ constraint ของ Prisma ไม่ deferrable → คืนค่าก่อนแล้วลบไม่ชน · MariaDB ยังมี switch เดิมครอบ · `quote()` แยก engine (backslash escape vs `''`) · **round-trip ทดสอบทั้งสอง engine**: brand+user ใหม่ที่ถูกอ้าง, rename Panasonic เป็นชื่อมี `'` และ `\\` → restore กลับ baseline เป๊ะ
+- spec: `sum(status='pending')` (MySQL-only) → `sum(case when … then 1 else 0 end)` · `auth.spec` เทียบ host กับ `QA_BASE_URL` · **`QA_BASE_URL`** ใน playwright.config (baseURL + webServer.url) · webServer ได้ `NODE_OPTIONS=--max-old-space-size=6144` (เหตุผลด้านล่าง)
+
+## ผลสวีป run `pg-20260915-1527` (output ที่ `C:\Project\ac-maintenance-pg-qa\`)
+| project | ผล |
+|---|---|
+| public | **32/32** (12.2 นาที — 4 เคส adversarial login ใช้ 1.5 นาที/เคส รอ timeout ปกติของ spec) |
+| admin | **32/32** (7.8 นาที) รวม BUG-004 duplicate WO ที่ตอนนี้มี index หนุน, B1 donut = DB ผ่าน `sum(case)` |
+| tech | รอบแรก 14/16: "catalogue: technician can rename" FAIL + "/qr/<uuid>" ถูกข้าม (serial) · **rerun ทั้งไฟล์ 16/16** |
+| ledger | **190 unique check: 188 PASS · 1 BLOCKED (demo-role panel — production) · 1 FAIL (OPEN-3 `<nextjs-portal>` ทับ bottom-nav — dev indicator)** = เหมือน MariaDB ทุกประการ · DB คืน baseline หลังทุก project |
+
+## อาการแวดล้อมที่เจอ (ไม่ใช่บั๊ก app)
+- **tech รอบแรก:** หน้า `/tech/catalogue` reload ตัวเอง 117 ครั้ง (~1.35 วิ/ครั้ง, document 200 ทุกครั้ง, console มีแค่ "[HMR] connected", ไม่มี request อื่นเลย ไม่มี `/api/auth/session`) → เป็น reload จาก HMR client ของ Next dev ไม่ใช่โค้ดเรา (grep แล้วไม่มี `location.reload` ในแอป) · ทำมือบนหน้าเดียวกันหลังจากนั้น: rename LG→"LG QA"→LG ผ่าน ไม่ loop · rerun ทั้งไฟล์ผ่าน · **ยังไม่พบสาเหตุแน่ชัด** — เกิดหลัง dev server เดียวกัน compile ทุก route ของ 3 project ต่อเนื่อง ~40 นาที
+- **rerun ครั้งแรกล้มด้วย `ERR_CONNECTION_REFUSED`:** log ขึ้น `⚠ Server is approaching the used memory threshold, restarting...` — Next 16 dev restart ตัวเองเมื่อ heap > 80% ของ limit (~4.1 GB default) เช็คหลังทุก request (`start-server.js`) · แก้ด้วย `NODE_OPTIONS=--max-old-space-size=6144` ตอนเปิด server (เครื่องมี RAM 16 GB) แล้วรัน tech ทั้งไฟล์ผ่าน 16/16
+- psql บน Windows: ห้ามใช้ `-c "…||…"` ส่ง SQL ทาง stdin เท่านั้น
+
+## สภาพตอนนี้
+- worktree `ac-maintenance-pg` = `feat/postgres` `962f74c` สะอาด · `.env` ชี้ 5432 · PostgreSQL local = **baseline เต็ม** (copy จาก MariaDB + migration D3 apply แล้ว) · snapshot อยู่ที่ `C:\Project\ac-maintenance-pg-qa\baseline.json`
+- dev server :3001 (heap 6 GB) **ยังเปิดอยู่** สำหรับ D4a · :3000 ของ master ยังอยู่ · MariaDB = baseline
+
+**วิธีรันสวีปบน Postgres ครั้งถัดไป:** ใน worktree `export QA_OUT=C:/Project/ac-maintenance-pg-qa QA_BASE_URL=http://localhost:3001 QA_RUN=pg-$(date +%Y%m%d-%H%M)` แล้วใช้ลำดับเดิมใน HANDOFF (snapshot → public → admin → restore → admin --grep 2 เคส → tech → restore)
+
+**ถัดไป:** D4a รูปไป Vercel Blob (branch `feat/blob-uploads` ตัดจาก master, แผนใน entry OPEN-2) · D4 deploy Vercel + Aiven (ใช้ `copy-mariadb-to-postgres.mjs` เท baseline ขึ้น Aiven ได้เลยถ้าเปลี่ยน `.env` ชั่วคราว — ห้าม print URL)
+
 # 🔒 D3 — partial unique index กันใบงานซ้ำในระดับ DB (ฝั่ง PostgreSQL) (15 ก.ย. 2026, DoubleKill)
 
 แผน D ข้อสาม · commit `14c1011` บน **`feat/postgres`** (ไม่ใช่ master — migration เป็น Postgres-only) · ทำใน worktree `C:\Project\ac-maintenance-pg`
