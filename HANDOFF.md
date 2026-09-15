@@ -1,5 +1,31 @@
 # Project Handoff & Technical Summary
 
+# ☁️ D4 ขั้นแรก — แอปต่อ Aiven PostgreSQL 18 จริงแล้ว พร้อม baseline เต็ม (15 ก.ย. 2026, DoubleKill)
+
+เจ้าของสร้าง service **`ac-maintenance-pg`** (PostgreSQL 18.6, Free tier, Asia Pacific, connection limit 20, ดับเองเมื่อไม่ใช้งาน) แล้วสั่ง "เชื่อมอันนี้ก่อน" · commit `5352987` บน `feat/postgres` (= master + 6 commit)
+
+## บั๊กที่เจอทันที — และเป็นเหตุผลที่ต้องทดสอบกับ Aiven จริง ไม่ใช่ Postgres local
+- `prisma.ts` ส่ง `{ connectionString, ssl: { ca, rejectUnauthorized: true } }` ให้ `PrismaPg` → ทุก query ล้ม **"Error opening a TLS connection: self-signed certificate in certificate chain"** ทั้งที่ CA ถูกต้อง
+- **สาเหตุ:** URI ของ Aiven ลงท้าย `?sslmode=require` และ `pg` (`connection-parameters.js`) ทำ `Object.assign({}, config, parse(connectionString))` — ค่าที่ parse จาก URL **ทับ** option ที่ส่งไป · `sslmode=require` ถูก parse เป็น `ssl = {}` → CA หาย → ตรวจกับ system roots → ล้ม (ทดสอบกับ Postgres local ไม่เจอเพราะไม่มี TLS)
+- **แก้:** ถ้ามี `DATABASE_CA_CERT` ให้ `new URL(connectionString)` แล้ว `searchParams.delete("sslmode")` ก่อนส่ง, ตั้ง `ssl` เอง · ถ้าไม่มี CA ส่ง URL เดิมทั้งดุ้น (DB บน cloud จะยังล้มดังๆ ไม่ต่อแบบไม่ตรวจ) · **ไม่ต้องใช้** `uselibpqcompat=true`
+
+## สภาพแวดล้อม (worktree `ac-maintenance-pg`, ไม่มีอะไรเข้า git)
+- `.env`: section "Aiven PostgreSQL (D4)" บนสุด — `DATABASE_URL` (copy จากปุ่ม copy ข้าง Service URI), `DATABASE_POOL_MAX=3` (limit 20 แบ่งกับ psql/Vercel), `DATABASE_CA_CERT` = เนื้อ PEM หลายบรรทัดในเครื่องหมายคำพูด (dotenv/@next/env อ่าน multi-line ได้ — ตรวจแล้ว 1540 chars ครบ BEGIN/END) · บรรทัด 5432 และ mysql คอมเมนต์ไว้
+- `aiven-ca.pem` ดาวน์โหลดจากหน้า Overview วางที่ root ของ worktree (`*.pem` อยู่ใน .gitignore แล้ว) · psql ใช้ `PGSSLROOTCERT=aiven-ca.pem` + `sslmode=verify-full` ผ่าน
+- ⚠️ **รหัสผ่าน avnadmin เคยหลุดใน screenshot ที่ส่งมาในแชท** — แนะนำให้ reset ที่หน้า Overview → Password → ไอคอน reset แล้ว copy URI ใหม่ลง `.env` (ยังไม่ยืนยันว่าทำแล้ว)
+
+## ที่ทำและพิสูจน์บน Aiven
+1. `npx prisma migrate deploy` → 2 migration (init + partial index D3) · `migrate diff --from-config-datasource` = No difference · `pg_indexes` มี `work_orders_one_open_per_unit_type`
+2. `node qa/copy-mariadb-to-postgres.mjs` → **4.7 วิ** ได้ users 5 · phones 7 · buildings 5 · rooms 32 · acs 73 · brands 5 · models 189 · logs 230 · WO 62 · schedules 73 · audit max 34 · pending 0 · md5 ข้อความไทย = MariaDB (`c4d1908f…`)
+3. dev server :3001 ชี้ Aiven → demo-role admin → `/admin` ตัวเลขเท่า MariaDB ทุกช่อง (73 เครื่อง · 62 ใบงาน · 6/6/48/2 · ล้าง 50 ซ่อม 12 · badge 48) · **ออกใบงาน** B572921-7-946577-01 → 63 ใบงาน · ออกซ้ำ → "เครื่องนี้มีใบงานซ่อมที่ยังเปิดอยู่ (รอช่างรับงาน)" · server log 0 error · latency: `/admin` application-code ~4–5 วิ (round-trip ไป Singapore หลาย query — ค่าปกติของ dev, ยังไม่ optimise)
+4. คืน baseline ด้วยการรัน copy script ซ้ำ (⚠️ **อย่าลบด้วย `id > 62`** — id ของ WO baseline ไม่ได้เรียง 1–62 ผมทำพลาดครั้งหนึ่งเหลือ 35 แถว copy ใหม่แก้ได้ใน 5 วิ · ใช้ `qa/baseline.mjs snapshot/restore` ที่รู้จัก Postgres แทน)
+
+## สถานะ
+- Aiven = baseline เต็ม · Postgres local (5432) = baseline เต็มเช่นกัน (สลับได้ด้วยคอมเมนต์ใน `.env`) · MariaDB ไม่ถูกแตะ · :3001 (heap 6 GB) ชี้ Aiven ยังเปิด · :3000 master ยังอยู่
+- **ยังไม่ทำ:** full sweep บน Aiven (ทำได้เลยด้วยคำสั่งชุด D2 — แต่ latency ทำให้ช้ากว่า 35 นาทีมาก และ Free tier ดับเองถ้าเงียบ) · Vercel project ยังไม่ import (เจ้าของสมัคร Vercel Hobby team แล้ว ยังไม่สร้าง Blob store)
+
+**ถัดไป:** D4a Blob (ต้อง `BLOB_READ_WRITE_TOKEN` จาก Vercel → Storage → Create → Blob) · D4 deploy: import repo → env บน Vercel = `DATABASE_URL` (Aiven URI) + `DATABASE_CA_CERT` (multi-line) + `DATABASE_POOL_MAX=1`–`2` + `AUTH_SECRET` ใหม่ + `BLOB_READ_WRITE_TOKEN` · build command ต้องมี `prisma generate` (migrate deploy รันจากเครื่องเราแล้ว) · branch ที่ deploy = `feat/postgres` จนกว่าจะ merge เข้า master (ตอนนั้น master จะเป็น Postgres ถาวร — เจ้าของต้องตัดสินใจว่า MariaDB local เลิกใช้ไหม)
+
 # 🐘 D2 — full sweep บน PostgreSQL 16 ผ่าน: 190 check · 188 PASS · harness รู้จักสอง engine (15 ก.ย. 2026, DoubleKill)
 
 แผน D ข้อสอง · harness commit `756263f` บน **master** (engine-neutral) · `feat/postgres` rebase ทับแล้ว = master + 5 commit (`962f74c`) · ทำใน worktree `C:\Project\ac-maintenance-pg` (:3001, PostgreSQL local) ขณะ master/:3000/MariaDB ไม่ถูกแตะ
