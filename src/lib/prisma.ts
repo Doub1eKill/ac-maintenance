@@ -13,8 +13,18 @@ function createPrismaClient() {
   // leaves the machine.
   const ca = process.env.DATABASE_CA_CERT;
 
+  // Aiven's URI ends in ?sslmode=require, and pg lets the URL win: it parses
+  // the string over the options it was given, so `sslmode` in the URL turned
+  // the `ssl` block below into a bare {} and the CA was never used — every
+  // query failed with "self-signed certificate in certificate chain". With a
+  // CA in hand the URL's mode is dropped and TLS is configured explicitly.
+  // Without one the URL is passed as-is, so a hosted database still fails
+  // loudly rather than silently connecting unverified.
+  const url = new URL(connectionString);
+  if (ca) url.searchParams.delete("sslmode");
+
   const adapter = new PrismaPg({
-    connectionString,
+    connectionString: url.toString(),
     ssl: ca ? { ca, rejectUnauthorized: true } : undefined,
     // Not the 20 the MariaDB pool used. A PostgreSQL connection is far more
     // expensive and Aiven's smaller plans cap max_connections low enough that a
