@@ -88,7 +88,7 @@ test.describe("authentication, adversarially", () => {
       await page.getByRole("button", { name: /เข้าสู่ระบบ \(Sign In\)/ }).click();
       await page.waitForTimeout(6000);
       const host = new URL(page.url()).host;
-      ledger("Login", `?callbackUrl=${cb} does not leave localhost`, "UI", host === "localhost:3000" ? "PASS" : "FAIL", await shot(page, `login-callback-${slug}`));
+      ledger("Login", `?callbackUrl=${cb} does not leave localhost`, "UI", host === new URL(process.env.QA_BASE_URL ?? "http://localhost:3000").host ? "PASS" : "FAIL", await shot(page, `login-callback-${slug}`));
     }
   });
 

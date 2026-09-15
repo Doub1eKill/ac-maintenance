@@ -21,9 +21,11 @@
 // snapshot lives outside the repo (next to the run output), because a file
 // written inside it makes Next dev reload every open page.
 //
-// Connection: the same mysql client and flags the HANDOFF uses. Override with
-// QA_MYSQL="path/to/mysql -h ... -u ... db" if yours differ. DATABASE_URL is
-// never read or printed.
+// Connection: follows the engine the app itself is on. If the repo's .env has
+// a postgres:// DATABASE_URL, statements go through psql to that database
+// (QA_PSQL for the binary); otherwise through the same mysql client and flags
+// the HANDOFF uses (QA_MYSQL="path/to/mysql -h ... -u ... db" to override).
+// The URL is passed to psql as an argument and never printed.
 
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -37,13 +39,33 @@ const SNAPSHOT = path.join(OUT, "baseline.json");
 const UPLOADS = path.join(repo, "public", "uploads");
 
 const MYSQL = (process.env.QA_MYSQL ?? "C:\\xampp\\mysql\\bin\\mysql.exe -h 127.0.0.1 -P 3306 -u root ac_maintenance").split(" ");
+const PSQL = process.env.QA_PSQL ?? "C:\\Program Files\\PostgreSQL\\16\\bin\\psql.exe";
+
+// The postgres:// DATABASE_URL from the repo's .env, or null when the app is
+// on MariaDB. Read once; kept in a closure, never logged.
+const POSTGRES_URL = (() => {
+  try {
+    return fs.readFileSync(path.join(repo, ".env"), "utf8").match(/^DATABASE_URL="?(postgres(?:ql)?:\/\/[^"\r\n]+)"?/m)?.[1] ?? null;
+  } catch {
+    return null;
+  }
+})();
+const ENGINE = POSTGRES_URL ? "postgres" : "mysql";
 
 function sql(query) {
   // Fed on stdin rather than -e: a restore is a few hundred UPDATEs, well past
-  // what a Windows command line can carry.
-  const r = spawnSync(MYSQL[0], [...MYSQL.slice(1), "-N", "-B"], { input: query, encoding: "utf8" });
+  // what a Windows command line can carry. Both clients are asked for the
+  // same shape back: no headers, one row per line, tab-separated, NULL spelt
+  // out (psql prints it as an empty string unless told otherwise).
+  const r = POSTGRES_URL
+    ? spawnSync(PSQL, ["-X", "-q", "-At", "-F", "\t", "-P", "null=NULL", "-v", "ON_ERROR_STOP=1", "-d", POSTGRES_URL], {
+        input: query,
+        encoding: "utf8",
+        env: { ...process.env, PGCLIENTENCODING: "UTF8" },
+      })
+    : spawnSync(MYSQL[0], [...MYSQL.slice(1), "-N", "-B"], { input: query, encoding: "utf8" });
   if (r.error) throw r.error;
-  if (r.status !== 0) throw new Error(`mysql exited ${r.status}: ${r.stderr || r.stdout}`);
+  if (r.status !== 0) throw new Error(`${ENGINE} client exited ${r.status}: ${r.stderr || r.stdout}`);
   return r.stdout
     .split(/\r?\n/)
     .filter((l) => l.length)
@@ -109,6 +131,10 @@ function snapshot() {
 
 function quote(v) {
   if (v === null) return "NULL";
+  // MariaDB reads backslash escapes inside a string literal; PostgreSQL (with
+  // standard_conforming_strings, the default) takes a backslash literally and
+  // only doubles the quote.
+  if (ENGINE === "postgres") return `'${String(v).replace(/'/g, "''")}'`;
   return `'${String(v).replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
 }
 
@@ -116,11 +142,17 @@ function restore() {
   if (!fs.existsSync(SNAPSHOT)) throw new Error(`no snapshot at ${SNAPSHOT} — run "snapshot" before the sweep`);
   const snap = JSON.parse(fs.readFileSync(SNAPSHOT, "utf8"));
 
-  // 1. Rows the run added.
-  const statements = ["SET FOREIGN_KEY_CHECKS=0"];
-  for (const t of GROWTH_TABLES) statements.push(`delete from ${t} where id > ${snap.maxIds[t]}`);
+  // Changed rows are put back before the added rows are deleted, in that
+  // order on purpose: a baseline row can still point at a run's row (a work
+  // order claimed by a QA technician, a unit moved onto a QA brand), and the
+  // foreign keys on those columns are RESTRICT. Restoring first takes the
+  // reference away, so the delete never meets it. PostgreSQL has no session
+  // switch for foreign keys and Prisma's constraints are not deferrable;
+  // MariaDB keeps its switch below only as a belt for the same braces.
+  const statements = [];
+  if (ENGINE === "mysql") statements.push("SET FOREIGN_KEY_CHECKS=0");
 
-  // 2. Rows the run changed. One UPDATE per row; the tables are small.
+  // 1. Rows the run changed. One UPDATE per row; the tables are small.
   for (const [table, cols] of Object.entries(MUTABLE)) {
     for (const row of snap.rows[table]) {
       const [id, ...values] = row;
@@ -128,8 +160,12 @@ function restore() {
       statements.push(`update ${table} set ${sets} where id = ${id}`);
     }
   }
-  statements.push("SET FOREIGN_KEY_CHECKS=1");
-  sql(statements.join(";\n"));
+
+  // 2. Rows the run added, deepest child first.
+  for (const t of GROWTH_TABLES) statements.push(`delete from ${t} where id > ${snap.maxIds[t]}`);
+
+  if (ENGINE === "mysql") statements.push("SET FOREIGN_KEY_CHECKS=1");
+  sql(statements.join(";\n") + ";");
 
   // 3. Files the run added.
   let removed = 0;

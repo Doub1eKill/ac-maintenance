@@ -209,7 +209,7 @@ test.describe.serial("work orders", () => {
     // The donut counts every order, not the board's first fifty (plan B1).
     const donutTotal = t.match(/รวมทั้งหมด:\s*(\d+)\s*ใบงาน/)?.[1];
     const pendingCard = t.match(/รอดำเนินการ\s*(\d+)\s*\d+%\s*รอการมอบหมาย/)?.[1];
-    const [[dbTotal, dbPending]] = db("select count(*), sum(status='pending') from work_orders");
+    const [[dbTotal, dbPending]] = db("select count(*), sum(case when status='pending' then 1 else 0 end) from work_orders");
     const badge = t.match(/กระดานใบงาน\s*(\d+)/)?.[1];
     ledger("Dashboard", `analytics total ${donutTotal} = DB ${dbTotal}; pending card ${pendingCard} = DB ${dbPending} = sidebar badge ${badge}`, "DB", donutTotal === dbTotal && pendingCard === dbPending && badge === dbPending ? "PASS" : "FAIL", "runs/" + process.env.QA_RUN + "/reg-dashboard-figures.png");
   });
