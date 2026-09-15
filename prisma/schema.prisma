@@ -276,6 +276,12 @@ model WorkOrder {
   @@index([status, createdAt], map: "work_orders_status_created_at_index")
   @@index([airConditionerId, status], map: "work_orders_air_conditioner_id_status_index")
   @@index([claimedBy], map: "work_orders_claimed_by_index")
+  // Not listed here because the schema language cannot say it: a partial
+  // unique index `work_orders_one_open_per_unit_type` on
+  // (air_conditioner_id, type) WHERE status IN ('pending', 'claimed'), from
+  // migration 20260915090000. It is what makes "one open job of a kind per
+  // unit" true under concurrent inserts; the application-level check in
+  // createWorkOrderAction is the friendly message, this is the guarantee.
   @@map("work_orders")
 }
 

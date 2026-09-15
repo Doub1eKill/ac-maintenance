@@ -1,9 +1,20 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@/generated/prisma/client";
 import { logAudit, logAuditMany } from "@/lib/audit";
 import { withDeadlockRetry } from "@/lib/db-retry";
 import { verifyOrgAdmin } from "@/lib/auth-guards";
+
+// Prisma's unique-violation code. On this table the only unique index an
+// insert can hit is the partial one over open orders per unit and type, so
+// this means "someone raised the same job a moment ago". Matched on the code
+// alone rather than meta.target, whose shape differs between driver adapters.
+function isUniqueConflict(error: unknown): boolean {
+  return (
+    typeof error === "object" && error !== null && (error as { code?: unknown }).code === "P2002"
+  );
+}
 
 const createWorkOrderSchema = z.object({
   airConditionerId: z.string().min(1, "กรุณาเลือกเครื่องปรับอากาศ"),
@@ -41,31 +52,48 @@ export async function createWorkOrderAction(formData: FormData) {
     // technician claimed the second found the work already done (QA
     // 20260913-1742, BUG-004). A repair and a cleaning may coexist — they
     // are different work — so the check is per type. Looked up inside the
-    // transaction that inserts, so two simultaneous submissions cannot both
-    // pass the check before either row exists.
-    const outcome = await prisma.$transaction(async (tx) => {
-      const open = await tx.workOrder.findFirst({
-        where: {
-          airConditionerId: acId,
-          type: parsed.data.type,
-          status: { in: ["pending", "claimed"] },
-        },
-        select: { id: true, status: true },
-      });
-      if (open) return { open };
+    // transaction that inserts, but that alone is not enough: under READ
+    // COMMITTED two simultaneous submissions can both find nothing and both
+    // insert. The partial unique index work_orders_one_open_per_unit_type
+    // (migration 20260915090000) refuses the second one, and that refusal is
+    // reported exactly like the row the check did see — the admin is told the
+    // same thing either way.
+    const openWhere: Prisma.WorkOrderWhereInput = {
+      airConditionerId: acId,
+      type: parsed.data.type,
+      status: { in: ["pending", "claimed"] },
+    };
+    const outcome = await prisma
+      .$transaction(async (tx) => {
+        const open = await tx.workOrder.findFirst({
+          where: openWhere,
+          select: { id: true, status: true },
+        });
+        if (open) return { open };
 
-      const workOrder = await tx.workOrder.create({
-        data: {
-          airConditionerId: acId,
-          status: assignTo ? "claimed" : "pending",
-          type: parsed.data.type,
-          priority: parsed.data.priority,
-          claimedBy: assignTo,
-          claimedAt: assignTo ? new Date() : null,
-        },
+        const workOrder = await tx.workOrder.create({
+          data: {
+            airConditionerId: acId,
+            status: assignTo ? "claimed" : "pending",
+            type: parsed.data.type,
+            priority: parsed.data.priority,
+            claimedBy: assignTo,
+            claimedAt: assignTo ? new Date() : null,
+          },
+        });
+        return { workOrder };
+      })
+      .catch(async (error: unknown) => {
+        if (!isUniqueConflict(error)) throw error;
+        // Lost the race. The winning row is committed by now, so read it back
+        // for its status; if it has already moved on (closed in the meantime),
+        // fall back to the pending wording rather than failing the request.
+        const open = await prisma.workOrder.findFirst({
+          where: openWhere,
+          select: { id: true, status: true },
+        });
+        return { open: open ?? { id: BigInt(0), status: "pending" as const } };
       });
-      return { workOrder };
-    });
 
     if (outcome.open) {
       const kind = parsed.data.type === "repair" ? "ใบงานซ่อม" : "ใบงานล้างแอร์";

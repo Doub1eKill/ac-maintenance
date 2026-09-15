@@ -197,6 +197,13 @@ export async function syncOverdueMaintenanceWorkOrders() {
             priority: "low",
             issueDescription: "ครบกำหนดล้างแอร์ตามรอบบำรุงรักษา (ระบบสร้างอัตโนมัติ)",
           })),
+          // ON CONFLICT DO NOTHING. The findMany above excluded units that
+          // already have an open order, but an admin can raise a cleaning job
+          // for one of them between that read and this insert. The partial
+          // unique index work_orders_one_open_per_unit_type would then reject
+          // the whole batch; skipping the one row that lost is the outcome the
+          // findMany was reaching for anyway.
+          skipDuplicates: true,
         }),
       ])
     );
