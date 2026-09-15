@@ -10,7 +10,24 @@
 - **แก้เฉพาะ comment ใน `qa/specs/admin/workflows.spec.ts`** ที่เขียนว่า "pages five at a time … still open here" ให้ตรงความจริง · โค้ด app ไม่แตะ · fallback กด "next" ใน spec คงไว้ (เป็น no-op เพราะ `.catch(() => {})`)
 - DB = baseline · dev server :3000 ยังเปิด
 
-**ถัดไป:** D1 rebase `feat/postgres` · D3 partial unique index · D2/D4 sweep บน Postgres + deploy Vercel/Aiven
+## แผน D4a — รูปไป Vercel Blob (ตัดสินใจ 15 ก.ย. 2026 ระหว่างสร้าง Aiven service)
+
+**ปัญหา:** `saveUpload()` ใน `src/lib/upload.ts` เขียนลง `public/uploads` — บน Vercel filesystem ของ function เป็น read-only (เขียนได้แค่ `/tmp` และหาย) → รูปก่อน/หลังซ่อม, ลายเซ็น, โปรไฟล์ จะ return `null` เงียบๆ ทุกครั้ง · และ **request body ของ Vercel function จำกัด 4.5 MB** — ฟอร์มบันทึกงานส่งรูปมือถือ 2 ใบ (3–5 MB/ใบ) ใน server action เดียวจะโดน 413 ก่อนถึง sharp (`bodySizeLimit: "25mb"` ใน next.config ช่วยเฉพาะ self-host)
+
+**เลือก Vercel Blob** (ไม่ใช่ R2/Supabase): อยู่ใน dashboard เดียวกับ deploy, token ถูกใส่ให้เอง, โค้ดเปลี่ยนน้อยสุด, Hobby ให้ storage ราว 1 GB ≈ 2,500–5,000 รูปหลัง sharp (200–400 KB/รูป) พอสำหรับใช้จริงระยะแรก
+
+**ขอบเขต (branch `feat/blob-uploads`, ขนาด M, ทำก่อน D4 deploy, ไม่แตะ schema จึงไม่ชนกับ feat/postgres):**
+1. `npm i @vercel/blob`
+2. `src/lib/upload.ts` — เลือก backend จากการมี `BLOB_READ_WRITE_TOKEN`: มี → `put("uploads/<ts>-<name>.jpg", processed, { access: "public", contentType: "image/jpeg", addRandomSuffix: false })` คืน `url` เต็ม (~90 ตัวอักษร ใส่ VarChar(255) ได้) · ไม่มี → ทางเดิม (dev/QA/มือถือใน LAN ไม่เปลี่ยน, `qa/baseline.mjs` ที่ลบ uploads ยังใช้ได้) · sharp pipeline คงเดิมทั้งหมด (กฎ BUG-012 "เก็บเฉพาะที่ decode ได้ เป็น .jpg เสมอ" ยังอยู่)
+3. `deleteUpload(url)` — ถ้า hostname ลงท้าย `.public.blob.vercel-storage.com` → `del(url)`; ไม่งั้นใช้ guard เดิม (basename ใต้ `/uploads/` เท่านั้น) · ยังเป็น log-not-throw เหมือนเดิม
+4. **ย่อรูปฝั่ง client ก่อนส่ง** (แก้ 4.5 MB): helper ใหม่ `src/lib/client-image.ts` — `createImageBitmap` + canvas → JPEG ≤1600px q0.85 (~300 KB) ใช้ใน `log-action-modal` (before/after), `profile-panel`, `register-form` · decode ไม่ได้ → ส่งไฟล์เดิมให้ server ตัดสิน · ผลพลอยได้: ช่างอัปโหลดผ่าน 4G เร็วขึ้นมาก
+5. `next.config.ts` — `images.remotePatterns` เพิ่ม `{ protocol: "https", hostname: "*.public.blob.vercel-storage.com" }` (avatar/รูปใบงานใช้ `next/image`: user-card, dashboard-layout, technician-detail-modal, profile-panel, work-order-detail-dialog) แล้วแก้ comment "Real uploads are same-origin" ให้ตรง
+6. Vercel: Storage → Create Blob store → Connect project → `BLOB_READ_WRITE_TOKEN` มาเอง · ทดสอบ local ด้วยการใส่ token ใน `.env.local` ชั่วคราว (ห้าม commit/print)
+
+**ทดสอบ:** (a) ไม่มี token → full sweep เดิมผ่าน, DB/uploads คืน baseline · (b) มี token → บันทึกงานพร้อมรูป 2 ใบจากมือถือจริง → URL ใน `maintenance_logs` เป็น https ของ blob, เปิดดูได้จาก work-order-detail และ `/qr/<uuid>` · เปลี่ยนรูปโปรไฟล์ 2 ครั้ง → รูปเก่าหายจาก blob (`list()`), ของใหม่อยู่ · ไฟล์ .html ปลอมนามสกุล .jpg ยังถูกปฏิเสธ (BUG-012) · หลังทดสอบลบ blob ที่สร้างและคืน DB
+**ไม่ทำ:** ย้ายรูป seed 5 ไฟล์ใน `public/uploads` (placeholder), client upload ตรงเข้า Blob (`@vercel/blob/client`) — ย่อฝั่ง client พอแล้ว ไม่ต้องเพิ่ม route
+
+**ลำดับงานใหม่:** D1 rebase `feat/postgres` → D3 partial unique index → D2 sweep บน Postgres → **D4a Blob** → D4 deploy Vercel + Aiven
 
 # 🧹 C1 — eslint 24 error / 19 warning → 0 error / 4 warning (15 ก.ย. 2026, DoubleKill)
 
