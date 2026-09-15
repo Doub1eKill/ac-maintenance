@@ -1,5 +1,30 @@
 # Project Handoff & Technical Summary
 
+# 🐘 D1 — rebase `feat/postgres` ขึ้นบน master แล้ว (ล้ำ 4 / ตามหลัง 96 → ล้ำ 4 / ตามหลัง 0) (15 ก.ย. 2026, DoubleKill)
+
+แผน D ข้อแรก · ทำใน **git worktree** `C:\Project\ac-maintenance-pg` (branch `feat/postgres`) เพื่อไม่แตะ working tree ของ master ที่ dev server :3000 (MariaDB) ยังรันอยู่ — ไม่ต้อง `npm install` สลับไปกลับตามที่ entry 9 ก.ย. เตือน · worktree นี้**คงไว้**สำหรับ D2/D3/D4a (มี node_modules + `.env` ชี้ PostgreSQL local ของตัวเอง)
+
+## conflict ที่เจอ (2 ไฟล์ ตามที่ `git merge-tree` ทำนาย)
+| ไฟล์ | commit ที่ชน | วิธีแก้ |
+|---|---|---|
+| `package-lock.json` | `6d37760` adapter | เอาของ master แล้ว `npm install` ใหม่ให้ lock ตาม `package.json` ที่ auto-merge (มี `@prisma/adapter-pg` + `pg` + `@playwright/test`, ไม่มี `adapter-mariadb`) |
+| `HANDOFF.md` ×2 | `f84e050`, `967bafd` | script อ่าน `:1:`/`:2:`/`:3:` จาก index — entry ของ master อยู่บน, entry ของ postgres (7 ก.ย.) แทรก**เหนือ** "🖥️ ตั้งเครื่อง dev ใหม่ (7 ก.ย.)" ซึ่งเป็น entry บนสุด ณ จุดแยก branch = ลำดับเวลาจริง · เขียนกลับเป็น CRLF |
+
+`maintenance.ts` / `maintenance-log.ts` / `package.json` git รวมเองถูก (postgres แก้เฉพาะ comment FOR KEY SHARE / 40P01) · schema.prisma + migrations ไม่ชนเพราะ master ไม่เคยแตะ · `prisma.config.ts` ที่ master เพิ่ม `seed:` ไม่ชน (postgres ไม่ได้แก้ไฟล์นี้) · `btuField` / duplicate-WO check / work-order-stats ของ master **ไม่ถูกแตะเลย** — semantics ของ master ชนะโดยอัตโนมัติ
+
+## ผลหลัง rebase (ใน worktree)
+- `git diff master...feat/postgres` = 29 ไฟล์ +824/−865 = การย้าย DB ล้วนๆ เท่าเดิม
+- `npm install` → `prisma generate` → **tsc: app 0 error** (qa/ มี 11 error TS7006 implicit any เท่ากับ master เป๊ะ — ของเดิม ไม่ใช่จาก rebase) · **eslint: 8 error / 8 warning = master เป๊ะ ทั้งหมดอยู่ใน `qa/`** (C1 นับเฉพาะ `src/`; `qa/lib.ts` `use` hook rule, `require()`, `any` ×5, `prefer-const`) — ไม่แตะในรอบนี้
+- **smoke บน PostgreSQL 16 local จริง** (service `postgresql-x64-16` ยังอยู่จาก 7 ก.ย., DB มี 2 users / 9 acs / 2 logs / 3 WO / 3 brands, `migrate status` up to date): dev server จาก worktree ที่ **:3001** → demo-role admin → `/admin` แสดง 9 เครื่อง, โดนัท B1 `getWorkOrderStats()` (groupBy) รวม 3 ใบงาน ตรง DB, กระดาน 2 อาคาร · `/admin/settings` (ยี่ห้อ Daikin), `/admin/assets`, `/admin/team` 200 หมด · server log 0 error, console 0 error · ปิด :3001 แล้ว, :3000 ของ master ยังอยู่
+- push `feat/postgres` ด้วย `--force-with-lease` (rebase เขียน history ใหม่) แล้ว rebase ซ้ำอีกครั้งหลัง entry นี้ลง master เพื่อให้ `feat/postgres` = master + 4 commit พอดี
+
+## กับดักที่เจอ
+- `preview_start` ของ Claude อ่าน `.claude/launch.json` ของ repo หลัก ไม่ใช่ของ worktree และชนกับ :3000 ของแชทอื่น → รัน `npx next dev --webpack -p 3001` เองใน worktree แล้วชี้เบราว์เซอร์ไป :3001
+- psql บน Windows: ส่ง SQL ทาง stdin (`printf ... | psql -At -d "$URL"`) ไม่ใช่ `-c` — argument ที่มี `||` ถูก shell/psql ตีความพัง · ตั้ง `PGCLIENTENCODING=UTF8`
+- worktree ไม่มี `.env` (untracked) — copy จาก repo หลักแล้วสลับคอมเมนต์ 2 บรรทัด DATABASE_URL ให้ชี้ 5432
+
+**ถัดไป:** D3 partial unique index `(air_conditioner_id, type) WHERE status IN ('pending','claimed')` ใน migration ฝั่ง Postgres (ทำใน worktree) · D2 sweep บน Postgres (psql variant ของ `qa/baseline.mjs` + `qa/lib.ts db()`) · D4a Blob · D4 deploy
+
 # ✅ OPEN-2 ปิดโดยไม่ต้องแก้โค้ด — รายชื่อยี่ห้อใน /admin/settings ไม่ได้แบ่งหน้า (15 ก.ย. 2026, DoubleKill)
 
 งานแรกของ hand-off 15 ก.ย. · branch `qa/open-2-closed` → ff-merge `master`
