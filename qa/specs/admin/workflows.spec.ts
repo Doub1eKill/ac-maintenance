@@ -319,9 +319,11 @@ test.describe("admin workflows", () => {
     const alreadyInTrash = /อยู่ในถังขยะ/.test(afterCreate);
     const created = alreadyInTrash || afterCreate.includes("QA_TEST_BRAND") || /เพิ่มยี่ห้อ.*(สำเร็จ|เรียบร้อย)/.test(tCreate);
     let tTrash = "";
-    // The brand list pages five at a time in name order, so a sixth brand
-    // sorting after "Panasonic" is created but not in view — the same shape
-    // as BUG-008 on the asset and board lists, still open here.
+    // The brand list is not paged (every brand renders, name order), so a
+    // sixth brand sorting after "Panasonic" is in view as soon as
+    // router.refresh() lands. OPEN-2 of sweep 20260914-2013 read a paging
+    // problem into this check; it never failed, and the "next page" fallback
+    // below is kept only as a harmless no-op.
     ledger("Catalogue", `new brand is in view right after creation (${afterCreate.includes("QA_TEST_BRAND") ? "yes" : "no — on the next page"})`, "UI", alreadyInTrash || afterCreate.includes("QA_TEST_BRAND") ? "PASS" : "FAIL", await shot(page, "settings-brand-created"));
     if (!alreadyInTrash) {
       if (!afterCreate.includes("QA_TEST_BRAND")) {
