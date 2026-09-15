@@ -1,5 +1,29 @@
 # Project Handoff & Technical Summary
 
+# 🚀 D4 — ขึ้น Vercel แล้ว: https://ac-maintenance-rho.vercel.app (feat/postgres + Aiven) (15 ก.ย. 2026, DoubleKill)
+
+แผน D ข้อสี่ · เจ้าของทำฝั่ง dashboard เอง (สมัคร Vercel Hobby team `ac-maintenance`, เชื่อม GitHub `Doub1eKill`, import repo, ใส่ env, สลับ branch) ผมเตรียม repo/ไฟล์/คำสั่งและทดสอบ · Production = **`feat/postgres`** (`87889e8`) ไม่ใช่ master
+
+## ที่ต้องรู้เพื่อ deploy ซ้ำ/ย้าย
+- **`npm run build` = `prisma generate && next build --webpack`** (commit `15147ff` บน master, engine-neutral) — `src/generated/prisma` ถูก .gitignore จึงต้อง generate บนเครื่อง build · migrate **ไม่ได้**รันตอน build (รันจากเครื่องเราด้วย `npx prisma migrate deploy` ในขั้น Aiven)
+- **env บน Vercel (Production + Preview) 4 ตัว:** `DATABASE_URL` (Aiven URI), `DATABASE_CA_CERT` (PEM ทั้งก้อน — ปุ่ม Import .env ตัดเหลือบรรทัดแรก ต้องวางมือในช่อง Value), `DATABASE_POOL_MAX=2`, `AUTH_SECRET` (ตัวใหม่ คนละตัวกับ dev; สร้างด้วย `crypto.randomBytes(32).toString("base64")`) · ไม่ต้องตั้ง `AUTH_URL`/`AUTH_TRUST_HOST` (Auth.js v5 บน Vercel ใช้ `VERCEL_URL` เอง) · **อย่ากด Add "Prisma Postgres"** ที่ Vercel เสนอตอน import — เป็น DB อีกตัวและจะทับ `DATABASE_URL`
+- **Production branch** ตั้งที่ Settings → **Environments** → Production → Branch Tracking (Vercel ย้ายออกจากหน้า Git แล้ว) · ตั้งได้ก็ต่อเมื่อ branch นั้นเคย deploy แล้วอย่างน้อย 1 ครั้ง → push empty commit `87889e8` ให้มัน build ก่อน แล้ว Save + Redeploy เป็น Production
+- deploy แรกของ `master` (MariaDB) **build ผ่าน** (`next build` ไม่แตะ DB) แต่ runtime ใช้ไม่ได้ — ถูกแทนแล้ว
+- domain: `ac-maintenance-rho.vercel.app` (auto) · Hobby: function 10 วิ, body 4.5 MB → D4a ยังจำเป็นสำหรับรูป
+
+## ทดสอบบน production จริง
+- `/login` 200 (cold ~4 วิ) · `/admin` ไม่มี session → 307 ไป `/login?callbackUrl=…` · **demo-role panel ไม่มีบน production** ✅ (ปิด BLOCKED item ที่ค้างทุกสวีป — "demo-role panel visible in development (verify absent in production build)")
+- login ด้วย admin baseline `admin@hansen-jacobs-university.test` (ตั้ง bcrypt ชั่วคราวผ่าน psql เพราะ baseline ทุกบัญชี password=NULL) → `/admin` ตัวเลข = MariaDB ทุกช่อง (73 · 62 · 6/6/48/2 · ล้าง 50 ซ่อม 12) · `/admin/settings` ยี่ห้อครบ · `/admin/work-orders` 5 อาคาร 62 ใบงาน · console 0 error
+- คืน password เป็น NULL แล้ว · Aiven = baseline (users 5 · acs 73 · logs 230 · WO 62 · audit max 34)
+
+## ค้าง / ข้อควรระวัง
+- **ยังไม่มีบัญชีที่ login ได้บน production** (baseline password NULL ทั้งหมด) — ทางที่ตั้งใจ: สมัครที่ `/register` → admin อนุมัติ… แต่ต้องมี admin ตัวแรกก่อน → ให้เจ้าของเลือก: (ก) ตั้งรหัสให้ id 2 ผ่าน psql แบบที่ผมทำ หรือ (ข) ใช้ flow "ตั้งรหัสผ่านใหม่" (`/request-password-reset`) ถ้า nodemailer ตั้ง SMTP แล้ว (ยังไม่ได้ตั้ง env ฝั่ง Vercel)
+- รหัสผ่าน avnadmin ที่หลุดใน screenshot — ยังไม่ยืนยันว่า reset แล้ว
+- รูปอัปโหลดบน production ยังใช้ไม่ได้จนกว่า D4a เสร็จ (`saveUpload` เขียน filesystem)
+- `feat/postgres` ยังไม่ merge เข้า master — master ยังเป็น MariaDB สำหรับ dev/QA ในเครื่อง · ทุก push เข้า `feat/postgres` = deploy production ทันที (ระวัง) · push เข้า master = preview เฉยๆ
+
+**ถัดไป:** D4a Blob (`BLOB_READ_WRITE_TOKEN` จาก Vercel → Storage → Create → Blob → Connect project) · ตัดสินใจเรื่องบัญชี admin ตัวแรกบน production · (ทีหลัง) merge `feat/postgres` → master เมื่อเลิก MariaDB
+
 # ☁️ D4 ขั้นแรก — แอปต่อ Aiven PostgreSQL 18 จริงแล้ว พร้อม baseline เต็ม (15 ก.ย. 2026, DoubleKill)
 
 เจ้าของสร้าง service **`ac-maintenance-pg`** (PostgreSQL 18.6, Free tier, Asia Pacific, connection limit 20, ดับเองเมื่อไม่ใช้งาน) แล้วสั่ง "เชื่อมอันนี้ก่อน" · commit `5352987` บน `feat/postgres` (= master + 6 commit)
