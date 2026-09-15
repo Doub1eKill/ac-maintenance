@@ -1,5 +1,17 @@
 # Project Handoff & Technical Summary
 
+# ✅ OPEN-2 ปิดโดยไม่ต้องแก้โค้ด — รายชื่อยี่ห้อใน /admin/settings ไม่ได้แบ่งหน้า (15 ก.ย. 2026, DoubleKill)
+
+งานแรกของ hand-off 15 ก.ย. · branch `qa/open-2-closed` → ff-merge `master`
+
+- **ข้อค้นพบ:** OPEN-2 ของสวีป `20260914-2013` ("รายชื่อยี่ห้อ 5/หน้า ยี่ห้อใหม่ที่เรียงหลัง Panasonic สร้างแล้วไม่เห็น") **ไม่ใช่บั๊ก** — `MasterDataClient` (`src/app/admin/master-data/master-data-client.tsx`) render ทุกยี่ห้อจาก `initialBrands.map()` ไม่มี pagination เลย (ไม่มี "หน้า 1 จาก" / "ถัดไป" ในการ์ดนี้; ที่แบ่ง 5/หน้า คือ `BuildingGroupList` ของ assets/board/pool ตาม BUG-008) · ledger "new brand is in view right after creation" ทุกรอบที่มีบันทึกเป็น PASS "(yes)" (`20260914-2013` ×2, `20260915-1243`) และ `settings-brand-created.png` ที่ถูกอ้างเป็นหลักฐานก็เห็น QA_TEST_BRAND เป็นแถวที่ 6 อยู่ · รายงานอนุมานรูปแบบจาก BUG-008 ไม่ได้สังเกตจริง
+- **ยืนยันในเบราว์เซอร์:** login ผ่าน demo-role admin → /admin/settings → เพิ่มยี่ห้อ "ZZ_OPEN2_CHECK" (เรียงท้ายสุด) → โผล่เป็นแถวที่ 6 ทันทีหลัง `router.refresh()` ไม่มีตัวแบ่งหน้า · แล้ว `baseline.mjs restore`
+- **รัน spec:** `--project=admin --grep "settings: rename a brand"` run `20260915-1438` → 6/6 ผ่าน (setup 5 + spec 1) · Catalogue 6 check PASS ทั้งหมด รวม "new brand is in view right after creation (yes)"
+- **แก้เฉพาะ comment ใน `qa/specs/admin/workflows.spec.ts`** ที่เขียนว่า "pages five at a time … still open here" ให้ตรงความจริง · โค้ด app ไม่แตะ · fallback กด "next" ใน spec คงไว้ (เป็น no-op เพราะ `.catch(() => {})`)
+- DB = baseline · dev server :3000 ยังเปิด
+
+**ถัดไป:** D1 rebase `feat/postgres` · D3 partial unique index · D2/D4 sweep บน Postgres + deploy Vercel/Aiven
+
 # 🧹 C1 — eslint 24 error / 19 warning → 0 error / 4 warning (15 ก.ย. 2026, DoubleKill)
 
 แผน C · branch `chore/eslint-clean` → ff-merge `master` · 27 ไฟล์ · `tsc` ผ่าน · full sweep หลังแก้: admin 32/32, tech 16/16, public 31/32 (ดูข้อสังเกตท้าย)
