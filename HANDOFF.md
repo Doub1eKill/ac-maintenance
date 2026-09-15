@@ -1,5 +1,32 @@
 # Project Handoff & Technical Summary
 
+# 🖼️ D4a — รูปไป Vercel Blob แล้ว + ย่อรูปฝั่งเบราว์เซอร์ก่อนส่ง (15 ก.ย. 2026, DoubleKill)
+
+แผน D4a ตาม entry OPEN-2 · branch `feat/blob-uploads` → ff-merge master (`39ac8d0` feature, `81cb4c4` harness) · เจ้าของสร้าง Blob store `ac-maintenance-photos` (Public, iad1, ติ๊ก read-write token) แล้ว Connect project → Vercel ใส่ `BLOB_READ_WRITE_TOKEN` ให้ Production+Preview เอง · token สำหรับ local อยู่ใน `ac-maintenance\.env.local` (gitignored, ไม่มีใน worktree)
+
+## โค้ด
+- **`src/lib/upload.ts`** — หลัง sharp เหมือนเดิม: มี `BLOB_READ_WRITE_TOKEN` → `put("uploads/<ts>-<name>.jpg", …, { access: "public", addRandomSuffix: false })` คืน `https://<store>.public.blob.vercel-storage.com/uploads/…` เก็บลงคอลัมน์เดิม (VarChar 255 พอ ~100 ตัว) · ไม่มี token → `public/uploads` เหมือนเดิมทุกประการ · `deleteUpload()`: hostname ลงท้าย `.public.blob.vercel-storage.com` → `del(url)` ไม่งั้น guard เดิม (basename ใต้ `/uploads/`) · ยัง log-not-throw
+- **`src/lib/client-image.ts` ใหม่** — `shrinkImage(file)`: `createImageBitmap(file, { imageOrientation: "from-image" })` → canvas ≤1600px → JPEG q0.85 → `File` ใหม่ · ข้ามไฟล์ < 400 KB / ไม่ใช่ image/* / decode ไม่ได้ / ย่อแล้วใหญ่กว่าเดิม (คืนไฟล์เดิม — server ยังเป็นผู้ตัดสินตาม BUG-012) · **เหตุผล:** Vercel function อ่าน body ได้ 4.5 MB ฟอร์มบันทึกงานส่งรูปมือถือ 2 ใบ
+- ใช้ใน 3 ที่: `log-action-modal` (`handleSubmit` เป็น async, ย่อ before/after ก่อน append) · `profile-panel` (`handlePickAvatar` ย่อตอนเลือก preview = สิ่งที่ส่ง) · `register-form` (ฟอร์ม submit native → ยัดไฟล์ที่ย่อกลับเข้า `<input>` ด้วย `DataTransfer`)
+- `next.config.ts` `images.remotePatterns` เพิ่ม `*.public.blob.vercel-storage.com` (avatar/รูปใบงานใช้ `next/image` 5 จุด)
+- ไม่ได้ทำ: client upload ตรงเข้า Blob (`@vercel/blob/client`) — ย่อฝั่ง client พอแล้ว · ย้ายรูป seed 5 ไฟล์
+
+## ทดสอบ (:3000 master/MariaDB + token ใน .env.local)
+- **ไม่มี token:** `tech/upload.spec` 5/5 PASS เก็บที่ `/uploads/…jpg` เหมือนเดิม
+- **มี token:** `upload.spec` + `tech/workflows.spec` **12/12** — fake.jpg/page.html ยังถูกปฏิเสธ · real PNG เก็บเป็น `https://hvsf5mqsubk1ej78.public.blob…/uploads/…-real.jpg` (regex ของ spec `%2Fuploads%2F…jpg` รับ URL blob อยู่แล้ว) · รูปก่อน/หลังงานของช่างเป็น blob URL, admin board เห็นใบงานเสร็จ · avatar ตอนสมัคร 3 บัญชีก็ขึ้น blob · **store == DB references (6 = 6)** → avatar ที่ถูกแทนถูก `del()` จริง
+- **ย่อฝั่ง client จริง:** ไฟล์ 4000×3000 / 2053 KB เลือกใน `/register` → ใน `<input>` กลายเป็น `image/jpeg` **1600×1200 / 430 KB** ก่อน submit (วัดจาก DOM เพราะ Playwright `postDataBuffer()` ไม่เห็น multipart) · หลัง sharp บน server เหลือ 281 KB บน Blob
+- ลบ blob ทดสอบทั้งหมดแล้ว (store ว่าง) · DB baseline
+
+## บั๊ก harness ที่เจอระหว่างทาง (แก้แล้ว `81cb4c4`)
+- ทดสอบด้วย demo tech (user baseline id 3) กด save โปรไฟล์ → `updateProfileAction` **ลบแถว primary phone แล้ว insert ใหม่** (id ใหม่) → `restore` ลบแถวใหม่ทิ้ง แถวเก่า (id 67) ไม่กลับมา → baseline เหลือ phones 6 · แก้: snapshot เก็บ `user_id` ของ user_phones ด้วย และ restore **re-insert แถวจาก snapshot ที่ id หายไป** (`insert ignore` / `insert … where not exists`) ทดสอบทั้ง MariaDB และ Aiven · re-insert แถว id 67 คืนมือแล้ว
+- spec ที่มีอยู่ไม่โดนเพราะแตะเฉพาะ QA users — กับดักนี้เกิดเมื่อทดสอบมือด้วย demo-role
+
+## ค้าง
+- **production ยังไม่ได้ทดสอบ D4a จริง** — หลัง rebase `feat/postgres` (deploy อัตโนมัติ) ต้องมีบัญชีที่ login ได้บน production ก่อน (ยังไม่มี — ดู entry D4) แล้วลองเปลี่ยนรูปโปรไฟล์ 1 ครั้ง ดูว่า URL เป็น blob และรูปแสดง
+- `qa/baseline.mjs restore` ไม่ลบ blob ที่ run สร้าง (ลบเฉพาะ `public/uploads`) — ถ้ารันสวีปโดยมี token ใน .env.local ต้องลบเองด้วย `list({prefix:"uploads/"})` + `del()` · หรือ**ถอด .env.local ก่อนสวีป**
+
+**ถัดไป:** ทดสอบรูปบน production (ต้องการบัญชี admin ตัวแรก — เจ้าของเลือกทาง ก/ข/ค ใน entry D4) · ค้างเดิม: reset รหัส avnadmin, E1 iOS decoder, `claimedBy` NULL ทาง /qr
+
 # 🚀 D4 — ขึ้น Vercel แล้ว: https://ac-maintenance-rho.vercel.app (feat/postgres + Aiven) (15 ก.ย. 2026, DoubleKill)
 
 แผน D ข้อสี่ · เจ้าของทำฝั่ง dashboard เอง (สมัคร Vercel Hobby team `ac-maintenance`, เชื่อม GitHub `Doub1eKill`, import repo, ใส่ env, สลับ branch) ผมเตรียม repo/ไฟล์/คำสั่งและทดสอบ · Production = **`feat/postgres`** (`87889e8`) ไม่ใช่ master
