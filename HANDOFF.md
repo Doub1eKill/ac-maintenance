@@ -1,5 +1,24 @@
 # Project Handoff & Technical Summary
 
+# ↩️ B4 — Back หลัง logout ไม่โชว์ dashboard เก่าแล้ว · B3 — ตัดสินใจคง org_admin ในฟอร์มสมัคร (15 ก.ย. 2026, DoubleKill)
+
+แผน B ข้อสาม/สี่ · branch `fix/logout-back` → ff-merge `master`
+
+## B4 (OPEN-1 ของสวีป `20260914-2013`, "logout+Back ผลไม่นิ่ง" ใน HANDOFF เดิม)
+- **สาเหตุจริง (ไม่ใช่แค่ bfcache):** trace ด้วย Playwright เห็นว่า Back ยิง `GET /tech` จริงและได้ 200 พร้อม dashboard ทั้งที่ cookie หายแล้ว — เบราว์เซอร์ใช้ **HTTP cache** สำหรับ history navigation แม้ response จะเป็น `no-cache, must-revalidate` (Next dev ส่งค่านี้) มีแค่ `no-store` ที่กัน · ใน production Next ส่ง `no-store` ให้ dynamic page เองอยู่แล้ว → อาการนี้เด่นบน dev แต่ bfcache (เอกสารทั้งก้อนใน memory ไม่มี request) เกิดได้ทุก mode
+- **แก้ที่ `BrowserSessionGuard`** (`src/components/auth/browser-session-guard.tsx`): (1) ตอน mount ถ้า `performance.getEntriesByType("navigation")[0].type === "back_forward"` และ (2) ตอน `pageshow` ที่ `event.persisted` → `fetch("/api/auth/session", {cache:"no-store"})` ถ้าไม่มี `user` → `location.replace("/login")` · offline/fetch พัง = ปล่อยไว้ ไม่เด้ง
+- **ลองแล้วถอด:** `headers()` ใน `next.config.ts` ใส่ `no-store` ให้ `/admin|/tech` — ติดเฉพาะ response redirect (307) ส่วนหน้า dynamic ถูก Next ทับด้วย Cache-Control ของมันเอง จึงไม่ช่วย ถอดออกไม่ให้ config หลอก
+- ทดสอบ: trace หลังแก้ Back → `GET /tech` (cache) → `GET /api/auth/session` → `GET /login` จบที่หน้า login · QA `public/auth.spec` "Back after logout does not show a dashboard" **PASS** (เคย FAIL 2 สวีปติด) · DB baseline
+
+## B3 — คำตอบเจ้าของโปรเจกต์
+**คงตัวเลือก "แอดมินสถาบัน" ในฟอร์มสมัครไว้ แต่ต้อง pending เสมอ** (สภาพหลังแก้ #1) — ไม่ตัดออก ไม่ต้องมีรหัสเชิญ · แอดมินเดิมอนุมัติที่ `/admin/approvals` (การ์ดโชว์ role "ผู้ดูแลระบบ") · harness `auth.setup.ts` ทดสอบเส้นทางนี้ทุกรอบอยู่แล้ว
+
+## หมายเหตุสภาพแวดล้อม
+- เครื่องรีบูต 15 ก.ย. 11:59 → MariaDB + dev server ดับ (ไม่ใช่บั๊ก) — ปลุก mysqld ด้วย WMI ตามสูตร, DB ยังเป็น baseline เพราะ `restore` รันก่อนรีบูต
+- Playwright จะเปิด dev server เองถ้าไม่มี แล้วปิดทิ้งหลังจบ → เช็ค `curl localhost:3000/login` ก่อนทดสอบมือทุกครั้ง
+
+**ถัดไป:** OPEN-2 รายชื่อยี่ห้อ 5/หน้า (ใช้ focus จาก `5ba6e08`) · C eslint 24 · D rebase `feat/postgres`
+
 # 🔒 B2 — `auth.ts` เทียบรหัสผ่านก่อนเช็คสถานะบัญชี (15 ก.ย. 2026, DoubleKill)
 
 แผน B ข้อสอง · branch `fix/auth-order` → ff-merge `master`
