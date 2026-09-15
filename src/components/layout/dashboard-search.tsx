@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 /**
@@ -36,24 +36,25 @@ export function DashboardSearchProvider({ children }: { children: React.ReactNod
   // Keyed off a remembered path rather than off the effect firing, because
   // stripping the param below changes searchParams and runs this again; an
   // unconditional clear would wipe the term the suggestion had just applied.
-  const lastPathRef = useRef(pathname);
+  // Applied during render (React's "adjust state on change" form) so the
+  // list that renders with the new path already has the right term; only
+  // the URL rewrite, a side effect, waits for the effect below.
+  const term = searchParams.get("q");
+  const [applied, setApplied] = useState<{ path: string; term: string | null }>({ path: pathname, term: null });
+  if (term && (applied.term !== term || applied.path !== pathname)) {
+    setApplied({ path: pathname, term });
+    setSearch(term);
+  } else if (!term && applied.path !== pathname) {
+    setApplied({ path: pathname, term: null });
+    setSearch("");
+  }
+
   useEffect(() => {
-    const term = searchParams.get("q");
-
-    if (term) {
-      setSearch(term);
-      lastPathRef.current = pathname;
-      // Stripped so a refresh or a back navigation does not re-apply a filter
-      // the user has since cleared.
-      router.replace(pathname);
-      return;
-    }
-
-    if (lastPathRef.current !== pathname) {
-      lastPathRef.current = pathname;
-      setSearch("");
-    }
-  }, [pathname, searchParams, router]);
+    // Stripped so a refresh or a back navigation does not re-apply a filter
+    // the user has since cleared. Once stripped, `term` is null and the path
+    // is unchanged, so the branch above leaves the applied term alone.
+    if (term) router.replace(pathname);
+  }, [term, pathname, router]);
 
   return (
     <DashboardSearchContext.Provider value={{ search, setSearch }}>

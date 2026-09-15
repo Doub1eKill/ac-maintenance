@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -9,17 +8,12 @@ import { motion } from "motion/react";
 import { MotionFade } from "@/components/ui/motion";
 import {
   Zap,
-  Building2,
   LogOut,
-  ShieldCheck,
-  Wrench,
-  UserCheck,
   LucideIcon,
   Search,
   Plus,
   User,
   Settings,
-  Bell,
   ChevronsUpDown,
 } from "lucide-react";
 import {

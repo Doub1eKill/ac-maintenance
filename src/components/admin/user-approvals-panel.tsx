@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { format } from "date-fns";
 import { CalendarClock, Clock, Phone, UserCheck, UserX } from "lucide-react";
 import {
@@ -49,9 +49,12 @@ export function UserApprovalsPanel({
     setRejectTarget(null);
   }
 
-  useEffect(() => {
+  // Back to page 1 the moment the search changes, in the same render.
+  const [searchForPage, setSearchForPage] = useState(globalSearch);
+  if (searchForPage !== globalSearch) {
+    setSearchForPage(globalSearch);
     setApprovalsPage(1);
-  }, [globalSearch]);
+  }
 
   const filteredPendingUsers = pendingUsers.filter(
     (u) =>

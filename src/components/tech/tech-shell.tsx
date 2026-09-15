@@ -5,7 +5,6 @@ import {
   useCallback,
   useContext,
   useEffect,
-  useRef,
   useState,
   useTransition,
 } from "react";
@@ -137,26 +136,26 @@ export function TechShell({ user, universityName, buildings, badges, children }:
   // an unconditional reset would then wipe the filter the same suggestion had
   // just applied, which is exactly what a suggestion picked while already on
   // the asset list did.
-  const lastPathRef = useRef(pathname);
+  // Applied during render (React's "adjust state on change" form), so the
+  // page that renders with the new path already has its filters right; only
+  // the URL rewrite, a side effect, waits for the effect below.
+  const term = searchParams.get("q");
+  const [applied, setApplied] = useState<{ path: string; term: string | null }>({ path: pathname, term: null });
+  if (term && (applied.term !== term || applied.path !== pathname)) {
+    setApplied({ path: pathname, term });
+    setSearch(term);
+    setBuilding("all");
+  } else if (!term && applied.path !== pathname) {
+    setApplied({ path: pathname, term: null });
+    setSearch("");
+    setBuilding("all");
+  }
+
   useEffect(() => {
-    const term = searchParams.get("q");
-
-    if (term) {
-      setSearch(term);
-      setBuilding("all");
-      lastPathRef.current = pathname;
-      // Stripped straight away, like the ?ac= handler below, so a refresh or a
-      // back navigation does not re-apply a filter the user has since cleared.
-      router.replace(pathname);
-      return;
-    }
-
-    if (lastPathRef.current !== pathname) {
-      lastPathRef.current = pathname;
-      setSearch("");
-      setBuilding("all");
-    }
-  }, [pathname, searchParams, router]);
+    // Stripped straight away, like the ?ac= handler below, so a refresh or a
+    // back navigation does not re-apply a filter the user has since cleared.
+    if (term) router.replace(pathname);
+  }, [term, pathname, router]);
 
   // Scanning the sticker on a unit links to /tech?ac=<acCode> (see the QR
   // page's button), so the technician lands straight on the log form instead of

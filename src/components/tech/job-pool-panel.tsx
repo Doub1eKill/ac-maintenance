@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { format } from "date-fns";
 import { AlertTriangle, Clock } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -38,17 +38,20 @@ function isUrgent(dateString?: string | null) {
 }
 
 export function JobPoolPanel({ jobPool, searchQuery, selectedBuilding, isPending, onClaim, onBulkClaim }: JobPoolPanelProps) {
-  const [selectedPoolIds, setSelectedPoolIds] = useState<string[]>([]);
+  const [rawSelectedIds, setSelectedPoolIds] = useState<string[]>([]);
 
-  useEffect(() => {
+  // Ticks are dropped the moment the filters change, in the same render.
+  const filterKey = `${searchQuery}|${selectedBuilding}`;
+  const [keyForSelection, setKeyForSelection] = useState(filterKey);
+  if (keyForSelection !== filterKey) {
+    setKeyForSelection(filterKey);
     setSelectedPoolIds([]);
-  }, [searchQuery, selectedBuilding]);
+  }
 
-  // Drop stale selections once a job leaves the pool (claimed by this tech or
-  // someone else), so the "เลือกแล้ว N งาน" count never lags reality.
-  useEffect(() => {
-    setSelectedPoolIds((prev) => prev.filter((id) => jobPool.some((job) => job.id === id)));
-  }, [jobPool]);
+  // Ticks on jobs that have since left the pool (claimed by this tech or
+  // someone else) are ignored rather than stored, so the "เลือกแล้ว N งาน"
+  // count never lags reality.
+  const selectedPoolIds = rawSelectedIds.filter((id) => jobPool.some((job) => job.id === id));
 
   function togglePoolSelection(jobId: string) {
     setSelectedPoolIds((prev) =>

@@ -52,7 +52,7 @@ export async function logMaintenanceAction(formData: FormData) {
       if (!Array.isArray(actionsArray) || actionsArray.length === 0) {
         throw new Error("Invalid actions format");
       }
-    } catch (e) {
+    } catch {
       return { error: "รูปแบบประเภทงานไม่ถูกต้อง" };
     }
 

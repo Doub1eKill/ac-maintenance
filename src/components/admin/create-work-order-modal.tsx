@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { X } from "lucide-react";
 import {
   NativeSelect,
@@ -39,17 +39,30 @@ export function CreateWorkOrderModal({
   onClose,
   onSubmit,
 }: CreateWorkOrderModalProps) {
-  const [selectedBuildingId, setSelectedBuildingId] = useState("");
-  const [selectedRoomId, setSelectedRoomId] = useState("");
-  const [selectedAcId, setSelectedAcId] = useState("");
-
-  useEffect(() => {
-    if (!open) return;
+  // The provider mounts this only while open, so the selection is seeded in
+  // the initialisers; if the unit it was opened for changes while open, the
+  // selection is re-seeded during render (React's "adjust state on prop
+  // change" form) rather than from an effect a frame later.
+  const seed = () => {
     const location = findLocationForAc(buildings, defaultAcId);
-    setSelectedBuildingId(location?.buildingId ?? "");
-    setSelectedRoomId(location?.roomId ?? "");
-    setSelectedAcId(defaultAcId ?? "");
-  }, [open, defaultAcId, buildings]);
+    return {
+      buildingId: location?.buildingId ?? "",
+      roomId: location?.roomId ?? "",
+      acId: defaultAcId ?? "",
+    };
+  };
+  const [selectedBuildingId, setSelectedBuildingId] = useState(() => seed().buildingId);
+  const [selectedRoomId, setSelectedRoomId] = useState(() => seed().roomId);
+  const [selectedAcId, setSelectedAcId] = useState(() => seed().acId);
+  const [seededFor, setSeededFor] = useState(defaultAcId);
+  if (seededFor !== defaultAcId) {
+    setSeededFor(defaultAcId);
+    const next = seed();
+    setSelectedBuildingId(next.buildingId);
+    setSelectedRoomId(next.roomId);
+    setSelectedAcId(next.acId);
+  }
+  void open;
 
   const roomsForBuilding = useMemo(
     () => buildings.find((b) => b.id === selectedBuildingId)?.rooms ?? [],

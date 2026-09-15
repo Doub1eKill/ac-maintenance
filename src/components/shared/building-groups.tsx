@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Building2, ChevronDown, ChevronUp, DoorClosed, Layers } from "lucide-react";
 import {
   Pagination,
@@ -290,10 +290,12 @@ export function BuildingGroupList<T>({
   // honoured on the very render the fresh data arrives in.
   const [consumedFocus, setConsumedFocus] = useState<number | null>(null);
 
-  useEffect(() => {
+  // Back to page 1 the moment the caller's filter changes, in the same render.
+  const [keyForPage, setKeyForPage] = useState(resetKey);
+  if (keyForPage !== resetKey) {
+    setKeyForPage(resetKey);
     setPage(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resetKey]);
+  }
 
   if (groups.length === 0) {
     return (

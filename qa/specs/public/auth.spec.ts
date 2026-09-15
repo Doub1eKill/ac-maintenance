@@ -21,7 +21,11 @@ test.describe("authentication, adversarially", () => {
     const landed = /\/tech/.test(url);
     ledger("Login", "valid technician lands on /tech*", "UI", landed ? "PASS" : "FAIL", await shot(page, "login-tech-valid"));
     await page.reload();
-    await page.waitForLoadState("networkidle").catch(() => {});
+    // "load" + the shell, not networkidle: the dev server's route prefetches
+    // can hold a request open for minutes while a route compiles, and that
+    // stalled this wait for the whole 180s test budget (run 20260915-1243).
+    await page.waitForLoadState("load").catch(() => {});
+    await page.locator("main").last().waitFor({ timeout: 60_000 }).catch(() => {});
     const stillIn = !page.url().includes("/login");
     ledger("Login", "session survives reload", "UI", stillIn ? "PASS" : "FAIL", await shot(page, "login-tech-reload"));
     const name = await page.evaluate(() => document.body.innerText.includes("QA_TEST_USER_TECH"));

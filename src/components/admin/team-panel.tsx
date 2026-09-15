@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { KeyRound, ShieldOff, ShieldCheck, Users } from "lucide-react";
 import {
@@ -62,9 +62,12 @@ export function TeamPanel({
     });
   }
 
-  useEffect(() => {
+  // Back to page 1 the moment the search changes, in the same render.
+  const [searchForPage, setSearchForPage] = useState(globalSearch);
+  if (searchForPage !== globalSearch) {
+    setSearchForPage(globalSearch);
     setTeamPage(1);
-  }, [globalSearch]);
+  }
 
   const filteredAllUsers = allUsers
     .filter(

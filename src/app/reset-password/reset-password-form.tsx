@@ -4,7 +4,6 @@ import { useState, useActionState } from "react";
 import Link from "next/link";
 import { resetPassword, type ResetPasswordState } from "./actions";
 import { Eye, EyeOff, AlertTriangle, CheckCircle2, KeyRound } from "lucide-react";
-import { AnimatedIcon } from "@/components/ui/animated-icon";
 
 export function ResetPasswordForm({ token }: { token: string }) {
   const [state, formAction, isPending] = useActionState<ResetPasswordState, FormData>(

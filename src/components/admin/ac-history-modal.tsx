@@ -55,7 +55,10 @@ export function AcHistoryModal({ airConditionerId, onClose, currentUserId, isAdm
   const [unit, setUnit] = useState<HistoryUnit | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  // Which unit the state above belongs to. Loading is "not this one yet",
+  // derived, rather than a flag flipped from inside the effect.
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
+  const isLoading = loadedFor !== airConditionerId;
 
   const [editingLogId, setEditingLogId] = useState<string | null>(null);
   const [editAction, setEditAction] = useState<HistoryEntry["action"]>("cleaning");
@@ -112,18 +115,17 @@ export function AcHistoryModal({ airConditionerId, onClose, currentUserId, isAdm
 
   useEffect(() => {
     let cancelled = false;
-    setIsLoading(true);
-    setError(null);
 
     getAirConditionerHistory(airConditionerId).then((result) => {
       if (cancelled) return;
       if ("error" in result) {
         setError(result.error ?? "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง");
       } else {
+        setError(null);
         setUnit(result.unit);
         setHistory(result.history);
       }
-      setIsLoading(false);
+      setLoadedFor(airConditionerId);
     });
 
     return () => {
@@ -150,7 +152,7 @@ export function AcHistoryModal({ airConditionerId, onClose, currentUserId, isAdm
           </div>
         )}
 
-        {error && (
+        {!isLoading && error && (
           <div className="text-center py-6 text-sm text-destructive">{error}</div>
         )}
 

@@ -4,7 +4,6 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { saveUpload, deleteUpload } from "@/lib/upload";
 import { avatarRejectionReason } from "@/lib/avatar";
-import { verifyOrgAdmin } from "@/lib/auth-guards";
 
 // Editing your own profile — name, phone and avatar. Shared by both dashboards:
 // the guard here is an active session, not org_admin, because a technician

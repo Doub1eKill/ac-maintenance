@@ -6,7 +6,6 @@ import Link from "next/link";
 import { registerUser, type RegisterState } from "@/app/register/actions";
 import { avatarRejectionReason } from "@/lib/avatar";
 import { Wrench, Building2, Eye, EyeOff, AlertTriangle, Clock, CheckCircle2, ArrowLeft, UserPlus, Camera, Phone, User } from "lucide-react";
-import { AnimatedIcon } from "@/components/ui/animated-icon";
 import {
   Alert,
   AlertTitle,

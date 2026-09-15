@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { X, Sparkles, Wrench, Droplets, PencilLine } from "lucide-react";
 import { PhotoUpload } from "@/components/tech/photo-upload";
+import type { FileWithPreview } from "@/hooks/use-file-upload";
 import { UnitCataloguePanel } from "@/components/tech/unit-catalogue-panel";
 import {
   NativeSelect,
@@ -20,8 +21,8 @@ interface LogActionModalProps {
 
 export function LogActionModal({ job, isPending, onClose, onSubmit, onValidationError }: LogActionModalProps) {
   const [selectedActions, setSelectedActions] = useState<string[]>([]);
-  const [beforePhotos, setBeforePhotos] = useState<any[]>([]);
-  const [afterPhotos, setAfterPhotos] = useState<any[]>([]);
+  const [beforePhotos, setBeforePhotos] = useState<FileWithPreview[]>([]);
+  const [afterPhotos, setAfterPhotos] = useState<FileWithPreview[]>([]);
   const [repairDetail, setRepairDetail] = useState("");
   const [editingUnit, setEditingUnit] = useState(false);
   // What the unit says after an in-modal correction. null until one is made,
@@ -50,12 +51,12 @@ export function LogActionModal({ job, isPending, onClose, onSubmit, onValidation
     const formData = new FormData(e.currentTarget);
     formData.append("actions", JSON.stringify(selectedActions));
 
-    if (beforePhotos.length > 0) {
-      formData.append("beforePhoto", beforePhotos[0].file);
-    }
-    if (afterPhotos.length > 0) {
-      formData.append("afterPhoto", afterPhotos[0].file);
-    }
+    // A FileWithPreview may wrap stored-file metadata rather than a File;
+    // only a real File can travel in the form.
+    const before = beforePhotos[0]?.file;
+    if (before instanceof File) formData.append("beforePhoto", before);
+    const after = afterPhotos[0]?.file;
+    if (after instanceof File) formData.append("afterPhoto", after);
 
     // Add parts to notes
     const parts = formData.get("parts") as string;

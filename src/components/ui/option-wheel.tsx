@@ -3,6 +3,25 @@
 import React, { useRef, useState, useCallback, useEffect } from "react";
 import "./option-wheel.css";
 
+// The subset of props the frame loop and the pointer handlers read on every
+// tick, snapshotted after each render (see cfgRef).
+interface WheelConfig {
+  count: number;
+  items: string[];
+  rowH: number;
+  curve: number;
+  tilt: number;
+  blur: number;
+  fade: number;
+  minOpacity: number;
+  side: "left" | "right";
+  loop: boolean;
+  smoothing: number;
+  draggable: boolean;
+  soundUrl: string;
+  soundVolume: number;
+}
+
 export interface OptionWheelProps {
   items: string[];
   defaultSelected?: number;
@@ -63,8 +82,10 @@ export function OptionWheel({
   const targetRef = useRef(defaultSelected);
   const rafRef = useRef<number | null>(null);
   const lastRef = useRef(0);
-  const cfgRef = useRef<Record<string, any>>({});
   const onChangeRef = useRef(onChange);
+  // runFrame schedules itself; it reaches the next frame through this ref
+  // rather than by name, which would be a use before its declaration.
+  const runFrameRef = useRef<(now: number) => void>(() => {});
   const selectedRef = useRef(defaultSelected);
   const wheelTimerRef = useRef<NodeJS.Timeout | null>(null);
   const dragRef = useRef<{ y: number; start: number; id: number } | null>(null);
@@ -80,8 +101,10 @@ export function OptionWheel({
       ? parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
       : 16;
 
-  onChangeRef.current = onChange;
-  cfgRef.current = {
+  // What the frame loop and the pointer handlers read. Built here (pure)
+  // and stored after commit — writing a ref during render is what the
+  // react-hooks/refs rule stops, since a render may be thrown away.
+  const cfg: WheelConfig = {
     count: items.length,
     items,
     rowH: Math.max(fontSize * spacing * remPx, 1),
@@ -97,6 +120,11 @@ export function OptionWheel({
     soundUrl,
     soundVolume,
   };
+  const cfgRef = useRef<WheelConfig>(cfg);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+    cfgRef.current = cfg;
+  });
 
   const runFrame = useCallback((now: number) => {
     const dt = Math.min((now - lastRef.current) / 1000, 0.05);
@@ -141,8 +169,11 @@ export function OptionWheel({
       el.style.setProperty("--ow-p", Math.max(0, 1 - Math.min(dist, 1)).toFixed(4));
     }
 
-    rafRef.current = settled ? null : requestAnimationFrame(runFrame);
+    rafRef.current = settled ? null : requestAnimationFrame((t) => runFrameRef.current(t));
   }, []);
+  useEffect(() => {
+    runFrameRef.current = runFrame;
+  }, [runFrame]);
 
   const startLoop = useCallback(() => {
     if (rafRef.current != null) return;

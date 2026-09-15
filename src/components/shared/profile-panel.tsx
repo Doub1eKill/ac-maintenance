@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition, useActionState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, useTransition, useActionState } from "react";
 import Image from "next/image";
 import { useTheme } from "next-themes";
 import { User, Mail, Phone, Building2, KeyRound, AlertTriangle, CheckCircle2, Sun, Moon, Monitor, Camera, Pencil } from "lucide-react";
@@ -397,12 +397,14 @@ function ThemeCard() {
   // rendering the active option before that would read the server's guess
   // (always "system") and flip a frame later, which shows up as every
   // button briefly looking unselected/selected wrong on first paint.
-  const [mounted, setMounted] = useState(false);
+  // false in the server render and the hydration pass, true from the first
+  // client render on — a hydration fact, read as one.
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
   const { theme, setTheme } = useTheme();
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   return (
     <div className="biz-card p-6 space-y-4">

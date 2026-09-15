@@ -221,36 +221,39 @@ function AuditLogCard() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Changing the filter also resets the page in a separate effect below;
-  // both depend on actionFilter and would otherwise fire back-to-back, with
-  // this one kicking off a fetch for the (stale) old page before the page
-  // reset takes effect. The cancelled flag drops that stale response instead
-  // of letting it land after the page-1 fetch that follows it.
+  // A filter change goes back to page 1 in the same render it arrives in
+  // (React's "adjust state on change" form), so the fetch below never sees
+  // the new filter with the old page.
+  const [filterForPage, setFilterForPage] = useState(actionFilter);
+  if (filterForPage !== actionFilter) {
+    setFilterForPage(actionFilter);
+    setPage(1);
+  }
+
+  // Loading is "the page/filter shown is not the one loaded yet" — derived,
+  // rather than a flag flipped from inside the effect.
+  const wanted = `${page}|${actionFilter}`;
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
+  const isLoading = loadedKey !== wanted;
+
   useEffect(() => {
     let cancelled = false;
-    setIsLoading(true);
-    setError(null);
 
     getAuditLogs({ page, action: actionFilter || undefined }).then((result) => {
       if (cancelled) return;
       setLogs(result.logs);
       setAvailableActions((prev) => (result.availableActions.length ? result.availableActions : prev));
       setTotalPages(Math.max(1, Math.ceil(result.page.total / result.page.pageSize)));
-      if (result.error) setError(result.error);
-      setIsLoading(false);
+      setError(result.error ?? null);
+      setLoadedKey(`${page}|${actionFilter}`);
     });
 
     return () => {
       cancelled = true;
     };
   }, [page, actionFilter]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [actionFilter]);
 
   return (
     <div className="biz-card p-6 space-y-4">

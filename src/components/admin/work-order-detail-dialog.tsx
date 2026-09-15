@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Image from "next/image";
 import {
   AlertTriangle,
@@ -50,11 +50,15 @@ export function WorkOrderDetailDialog({ workOrder, isPending, onClose, onCancelW
   const [showCancelForm, setShowCancelForm] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
 
-  useEffect(() => {
+  // Per-order scratch state is dropped the moment a different order (or
+  // none) is shown, in the same render, rather than a frame later.
+  const [shownId, setShownId] = useState(workOrder?.id ?? null);
+  if (shownId !== (workOrder?.id ?? null)) {
+    setShownId(workOrder?.id ?? null);
     setBrokenEvidenceImages({});
     setShowCancelForm(false);
     setCancelReason("");
-  }, [workOrder?.id]);
+  }
 
   const canCancel = workOrder && (workOrder.status === "pending" || workOrder.status === "claimed");
 

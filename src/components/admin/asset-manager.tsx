@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import {
   Building2, Plus, ChevronDown, ChevronUp, X, QrCode, CalendarClock, Printer, Clock, Pencil, Hash
@@ -157,18 +157,21 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
   // than the convenience of dismissing them with a key.
   useEscapeToClose(() => setShowQrCode(null), showQrCode !== null);
 
-  useEffect(() => {
+  // Applied in the same render the search changes in (React's "adjust state
+  // on change" form): back to page 1, and dropping a deliberate collapse so
+  // it can't outlive the list it was aimed at — without that, closing a
+  // building and then searching would suppress the search's own auto-open
+  // and answer with a page that looks empty, which is the bug the auto-open
+  // was added to fix. The focus on a just-created building goes too: a
+  // search that hid it would otherwise let it snap the list back to its page
+  // the moment the search was cleared.
+  const [searchForList, setSearchForList] = useState(globalSearch);
+  if (searchForList !== globalSearch) {
+    setSearchForList(globalSearch);
     setBuildingsPage(1);
-    // Also drops a deliberate collapse, so it can't outlive the list it was
-    // aimed at. Without this, closing a building and then searching would
-    // suppress the search's own auto-open and answer with a page that looks
-    // empty — which is the bug the auto-open was added to fix.
     setExpandedBuilding(null);
-    // And the focus on a just-created building, for the same reason: a
-    // search that hid it would otherwise let it snap the list back to its
-    // page the moment the search was cleared, overriding the reset above.
     setFocusBuilding(null);
-  }, [globalSearch]);
+  }
 
   // Matches what the header box says it searches — "ค้นหารหัสแอร์, สถานที่,
   // หรือแบรนด์" — and in particular the unit code, which is how the overview's

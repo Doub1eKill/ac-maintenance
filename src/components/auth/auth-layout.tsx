@@ -1,6 +1,6 @@
 import React from "react";
 import Link from "next/link";
-import { Zap, ShieldCheck, Building2, Wrench } from "lucide-react";
+import { Zap, ShieldCheck, Wrench } from "lucide-react";
 
 interface AuthLayoutProps {
   children: React.ReactNode;

@@ -62,17 +62,23 @@ export function TrashModal({ onClose }: TrashModalProps) {
     onClose();
   });
 
-  const loadTrash = () => {
-    setIsLoading(true);
+  // Fetch and fill; the caller decides whether to show the spinner first.
+  // isLoading starts true, so the mount fetch needs no set of its own.
+  const fetchTrash = () =>
     getAcTrashData().then((data) => {
       setBrands(data.brands);
       setModels(data.models);
       setIsLoading(false);
     });
+
+  const loadTrash = () => {
+    setIsLoading(true);
+    return fetchTrash();
   };
 
   useEffect(() => {
-    loadTrash();
+    // Mount only; the reloads after restore/purge go through loadTrash.
+    void fetchTrash();
   }, []);
 
   function handleRestoreBrand(brand: TrashBrand) {

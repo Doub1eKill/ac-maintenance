@@ -115,7 +115,7 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.json(serialized);
-  } catch (error: any) {
+  } catch (error) {
     console.error("[MAINTENANCE_SCHEDULES_GET] Error:", error);
     return NextResponse.json({ error: "Failed to fetch schedules" }, { status: 500 });
   }

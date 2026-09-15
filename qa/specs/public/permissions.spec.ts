@@ -8,7 +8,7 @@ const LIVE_CODE = "B572921-6-357199-01";
 
 async function landing(page, url: string) {
   await page.goto(url);
-  await page.waitForLoadState("networkidle").catch(() => {});
+  await page.waitForLoadState("load").catch(() => {});
   await page.waitForTimeout(800);
   return page.url();
 }

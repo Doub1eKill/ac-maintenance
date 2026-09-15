@@ -7,7 +7,6 @@ import type { SignInCode } from "@/lib/sign-in-codes";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff, AlertTriangle, Building2, Wrench, ArrowRight } from "lucide-react";
-import { AnimatedIcon } from "@/components/ui/animated-icon";
 import {
   Alert,
   AlertDescription,

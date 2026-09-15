@@ -279,7 +279,7 @@ export const columns: ColumnDef<MaintenanceRow>[] = [
     // the toolbar button below the table.
     cell: ({ row, table }) => {
       const item = row.original;
-      const meta = table.options.meta as any;
+      const meta = table.options.meta as MaintenanceTableMeta | undefined;
 
       return (
         <div className="flex items-center justify-end gap-1">
@@ -322,10 +322,14 @@ export const columns: ColumnDef<MaintenanceRow>[] = [
   },
 ];
 
-interface UpcomingMaintenanceTableProps {
-  data: MaintenanceRow[];
+// What the column definitions reach through table.options.meta.
+interface MaintenanceTableMeta {
   onViewDetails?: (acCode: string) => void;
   onCreateWorkOrder?: (acId: string) => void;
+}
+
+interface UpcomingMaintenanceTableProps extends MaintenanceTableMeta {
+  data: MaintenanceRow[];
   onBulkAssignWorkOrder?: (workOrderIds: string[]) => void;
 }
 
