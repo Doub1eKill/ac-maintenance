@@ -51,13 +51,66 @@ function getBarcodeDetector(): BarcodeDetectorCtor | null {
   return ctor ?? null;
 }
 
-// Whether this browser can scan at all: the Barcode Detection API plus a
-// camera. A browser capability, not React state, so it is read through
-// useSyncExternalStore rather than set from an effect. Never changes while
-// the page is open.
+// Frames handed to the JavaScript decoder are downscaled to this on their
+// longest side: a sticker fills a good part of the view when a technician
+// aims at it, and decoding a 4K frame every quarter second on a phone is what
+// makes a scanner feel stuck.
+const DECODE_MAX_DIMENSION = 640;
+
+/**
+ * The QR reader for this browser: the platform's BarcodeDetector where it
+ * exists and lists qr_code (Android and macOS Chrome), otherwise jsQR reading
+ * the video through a canvas. The second path is what makes the camera work
+ * on iOS — Safari has no BarcodeDetector at all, and before this the iPhone
+ * got only the typed fallback (A4, E1). Same interface either way, so the
+ * scanning loop does not know which one it has.
+ *
+ * Desktop Chrome on Windows and Linux defines BarcodeDetector but supports no
+ * formats on it, so the constructor being present is not enough; that case
+ * takes the JavaScript path too.
+ */
+async function createQrDetector(): Promise<BarcodeDetectorLike> {
+  const Native = getBarcodeDetector();
+  if (Native) {
+    const formats = await (Native.getSupportedFormats?.() ?? Promise.resolve(["qr_code"]));
+    if (formats.includes("qr_code")) return new Native({ formats: ["qr_code"] });
+  }
+
+  // Loaded only on the browsers that need it; the native path never pays
+  // for the decoder's bundle.
+  const { default: jsQR } = await import("jsqr");
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) throw new DOMException("canvas 2d unavailable", "NotSupportedError");
+
+  return {
+    async detect(source) {
+      // The loop only ever hands over the <video>; anything else is not a
+      // frame this decoder knows how to read.
+      if (!(source instanceof HTMLVideoElement)) return [];
+      const vw = source.videoWidth;
+      const vh = source.videoHeight;
+      if (!vw || !vh) return [];
+      const scale = Math.min(1, DECODE_MAX_DIMENSION / Math.max(vw, vh));
+      canvas.width = Math.round(vw * scale);
+      canvas.height = Math.round(vh * scale);
+      ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+      const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      // A sticker is dark on light; skipping the inverted attempt halves the
+      // work per frame.
+      const code = jsQR(image.data, image.width, image.height, { inversionAttempts: "dontInvert" });
+      return code?.data ? [{ rawValue: code.data }] : [];
+    },
+  };
+}
+
+// Whether this browser can scan at all: a camera it can ask for. The decoder
+// is no longer a condition — createQrDetector() always has one. A browser
+// capability, not React state, so it is read through useSyncExternalStore
+// rather than set from an effect. Never changes while the page is open.
 const noSubscribe = () => () => {};
 function readCameraSupport() {
-  return getBarcodeDetector() !== null && typeof navigator.mediaDevices?.getUserMedia === "function";
+  return typeof navigator !== "undefined" && typeof navigator.mediaDevices?.getUserMedia === "function";
 }
 
 type CameraState =
@@ -67,8 +120,8 @@ type CameraState =
   | "starting"
   // Streaming and being polled for a QR code.
   | "scanning"
-  // No BarcodeDetector, no camera, or permission refused. The typed
-  // fallback below is the whole scanner in this state.
+  // No camera API, no camera, or permission refused. The typed fallback
+  // below is the whole scanner in this state.
   | "unavailable";
 
 const UNSUPPORTED_NOTE = "เบราว์เซอร์นี้ไม่รองรับการสแกนด้วยกล้อง — พิมพ์รหัสเครื่องหรือวางลิงก์จากสติกเกอร์แทน";
@@ -158,26 +211,15 @@ function QrScanModalBody({ isPending, onClose, onClaim, onClaimAndLog, onLogWork
   useEffect(() => {
     if (!supported || qrResult) return;
 
-    const Detector = getBarcodeDetector();
-    if (!Detector) return;
-
     let cancelled = false;
     let timer: number | undefined;
     let detector: BarcodeDetectorLike | null = null;
 
-    // Desktop Chrome on Windows and Linux defines BarcodeDetector but
-    // supports no formats on it, so the constructor being present is not
-    // enough — ask before opening the camera, and fall back to typing if
-    // QR is not on the list. The detector is built here too, before the
-    // stream exists: if construction throws there is nothing to leave
-    // running behind the "ใช้กล้องไม่ได้" message.
-    const formats = Detector.getSupportedFormats?.() ?? Promise.resolve(["qr_code"]);
-    formats
-      .then((list) => {
-        if (!list.includes("qr_code")) {
-          throw new DOMException("qr_code not supported", "NotSupportedError");
-        }
-        detector = new Detector({ formats: ["qr_code"] });
+    // The detector is built before the stream exists: if that fails there
+    // is nothing left running behind the "ใช้กล้องไม่ได้" message.
+    createQrDetector()
+      .then((built) => {
+        detector = built;
         return navigator.mediaDevices.getUserMedia({
           video: { facingMode: { ideal: "environment" } },
           audio: false,

@@ -1,5 +1,11 @@
-import type { Page } from "@playwright/test";
-import { test, expect, ledger, shot, note, hydrated, toastText, clearToasts, db, QA } from "../../lib";
+import { chromium, devices, type Page } from "@playwright/test";
+import fs from "node:fs";
+import path from "node:path";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { QRCodeSVG } from "qrcode.react";
+import sharp from "sharp";
+import { test, expect, ledger, shot, note, hydrated, toastText, clearToasts, db, QA, RUN_DIR } from "../../lib";
 
 // Regressions for the technician-side findings of run 20260913-1742 — the QR
 // scanner above all (BUG-002), which was a typed-code mock until fb801a5.
@@ -182,4 +188,54 @@ test("walk-up close via /qr → /tech?ac=: the technician who records the work b
   // Put the job back so the earlier tests in this file still find a pending unit on a rerun.
   db(`delete from maintenance_logs where work_order_id=${jobId} and notes='QA_TEST_WALKUP_CLOSE'`);
   db(`update work_orders set status='pending', claimed_by=NULL, claimed_at=NULL, completed_at=NULL where id=${jobId}`);
+});
+
+test("E1: without BarcodeDetector (iOS Safari), the camera still reads a sticker through the JavaScript decoder", async () => {
+  test.setTimeout(240_000);
+  // Chromium's fake camera can play a file. The sticker is rendered here from
+  // the same component the admin's QR sheet uses, for a unit with a pending
+  // order, into a 640x480 MJPEG clip; BarcodeDetector is then deleted before
+  // the app loads so only jsQR (lib/upload's counterpart in qr-scan-modal) can
+  // read it. This is the whole iOS path, minus the phone.
+  const u = units();
+  const svg = renderToStaticMarkup(
+    createElement(QRCodeSVG, { value: `http://localhost:3000/qr/${u.pendingUuid}`, size: 400, level: "M", marginSize: 4 })
+  );
+  const qr = await sharp(Buffer.from(svg)).png().toBuffer();
+  const frame = await sharp({ create: { width: 640, height: 480, channels: 3, background: "#ffffff" } })
+    .composite([{ input: qr, left: 120, top: 40 }]).jpeg({ quality: 92 }).toBuffer();
+  const clip = path.join(RUN_DIR, "e1-sticker.mjpeg");
+  fs.writeFileSync(clip, Buffer.concat(Array(30).fill(frame)));
+
+  const browser = await chromium.launch({
+    args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream", `--use-file-for-fake-video-capture=${clip}`],
+  });
+  try {
+    const ctx = await browser.newContext({
+      ...devices["Pixel 7"],
+      permissions: ["camera"],
+      storageState: (test.info().project.use as { storageState?: string }).storageState,
+      baseURL: test.info().project.use.baseURL,
+    });
+    await ctx.addInitScript(() => sessionStorage.setItem("ac-maintenance.browser-session", "1"));
+    await ctx.addInitScript(() => {
+      const w = window as unknown as { BarcodeDetector?: unknown; __hadDetector: boolean };
+      w.__hadDetector = "BarcodeDetector" in window;
+      delete w.BarcodeDetector;
+    });
+    const page = await ctx.newPage();
+    const dlg = await openScanner(page);
+    // Either still aiming, or the decoder has already read the clip — it is
+    // fast enough that the result can be up before this line runs.
+    const live = /เล็งกล้องไปที่ QR Code|รับงานทันที/.test(await dlg.innerText());
+    ledger("QR scan", "no BarcodeDetector: the camera still opens (typed fallback is not the whole scanner any more)", "UI", live ? "PASS" : "FAIL", await shot(page, "reg-e1-camera-live"));
+    await dlg.getByText(u.pendingCode).waitFor({ timeout: 20_000 }).catch(() => {});
+    const t = (await dlg.innerText().catch(() => "")).replace(/\s+/g, " ");
+    const hadDetector = await page.evaluate(() => (window as unknown as { __hadDetector: boolean }).__hadDetector);
+    note("reg-e1-decoder.txt", `BarcodeDetector present before deletion: ${hadDetector}; result text: ${t.slice(0, 300)}`);
+    ledger("QR scan", `jsQR reads ${u.pendingCode}'s sticker from the camera feed and the result shows`, "UI", t.includes(u.pendingCode) && /รับงานทันที/.test(t) ? "PASS" : "FAIL", await shot(page, "reg-e1-decoded"));
+    await ctx.close();
+  } finally {
+    await browser.close();
+  }
 });
