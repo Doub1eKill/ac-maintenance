@@ -1,5 +1,27 @@
 # Project Handoff & Technical Summary
 
+# 🧹 C1 — eslint 24 error / 19 warning → 0 error / 4 warning (15 ก.ย. 2026, DoubleKill)
+
+แผน C · branch `chore/eslint-clean` → ff-merge `master` · 27 ไฟล์ · `tsc` ผ่าน · full sweep หลังแก้: admin 32/32, tech 16/16, public 31/32 (ดูข้อสังเกตท้าย)
+
+## วิธีที่ใช้แก้ `react-hooks/set-state-in-effect` ×16 — ไม่มี eslint-disable แม้แต่จุดเดียว
+| แบบ | ที่ | ใช้อะไรแทน |
+|---|---|---|
+| "reset X เมื่อ key เปลี่ยน" (page → 1 เมื่อ search/filter เปลี่ยน, เคลียร์ selection, เคลียร์ scratch state ของ dialog) | `team-panel`, `user-approvals-panel`, `asset-manager`, `building-groups` (`resetKey`), `job-pool-panel`, `work-order-detail-dialog`, `settings-panel` (filter→page 1), `create-work-order-modal` (re-seed จาก `defaultAcId`) | **adjust-state-during-render** ของ React docs: `const [prev, setPrev] = useState(key); if (prev !== key) { setPrev(key); setX(init) }` — lint ยอมรับ, มีผลใน render เดียวกันไม่ต้องรอเฟรมถัดไป |
+| `setIsLoading(true)` ต้นทาง effect ที่ fetch | `ac-history-modal`, `settings-panel` AuditLogCard, `trash-modal` | derived: `isLoading = loadedFor !== id` / `loadedKey !== \`${page}|${filter}\`` · เซ็ตเฉพาะใน callback · trash-modal แยก `fetchTrash()` (mount) กับ `loadTrash()` (มี spinner) |
+| seed จาก URL `?q=` + `router.replace` | `dashboard-search`, `tech-shell` | ส่วน state ทำใน render (`applied {path, term}` แทน `lastPathRef`) เหลือแค่ `router.replace` ใน effect |
+| mounted/hydration flag, viewport | `profile-panel` ThemeCard, `use-mobile` | `useSyncExternalStore` (แบบเดียวกับ login-form #2) |
+| selection ที่ต้องตัด id ที่หายไปจาก pool | `job-pool-panel` | derive `selectedPoolIds = raw.filter(in pool)` แทน effect prune |
+
+- `no-explicit-any` ×5: `WheelConfig` (option-wheel), `MaintenanceTableMeta` (TanStack meta), `FileWithPreview` (log-action-modal — `formData.append` เฉพาะ `instanceof File`), `catch (error)` ใน route
+- `option-wheel.tsx`: ref ที่เขียนตอน render (`onChangeRef`, `cfgRef`) ย้ายไป `useEffect` ทุก render · `runFrame` เรียกตัวเองผ่าน `runFrameRef` แทนอ้างชื่อก่อนประกาศ
+- ลบ import ที่ไม่ได้ใช้ 15 จุด (`AnimatedIcon` ×3, icons ใน dashboard-layout ×5, ฯลฯ)
+- warning ที่เหลือ 4 = third-party: `<img>` ×2 ใน `photo-upload` (preview blob), `react-hooks/incompatible-library` ที่ TanStack table, `exhaustive-deps` ใน `use-file-upload` (shadcn hook) — ปล่อยไว้
+
+## ข้อสังเกตจากสวีป `20260915-1243`
+- `public/auth.spec` "valid technician, then reload keeps the session" ล้ม 3 รอบติดที่ `waitForLoadState("networkidle")` หลัง `reload()` — trace แสดงหน้าโหลดเสร็จปกติ (screenshot เห็น dashboard ครบ) แต่ networkidle ไม่มาเลย 169 วิ · รันเดี่ยวผ่าน, reload มือ 1.3 วิ · เป็น dev-server prefetch/compile ค้าง ไม่ใช่ของแตก → เปลี่ยน spec เป็น `load` + รอ `main` (และ `permissions.spec` ที่ใช้ networkidle เหมือนกัน)
+- "approved user can log in afterwards" FAIL 1 ครั้ง = screenshot ยัง "Rendering…" (compile ช้า) ไม่ใช่ regression
+
 # ↩️ B4 — Back หลัง logout ไม่โชว์ dashboard เก่าแล้ว · B3 — ตัดสินใจคง org_admin ในฟอร์มสมัคร (15 ก.ย. 2026, DoubleKill)
 
 แผน B ข้อสาม/สี่ · branch `fix/logout-back` → ff-merge `master`
