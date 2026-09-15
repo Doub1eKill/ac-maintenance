@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { X, Sparkles, Wrench, Droplets, PencilLine } from "lucide-react";
 import { PhotoUpload } from "@/components/tech/photo-upload";
+import { shrinkImage } from "@/lib/client-image";
 import type { FileWithPreview } from "@/hooks/use-file-upload";
 import { UnitCataloguePanel } from "@/components/tech/unit-catalogue-panel";
 import {
@@ -35,7 +36,7 @@ export function LogActionModal({ job, isPending, onClose, onSubmit, onValidation
     );
   }
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
     if (selectedActions.length === 0) {
@@ -52,11 +53,12 @@ export function LogActionModal({ job, isPending, onClose, onSubmit, onValidation
     formData.append("actions", JSON.stringify(selectedActions));
 
     // A FileWithPreview may wrap stored-file metadata rather than a File;
-    // only a real File can travel in the form.
+    // only a real File can travel in the form. Shrunk first: two camera
+    // originals in one request is more than a Vercel function will read.
     const before = beforePhotos[0]?.file;
-    if (before instanceof File) formData.append("beforePhoto", before);
+    if (before instanceof File) formData.append("beforePhoto", await shrinkImage(before));
     const after = afterPhotos[0]?.file;
-    if (after instanceof File) formData.append("afterPhoto", after);
+    if (after instanceof File) formData.append("afterPhoto", await shrinkImage(after));
 
     // Add parts to notes
     const parts = formData.get("parts") as string;

@@ -8,6 +8,7 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { requestPasswordReset, type RequestResetState } from "@/app/request-password-reset/actions";
 import { updateProfileAction } from "@/app/admin/actions";
 import { avatarRejectionReason } from "@/lib/avatar";
+import { shrinkImage } from "@/lib/client-image";
 
 interface ProfilePanelProps {
   profile: {
@@ -74,7 +75,7 @@ export function ProfilePanel({ profile, universityName }: ProfilePanelProps) {
   // while the refreshed server data is still on its way.
   const avatarSrc = avatarPreview ?? profile.avatarUrl;
 
-  const handlePickAvatar = (file: File | null) => {
+  const handlePickAvatar = async (file: File | null) => {
     if (!file) return;
     setSaveResult(null);
     const rejection = avatarRejectionReason(file);
@@ -83,8 +84,10 @@ export function ProfilePanel({ profile, universityName }: ProfilePanelProps) {
       return;
     }
     setAvatarError(null);
-    setAvatarFile(file);
-    setAvatarPreview(URL.createObjectURL(file));
+    // Shrunk at pick time, so what is previewed is what gets sent.
+    const picked = await shrinkImage(file);
+    setAvatarFile(picked);
+    setAvatarPreview(URL.createObjectURL(picked));
   };
 
   const cancelAvatarPick = () => {

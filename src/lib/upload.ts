@@ -8,16 +8,38 @@ import path from "path";
 const MAX_IMAGE_DIMENSION = 1600;
 const IMAGE_QUALITY = 80;
 
-// Everything this module writes lives here, and nothing outside it may be
-// deleted — see deleteUpload().
+// Everything this module writes lives in one of two places, and nothing
+// outside them may be deleted — see deleteUpload().
+//
+// Locally, public/uploads: the dev server serves it, the QA harness knows to
+// clear it, a phone on the LAN reaches it. On Vercel the filesystem a function
+// sees is read-only and gone with the function, so there the same bytes go to
+// a Vercel Blob store and the stored URL is the blob's public address. The
+// switch is the token: set (Vercel adds it when the store is connected, or
+// .env.local carries it for a local trial) means Blob, absent means disk.
 const UPLOAD_URL_PREFIX = "/uploads/";
+const BLOB_HOST_SUFFIX = ".public.blob.vercel-storage.com";
+
+function blobToken() {
+  return process.env.BLOB_READ_WRITE_TOKEN || null;
+}
+
+function isBlobUrl(url: string): boolean {
+  try {
+    const { protocol, hostname } = new URL(url);
+    return protocol === "https:" && hostname.endsWith(BLOB_HOST_SUFFIX);
+  } catch {
+    return false;
+  }
+}
 
 function uploadDir() {
   return path.join(process.cwd(), "public/uploads");
 }
 
 /**
- * Writes an uploaded image to public/uploads and returns its public path.
+ * Stores an uploaded image and returns its public URL: a /uploads/ path on
+ * disk, or an https:// address on Vercel Blob when a token is configured.
  *
  * Lived in tech/actions.ts until profile pictures needed it from admin/
  * actions.ts too; moved here rather than copied so both callers keep the same
@@ -43,7 +65,7 @@ export async function saveUpload(file: File | null): Promise<string | null> {
     const buffer = Buffer.from(await file.arrayBuffer());
     const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
     const dir = uploadDir();
-    await fs.mkdir(dir, { recursive: true });
+    if (!blobToken()) await fs.mkdir(dir, { recursive: true });
 
     // The claimed MIME type is the browser's guess from the extension and is
     // not checked here: sharp reads the bytes, and a file it cannot decode is
@@ -61,6 +83,21 @@ export async function saveUpload(file: File | null): Promise<string | null> {
       .toBuffer();
 
     const filename = `${Date.now()}-${safeName.replace(/\.[^.]+$/, "")}.jpg`;
+
+    const token = blobToken();
+    if (token) {
+      const { put } = await import("@vercel/blob");
+      // No random suffix: the timestamp already makes the name unique, and a
+      // predictable key is what lets deleteUpload() and a human find it again.
+      const blob = await put(`uploads/${filename}`, processed, {
+        access: "public",
+        contentType: "image/jpeg",
+        addRandomSuffix: false,
+        token,
+      });
+      return blob.url;
+    }
+
     await fs.writeFile(path.join(dir, filename), processed);
     return `${UPLOAD_URL_PREFIX}${filename}`;
   } catch (error) {
@@ -87,7 +124,26 @@ export async function saveUpload(file: File | null): Promise<string | null> {
  * the whole action over it would lose the user's actual change.
  */
 export async function deleteUpload(url: string | null | undefined): Promise<void> {
-  if (!url || !url.startsWith(UPLOAD_URL_PREFIX)) return;
+  if (!url) return;
+
+  // A blob is named by its full URL and deleted by it; the host check is the
+  // whole guard, since nothing else this module wrote lives on that host.
+  if (isBlobUrl(url)) {
+    const token = blobToken();
+    if (!token) {
+      console.error("Cannot delete old upload: BLOB_READ_WRITE_TOKEN is not set");
+      return;
+    }
+    try {
+      const { del } = await import("@vercel/blob");
+      await del(url, { token });
+    } catch (error) {
+      console.error("Failed to delete old upload:", error);
+    }
+    return;
+  }
+
+  if (!url.startsWith(UPLOAD_URL_PREFIX)) return;
 
   const filename = url.slice(UPLOAD_URL_PREFIX.length);
   // basename strips any traversal; comparing back catches the cases where it

@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { registerUser, type RegisterState } from "@/app/register/actions";
 import { avatarRejectionReason } from "@/lib/avatar";
+import { shrinkImage } from "@/lib/client-image";
 import { Wrench, Building2, Eye, EyeOff, AlertTriangle, Clock, CheckCircle2, ArrowLeft, UserPlus, Camera, Phone, User } from "lucide-react";
 import {
   Alert,
@@ -34,7 +35,7 @@ export function RegisterForm() {
     return () => URL.revokeObjectURL(avatarPreview);
   }, [avatarPreview]);
 
-  const handlePickAvatar = (file: File | null) => {
+  const handlePickAvatar = async (file: File | null) => {
     if (!file) return;
     const rejection = avatarRejectionReason(file);
     if (rejection) {
@@ -46,7 +47,15 @@ export function RegisterForm() {
       return;
     }
     setAvatarError(null);
-    setAvatarPreview(URL.createObjectURL(file));
+    // This form submits natively through the input, so the shrunk file has to
+    // go back into the input: a DataTransfer is the one way to set its files.
+    const picked = await shrinkImage(file);
+    if (picked !== file && avatarInputRef.current && typeof DataTransfer !== "undefined") {
+      const dt = new DataTransfer();
+      dt.items.add(picked);
+      avatarInputRef.current.files = dt.files;
+    }
+    setAvatarPreview(URL.createObjectURL(picked));
   };
 
   // The hidden input cannot carry `required` — the browser will not submit a

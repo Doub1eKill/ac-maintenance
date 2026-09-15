@@ -23,10 +23,12 @@ const nextConfig: NextConfig = {
     },
   },
   images: {
-    // Real uploads are same-origin (/uploads/...) and need no entry here.
-    // Unsplash is only allow-listed because seed data uses it as a
-    // placeholder for work order evidence photos.
+    // Local uploads are same-origin (/uploads/...) and need no entry here;
+    // on Vercel they live on the project's Blob store (lib/upload.ts), whose
+    // public host is allow-listed by suffix. Unsplash is only here because
+    // seed data uses it as a placeholder for work order evidence photos.
     remotePatterns: [
+      { protocol: "https", hostname: "*.public.blob.vercel-storage.com" },
       { protocol: "https", hostname: "images.unsplash.com" },
     ],
   },
