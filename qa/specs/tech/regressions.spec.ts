@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { test, expect, ledger, shot, note, hydrated, toastText, clearToasts, db } from "../../lib";
+import { test, expect, ledger, shot, note, hydrated, toastText, clearToasts, db, QA } from "../../lib";
 
 // Regressions for the technician-side findings of run 20260913-1742 — the QR
 // scanner above all (BUG-002), which was a typed-code mock until fb801a5.
@@ -154,3 +154,32 @@ test("BUG-011: technician pages carry exactly one <main>", async ({ page }) => {
 
 // Keep TypeScript honest about the helper we do not use in every test.
 void expect;
+
+test("walk-up close via /qr → /tech?ac=: the technician who records the work becomes claimed_by", async ({ page }) => {
+  // The sticker's own page hands off to /tech?ac=<code>, which opens the log
+  // form straight on the unit's pending order — no "claim" step in between.
+  // The close used to leave claimed_by NULL on that path.
+  const u = units();
+  const [[jobId]] = db(`select w.id from work_orders w join air_conditioners a on a.id=w.air_conditioner_id where a.ac_code='${u.pendingCode}' and w.status='pending' order by w.id limit 1`);
+  const [[techId]] = db(`select id from users where email='${QA.tech}'`);
+  expect(jobId).toBeTruthy();
+
+  await page.goto(`/tech?ac=${u.pendingCode}`); await page.locator("main").last().waitFor({ timeout: 90_000 }); await hydrated(page, "main");
+  const dlg = page.locator("div.fixed.inset-0").filter({ hasText: /บันทึกประวัติการซ่อม/ }).first();
+  await dlg.waitFor({ timeout: 15_000 });
+  const formJob = await dlg.locator('input[name="workOrderId"]').inputValue().catch(() => "");
+  ledger("Maintenance log", `?ac=${u.pendingCode} opens the log form on pending job ${jobId} (form has ${formJob || "none"})`, "UI", formJob === String(jobId) ? "PASS" : "FAIL", await shot(page, "reg-qr-walkup-form"));
+
+  await dlg.getByText(/^ล้างแอร์$/).click();
+  await dlg.locator('select[name="acStatus"]').selectOption("normal");
+  await dlg.locator('textarea[name="notes"], input[name="notes"]').first().fill("QA_TEST_WALKUP_CLOSE");
+  await dlg.getByRole("button", { name: /บันทึกและเสร็จสิ้น/ }).click();
+  const tt = await toastText(page);
+  await page.waitForTimeout(1500);
+  const [[status, claimedBy, claimedAt]] = db(`select status, claimed_by, claimed_at from work_orders where id=${jobId}`);
+  ledger("Maintenance log", `closing job ${jobId} from the ?ac= hand-off: status ${status}, claimed_by ${claimedBy} (tech ${techId}), claimed_at ${claimedAt ? "set" : "NULL"}`, "DB", /สำเร็จ/.test(tt) && status === "completed" && claimedBy === techId && !!claimedAt ? "PASS" : "FAIL", await shot(page, "reg-qr-walkup-closed"));
+
+  // Put the job back so the earlier tests in this file still find a pending unit on a rerun.
+  db(`delete from maintenance_logs where work_order_id=${jobId} and notes='QA_TEST_WALKUP_CLOSE'`);
+  db(`update work_orders set status='pending', claimed_by=NULL, claimed_at=NULL, completed_at=NULL where id=${jobId}`);
+});

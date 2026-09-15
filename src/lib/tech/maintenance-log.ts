@@ -111,6 +111,19 @@ export async function logMaintenanceAction(formData: FormData) {
           where: { id: wId },
           data: { status: "completed", completedAt: performedAt },
         });
+
+        // A job can be closed without ever having been claimed: scanning a
+        // unit's sticker leads to /tech?ac=<code>, which opens this form on
+        // the unit's pending order directly. The pool's "claim" step is what
+        // normally writes claimed_by, so an order closed this way used to
+        // finish with nobody on it — invisible in that technician's history
+        // and missing from the per-technician counts. Whoever records the
+        // work on an unclaimed order is the one who did it. An order another
+        // technician had claimed is left as theirs.
+        await tx.workOrder.updateMany({
+          where: { id: wId, claimedBy: null },
+          data: { claimedBy: techId, claimedAt: performedAt },
+        });
       } else {
         const created = await tx.workOrder.create({
           data: {
