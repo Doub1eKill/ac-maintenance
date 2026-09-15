@@ -1,5 +1,26 @@
 # Project Handoff & Technical Summary
 
+# 🔒 D3 — partial unique index กันใบงานซ้ำในระดับ DB (ฝั่ง PostgreSQL) (15 ก.ย. 2026, DoubleKill)
+
+แผน D ข้อสาม · commit `14c1011` บน **`feat/postgres`** (ไม่ใช่ master — migration เป็น Postgres-only) · ทำใน worktree `C:\Project\ac-maintenance-pg`
+
+- **ช่องโหว่ที่ปิด:** BUG-004 (`fd20f3e`) เช็ค `findFirst` ใน `$transaction` ก่อน insert — กันแอดมินคนเดียวกดซ้ำได้ แต่ภายใต้ READ COMMITTED สอง request พร้อมกันจะเห็น "ไม่มี" ทั้งคู่แล้ว insert ทั้งคู่ · index ใหม่ `work_orders_one_open_per_unit_type` ON `(air_conditioner_id, type) WHERE status IN ('pending','claimed')` ทำให้ insert ที่สองล้มด้วย P2002
+- **migration `20260915090000_one_open_work_order_per_unit_type`** เขียนมือ (schema language ไม่มี partial index) · **พิสูจน์แล้วว่า Prisma ไม่ลบทิ้ง:** `prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma` หลัง apply → "No difference detected" (introspection มอง partial index ไม่เห็น) · เพิ่ม comment ใน `schema.prisma` ตรง `@@index` ของ WorkOrder ชี้ไปที่ migration
+- **`createWorkOrderAction`** (`src/lib/admin/work-orders.ts`): `.catch` ที่ `$transaction` — `isUniqueConflict` (code P2002 แบบเดียวกับ `air-conditioners.ts`) → อ่านแถวที่ชนะกลับมาแล้วคืนข้อความเดิม "เครื่องนี้มี…ที่ยังเปิดอยู่ (…)" ถ้าแถวปิดไปแล้วระหว่างนั้น fallback เป็นถ้อยคำ pending · `openWhere` ประกาศเป็น `Prisma.WorkOrderWhereInput` ใช้ซ้ำ 2 ที่
+- **`syncOverdueMaintenanceWorkOrders`** (`src/lib/maintenance.ts`): `createMany` เพิ่ม `skipDuplicates: true` (= ON CONFLICT DO NOTHING) — `findMany` กรองเครื่องที่มีใบงานเปิดอยู่แล้ว แต่แอดมินออกใบล้างให้เครื่องนั้นระหว่าง read→insert ได้ ไม่งั้น batch ทั้งก้อนล้ม
+- **ทางที่สาม** `logMaintenanceAction` walk-up สร้าง WO เป็น `completed` ทันที → อยู่นอก predicate ไม่กระทบ · MariaDB baseline ตรวจแล้ว**ไม่มี**คู่ (ac, type) ที่เปิดซ้ำ → ตอน D2 ย้ายข้อมูลลง Postgres index สร้างผ่านแน่
+
+## ทดสอบ (PostgreSQL 16 local, ข้อมูล seed 7 ก.ย.)
+1. **psql:** unit 10 insert repair pending → repair claimed ล้ม `duplicate key … work_orders_one_open_per_unit_type` · unit 12 repair pending + cleaning pending + repair completed + repair cancelled = **4 แถวผ่านหมด** · rollback ทั้งคู่
+2. **race ผ่าน pg adapter จริง** (script tsx ชั่วคราว: 2 transaction "findFirst → รอ 300ms → create" พร้อมกัน): A created, **B threw code=P2002 `PrismaClientKnownRequestError`** — เหลือ 1 แถว → `isUniqueConflict` จับได้จริงกับ adapter นี้ · ลบแถวทิ้งแล้ว
+3. **เบราว์เซอร์ :3001** demo admin → "+ สร้างใบงานซ่อมบำรุง" SCI-101-01 งานซ่อม → toast สำเร็จ รวม 3→4 ใบงาน · ออกซ้ำเครื่องเดิม/ประเภทเดิม → **"เครื่องนี้มีใบงานซ่อมที่ยังเปิดอยู่ (รอช่างรับงาน) — ปิดหรือยกเลิกใบงานเดิมก่อนออกใบใหม่"** · server log 0 error
+4. คืน local PG: ลบ WO + audit row ที่สร้าง, unit 10 กลับเป็น normal (wo=3 audit=0) · MariaDB ไม่ถูกแตะ · :3001 ปิดแล้ว, :3000 ยังอยู่
+- tsc app 0 error · eslint 2 ไฟล์ที่แก้สะอาด
+
+**หมายเหตุ:** MariaDB บน master ยัง**ไม่มี** index นี้ (partial index ทำไม่ได้ใน MariaDB) — master พึ่งเช็คใน transaction อย่างเดียวต่อไปจนกว่าจะย้าย
+
+**ถัดไป:** D2 sweep บน Postgres (psql variant ของ `qa/baseline.mjs` + `qa/lib.ts db()`, ย้าย baseline data จาก MariaDB) · D4a Blob · D4 deploy
+
 # 🐘 D1 — rebase `feat/postgres` ขึ้นบน master แล้ว (ล้ำ 4 / ตามหลัง 96 → ล้ำ 4 / ตามหลัง 0) (15 ก.ย. 2026, DoubleKill)
 
 แผน D ข้อแรก · ทำใน **git worktree** `C:\Project\ac-maintenance-pg` (branch `feat/postgres`) เพื่อไม่แตะ working tree ของ master ที่ dev server :3000 (MariaDB) ยังรันอยู่ — ไม่ต้อง `npm install` สลับไปกลับตามที่ entry 9 ก.ย. เตือน · worktree นี้**คงไว้**สำหรับ D2/D3/D4a (มี node_modules + `.env` ชี้ PostgreSQL local ของตัวเอง)
