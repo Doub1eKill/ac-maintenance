@@ -1,5 +1,26 @@
 # Project Handoff & Technical Summary
 
+# 🧩 B · C · D — claimed_by ทาง /qr, restore ลบ blob, กล้องสแกนบน iOS (15 ก.ย. 2026, DoubleKill)
+
+เจ้าของสั่ง "ทำ B, C, D ต่อ" หลัง A (ย้าย Vercel Functions region → **sin1** — ยืนยันจาก `X-Vercel-Id: sin1::sin1::`, มีผลกับ deploy ใหม่เท่านั้น deploy D4a ได้ค่านี้พอดี) · เจ้าของตัดเรื่อง reset รหัส avnadmin ออก (ไม่ทำ) · 3 commit บน master แยกเรื่อง, `feat/postgres` rebase ทับ
+
+## B — `090443e` fix(tech): ปิดใบงานทาง /qr → /tech?ac= แล้ว claimed_by ไม่ NULL อีก
+- `src/lib/tech/maintenance-log.ts`: หลัง update status=completed เพิ่ม `updateMany({ where: { id, claimedBy: null }, data: { claimedBy: techId, claimedAt: performedAt } })` — คนที่บันทึกงานบนใบงานที่ยังไม่มีใครรับ = คนทำ · ใบงานที่ช่างอื่นรับไว้ไม่ถูกแย่ง
+- regression ใหม่ใน `tech/regressions.spec.ts` "walk-up close via /qr → /tech?ac=": เปิด `/tech?ac=<code>` → ฟอร์มเปิดบน job pending → บันทึก → DB: status completed, claimed_by = QA tech (182), claimed_at set → **PASS** แล้วคืน job ในตัว spec
+
+## C — `a587f0d` test(qa): `baseline.mjs` snapshot/restore รู้จัก Vercel Blob
+- token อ่านจาก env หรือ `.env.local` (เหมือน dev server) · snapshot เก็บ pathnames ใต้ `uploads/` (`blobs: null` ถ้าไม่มี token) · restore ลบ blob ที่ไม่อยู่ใน snapshot · snapshot ที่ไม่มี token จะไม่แตะ store
+- พิสูจน์: seed blob → snapshot → เพิ่ม blob → restore ลบ 1 เก็บ 1 · เจอ orphan 8 avatar จาก 2 run ก่อนหน้า (ก่อนมี C) ลบทิ้งแล้ว store ว่าง
+
+## D (E1) — `9c6a297` feat(tech): กล้องสแกนได้แม้ไม่มี BarcodeDetector (iOS Safari)
+- `qr-scan-modal.tsx`: `createQrDetector()` — native ถ้ามีและรองรับ qr_code, ไม่งั้น **jsQR** (`npm i jsqr` ~ dynamic import เฉพาะเบราว์เซอร์ที่ต้องใช้) อ่าน `<video>` ผ่าน canvas ย่อ ≤640px, `inversionAttempts: "dontInvert"` · interface `detect()` เดิม → loop/cooldown/hand-off ไม่แตะ · `readCameraSupport()` เหลือแค่เช็ค getUserMedia · Desktop Chrome Windows/Linux (มี API แต่ไม่มี format) ได้ jsQR แทนการปฏิเสธ
+- regression "E1: without BarcodeDetector…": render สติกเกอร์ของ unit ที่มี job pending ด้วย `QRCodeSVG` ตัวเดียวกับหน้า admin (react-dom/server) → sharp → MJPEG 640×480 30 เฟรม → `chromium.launch({ args: [--use-file-for-fake-video-capture=<clip>] })` + `delete window.BarcodeDetector` ใน init script → สแกนเนอร์เปิด, **ผลลัพธ์ขึ้นเองใน ~4 วิ พร้อม "รับงานทันที"** · เฟรมถูกเขียนที่ `runs/<run>/e1-sticker.mjpeg` (ไม่มี fixture ใน repo) · เช็ค "กล้องเปิด" ยอมรับทั้งข้อความ "เล็งกล้อง" หรือผลลัพธ์ เพราะ decoder เร็วกว่าการ sample ข้อความ
+- **ยังไม่ได้ทดสอบบน iPhone จริง** — ต้องมีเครื่อง + HTTPS (production URL ใช้ได้เลย ไม่ต้องตั้ง flag เหมือน LAN)
+
+## ทดสอบทั้งหมดบน :3000 master/MariaDB · DB คืน baseline ทุกครั้ง · tsc 0 · eslint สะอาด
+
+**ค้าง:** ข้อ 1 บัญชี admin บน production (เจ้าของสมัครที่ `/register` แล้วบอกอีเมล) · ทดสอบรูป + สแกนบน production ด้วยมือถือจริง · E: merge `feat/postgres` → master เมื่อพร้อมเลิก MariaDB
+
 # 🖼️ D4a — รูปไป Vercel Blob แล้ว + ย่อรูปฝั่งเบราว์เซอร์ก่อนส่ง (15 ก.ย. 2026, DoubleKill)
 
 แผน D4a ตาม entry OPEN-2 · branch `feat/blob-uploads` → ff-merge master (`39ac8d0` feature, `81cb4c4` harness) · เจ้าของสร้าง Blob store `ac-maintenance-photos` (Public, iad1, ติ๊ก read-write token) แล้ว Connect project → Vercel ใส่ `BLOB_READ_WRITE_TOKEN` ให้ Production+Preview เอง · token สำหรับ local อยู่ใน `ac-maintenance\.env.local` (gitignored, ไม่มีใน worktree)
