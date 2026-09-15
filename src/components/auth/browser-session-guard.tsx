@@ -23,8 +23,44 @@ import { BROWSER_SESSION_KEY } from "@/lib/session-expiry";
  * (Ctrl+T, then typing the address) gets its own empty sessionStorage and is
  * therefore signed out too. Duplicating a tab, following a link, refreshing and
  * navigating all carry the marker across and are unaffected.
+ *
+ * It also covers Back after signing out. A history navigation is served from
+ * the browser's own cache when it can be — from the back/forward cache (the
+ * whole document kept in memory, no request, no effect re-run) or from the
+ * HTTP cache (a "no-cache" response is still reused for Back; only
+ * "no-store" is not) — so the dashboard came back exactly as it was, session
+ * gone, and neither the server nor the redirect guard was asked (QA
+ * 20260914-2013, OPEN-1). On either kind of restore the session is asked for
+ * again; if it is gone, the page is replaced with the login page.
  */
+function verifySessionStillHeld() {
+  fetch("/api/auth/session", { cache: "no-store", credentials: "same-origin" })
+    .then((res) => (res.ok ? res.json() : null))
+    .then((session: { user?: unknown } | null) => {
+      if (!session?.user) window.location.replace("/login");
+    })
+    .catch(() => {
+      // Offline or the server is away: leave the restored page alone rather
+      // than bounce someone who may simply have lost signal.
+    });
+}
+
 export function BrowserSessionGuard() {
+  useEffect(() => {
+    // A document restored from the HTTP cache runs its scripts afresh, so this
+    // effect sees it; the navigation entry says how it was reached.
+    const nav = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+    if (nav?.type === "back_forward") verifySessionStillHeld();
+
+    // A document restored from the back/forward cache runs nothing afresh;
+    // pageshow with `persisted` is the one signal it gives.
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) verifySessionStillHeld();
+    };
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
+  }, []);
+
   useEffect(() => {
     let alreadyMarked: boolean;
 
