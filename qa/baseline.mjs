@@ -92,7 +92,9 @@ const GROWTH_TABLES = [
 const MUTABLE = {
   air_conditioners: ["status", "btu", "ac_brand_id", "ac_model_id", "brand", "model", "deleted_at"],
   users: ["status", "name", "avatar_url", "password"],
-  user_phones: ["phone_number", "is_primary"],
+  // user_id is carried too, so a row the run replaced (see REINSERT) can be
+  // put back whole.
+  user_phones: ["user_id", "phone_number", "is_primary"],
   ac_brands: ["name", "deleted_at"],
   ac_models: ["name", "default_btu", "deleted_at"],
   maintenance_schedules: ["last_performed_at", "next_due_date", "is_active", "frequency_value", "frequency_unit"],
@@ -101,6 +103,14 @@ const MUTABLE = {
   buildings: ["name", "abbreviation"],
   system_settings: ["default_frequency_value", "default_frequency_unit", "organisation_name", "organisation_address", "organisation_phone"],
 };
+
+// Tables where a run can make a baseline row vanish rather than change it:
+// saving a profile deletes the primary phone row and inserts a fresh one
+// (lib/admin/profile.ts), and the fresh one has a new id, which the delete
+// step below then removes. Restored by re-inserting the snapshot's row under
+// its original id when that id is gone. Only listed for tables whose snapshot
+// columns are enough to rebuild the row.
+const REINSERT = ["user_phones"];
 
 const COUNTS = `select
   (select count(*) from users),(select count(*) from user_phones),(select count(*) from buildings),
@@ -164,10 +174,25 @@ function restore() {
   // 2. Rows the run added, deepest child first.
   for (const t of GROWTH_TABLES) statements.push(`delete from ${t} where id > ${snap.maxIds[t]}`);
 
+  // 3. Baseline rows the run replaced with new ones (now deleted above).
+  for (const table of REINSERT) {
+    const cols = MUTABLE[table];
+    for (const row of snap.rows[table]) {
+      const [id, ...values] = row;
+      const names = ["id", ...cols].join(", ");
+      const vals = [id, ...values.map(quote)].join(", ");
+      statements.push(
+        ENGINE === "postgres"
+          ? `insert into ${table} (${names}) select ${vals} where not exists (select 1 from ${table} where id = ${id})`
+          : `insert ignore into ${table} (${names}) values (${vals})`
+      );
+    }
+  }
+
   if (ENGINE === "mysql") statements.push("SET FOREIGN_KEY_CHECKS=1");
   sql(statements.join(";\n") + ";");
 
-  // 3. Files the run added.
+  // 4. Files the run added.
   let removed = 0;
   if (fs.existsSync(UPLOADS)) {
     const keep = new Set(snap.uploads);
