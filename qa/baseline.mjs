@@ -15,7 +15,9 @@
 //   - rows the run changed in place (a unit marked broken by a new order, an
 //     avatar replaced, a brand renamed, a schedule advanced by a logged visit)
 //     are put back from the snapshot's copy of the few mutable columns;
-//   - files the run added under public/uploads are removed.
+//   - files the run added under public/uploads are removed — and, when a
+//     BLOB_READ_WRITE_TOKEN is in .env.local (the app then stores photos on
+//     Vercel Blob instead, see lib/upload.ts), blobs the run added are too.
 //
 // Nothing here runs the Prisma seed — that wipes the restored data. The
 // snapshot lives outside the repo (next to the run output), because a file
@@ -37,6 +39,33 @@ const repo = path.resolve(here, "..");
 const OUT = process.env.QA_OUT ?? path.resolve(repo, "..", "ac-maintenance-qa");
 const SNAPSHOT = path.join(OUT, "baseline.json");
 const UPLOADS = path.join(repo, "public", "uploads");
+
+// Same rule as the app: a token means uploads went to Vercel Blob. Read from
+// the environment or the repo's .env.local, the file the dev server reads it
+// from. Never logged.
+const BLOB_TOKEN = (() => {
+  if (process.env.BLOB_READ_WRITE_TOKEN) return process.env.BLOB_READ_WRITE_TOKEN;
+  try {
+    return fs.readFileSync(path.join(repo, ".env.local"), "utf8").match(/^BLOB_READ_WRITE_TOKEN="?([^"\r\n]+)"?/m)?.[1] ?? null;
+  } catch {
+    return null;
+  }
+})();
+const BLOB_PREFIX = "uploads/";
+
+/** Pathnames of every blob the app has stored, or null when there is no token. */
+async function listBlobs() {
+  if (!BLOB_TOKEN) return null;
+  const { list } = await import("@vercel/blob");
+  const names = [];
+  let cursor;
+  do {
+    const page = await list({ prefix: BLOB_PREFIX, cursor, token: BLOB_TOKEN });
+    for (const b of page.blobs) names.push(b.pathname);
+    cursor = page.hasMore ? page.cursor : undefined;
+  } while (cursor);
+  return names;
+}
 
 const MYSQL = (process.env.QA_MYSQL ?? "C:\\xampp\\mysql\\bin\\mysql.exe -h 127.0.0.1 -P 3306 -u root ac_maintenance").split(" ");
 const PSQL = process.env.QA_PSQL ?? "C:\\Program Files\\PostgreSQL\\16\\bin\\psql.exe";
@@ -126,15 +155,16 @@ function check() {
   return row;
 }
 
-function snapshot() {
+async function snapshot() {
   const maxIds = Object.fromEntries(GROWTH_TABLES.map((t) => [t, Number(sql(`select coalesce(max(id),0) from ${t}`)[0][0])]));
   const rows = {};
   for (const [table, cols] of Object.entries(MUTABLE)) {
     rows[table] = sql(`select id, ${cols.join(", ")} from ${table}`);
   }
   const uploads = fs.existsSync(UPLOADS) ? fs.readdirSync(UPLOADS) : [];
+  const blobs = await listBlobs();
   fs.mkdirSync(OUT, { recursive: true });
-  fs.writeFileSync(SNAPSHOT, JSON.stringify({ takenAt: new Date().toISOString(), maxIds, rows, uploads }, null, 1));
+  fs.writeFileSync(SNAPSHOT, JSON.stringify({ takenAt: new Date().toISOString(), maxIds, rows, uploads, blobs }, null, 1));
   console.log(`snapshot → ${SNAPSHOT}`);
   check();
 }
@@ -148,7 +178,7 @@ function quote(v) {
   return `'${String(v).replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
 }
 
-function restore() {
+async function restore() {
   if (!fs.existsSync(SNAPSHOT)) throw new Error(`no snapshot at ${SNAPSHOT} — run "snapshot" before the sweep`);
   const snap = JSON.parse(fs.readFileSync(SNAPSHOT, "utf8"));
 
@@ -203,13 +233,28 @@ function restore() {
       }
     }
   }
-  console.log(`restored from ${snap.takenAt}; removed ${removed} upload(s)`);
+
+  // 5. Blobs the run added. Only when the token is present now; a snapshot
+  // taken without one (blobs: null) has nothing to compare against, and the
+  // store is left alone rather than emptied.
+  let removedBlobs = 0;
+  if (BLOB_TOKEN && Array.isArray(snap.blobs)) {
+    const keep = new Set(snap.blobs);
+    const extra = (await listBlobs()).filter((name) => !keep.has(name));
+    if (extra.length) {
+      const { del } = await import("@vercel/blob");
+      // del takes URLs or pathnames; pathnames are what the snapshot holds.
+      await del(extra, { token: BLOB_TOKEN });
+      removedBlobs = extra.length;
+    }
+  }
+  console.log(`restored from ${snap.takenAt}; removed ${removed} upload(s), ${removedBlobs} blob(s)`);
   check();
 }
 
 const cmd = process.argv[2];
-if (cmd === "snapshot") snapshot();
-else if (cmd === "restore") restore();
+if (cmd === "snapshot") await snapshot();
+else if (cmd === "restore") await restore();
 else if (cmd === "check") check();
 else {
   console.error("usage: node qa/baseline.mjs snapshot | restore | check");
