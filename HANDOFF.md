@@ -1,5 +1,15 @@
 # Project Handoff & Technical Summary
 
+# 🗑️ ลบเศษไฟล์ 3 กลุ่มที่ไม่มีใครอ้างถึง (17 ก.ย. 2026, DoubleKill)
+
+เจ้าของขอแผนที่ไฟล์ทั้ง repo แล้วสั่ง "เช็คให้ชัวร์ว่าไม่ใช้แล้ว แล้วลบได้เลย" · commit `0147c32` บน `chore/leftover-files` ff-merge master
+
+- `src/components/ui/option-wheel.css` — คู่ของ `option-wheel.tsx` ที่ลบไปใน `2d9a367` · grep "option-wheel" ใน src/qa/config = เจอแต่ในไฟล์ตัวเอง (globals.css ไม่ได้ @import)
+- `public/{file,globe,next,vercel,window}.svg` — ตัวอย่างจาก create-next-app · grep ชื่อไฟล์ใน src/qa/README/PRODUCT/design/next.config = 0 · `app/layout.tsx` ไม่ได้ตั้ง icon ไปที่ไฟล์เหล่านี้ (favicon คือ `src/app/favicon.ico`)
+- `qa/.run` — marker `RUN=20260913-1742` · ไม่มีอะไรใน qa/*.ts, *.mjs อ่านหรือเขียนมัน (run id มาจาก env `QA_RUN`)
+- tsc + eslint --max-warnings=0 ผ่าน · ไม่มีอะไรให้ทดสอบในเบราว์เซอร์ (ไม่มี route/UI เปลี่ยน) · `npm run build` ใน worktree ผ่าน · feat/postgres rebase + push
+
+
 # 🔧 ตามงาน refactor: "ซ่อมแซม" คำเดียวทุกหน้า + harness แก้ 3 บทเรียนของรอบก่อน (17 ก.ย. 2026, DoubleKill)
 
 เจ้าของสั่ง 2 อย่างจาก entry ก่อนหน้า: ใช้ "ซ่อมแซม" ให้ตรงกัน และแก้บทเรียน harness ได้เลย · branch `fix/labels-and-harness` 2 commit ff-merge master
