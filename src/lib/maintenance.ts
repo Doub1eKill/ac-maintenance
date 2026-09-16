@@ -28,6 +28,33 @@ export function businessDateToday(): Date {
   return new Date(`${ymd}T00:00:00.000Z`);
 }
 
+/**
+ * The same instant with its local fields set to APP_TIME_ZONE wall-clock time,
+ * for date-fns `format()` on the server. format() reads a Date's local fields,
+ * which are the process's zone: on Vercel that is UTC, so the public sticker
+ * page showed a 16:40 visit as 09:40 — while the same code on a Bangkok
+ * machine was right. Rebuilding the Date from Intl's parts makes the output
+ * the same wherever the server runs. Client components need none of this: the
+ * browser's zone is the reader's.
+ *
+ * Only for formatting. The returned Date is a different instant and must not
+ * be stored or compared.
+ */
+export function inAppTimeZone(date: Date): Date {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: APP_TIME_ZONE,
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
+    minute: "numeric",
+    second: "numeric",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0);
+  return new Date(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
+}
+
 // Parses a YYYY-MM-DD string (what <input type="date"> submits) into the same
 // UTC-midnight anchor businessDateToday() produces, so both round-trip through
 // a DATE column identically. Returns null for anything that isn't a real

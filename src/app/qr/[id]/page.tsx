@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { getMaintenanceHistory } from "@/lib/maintenance";
+import { getMaintenanceHistory, inAppTimeZone } from "@/lib/maintenance";
 import type { MaintenanceAction } from "@/generated/prisma/enums";
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
@@ -168,7 +168,7 @@ export default async function QRCodePage(props: { params: Promise<{ id: string }
             <div className="flex items-center justify-between p-3 bg-sky-50 border border-sky-100 rounded-xl">
               <div>
                 <p className="text-xs text-sky-700 font-bold mb-0.5">ล้างทุกๆ {activeSchedule.frequencyValue} {activeSchedule.frequencyUnit === 'days' ? 'วัน' : activeSchedule.frequencyUnit === 'months' ? 'เดือน' : 'ปี'}</p>
-                <p className="text-[11px] text-sky-600 font-medium">กำหนดครั้งถัดไป: {format(activeSchedule.nextDueDate, "d MMM yyyy", { locale: th })}</p>
+                <p className="text-[11px] text-sky-600 font-medium">กำหนดครั้งถัดไป: {format(inAppTimeZone(activeSchedule.nextDueDate), "d MMM yyyy", { locale: th })}</p>
               </div>
               <ShieldCheck className="w-8 h-8 text-sky-500 opacity-50" />
             </div>
@@ -191,7 +191,7 @@ export default async function QRCodePage(props: { params: Promise<{ id: string }
                   <div className="absolute -left-[5px] top-0 w-2 h-2 rounded-full bg-emerald-500"></div>
                   <div className="text-xs font-bold text-slate-900 mb-1">{MAINTENANCE_ACTION_LABEL[log.action]}</div>
                   <div className="text-[11px] text-slate-500 mb-2">
-                    {format(new Date(log.performedAt), "d MMM yyyy HH:mm", { locale: th })}
+                    {format(inAppTimeZone(new Date(log.performedAt)), "d MMM yyyy HH:mm", { locale: th })}
                     {isSignedIn && <> • โดย {log.technicianName}</>}
                   </div>
                   {log.repairDetail && (
