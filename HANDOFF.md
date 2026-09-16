@@ -1,5 +1,30 @@
 # Project Handoff & Technical Summary
 
+# 🖼️ ระบบ Guest — รูปหลักของแอร์ + หน้าสติกเกอร์สำหรับคนทั่วไป + login ช่างเข้าฟอร์มทันที (16 ก.ย. 2026, DoubleKill)
+
+ตามแผน entry "📋 แผน: ระบบ Guest" · คำตอบเจ้าของ: **ก.** guest เห็นรูปหลัก + ประวัติ (ประเภทงาน/วันที่/ซ่อมอะไร) ไม่เห็นชื่อช่าง/notes/รูปหลังซ่อม, admin และช่างที่ login เห็นครบ (ต่างจาก "ประวัติของฉัน" ที่เห็นแค่ของตัวเอง) **ข.** เครื่องเดิมปล่อยว่าง + ปุ่มเพิ่มรูปในหน้าแก้ไข **ค.** เขียน migration 2 ชุด ไม่ merge ก่อน (ข้อมูล seed จะถูกล้างตอนใช้จริง) · branch `feat/guest-view` → master `4f48e7e` · `feat/postgres` = master + 8 (`ed25cf9`) push แล้ว = deploy production
+
+## schema (2 ชุด ชื่อโฟลเดอร์เดียวกัน `20260916090000_add_unit_photo`)
+- `AirConditioner.photoUrl String? @map("photo_url") @db.VarChar(255)` — nullable
+- master: `ALTER TABLE \`air_conditioners\` ADD COLUMN \`photo_url\` VARCHAR(255) NULL AFTER \`installed_at\`` apply บน MariaDB แล้ว · feat/postgres: commit แยก `ed25cf9` เขียนทับไฟล์เดียวกันเป็น `ALTER TABLE "air_conditioners" ADD COLUMN "photo_url" VARCHAR(255)` apply บน **Aiven + Postgres local** แล้ว · `migrate diff` ไม่มี drift ทั้งสองฝั่ง · **กติกาต่อไป:** migration ใหม่ทุกตัวต้องมี 2 ชุดชื่อเดียวกัน — เขียน MySQL บน master, แล้วบน feat/postgres commit ทับไฟล์เดียวกันด้วย SQL ของ PG (rebase ไม่ชนเพราะ master ไม่แก้ไฟล์นั้นอีก)
+
+## โค้ด
+- **`src/components/shared/unit-photo-field.tsx` ใหม่** — `<input type="file" name="photo">` ธรรมดาในฟอร์ม (FormData ของ caller เก็บให้เอง) ย่อด้วย `shrinkImage` แล้วยัดกลับผ่าน `DataTransfer` · preview 80px · `required` เฉพาะเมื่อไม่มี `currentUrl` · `onPick` สำหรับฟอร์มที่ประกอบ FormData เอง (tech modal/panel)
+- **`createAirConditionerAction`** บังคับรูป (ทั้ง admin form และ tech modal ผ่านตัวนี้) → `saveUpload` ก่อน insert (sharp/BUG-012 เดิม; Blob บน prod) → `deleteUpload` ถ้า insert ไม่สำเร็จทุกทาง · **`updateAirConditionerAction`** รับรูปใหม่ optional → เก็บใหม่ก่อน, update row, แล้วค่อยลบรูปเก่า · `getAirConditionerHistory` ส่ง `unit.photoUrl` ให้ edit modal
+- ฟอร์ม: admin register (required) · admin edit (แสดงรูปเดิม/placeholder "เครื่องนี้ยังไม่มีรูป — เพิ่มได้ที่นี่") · tech `register-unit-modal` (required) · tech `unit-catalogue-panel` ในฟอร์มบันทึกงาน (optional — ช่างหน้าเครื่องคือคนที่ถ่ายรูปให้เครื่องเก่าได้สะดวกสุด)
+- **`/qr/[id]`**: hero `next/image` 4:3 (placeholder icon Wind) · ประวัติ: ทุกคนเห็น action + วันที่ + `repairDetail` (icon Wrench); `isSignedIn` เท่านั้นเห็น "โดย <ช่าง>", notes, ลิงก์รูปก่อน/หลัง · ปุ่ม **"เข้าสู่ระบบสำหรับช่าง"** → `/login?callbackUrl=/tech?ac=<code>` (login แล้วเปิดฟอร์มบันทึกงานของเครื่องนั้นเลย; admin โดน guard ส่งไป /admin)
+
+## QA
+- `qa/lib.ts` `unitPhoto()` + 5 จุดที่ spec ลงทะเบียนเครื่อง (`admin/regressions` ×3, `admin/workflows` ×2) แนบรูป · `baseline.mjs` MUTABLE เพิ่ม `photo_url`
+- **regression ใหม่ `public/regressions.spec.ts` "guest view"** 4 check: รูป/placeholder + ประวัติ · เห็น repair_detail ไม่เห็นชื่อช่าง/"โดย" · ไม่มีปุ่มรับงาน/ปิดงาน/บันทึก/รูปหลังซ่อม · ลิงก์ login มี `callbackUrl=/tech?ac=<code>` → **4/4 PASS**
+- **บั๊ก harness ที่เจอ:** `db()` (และ `baseline.mjs`) เรียก mysql โดยไม่ใส่ `--default-character-set=utf8mb4` → ข้อความไทยจาก DB เป็น mojibake บน Windows (copy script ใส่ไว้แล้ว) — spec เดิมไม่เคยเทียบข้อความไทยจาก DB จึงไม่เคยเห็น · แก้แล้ว
+- ผ่านทั้งหมดบน :3000/MariaDB + token Blob: BUG-005/006/008 + "assets: create building → room → unit" (แนบรูป) · scratch spec: เครื่องเดิม (photo_url NULL) ใส่รูปจาก admin edit → `photo_url` = blob URL → `/qr` แสดง hero (screenshot) · restore ลบ blob 5 ตัว DB baseline
+
+## สภาพแวดล้อม
+- **เครื่องรีบูต 16 ก.ย. 13:59** → MariaDB/:3000/:3001 ดับหมด · ปลุก mysqld ด้วย WMI แล้ว · dev server :3000 ตอนนี้เป็นของ session นี้ (`preview_start` config `ac-maintenance-dev`) · :3001 ยังไม่เปิดใหม่ (ไม่จำเป็น)
+
+**ค้าง:** ทดสอบบน production หลัง deploy (guest view ของ unit จริง + ลงทะเบียนเครื่องใหม่พร้อมรูปจากมือถือ) · ข้อ 1 บัญชี admin บน production (ยังรอเจ้าของสมัคร) · E merge feat/postgres → master ตอนใช้จริง (ล้าง seed ตอนนั้น)
+
 # 📋 แผน: ระบบ Guest — สแกนสติกเกอร์แล้วเห็นรูปแอร์ + ประวัติ โดยไม่ต้อง login (เขียน 16 ก.ย. 2026, DoubleKill) — ยังไม่ได้ลงมือ
 
 เจ้าของสั่ง: "เมื่อสแกน QR จะ link เข้าระบบ Guest อัตโนมัติ เห็นรูปหลักของแอร์ตัวนั้น (เพิ่มตอนลงทะเบียนแอร์ ต้องมีรูป 1 รูป แยกจากรูปหลังซ่อม) เห็นประวัติ ไม่เห็นปุ่มรับงาน/ปิดงาน มีปุ่ม Login สำหรับช่างเพื่อเข้าไปทำงาน"
