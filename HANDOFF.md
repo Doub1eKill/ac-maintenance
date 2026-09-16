@@ -1,5 +1,24 @@
 # Project Handoff & Technical Summary
 
+# 🔧 ตามงาน refactor: "ซ่อมแซม" คำเดียวทุกหน้า + harness แก้ 3 บทเรียนของรอบก่อน (17 ก.ย. 2026, DoubleKill)
+
+เจ้าของสั่ง 2 อย่างจาก entry ก่อนหน้า: ใช้ "ซ่อมแซม" ให้ตรงกัน และแก้บทเรียน harness ได้เลย · branch `fix/labels-and-harness` 2 commit ff-merge master
+
+## `ccc8b52` fix(ui): "ซ่อมแซม" ทุกที่
+- `technician-detail-modal.tsx` เคยพิมพ์ "ซ่อมแอร์" ใน history list · `log-action-modal.tsx` (ฟอร์มบันทึกงานของช่าง) ก็ "ซ่อมแอร์" — ทั้งสองอ่านคำจาก `MAINTENANCE_ACTION_LABEL` ใน `src/lib/labels.ts` แล้ว (modal เหลือแค่ `ACTION_ICONS`) · `grep ซ่อมแอร์ src qa` = 0
+- tech spec ที่คลิกปุ่มในฟอร์ม เปลี่ยน regex เป็น `/^ซ่อมแซม$/`
+
+## `433431b` qa: harness แก้ 3 เรื่อง
+1. **tech project seed ตัวเอง** — เพิ่ม project `admin-seed` (= admin/workflows 2 test: "assets: create building" + "work order: create for the QA unit" ผ่าน project-level `grep`) และ tech `dependencies: ["setup", "admin-seed"]` → `--project=tech` อย่างเดียวรัน setup → admin-seed → tech ให้เอง · dependency project ไม่สน `--grep` ของ CLI (เหมือน setup) · test ทั้งสองรับกรณีแถวมีอยู่แล้ว → รัน admin เต็มแล้วต่อ tech โดยไม่ restore ก็ได้
+2. **heap 6 GB อยู่ใน `npm run dev`** — `package.json` `"dev": "node --max-old-space-size=6144 node_modules/next/dist/bin/next dev --webpack"` (cross-platform ไม่ต้อง cross-env) · ตัด `env` ใน `webServer` ของ playwright config ออก · dev server ที่เปิดจาก `preview_start`/launch.json ได้ heap เท่ากัน (ยืนยันจาก Win32_Process command line)
+3. **hit-test bottom nav มองข้าม `<nextjs-portal>`** — ใช้ `elementsFromPoint().find(tag !== NEXTJS-PORTAL)` แทน `elementFromPoint` · ledger บรรทัดนี้ FAIL ทุก full run ตั้งแต่ 13 ก.ย. → ตอนนี้ "clear" PASS
+
+## ทดสอบ (run `followup-20260917-0014`)
+- `npx playwright test --project=tech` ครั้งเดียว: setup 5 + admin-seed 2 + tech 13 = **20/20** (รวม race, claim once, บันทึกงานที่คลิก "ซ่อมแซม") · ledger **78 PASS · 0 FAIL** · dev server ไม่ restart ระหว่างรัน
+- tsc + `eslint --max-warnings=0` ผ่านทั้ง master และ feat/postgres · `npm run build` ใน worktree ผ่าน
+- DB คืน baseline (`check` ผ่าน) · feat/postgres rebase ทับ master แล้ว push (deploy production)
+
+
 # 🧹 Refactor รอบทำความสะอาด — ลบ dead code 847 บรรทัด, รวม label ที่สะกดซ้ำ, tsc + lint สะอาดทั้ง repo (16 ก.ย. 2026, DoubleKill)
 
 เจ้าของสั่ง "ตรวจสอบโครงสร้าง Project และ Optimize กับ Refactor" · สำรวจก่อนแตะ: eslint 0 error, N+1 ที่ `master-data.ts` (countBrandReferences ต่อ brand) มี comment อธิบายว่า bounded ≤5 แถวและ model ใช้ groupBy แล้ว → **ไม่แตะ** · `sidebar.tsx`/`use-file-upload.ts` เป็นไฟล์ vendored shadcn/origin-ui ใช้บางส่วนเป็นเรื่องปกติ → ไม่แตะ · ไม่แตก `asset-manager.tsx` (971) / `upcoming-maintenance-table.tsx` (761) เพราะยังไม่มี pain point ที่คุ้ม regression ทั้งหน้า
