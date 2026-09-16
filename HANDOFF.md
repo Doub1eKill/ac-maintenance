@@ -1,5 +1,25 @@
 # Project Handoff & Technical Summary
 
+# 📋 แผน: ระบบ Guest — สแกนสติกเกอร์แล้วเห็นรูปแอร์ + ประวัติ โดยไม่ต้อง login (เขียน 16 ก.ย. 2026, DoubleKill) — ยังไม่ได้ลงมือ
+
+เจ้าของสั่ง: "เมื่อสแกน QR จะ link เข้าระบบ Guest อัตโนมัติ เห็นรูปหลักของแอร์ตัวนั้น (เพิ่มตอนลงทะเบียนแอร์ ต้องมีรูป 1 รูป แยกจากรูปหลังซ่อม) เห็นประวัติ ไม่เห็นปุ่มรับงาน/ปิดงาน มีปุ่ม Login สำหรับช่างเพื่อเข้าไปทำงาน"
+
+## สิ่งที่มีอยู่แล้ว (ไม่ต้องสร้างใหม่)
+- สติกเกอร์ encode `<origin>/qr/<uuid>` → หน้า `src/app/qr/[id]/page.tsx` **เปิดได้โดยไม่ login อยู่แล้ว** (uuid สุ่ม ไม่ใช่ acCode — ต้องมีสติกเกอร์ในมือ) แสดง ยี่ห้อ/รุ่น/BTU/ที่ตั้ง/สถานะ/รอบล้าง/ประวัติ · **ไม่มี**ปุ่มรับงาน/ปิดงานสำหรับ guest · มีกล่อง "หากคุณเป็นช่าง… เข้าสู่ระบบ" → `/login?callbackUrl=/qr/<uuid>` · ช่างที่ login แล้วเห็นปุ่ม "บันทึกงานซ่อมบำรุง" → `/tech?ac=<code>` (เปิดฟอร์มบน job pending ของเครื่องนั้นเอง — B ทำให้ claimed_by ถูกต้องแล้ว)
+- ประวัติมาจาก `getMaintenanceHistory()` (`src/lib/maintenance.ts`) ตัวเดียวกับ admin/tech · รูปงานเก็บบน Blob แล้ว (D4a) · **ที่ขาดจริงคือ "รูปหลักของแอร์" กับหน้าตาแบบ Guest**
+
+## ขอบเขต (ขนาด M, branch `feat/guest-view`)
+1. **schema:** `AirConditioner.photoUrl String? @map("photo_url") @db.VarChar(255)` — nullable เพราะ 73 เครื่องเดิมไม่มีรูป · migration ต้องมี**สองชุด**ตราบใดที่ master ยังเป็น MariaDB (`prisma/migrations` ของ master = MySQL, ของ `feat/postgres` = PG) → **แนะนำทำ E (merge feat/postgres → master) ก่อน** จะได้เขียน migration เดียว
+2. **บังคับรูปตอนลงทะเบียนเครื่องใหม่:** `createAirConditionerAction` (`src/lib/admin/air-conditioners.ts` — ใช้ร่วมกันทั้ง admin `asset-manager` และ tech `register-unit-modal`) รับ `photo` (File) → `shrinkImage` ฝั่ง client + `saveUpload` (ไป Blob บน prod) → ปฏิเสธถ้าไม่มี/decode ไม่ได้ (กฎ BUG-012) · ฟอร์มทั้งสองใช้ `PhotoUpload` ตัวเดิม (1 รูป, กล้อง/แกลเลอรี) + `nativeValidity` ไทย
+3. **แก้ไขรูปทีหลัง:** `updateAirConditionerAction` รับรูปใหม่ (optional) → `saveUpload` แล้ว `deleteUpload` รูปเก่า (แบบเดียวกับ avatar ใน profile.ts) · เครื่องเดิมที่ยังไม่มีรูปแสดง placeholder (icon `Wind`) + ปุ่ม "เพิ่มรูปเครื่อง" ในหน้าแก้ไข (admin assets + tech assets)
+4. **หน้า `/qr/[id]` เป็นหน้า Guest:** hero = รูปหลัก (`next/image`, remotePatterns มีแล้ว) หรือ placeholder · ข้อมูลเครื่อง · สถานะ · รอบล้าง · ประวัติ · **ปุ่ม "เข้าสู่ระบบสำหรับช่าง"** → `/login?callbackUrl=/tech?ac=<code>` (login แล้วเด้งเข้าฟอร์มบันทึกงานของเครื่องนี้ทันที แทนกลับมาหน้า guest — ตัดไป 1 คลิก) · ช่างที่ login อยู่แล้วเห็น "บันทึกงานซ่อมบำรุง" เหมือนเดิม · admin ที่ login เห็นลิงก์ไปหน้าสินทรัพย์ของเครื่อง
+5. **ความเป็นส่วนตัวของประวัติสำหรับ guest (ต้องตัดสินใจ):** ตอนนี้ guest เห็น *ชื่อช่าง* และ *notes* ทุกรายการ · แนะนำ guest เห็นแค่ ประเภทงาน + วันที่ + ผล (สถานะหลังทำ) และซ่อนชื่อช่าง/notes/รูปก่อน-หลัง — ช่าง/admin ที่ login เห็นครบ (ทำในหน้าเดียวด้วย `isSignedIn`)
+6. **QA:** regression ใหม่ใน `public/regressions.spec.ts` (guest เห็นรูป/ประวัติ ไม่เห็นปุ่มรับงาน, ปุ่ม login พา callback ถูก) + `admin/workflows` "assets: create … unit" ต้องแนบรูป (spec เดิมจะ FAIL ถ้าไม่แนบ — ตั้งใจ) + `tech/workflows` ลงทะเบียนเครื่องจากมือถือแนบรูป · `baseline.mjs` MUTABLE เพิ่ม `photo_url` ใน air_conditioners · ลบ blob ที่ run สร้าง (C ทำแล้ว)
+7. ไม่ทำในรอบนี้: หลายรูปต่อเครื่อง, guest แจ้งซ่อมเอง (เป็นฟีเจอร์ใหม่คนละเรื่อง — ถ้าอยากได้ค่อยวางแผนแยก)
+
+## ลำดับที่แนะนำ
+E (merge feat/postgres → master, เลิก MariaDB local, worktree/:3001 เลิกใช้) → ข้อ 1–2 → 4–5 → 3 → 6 · ทดสอบผ่านเบราว์เซอร์ + มือถือจริงบน production หลัง deploy
+
 # 🧩 B · C · D — claimed_by ทาง /qr, restore ลบ blob, กล้องสแกนบน iOS (15 ก.ย. 2026, DoubleKill)
 
 เจ้าของสั่ง "ทำ B, C, D ต่อ" หลัง A (ย้าย Vercel Functions region → **sin1** — ยืนยันจาก `X-Vercel-Id: sin1::sin1::`, มีผลกับ deploy ใหม่เท่านั้น deploy D4a ได้ค่านี้พอดี) · เจ้าของตัดเรื่อง reset รหัส avnadmin ออก (ไม่ทำ) · 3 commit บน master แยกเรื่อง, `feat/postgres` rebase ทับ
