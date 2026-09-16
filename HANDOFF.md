@@ -1,5 +1,27 @@
 # Project Handoff & Technical Summary
 
+# 🧹 Refactor รอบทำความสะอาด — ลบ dead code 847 บรรทัด, รวม label ที่สะกดซ้ำ, tsc + lint สะอาดทั้ง repo (16 ก.ย. 2026, DoubleKill)
+
+เจ้าของสั่ง "ตรวจสอบโครงสร้าง Project และ Optimize กับ Refactor" · สำรวจก่อนแตะ: eslint 0 error, N+1 ที่ `master-data.ts` (countBrandReferences ต่อ brand) มี comment อธิบายว่า bounded ≤5 แถวและ model ใช้ groupBy แล้ว → **ไม่แตะ** · `sidebar.tsx`/`use-file-upload.ts` เป็นไฟล์ vendored shadcn/origin-ui ใช้บางส่วนเป็นเรื่องปกติ → ไม่แตะ · ไม่แตก `asset-manager.tsx` (971) / `upcoming-maintenance-table.tsx` (761) เพราะยังไม่มี pain point ที่คุ้ม regression ทั้งหน้า
+
+## 4 commit บน branch `chore/dead-code-and-dry` (ff-merge master) — พฤติกรรม UI ไม่เปลี่ยน
+1. **`2d9a367` ลบไฟล์ที่ไม่มีใคร import** (ยืนยันด้วย grep 2 รอบ: path import + ชื่อไฟล์): `chart-area-interactive.tsx` (เศษ financial dashboard), `ui/option-wheel.tsx`, `ui/tabs.tsx`, `ui/slider.tsx`, `ui/toggle.tsx`, `ui/label.tsx`, `layout/nav-header.tsx`, `ui/motion/motion-modal.tsx` (export ผ่าน index แต่ไม่มีใครเรียก `MotionModal`), `.gitkeep` 2 ไฟล์ — รวม 847 บรรทัด · `ui/chart.tsx` ยังอยู่ (donut ใช้)
+2. **`cf9d5e9` `src/lib/labels.ts` ใหม่** — `MAINTENANCE_ACTION_LABEL` (เคยสะกดเหมือนกันเป๊ะใน `/qr/[id]/page.tsx` และ `ac-history-modal.tsx`), `USER_STATUS_LABEL` (ซ้ำใน `user-card.tsx` และ `technician-detail-modal.tsx`), `formatThaiDate()` แทน `toLocaleDateString("th-TH")` inline 5 จุดใน 3 client component (history modal, upcoming table, work-order board) · module ไม่มี server import → client ใช้ได้ · `HistoryEntry.action` ใน history modal เปลี่ยนจาก union ที่เขียนมือเป็น `MaintenanceAction` (type-only import จาก generated enums)
+3. **`f7a307a` tsc + `eslint --max-warnings=0` ผ่านทั้ง repo** — `npx tsc --noEmit` เคยล้ม 11 จุด TS7006 ใน `qa/specs/**` (helper รับ `page` ไม่มี type) → `page: Page` · `npm run lint` (= `eslint` ทั้ง cwd) เคยล้ม 8 error + 4 warning: `use-file-upload.ts` ขาด `onError` ใน deps ของ useCallback (stale closure จริง), `<img>` 2 จุดใน `photo-upload.tsx` เป็น object URL ของไฟล์ที่ยังไม่อัปโหลด (next/image ทำอะไรไม่ได้ → disable พร้อมเหตุผล), `react-hooks/incompatible-library` ที่ `useReactTable` (โดยดีไซน์ → disable พร้อมเหตุผล), `qa/lib.ts` `use` ของ Playwright fixture โดน rules-of-hooks (disable), `any`×5 / `require()` / import ไม่ได้ใช้ / `let`→`const` ใน qa specs, `prisma/seed.ts` binding `mitsuModel1` ไม่ได้ใช้ (ตัด binding แต่ยัง create แถวเดิม) · `race.spec.ts` `new RegExp(CODE2) as any` → `as unknown as string` ค่าที่ส่งถึง Playwright เท่าเดิม (fallback `.catch` ยังทำงานเหมือนเดิม)
+4. **`bef32e2` ลบ `skills-lock.json` + `docs/superpowers/**`** (18 ไฟล์ plan/spec ก.ค.–ก.ย. รวม financial dashboard ที่ถอดไปแล้ว) — เจ้าของเลือกเอง (ถามก่อน) · git history ยังมี
+
+## ทดสอบ (MariaDB :3000, run `refactor-20260916-2255{,b,c}` ใน `C:\Project\ac-maintenance-qa\runs\`)
+- **public 33/33** (รวม guest view ที่ใช้ `MAINTENANCE_ACTION_LABEL` ใหม่) · **admin 32/32** (team/approvals ใช้ `USER_STATUS_LABEL`, work-order board/upcoming table ใช้ `formatThaiDate`, QR print) · **tech 17/17 + race 1/1 (รันซ้ำแยกหลัง dev server restart: 2 PASS — success toast 1, refusal toast 1) — รวม 18/18**
+- ledger: 82 PASS · 1 FAIL = "Bottom nav hit-test covered by `<nextjs-portal>`" — **ของเดิม** FAIL ทุก full run ตั้งแต่ 13 ก.ย. (dev overlay ของ Next ทับ nav ตอน elementFromPoint) ไม่ใช่ regression
+- **บทเรียน harness 2 ข้อ (ผมพลาดเอง):** (1) tech project ต้องรัน `admin --grep "assets: create building|work order: create for the QA unit"` ก่อน แล้ว **ห้าม restore คั่นกลาง** ไม่งั้น tech ไม่มีใบงานให้ "รับงาน" (2 spec timeout) · (2) dev server ที่เปิดผ่าน `preview_start` ไม่มี heap 6 GB → Next dev "approaching the used memory threshold, restarting" กลางทาง ทำให้ race spec ล้มที่ `goto` — รันซ้ำหลัง restart ผ่าน; ถ้าจะ full sweep ควรปล่อยให้ harness เปิด webServer เอง
+- DB คืน baseline แล้ว (`baseline.mjs restore` + `check` = users 5 · acs 73 · logs 230 · WO 62 · audit max 34 · pending 0) · blob ที่ run สร้าง 8+4+8 ลบแล้ว
+
+## ข้อสังเกตที่ไม่ได้แก้ (รอเจ้าของ)
+- `technician-detail-modal.tsx` ใช้คำ **"ซ่อมแอร์"** สำหรับ action `repair` ขณะที่ทุกที่อื่นใช้ "ซ่อมแซม" — เป็น wording drift ที่ DRY จะกันได้ แต่การเปลี่ยนคำเป็น UI change ไม่ใช่ refactor จึงคงไว้ · ถ้าจะให้ตรงกัน แค่ import จาก `labels.ts` (icon map ยังอยู่ที่เดิม)
+- `asset-manager.tsx` 971 บรรทัด / `upcoming-maintenance-table.tsx` 761 — ถ้าจะแตก ควรเป็นงานแยกพร้อม regression ทั้งหน้า
+- ยังไม่ merge `feat/postgres` → master ตามกติกาเดิม · รอบนี้ rebase worktree ทับ master แล้ว push (deploy production) ตามที่เจ้าของเลือก
+
+
 # 🕰️ เวลาบนหน้าสติกเกอร์ production เพี้ยน 7 ชม. — แก้ด้วย inAppTimeZone() (16 ก.ย. 2026, DoubleKill)
 
 พบตอนตรวจ guest view บน production: ประวัติ "25 ส.ค. 2026 16:40" (local) แสดง **09:40** บน Vercel — `/qr/[id]` เป็น server component ที่ `format()` ด้วย date-fns ซึ่งอ่าน local fields ของ Date = timezone ของ process (Vercel = UTC) · หน้าอื่นเป็น client component format ในเบราว์เซอร์จึงไม่โดน
