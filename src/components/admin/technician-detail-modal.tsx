@@ -32,7 +32,8 @@ import { useEscapeToClose } from "@/hooks/use-escape-to-close";
 import { adminResetUserPasswordAction, getTechnicianDetail } from "@/app/admin/actions";
 import type { TechnicianLogRow } from "@/lib/admin/users";
 import type { PendingUser } from "@/components/admin/types";
-import { USER_STATUS_LABEL } from "@/lib/labels";
+import { MAINTENANCE_ACTION_LABEL, USER_STATUS_LABEL } from "@/lib/labels";
+import type { MaintenanceAction } from "@/generated/prisma/enums";
 
 interface TechnicianDetail {
   id: string;
@@ -53,10 +54,12 @@ interface TechnicianDetailModalProps {
   onClose: () => void;
 }
 
-const ACTION_LABELS: Record<string, { label: string; icon: typeof Wrench }> = {
-  cleaning: { label: "ล้างแอร์", icon: Sparkles },
-  repair: { label: "ซ่อมแอร์", icon: Wrench },
-  refill_refrigerant: { label: "เติมน้ำยาแอร์", icon: Droplets },
+// The wording comes from @/lib/labels so this list cannot drift from the
+// history modal and the sticker page; only the icons are this modal's own.
+const ACTION_ICONS: Record<MaintenanceAction, typeof Wrench> = {
+  cleaning: Sparkles,
+  repair: Wrench,
+  refill_refrigerant: Droplets,
 };
 
 /**
@@ -180,7 +183,8 @@ export function TechnicianDetailModal({
               {open && (
                 <ul className="divide-y divide-border">
                   {logs.map((log) => {
-                    const meta = ACTION_LABELS[log.action] ?? { label: log.action, icon: Wrench };
+                    const action = log.action as MaintenanceAction;
+                    const meta = { label: MAINTENANCE_ACTION_LABEL[action] ?? log.action, icon: ACTION_ICONS[action] ?? Wrench };
                     const ActionIcon = meta.icon;
                     return (
                       <li key={log.id} className="px-3 py-2.5">

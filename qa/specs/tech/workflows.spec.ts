@@ -98,7 +98,7 @@ test.describe("technician on a phone", () => {
     await card.getByRole("button", { name: /บันทึกและปิดงาน/ }).first().click();
     const dlg = page.locator("div.fixed.inset-0").filter({ hasText: /บันทึกประวัติการซ่อม/ }).first();
     await dlg.waitFor({ timeout: 10_000 });
-    await dlg.getByText(/^ซ่อมแอร์$/).click();
+    await dlg.getByText(/^ซ่อมแซม$/).click();
     await dlg.locator('textarea[name="repairDetail"], input[name="repairDetail"]').first().fill("QA_TEST: เปลี่ยนคาปาซิเตอร์");
     const files = dlg.locator('input[type="file"]');
     await files.nth(0).setInputFiles({ name: "before.png", mimeType: "image/png", buffer: pngBuffer([200, 60, 60], 96) });

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { X, Sparkles, Wrench, Droplets, PencilLine } from "lucide-react";
 import { PhotoUpload } from "@/components/tech/photo-upload";
 import { shrinkImage } from "@/lib/client-image";
+import { MAINTENANCE_ACTION_LABEL } from "@/lib/labels";
 import type { FileWithPreview } from "@/hooks/use-file-upload";
 import { UnitCataloguePanel } from "@/components/tech/unit-catalogue-panel";
 import {
@@ -137,7 +138,7 @@ export function LogActionModal({ job, isPending, onClose, onSubmit, onValidation
                 className={`flex flex-col items-center justify-center rounded-xl border p-3 text-center cursor-pointer transition-colors ${selectedActions.includes("cleaning") ? "border-foreground bg-secondary ring-1 ring-foreground" : "border-border bg-muted hover:border-muted-foreground"}`}
               >
                 <Sparkles className="h-4 w-4 text-foreground mb-1" />
-                <span className="font-bold text-foreground">ล้างแอร์</span>
+                <span className="font-bold text-foreground">{MAINTENANCE_ACTION_LABEL.cleaning}</span>
               </div>
 
               <div
@@ -145,7 +146,7 @@ export function LogActionModal({ job, isPending, onClose, onSubmit, onValidation
                 className={`flex flex-col items-center justify-center rounded-xl border p-3 text-center cursor-pointer transition-colors ${selectedActions.includes("repair") ? "border-foreground bg-secondary ring-1 ring-foreground" : "border-border bg-muted hover:border-muted-foreground"}`}
               >
                 <Wrench className="h-4 w-4 text-foreground mb-1" />
-                <span className="font-bold text-foreground">ซ่อมแอร์</span>
+                <span className="font-bold text-foreground">{MAINTENANCE_ACTION_LABEL.repair}</span>
               </div>
 
               <div
@@ -153,7 +154,7 @@ export function LogActionModal({ job, isPending, onClose, onSubmit, onValidation
                 className={`flex flex-col items-center justify-center rounded-xl border p-3 text-center cursor-pointer transition-colors ${selectedActions.includes("refill_refrigerant") ? "border-foreground bg-secondary ring-1 ring-foreground" : "border-border bg-muted hover:border-muted-foreground"}`}
               >
                 <Droplets className="h-4 w-4 text-foreground mb-1" />
-                <span className="font-bold text-foreground">เติมน้ำยาแอร์</span>
+                <span className="font-bold text-foreground">{MAINTENANCE_ACTION_LABEL.refill_refrigerant}</span>
               </div>
             </div>
           </div>
