@@ -1,15 +1,16 @@
 import path from "node:path";
+import type { Page } from "@playwright/test";
 import { test, QA, OUT_ROOT, ledger, shot, note, hydrated, watchConsole, pngBuffer } from "../../lib";
 
 const CODE1 = `${QA.building.abbr}-${QA.room}-01`;
-const body = (page) => page.evaluate(() => document.body.innerText as string);
-const toast = async (page) => {
+const body = (page: Page) => page.evaluate(() => document.body.innerText as string);
+const toast = async (page: Page) => {
   const t = page.locator("[data-sonner-toaster] li");
   await t.first().waitFor({ timeout: 6000 }).catch(() => {});
   await page.waitForTimeout(300);
   return (await t.allInnerTexts().catch(() => [])).join(" | ");
 };
-const search = async (page, term: string) => {
+const search = async (page: Page, term: string) => {
   const box = page.locator("header input[type=text]").first();
   await box.fill(term); await box.press("Enter"); await page.waitForTimeout(1200);
 };

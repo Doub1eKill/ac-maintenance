@@ -1,12 +1,13 @@
 import path from "node:path";
-import { test, QA, OUT_ROOT, ledger, shot, note } from "../../lib";
+import type { Page } from "@playwright/test";
+import { test, OUT_ROOT, ledger, shot, note } from "../../lib";
 
 const ADMIN_PAGES = ["/admin", "/admin/work-orders", "/admin/calendar", "/admin/approvals", "/admin/team", "/admin/assets", "/admin/qr-codes", "/admin/profile", "/admin/settings"];
 const TECH_PAGES = ["/tech", "/tech/assets", "/tech/my-jobs", "/tech/history", "/tech/calendar", "/tech/profile"];
 const LIVE_QR = "d8df0abf-de82-4a99-97d4-b48c4615fbe2"; // B572921-6-357199-01
 const LIVE_CODE = "B572921-6-357199-01";
 
-async function landing(page, url: string) {
+async function landing(page: Page, url: string) {
   await page.goto(url);
   await page.waitForLoadState("load").catch(() => {});
   await page.waitForTimeout(800);
@@ -86,7 +87,7 @@ test.describe("/qr/[id] — public by design, but only by uuid", () => {
   test("live uuid resolves; ac_code, made-up uuid and junk do not", async ({ browser }) => {
     const ctx = await browser.newContext();
     const page = await ctx.newPage();
-    let u = await landing(page, `/qr/${LIVE_QR}`);
+    const u = await landing(page, `/qr/${LIVE_QR}`);
     const body = await page.evaluate(() => document.body.innerText);
     const liveOk = body.includes(LIVE_CODE);
     ledger("QR", "/qr/<live uuid> shows the unit publicly (intended)", "UI", liveOk ? "PASS" : "FAIL", await shot(page, "qr-live"));

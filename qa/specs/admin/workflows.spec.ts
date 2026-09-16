@@ -1,9 +1,13 @@
 import path from "node:path";
-import { test, expect, QA, OUT_ROOT, ledger, shot, note, hydrated, loginViaForm, watchConsole, unitPhoto } from "../../lib";
+import { devices, type Page } from "@playwright/test";
+import { test, QA, OUT_ROOT, ledger, shot, note, hydrated, loginViaForm, watchConsole, unitPhoto } from "../../lib";
 
-const settle = async (page, ms = 1500) => { await page.waitForLoadState("domcontentloaded"); await page.waitForTimeout(ms); };
-const body = (page) => page.evaluate(() => document.body.innerText as string);
-const toastText = async (page) => {
+// What the print test hangs off `window` inside the page.
+type PrintWindow = Window & { __printDoc: string };
+
+const settle = async (page: Page, ms = 1500) => { await page.waitForLoadState("domcontentloaded"); await page.waitForTimeout(ms); };
+const body = (page: Page) => page.evaluate(() => document.body.innerText as string);
+const toastText = async (page: Page) => {
   // sonner mounts toasts under [data-sonner-toaster]; give it up to 6s
   const toaster = page.locator("[data-sonner-toaster] [data-sonner-toast], [data-sonner-toaster] li");
   await toaster.first().waitFor({ timeout: 6000 }).catch(() => {});
@@ -13,13 +17,13 @@ const toastText = async (page) => {
 };
 // the assets list is paginated (5 per page) and a new building lands on the last page;
 // the header omnibox filters the list in place
-const filterAssets = async (page, term: string) => {
+const filterAssets = async (page: Page, term: string) => {
   const box = page.locator("header input[type=text]").first();
   await box.fill(term);
   await box.press("Enter"); // closes the suggestion panel; the filter applied on typing
   await page.waitForTimeout(1200);
 };
-const kpi = async (page) => {
+const kpi = async (page: Page) => {
   const t = await body(page);
   const pick = (re: RegExp) => Number((t.match(re)?.[1] ?? "-1").replace(/,/g, ""));
   return { units: pick(/เครื่องปรับอากาศทั้งหมด\s*([\d,]+)/), repair: pick(/รอซ่อมด่วน\s*([\d,]+)/), cleaning: pick(/ถึงรอบล้างแอร์\s*([\d,]+)/), techs: pick(/ช่างเทคนิคในระบบ\s*([\d,]+)/) };
@@ -194,7 +198,7 @@ test.describe("admin workflows", () => {
     ledger("Dashboard", `รอซ่อมด่วน counter moved ${before.repair} → ${after.repair} after a repair order`, "UI", after.repair === before.repair + 1 ? "PASS" : "FAIL", await shot(page, "admin-dashboard-after-wo"));
 
     // cross-side: technician pool must show it without a restart
-    const ctx = await browser.newContext({ ...require("@playwright/test").devices["Pixel 7"], storageState: path.join(OUT_ROOT, "auth", "tech.json") });
+    const ctx = await browser.newContext({ ...devices["Pixel 7"], storageState: path.join(OUT_ROOT, "auth", "tech.json") });
     await ctx.addInitScript(() => sessionStorage.setItem("ac-maintenance.browser-session", "1"));
     const tp = await ctx.newPage();
     await tp.goto("/tech"); await tp.locator("main").last().waitFor({ timeout: 90_000 }); await tp.waitForTimeout(4000);
@@ -369,10 +373,10 @@ test.describe("admin workflows", () => {
     const m = await dlg.innerText();
     ledger("QR", "preview modal shows acCode, brand, BTU and 'เครื่องที่ N ของห้องนี้'", "UI", /เครื่องที่ \d+ ของห้องนี้/.test(m) && /BTU/.test(m) ? "PASS" : "FAIL", await shot(page, "qr-modal"));
     // print: capture what would be written to the print window
-    await page.evaluate(() => { (window as any).__printDoc = ""; window.open = () => ({ document: { write: (h: string) => { (window as any).__printDoc += h; }, close() {} } } as any); });
+    await page.evaluate(() => { const w = window as unknown as PrintWindow; w.__printDoc = ""; window.open = () => ({ document: { write: (h: string) => { w.__printDoc += h; }, close() {} } } as unknown as Window); });
     await dlg.getByRole("button", { name: /พิมพ์ \(Print\)/ }).click();
     await page.waitForTimeout(800);
-    const doc: string = await page.evaluate(() => (window as any).__printDoc);
+    const doc: string = await page.evaluate(() => (window as unknown as PrintWindow).__printDoc);
     ledger("QR", "single print writes one 150x52mm sticker with a 46mm code", "UI", /width: 150mm/.test(doc) && /width: 46mm/.test(doc) && (doc.match(/class="sticker"/g) || []).length === 1 ? "PASS" : "FAIL", note("qr-print-single.html", doc));
     // popup blocked path
     await page.evaluate(() => { window.open = () => null; });

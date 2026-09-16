@@ -293,6 +293,7 @@ export const useFileUpload = (
       generateUniqueId,
       clearFiles,
       onFilesAdded,
+      onError,
     ]
   )
 

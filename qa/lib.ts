@@ -269,6 +269,7 @@ export const test = base.extend({
     await context.addInitScript((k: string) => {
       try { window.sessionStorage.setItem(k, "1"); } catch { /* storage blocked */ }
     }, "ac-maintenance.browser-session");
+    // eslint-disable-next-line react-hooks/rules-of-hooks -- Playwright's fixture `use`, not a React hook
     await use(context);
   },
 });

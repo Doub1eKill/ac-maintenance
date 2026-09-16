@@ -1,9 +1,10 @@
-import { test, expect, QA, ledger, shot, note, loginViaForm, hydrated, watchConsole } from "../../lib";
+import type { Page } from "@playwright/test";
+import { test, QA, ledger, shot, note, loginViaForm, hydrated, watchConsole } from "../../lib";
 
 test.describe("authentication, adversarially", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  const bad = async (page, email: string, password: string, label: string, slug: string) => {
+  const bad = async (page: Page, email: string, password: string, label: string, slug: string) => {
     const url = await loginViaForm(page, email, password);
     const txt = await page.evaluate(() => document.body.innerText);
     const art = await shot(page, `login-${slug}`);

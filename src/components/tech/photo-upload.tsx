@@ -163,6 +163,7 @@ export function PhotoUpload({
                       <Spinner className="text-muted-foreground size-6" />
                     </div>
                   )}
+                  {/* eslint-disable-next-line @next/next/no-img-element -- object URL of a file that has not been uploaded yet; next/image cannot optimise a blob: source */}
                   <img
                     src={fileItem.preview}
                     alt={fileItem.file.name}
@@ -263,6 +264,7 @@ export function PhotoUpload({
                     <Spinner className="size-8 text-white" />
                   </div>
                 )}
+                {/* eslint-disable-next-line @next/next/no-img-element -- object URL of a file that has not been uploaded yet; next/image cannot optimise a blob: source */}
                 <img
                   src={selectedImage}
                   alt="Preview"

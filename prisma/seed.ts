@@ -61,7 +61,7 @@ async function main() {
   const daikinModel1 = await prisma.acModel.create({ data: { brandId: daikin.id, name: "Inverter 12000", defaultBtu: 12000 } });
   const daikinModel2 = await prisma.acModel.create({ data: { brandId: daikin.id, name: "Inverter 18000", defaultBtu: 18000 } });
   
-  const mitsuModel1 = await prisma.acModel.create({ data: { brandId: mitsu.id, name: "Heavy Duty 18000", defaultBtu: 18000 } });
+  await prisma.acModel.create({ data: { brandId: mitsu.id, name: "Heavy Duty 18000", defaultBtu: 18000 } });
   const mitsuModel2 = await prisma.acModel.create({ data: { brandId: mitsu.id, name: "Heavy Duty 24000", defaultBtu: 24000 } });
 
   const panaModel = await prisma.acModel.create({ data: { brandId: panasonic.id, name: "Econavi 18000", defaultBtu: 18000 } });

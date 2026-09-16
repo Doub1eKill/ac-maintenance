@@ -376,6 +376,9 @@ export function UpcomingMaintenanceTable({ data, onViewDetails, onCreateWorkOrde
     setRowSelection({});
   }, [data, filterKind]);
 
+  // TanStack returns functions the React Compiler cannot memoise, so it skips
+  // this component — intended, and not something a code change here can fix.
+  // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
     data: filteredData,
     columns,

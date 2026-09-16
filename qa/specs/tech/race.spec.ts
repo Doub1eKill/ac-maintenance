@@ -1,5 +1,5 @@
 import path from "node:path";
-import { devices } from "@playwright/test";
+import { devices, type Page } from "@playwright/test";
 import { test, QA, OUT_ROOT, ledger, shot, note } from "../../lib";
 
 // Two technicians press รับงาน on the same pool job in the same instant.
@@ -18,7 +18,7 @@ test("two technicians claim the same job at the same moment", async ({ browser }
   await dlg.waitFor({ timeout: 15_000 });
   await dlg.locator("select").nth(0).selectOption({ label: QA.building.name }); await ap.waitForTimeout(400);
   await dlg.locator("select").nth(1).selectOption({ index: 1 }); await ap.waitForTimeout(400);
-  await dlg.locator('select[name="airConditionerId"]').selectOption({ label: new RegExp(CODE2) as any }).catch(async () => dlg.locator('select[name="airConditionerId"]').selectOption({ index: 2 }));
+  await dlg.locator('select[name="airConditionerId"]').selectOption({ label: new RegExp(CODE2) as unknown as string }).catch(async () => dlg.locator('select[name="airConditionerId"]').selectOption({ index: 2 }));
   await dlg.locator('select[name="type"]').selectOption("cleaning");
   await dlg.getByRole("button", { name: /ยืนยันการสร้างใบงาน/ }).click();
   await ap.waitForTimeout(3000);
@@ -49,7 +49,7 @@ test("two technicians claim the same job at the same moment", async ({ browser }
 
   await Promise.all([a.btn.click(), b.btn.click()]);
   await a.page.waitForTimeout(3000); await b.page.waitForTimeout(500);
-  const toastOf = async (p) => (await p.locator("[data-sonner-toaster] li").allInnerTexts().catch(() => [])).join(" | ");
+  const toastOf = async (p: Page) => (await p.locator("[data-sonner-toaster] li").allInnerTexts().catch(() => [])).join(" | ");
   const ta = await toastOf(a.page); const tb = await toastOf(b.page);
   const wins = [ta, tb].filter((t) => /รับงานเรียบร้อย/.test(t)).length;
   const losers = [ta, tb].filter((t) => /ถูกรับ|ไม่สำเร็จ|ไปแล้ว|ผิดพลาด|ไม่พบ|ไม่สามารถ/.test(t)).length;
