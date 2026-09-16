@@ -1,5 +1,14 @@
 # Project Handoff & Technical Summary
 
+# 🕰️ เวลาบนหน้าสติกเกอร์ production เพี้ยน 7 ชม. — แก้ด้วย inAppTimeZone() (16 ก.ย. 2026, DoubleKill)
+
+พบตอนตรวจ guest view บน production: ประวัติ "25 ส.ค. 2026 16:40" (local) แสดง **09:40** บน Vercel — `/qr/[id]` เป็น server component ที่ `format()` ด้วย date-fns ซึ่งอ่าน local fields ของ Date = timezone ของ process (Vercel = UTC) · หน้าอื่นเป็น client component format ในเบราว์เซอร์จึงไม่โดน
+
+- **ตั้ง env `TZ` บน Vercel ไม่ได้** — ชื่อสงวน ("The name of your Environment Variable is reserved") เจ้าของลองแล้ว
+- แก้ในโค้ด: `src/lib/maintenance.ts` เพิ่ม `inAppTimeZone(date)` — สร้าง Date ใหม่จาก `Intl.DateTimeFormat(…, { timeZone: APP_TIME_ZONE }).formatToParts()` ให้ local fields = เวลา Bangkok → `format()` ถูกทุก process zone · **ใช้เฉพาะ format ห้ามเก็บ/เปรียบเทียบ** · หน้า `/qr` ใช้กับ performedAt และ nextDueDate
+- พิสูจน์: `TZ=UTC npx tsx` → 16:40 (naive 09:40), `TZ=Asia/Bangkok` → 16:40 · production หลัง deploy (`feat/postgres` `eda45b4`) แสดง **16:40** ✓
+- **กติกาใหม่:** server component/route ใดที่ format วัน-เวลาให้ผู้ใช้ ต้องผ่าน `inAppTimeZone()` (ตอนนี้มีที่เดียว) · client component ไม่ต้อง
+
 # 🖼️ ระบบ Guest — รูปหลักของแอร์ + หน้าสติกเกอร์สำหรับคนทั่วไป + login ช่างเข้าฟอร์มทันที (16 ก.ย. 2026, DoubleKill)
 
 ตามแผน entry "📋 แผน: ระบบ Guest" · คำตอบเจ้าของ: **ก.** guest เห็นรูปหลัก + ประวัติ (ประเภทงาน/วันที่/ซ่อมอะไร) ไม่เห็นชื่อช่าง/notes/รูปหลังซ่อม, admin และช่างที่ login เห็นครบ (ต่างจาก "ประวัติของฉัน" ที่เห็นแค่ของตัวเอง) **ข.** เครื่องเดิมปล่อยว่าง + ปุ่มเพิ่มรูปในหน้าแก้ไข **ค.** เขียน migration 2 ชุด ไม่ merge ก่อน (ข้อมูล seed จะถูกล้างตอนใช้จริง) · branch `feat/guest-view` → master `4f48e7e` · `feat/postgres` = master + 8 (`ed25cf9`) push แล้ว = deploy production
