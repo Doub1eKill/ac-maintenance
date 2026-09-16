@@ -40,7 +40,9 @@ test.describe("technician on a phone", () => {
       const first = nav.querySelector("a");
       if (!first) return "no-link";
       const r = first.getBoundingClientRect();
-      const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      // Next's dev-tools badge (<nextjs-portal>) floats over that corner in
+      // development only; look past it to whatever the app itself put there.
+      const el = document.elementsFromPoint(r.left + r.width / 2, r.top + r.height / 2).find((e) => e.tagName !== "NEXTJS-PORTAL") ?? null;
       return el && (first.contains(el) || el === first) ? "clear" : `covered by <${el?.tagName.toLowerCase()} class="${(el as HTMLElement)?.className?.toString().slice(0, 60)}">`;
     });
     ledger("Bottom nav", `first nav item hit-test at its centre: ${overlap}`, "UI", overlap === "clear" ? "PASS" : "FAIL", "runs/" + process.env.QA_RUN + "/tech-bottom-nav.png");

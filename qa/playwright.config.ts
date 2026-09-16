@@ -28,6 +28,19 @@ export default defineConfig({
     { name: "setup", testMatch: /auth\.setup\.ts/ },
     { name: "public", use: { ...devices["Desktop Chrome"] }, testMatch: /public\/.*\.spec\.ts/, dependencies: ["setup"] },
     { name: "admin", use: { ...devices["Desktop Chrome"], storageState: path.join(OUT, "auth", "admin.json") }, dependencies: ["setup"], testMatch: /admin\/.*\.spec\.ts/ },
+    // The tech specs claim and close the QA work order that the admin specs
+    // create through the forms. Rather than remembering to run those two admin
+    // tests by hand first (and not to restore the database in between), the
+    // tech project depends on this slice of the admin one. Both tests cope with
+    // the rows already being there, so running admin and then tech is fine too.
+    // Like setup, a dependency project ignores the command line's --grep.
+    {
+      name: "admin-seed",
+      use: { ...devices["Desktop Chrome"], storageState: path.join(OUT, "auth", "admin.json") },
+      dependencies: ["setup"],
+      testMatch: /admin\/workflows\.spec\.ts/,
+      grep: /assets: create building|work order: create for the QA unit/,
+    },
     {
       name: "tech",
       use: {
@@ -37,17 +50,15 @@ export default defineConfig({
         // camera path can run headless (tech/regressions.spec.ts).
         launchOptions: { args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"] },
       },
-      dependencies: ["setup"],
+      dependencies: ["setup", "admin-seed"],
       testMatch: /tech\/.*\.spec\.ts/,
     },
   ],
   webServer: {
+    // The 6 GB heap Next dev needs for a full sweep is part of the dev script
+    // itself (see package.json), so a server someone already started by hand or
+    // from the editor is the same server this would start.
     command: "npm run dev",
-    // Next dev restarts itself after any request that finds the heap above 80%
-    // of its limit, and a full sweep compiles every route into one long-lived
-    // server. On the default ~4 GB limit that restart landed mid-test once
-    // (ERR_CONNECTION_REFUSED); a bigger old space keeps it out of the run.
-    env: { NODE_OPTIONS: "--max-old-space-size=6144" },
     url: `${BASE_URL}/login`,
     reuseExistingServer: true,
     timeout: 180_000,
