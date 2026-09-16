@@ -158,6 +158,12 @@ model AirConditioner {
   model       String?              @db.VarChar(255) // Fallback for "Other" custom models
   btu         Int?                 @db.UnsignedInt
   installedAt DateTime?            @map("installed_at") @db.Date
+  // The unit's own picture, taken when it is registered and shown first on
+  // the public sticker page — distinct from the before/after photos a visit
+  // records on maintenance_logs. Nullable because the units that predate the
+  // field have none; the register forms require one from here on. Written by
+  // saveUpload(): a /uploads path locally, a Blob URL on Vercel.
+  photoUrl    String?              @map("photo_url") @db.VarChar(255)
   status      AirConditionerStatus @default(normal)
   createdAt   DateTime?            @map("created_at") @db.Timestamp(0)
   updatedAt   DateTime?            @map("updated_at") @db.Timestamp(0)

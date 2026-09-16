@@ -92,7 +92,7 @@ function sql(query) {
         encoding: "utf8",
         env: { ...process.env, PGCLIENTENCODING: "UTF8" },
       })
-    : spawnSync(MYSQL[0], [...MYSQL.slice(1), "-N", "-B"], { input: query, encoding: "utf8" });
+    : spawnSync(MYSQL[0], [...MYSQL.slice(1), "--default-character-set=utf8mb4", "-N", "-B"], { input: query, encoding: "utf8" });
   if (r.error) throw r.error;
   if (r.status !== 0) throw new Error(`${ENGINE} client exited ${r.status}: ${r.stderr || r.stdout}`);
   return r.stdout
@@ -119,7 +119,7 @@ const GROWTH_TABLES = [
 
 // The columns a run changes on rows that already existed. Restored verbatim.
 const MUTABLE = {
-  air_conditioners: ["status", "btu", "ac_brand_id", "ac_model_id", "brand", "model", "deleted_at"],
+  air_conditioners: ["status", "btu", "ac_brand_id", "ac_model_id", "brand", "model", "photo_url", "deleted_at"],
   users: ["status", "name", "avatar_url", "password"],
   // user_id is carried too, so a row the run replaced (see REINSERT) can be
   // put back whole.

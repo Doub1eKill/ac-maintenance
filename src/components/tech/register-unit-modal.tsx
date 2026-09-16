@@ -13,6 +13,7 @@ import {
   type CatalogueBrand,
 } from "@/components/shared/brand-model-picker";
 import { createAirConditionerAction, getAcMasterDataAction } from "@/app/tech/actions";
+import { UnitPhotoField } from "@/components/shared/unit-photo-field";
 import type { RoomOption } from "@/lib/tech/pages";
 
 interface RegisterUnitModalProps {
@@ -35,6 +36,7 @@ export function RegisterUnitModal({ rooms, onClose }: RegisterUnitModalProps) {
   const [picked, setPicked] = useState<BrandModelValue>(emptyBrandModel);
   const [btu, setBtu] = useState("");
   const [installedAt, setInstalledAt] = useState("");
+  const [photo, setPhoto] = useState<File | null>(null);
   const [createdCode, setCreatedCode] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -77,11 +79,16 @@ export function RegisterUnitModal({ rooms, onClose }: RegisterUnitModalProps) {
       toast.error("กรุณาระบุยี่ห้อแอร์");
       return;
     }
+    if (!photo) {
+      toast.error("กรุณาแนบรูปเครื่องปรับอากาศ 1 รูป");
+      return;
+    }
 
     const formData = new FormData();
     formData.append("roomId", roomId);
     formData.append("btu", btu);
     formData.append("installedAt", installedAt);
+    formData.append("photo", photo);
     appendBrandModel(formData, picked);
 
     startTransition(async () => {
@@ -182,6 +189,9 @@ export function RegisterUnitModal({ rooms, onClose }: RegisterUnitModalProps) {
                   placeholder="เช่น 18000"
                   className="w-full rounded-xl border border-border bg-muted px-3 py-2.5 text-xs text-foreground focus:border-primary focus:outline-none"
                 />
+              </div>
+              <div className="col-span-full text-[11px]">
+                <UnitPhotoField required disabled={isPending} onPick={setPhoto} />
               </div>
               <div>
                 <label className="mb-1 block text-[11px] font-bold text-foreground">

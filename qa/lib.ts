@@ -58,6 +58,14 @@ export function watchConsole(page: Page) {
 }
 
 /** A tiny valid PNG, for file inputs that demand an image. */
+/**
+ * The unit picture a register form needs since the guest view (a plain
+ * PNG the server re-encodes; what it shows does not matter to any check).
+ */
+export function unitPhoto() {
+  return { name: "unit.png", mimeType: "image/png", buffer: pngBuffer([90, 140, 200], 96) };
+}
+
 export function pngBuffer(color: [number, number, number] = [40, 120, 200], size = 64): Buffer {
   const raw = Buffer.alloc((size * 3 + 1) * size);
   for (let y = 0; y < size; y++) {
@@ -192,7 +200,9 @@ export function db(query: string): (string | null)[][] {
       })
     : (() => {
         const argv = (process.env.QA_MYSQL ?? "C:\\xampp\\mysql\\bin\\mysql.exe -h 127.0.0.1 -P 3306 -u root ac_maintenance").split(" ");
-        return spawnSync(argv[0], [...argv.slice(1), "-N", "-B"], { input: query, encoding: "utf8" });
+        // utf8mb4 spelt out: the client's default charset on Windows garbles Thai
+        // text on the way out, and the specs compare it against the page.
+        return spawnSync(argv[0], [...argv.slice(1), "--default-character-set=utf8mb4", "-N", "-B"], { input: query, encoding: "utf8" });
       })();
   if (r.error) throw r.error;
   if (r.status !== 0) throw new Error(`${DB_ENGINE} client exited ${r.status}: ${r.stderr}`);

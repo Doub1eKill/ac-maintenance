@@ -1,5 +1,5 @@
 import path from "node:path";
-import { test, expect, QA, OUT_ROOT, ledger, shot, note, hydrated, loginViaForm, watchConsole } from "../../lib";
+import { test, expect, QA, OUT_ROOT, ledger, shot, note, hydrated, loginViaForm, watchConsole, unitPhoto } from "../../lib";
 
 const settle = async (page, ms = 1500) => { await page.waitForLoadState("domcontentloaded"); await page.waitForTimeout(ms); };
 const body = (page) => page.evaluate(() => document.body.innerText as string);
@@ -124,6 +124,7 @@ test.describe("admin workflows", () => {
     await brandSel.selectOption({ index: 1 });
     await page.waitForTimeout(400);
     await uform.locator('select[name="acModelId"]').selectOption({ index: 1 });
+    await uform.locator('input[name="photo"]').setInputFiles(unitPhoto());
     await uform.getByRole("button", { name: /ลงทะเบียนเครื่องปรับอากาศ/ }).click();
     const t5 = await toastText(page);
     await settle(page, 3000);
@@ -138,6 +139,7 @@ test.describe("admin workflows", () => {
     await cform.locator('input[name="customBrand"]').fill("QA Custom Brand");
     await cform.locator('input[name="customModel"]').fill("QA-MODEL");
     await cform.locator('input[name="btu"]').fill("-5");
+    await cform.locator('input[name="photo"]').setInputFiles(unitPhoto());
     await cform.getByRole("button", { name: /ลงทะเบียนเครื่องปรับอากาศ/ }).click();
     const btuMsg = await cform.locator('input[name="btu"]').evaluate((el: HTMLInputElement) => el.validationMessage).catch(() => "");
     note("assets-unit-btu-validation.txt", btuMsg);

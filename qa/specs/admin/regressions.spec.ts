@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { test, expect, ledger, shot, note, hydrated, toastText, clearToasts, db } from "../../lib";
+import { test, expect, ledger, shot, note, hydrated, toastText, clearToasts, db, unitPhoto } from "../../lib";
 
 // Regressions for the admin-side findings of run 20260913-1742. These write
 // to the database on purpose; qa/baseline.mjs restore puts it back.
@@ -65,6 +65,7 @@ test.describe.serial("assets", () => {
     await page.waitForTimeout(400);
     await form.locator('select[name="acModelId"]').selectOption(String(f.modelId));
     const hasBtuField = await form.locator('input[name="btu"]').count();
+    await form.locator('input[name="photo"]').setInputFiles(unitPhoto());
     await form.getByRole("button", { name: /ลงทะเบียนเครื่องปรับอากาศ/ }).click();
     const tt = await toastText(page);
     await page.waitForTimeout(1500);
@@ -95,6 +96,7 @@ test.describe.serial("assets", () => {
     await form.locator('input[name="customBrand"]').fill("QA_TEST_BRAND_NEG");
     const btu = form.locator('input[name="btu"]');
     const submit = form.getByRole("button", { name: /ลงทะเบียนเครื่องปรับอากาศ/ });
+    await form.locator('input[name="photo"]').setInputFiles(unitPhoto());
 
     await btu.fill("-5");
     await submit.click();
@@ -245,6 +247,7 @@ test.describe.serial("work orders", () => {
     await page.getByRole("button", { name: /กำหนดเอง/ }).click();
     const uform = page.locator("form").filter({ has: page.locator('input[name="customBrand"]') });
     await uform.locator('input[name="customBrand"]').fill("QA_TEST_BRAND_FOCUS");
+    await uform.locator('input[name="photo"]').setInputFiles(unitPhoto());
     await clearToasts(page);
     await uform.getByRole("button", { name: /ลงทะเบียนเครื่องปรับอากาศ/ }).click();
     await toastText(page);

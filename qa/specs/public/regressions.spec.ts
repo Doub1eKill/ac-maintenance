@@ -70,3 +70,21 @@ test("BUG-011: the public QR page and the login page carry one <main> at most", 
     ledger("A11y", `${path}: ${mains} <main> landmark(s)`, "UI", mains <= 1 ? "PASS" : "FAIL", await shot(page, `reg-main-${path.replace(/[^a-z0-9]+/gi, "-")}`));
   }
 });
+
+test("guest view: a scanned sticker shows the unit's picture and record, nothing staff-only, and a technician sign-in", async ({ page }) => {
+  // A unit with at least one visit, so there is a record to inspect — and
+  // the name of whoever made the latest one, which a visitor must not see.
+  const [[uuid, acCode, techName, repairDetail]] = db(
+    "select a.qr_code, a.ac_code, u.name, l.repair_detail from maintenance_logs l join air_conditioners a on a.id=l.air_conditioner_id join users u on u.id=l.user_id where a.deleted_at is null order by l.performed_at desc limit 1"
+  );
+  expect(uuid).toBeTruthy();
+  await page.goto(`/qr/${uuid}`);
+  await page.waitForLoadState("domcontentloaded"); await page.waitForTimeout(1500);
+  const t = (await page.evaluate(() => document.body.innerText)).replace(/\s+/g, " ");
+  const hasPicture = (await page.locator("img[alt^='เครื่องปรับอากาศ']").count()) > 0 || /ยังไม่มีรูปเครื่องนี้/.test(t);
+  ledger("Guest", `/qr/<uuid> for ${acCode}: picture (or its placeholder) and the record are shown without signing in`, "UI", t.includes(acCode!) && /ประวัติการซ่อมบำรุง/.test(t) && hasPicture ? "PASS" : "FAIL", await shot(page, "reg-guest-view"));
+  ledger("Guest", `visitor sees what was repaired (${repairDetail ? "yes" : "no repair detail on this unit"}) but not who did it (${techName})`, "UI", !t.includes(techName!) && !/โดย /.test(t) && (!repairDetail || t.includes(repairDetail)) ? "PASS" : "FAIL", "runs/" + process.env.QA_RUN + "/reg-guest-view.png");
+  ledger("Guest", "no claim/close/log controls for a visitor", "UI", !/รับงานทันที|บันทึกและปิดงาน|บันทึกงานซ่อมบำรุง|รูปหลังซ่อม/.test(t) ? "PASS" : "FAIL", "runs/" + process.env.QA_RUN + "/reg-guest-view.png");
+  const href = await page.getByRole("link", { name: /เข้าสู่ระบบสำหรับช่าง/ }).getAttribute("href");
+  ledger("Guest", `technician sign-in link carries the unit: ${href}`, "UI", !!href && href.startsWith("/login?callbackUrl=") && decodeURIComponent(href).includes(`/tech?ac=${acCode}`) ? "PASS" : "FAIL", "runs/" + process.env.QA_RUN + "/reg-guest-view.png");
+});

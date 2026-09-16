@@ -17,6 +17,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { AcHistoryModal } from "@/components/admin/ac-history-modal";
 import { useEscapeToClose } from "@/hooks/use-escape-to-close";
 import { nativeValidity } from "@/lib/native-validity";
+import { UnitPhotoField } from "@/components/shared/unit-photo-field";
 import {
   StickerCard,
   openStickerSheet,
@@ -139,6 +140,7 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
   const [editAcBrandType, setEditAcBrandType] = useState<"master" | "other">("other");
   const [editSelectedBrandId, setEditSelectedBrandId] = useState<string>("");
   const [editAcInstalledAt, setEditAcInstalledAt] = useState<string>("");
+  const [editAcPhotoUrl, setEditAcPhotoUrl] = useState<string | null>(null);
   const [isLoadingEditAc, setIsLoadingEditAc] = useState(false);
   const [editAcLoadFailed, setEditAcLoadFailed] = useState(false);
 
@@ -294,6 +296,7 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
     setEditAcBrandType("other");
     setEditSelectedBrandId("");
     setEditAcInstalledAt("");
+    setEditAcPhotoUrl(null);
     setEditAcLoadFailed(false);
     setIsLoadingEditAc(true);
     getAirConditionerHistory(ac.id).then((result) => {
@@ -305,6 +308,7 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
         toast.error("โหลดวันที่ติดตั้งเดิมไม่สำเร็จ ลองปิดแล้วเปิดใหม่อีกครั้ง");
       } else {
         setEditAcInstalledAt(result.unit.installedAt ? result.unit.installedAt.slice(0, 10) : "");
+        setEditAcPhotoUrl(result.unit.photoUrl);
       }
       setIsLoadingEditAc(false);
     });
@@ -696,6 +700,8 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
                 </>
               )}
 
+              <UnitPhotoField required disabled={isPending} />
+
               <div>
                 <label className="mb-1.5 block font-bold text-foreground">
                   วันที่ติดตั้ง (ไม่บังคับ)
@@ -787,6 +793,12 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
                   <NativeSelectOption value="needs_cleaning">รอล้าง</NativeSelectOption>
                 </NativeSelect>
               </div>
+
+              <UnitPhotoField
+                currentUrl={editAcPhotoUrl}
+                disabled={isPending || isLoadingEditAc || editAcLoadFailed}
+                hint={editAcPhotoUrl ? "เว้นว่าง = ใช้รูปเดิม" : "เครื่องนี้ยังไม่มีรูป — เพิ่มได้ที่นี่"}
+              />
 
               <div>
                 <label className="mb-1.5 block font-bold text-foreground">

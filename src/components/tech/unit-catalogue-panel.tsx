@@ -12,6 +12,7 @@ import {
   type CatalogueBrand,
 } from "@/components/shared/brand-model-picker";
 import { getAcMasterDataAction, updateAirConditionerAction } from "@/app/tech/actions";
+import { UnitPhotoField } from "@/components/shared/unit-photo-field";
 
 interface UnitCataloguePanelProps {
   airConditionerId: string;
@@ -51,6 +52,9 @@ export function UnitCataloguePanel({
   const [brands, setBrands] = useState<CatalogueBrand[]>([]);
   const [loading, setLoading] = useState(true);
   const [picked, setPicked] = useState<BrandModelValue>(emptyBrandModel);
+  // Optional here: the technician at the machine is the natural person to
+  // give a unit registered before pictures existed its picture.
+  const [photo, setPhoto] = useState<File | null>(null);
   const [btu, setBtu] = useState(currentBtu ? String(currentBtu) : "");
   const [isPending, startTransition] = useTransition();
 
@@ -100,6 +104,7 @@ export function UnitCataloguePanel({
     formData.append("airConditionerId", airConditionerId);
     formData.append("btu", btu);
     appendBrandModel(formData, picked);
+    if (photo) formData.append("photo", photo);
     // status and installedAt are left out on purpose — not sent means not
     // touched. This panel has no business resetting either one.
 
@@ -153,6 +158,10 @@ export function UnitCataloguePanel({
           placeholder="เช่น 18000"
           className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-xs text-foreground focus:border-primary focus:outline-none"
         />
+      </div>
+
+      <div className="text-[11px]">
+        <UnitPhotoField disabled={isPending} onPick={setPhoto} hint="เพิ่มหรือเปลี่ยนรูปตัวเครื่องที่หน้าสติกเกอร์แสดง (ไม่บังคับ)" />
       </div>
 
       <button

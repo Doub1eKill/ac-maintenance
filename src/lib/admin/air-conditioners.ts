@@ -6,6 +6,7 @@ import { logAudit } from "@/lib/audit";
 import { businessDateToday, businessDateFrom, addMaintenanceInterval } from "@/lib/maintenance";
 import { getDefaultMaintenanceFrequency } from "@/lib/organisation";
 import { verifyAssetEditor } from "@/lib/auth-guards";
+import { saveUpload, deleteUpload } from "@/lib/upload";
 
 /**
  * A unique-constraint violation coming back from Prisma.
@@ -86,6 +87,18 @@ export async function createAirConditionerAction(formData: FormData) {
     return { error: "กรุณาระบุยี่ห้อแอร์" };
   }
 
+  // The unit's own picture is part of registering it: the sticker page shows
+  // it first, to a visitor who has nothing else to go on. Required here, not
+  // only in the forms, because the forms are a courtesy and this is the guard.
+  // Stored before the row so a failure to store it fails registration, and
+  // removed again if the row never happens.
+  const photoFile = formData.get("photo");
+  if (!(photoFile instanceof File) || photoFile.size === 0) {
+    return { error: "กรุณาแนบรูปเครื่องปรับอากาศ 1 รูป" };
+  }
+  const photoUrl = await saveUpload(photoFile);
+  if (!photoUrl) return { error: "ไฟล์รูปเครื่องปรับอากาศอ่านไม่ได้ กรุณาเลือกรูปภาพอื่น" };
+
   try {
     const room = await prisma.room.findUnique({
       where: { id: BigInt(data.roomId) },
@@ -93,6 +106,7 @@ export async function createAirConditionerAction(formData: FormData) {
     });
 
     if (!room) {
+      await deleteUpload(photoUrl);
       return { error: "ห้องไม่ถูกต้อง" };
     }
 
@@ -109,6 +123,7 @@ export async function createAirConditionerAction(formData: FormData) {
       roomId: room.id,
       btu: data.btu,
       installedAt,
+      photoUrl,
     };
 
     if (data.brandType === "master") {
@@ -119,7 +134,10 @@ export async function createAirConditionerAction(formData: FormData) {
       const model = await prisma.acModel.findFirst({
         where: { id: BigInt(data.acModelId!), deletedAt: null, brand: { deletedAt: null } }
       });
-      if (!model) return { error: "ไม่พบรุ่นแอร์ที่เลือก" };
+      if (!model) {
+        await deleteUpload(photoUrl);
+        return { error: "ไม่พบรุ่นแอร์ที่เลือก" };
+      }
       
       dbData.acBrandId = model.brandId;
       dbData.acModelId = model.id;
@@ -196,7 +214,10 @@ export async function createAirConditionerAction(formData: FormData) {
       }
     }
 
-    if (!created) return { error: "ไม่สามารถสร้างรหัสแอร์ที่ไม่ซ้ำได้ กรุณาลองใหม่อีกครั้ง" };
+    if (!created) {
+      await deleteUpload(photoUrl);
+      return { error: "ไม่สามารถสร้างรหัสแอร์ที่ไม่ซ้ำได้ กรุณาลองใหม่อีกครั้ง" };
+    }
 
     await logAudit({
       userId: BigInt(session.user.id!),
@@ -219,6 +240,7 @@ export async function createAirConditionerAction(formData: FormData) {
     return { success: true, acCode: created.acCode };
   } catch (error) {
     console.error(error);
+    await deleteUpload(photoUrl);
     return { error: "เกิดข้อผิดพลาดในการลงทะเบียนแอร์" };
   }
 }
@@ -312,10 +334,21 @@ export async function updateAirConditionerAction(formData: FormData) {
     const acId = BigInt(data.airConditionerId);
     const existing = await prisma.airConditioner.findUnique({
       where: { id: acId },
-      select: { id: true, status: true, btu: true, installedAt: true },
+      select: { id: true, status: true, btu: true, installedAt: true, photoUrl: true },
     });
 
     if (!existing) return { error: "ไม่พบเครื่องปรับอากาศ" };
+
+    // A new picture replaces the stored one; no file means keep it. Units
+    // registered before the field existed have none, and this is where they
+    // get one. Stored first so a bad file fails the save before anything is
+    // written; the old picture is removed only once the row points elsewhere.
+    const photoFile = formData.get("photo");
+    let newPhotoUrl: string | null = null;
+    if (photoFile instanceof File && photoFile.size > 0) {
+      newPhotoUrl = await saveUpload(photoFile);
+      if (!newPhotoUrl) return { error: "ไฟล์รูปเครื่องปรับอากาศอ่านไม่ได้ กรุณาเลือกรูปภาพอื่น" };
+    }
 
     // The two brand paths are mutually exclusive: switching to a catalogue
     // model must clear the typed-in text, and switching away must clear the
@@ -343,12 +376,16 @@ export async function updateAirConditionerAction(formData: FormData) {
           })()
         : { acBrandId: null, acModelId: null, brand: data.customBrand, model: data.customModel ?? null, btu: data.btu };
 
-    if (!brandFields) return { error: "ไม่พบรุ่นแอร์ที่เลือก" };
+    if (!brandFields) {
+      await deleteUpload(newPhotoUrl);
+      return { error: "ไม่พบรุ่นแอร์ที่เลือก" };
+    }
 
     await prisma.airConditioner.update({
       where: { id: acId },
       data: {
         ...brandFields,
+        ...(newPhotoUrl ? { photoUrl: newPhotoUrl } : {}),
         // Both left out of the update entirely when the form did not send them,
         // rather than written as null. See the schema comment above.
         ...(data.status !== undefined ? { status: data.status } : {}),
@@ -357,6 +394,11 @@ export async function updateAirConditionerAction(formData: FormData) {
           : {}),
       },
     });
+
+    // The row no longer references the old picture; nothing else does either.
+    if (newPhotoUrl && existing.photoUrl && existing.photoUrl !== newPhotoUrl) {
+      await deleteUpload(existing.photoUrl);
+    }
 
     await logAudit({
       userId: BigInt(session.user.id!),
@@ -371,6 +413,7 @@ export async function updateAirConditionerAction(formData: FormData) {
       newValues: {
         status: data.status ?? existing.status,
         btu: brandFields.btu,
+        ...(newPhotoUrl ? { photoUrl: newPhotoUrl } : {}),
         installedAt:
           data.installedAt !== undefined
             ? data.installedAt || null

@@ -5,8 +5,9 @@ import { getMaintenanceHistory } from "@/lib/maintenance";
 import type { MaintenanceAction } from "@/generated/prisma/enums";
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
-import { ArrowLeft, Clock, CalendarClock, Settings2, ShieldCheck, ClipboardPen, LogIn } from "lucide-react";
+import { ArrowLeft, Clock, CalendarClock, Settings2, ShieldCheck, ClipboardPen, LogIn, Wind, Wrench, Image as ImageIcon } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { catalogueFlags } from "@/lib/catalogue-status";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
 
@@ -27,10 +28,20 @@ const MAINTENANCE_ACTION_LABEL: Record<MaintenanceAction, string> = {
  * random uuid rather than the sequential acCode, so the page can only be
  * opened by someone who has the sticker (or the link) in hand.
  *
+ * What a visitor sees is narrower than what staff see. The unit's own
+ * picture, its details and the record of work — kind of work, when, what was
+ * repaired — are for anyone; who did it, the notes they left and the
+ * before/after photos are for signed-in staff (technicians see every unit's
+ * full history here, as admins do; "my history" under /tech is the view that
+ * is limited to their own visits). One page, one query, one flag.
+ *
  * Recording work is a different matter and still requires an account:
  * logMaintenanceAction is guarded by verifyTechnician() regardless of how
  * the technician got here, so this page only decides which call to action to
- * show, never whether the write is allowed.
+ * show, never whether the write is allowed. A visitor's sign-in lands on
+ * /tech?ac=<code> — the log form for this very unit — rather than back here,
+ * since a technician who scanned the sticker came to record work, not to
+ * read.
  */
 export default async function QRCodePage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -47,6 +58,7 @@ export default async function QRCodePage(props: { params: Promise<{ id: string }
       model: true,
       btu: true,
       status: true,
+      photoUrl: true,
       room: {
         select: { name: true, building: { select: { name: true } } },
       },
@@ -103,6 +115,21 @@ export default async function QRCodePage(props: { params: Promise<{ id: string }
       </div>
 
       <div className="max-w-2xl mx-auto px-4 -mt-10 space-y-4">
+        {/* The unit's own picture first: it is what tells a visitor they are
+            looking at the right page for the machine in front of them. Units
+            registered before pictures existed show a placeholder until someone
+            adds one from the edit form. */}
+        <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          {ac.photoUrl ? (
+            <Image src={ac.photoUrl} alt={`เครื่องปรับอากาศ ${ac.acCode}`} fill sizes="(max-width: 672px) 100vw, 672px" className="object-cover" priority />
+          ) : (
+            <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-slate-400">
+              <Wind className="h-12 w-12" />
+              <span className="text-xs font-medium">ยังไม่มีรูปเครื่องนี้</span>
+            </div>
+          )}
+        </div>
+
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
           <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
             <Settings2 className="w-4 h-4" /> ข้อมูลทั่วไป
@@ -163,9 +190,32 @@ export default async function QRCodePage(props: { params: Promise<{ id: string }
                 <div key={log.id} className="relative pl-6 border-l-2 border-slate-100 last:border-0 pb-4 last:pb-0">
                   <div className="absolute -left-[5px] top-0 w-2 h-2 rounded-full bg-emerald-500"></div>
                   <div className="text-xs font-bold text-slate-900 mb-1">{MAINTENANCE_ACTION_LABEL[log.action]}</div>
-                  <div className="text-[11px] text-slate-500 mb-2">{format(new Date(log.performedAt), "d MMM yyyy HH:mm", { locale: th })} • โดย {log.technicianName}</div>
-                  {log.notes && (
+                  <div className="text-[11px] text-slate-500 mb-2">
+                    {format(new Date(log.performedAt), "d MMM yyyy HH:mm", { locale: th })}
+                    {isSignedIn && <> • โดย {log.technicianName}</>}
+                  </div>
+                  {log.repairDetail && (
+                    <div className="text-xs text-slate-700 flex items-start gap-1.5 mb-1.5">
+                      <Wrench className="w-3.5 h-3.5 mt-0.5 shrink-0 text-slate-400" />
+                      <span>{log.repairDetail}</span>
+                    </div>
+                  )}
+                  {isSignedIn && log.notes && (
                     <div className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg border border-slate-100">{log.notes}</div>
+                  )}
+                  {isSignedIn && (log.beforePhotoUrl || log.afterPhotoUrl) && (
+                    <div className="mt-2 flex gap-3 text-[11px] font-bold">
+                      {log.beforePhotoUrl && (
+                        <a href={log.beforePhotoUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sky-700 hover:underline">
+                          <ImageIcon className="w-3.5 h-3.5" /> รูปก่อนซ่อม
+                        </a>
+                      )}
+                      {log.afterPhotoUrl && (
+                        <a href={log.afterPhotoUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sky-700 hover:underline">
+                          <ImageIcon className="w-3.5 h-3.5" /> รูปหลังซ่อม
+                        </a>
+                      )}
+                    </div>
                   )}
                 </div>
               ))}
@@ -193,14 +243,17 @@ export default async function QRCodePage(props: { params: Promise<{ id: string }
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 text-center">
             <LogIn className="w-8 h-8 text-slate-400 mx-auto mb-3" />
             <p className="text-sm text-slate-600 mb-4">
-              หากคุณเป็นช่างซ่อมบำรุงและต้องการบันทึกผลการปฏิบัติงานของเครื่องนี้ กรุณาเข้าสู่ระบบก่อน
+              หากคุณเป็นช่างซ่อมบำรุง เข้าสู่ระบบเพื่อบันทึกผลการปฏิบัติงานของเครื่องนี้ได้ทันที
             </p>
+            {/* Straight to this unit's log form after signing in — see the
+                note at the top of the file. An admin who signs in here is
+                sent to /admin by the route guard instead. */}
             <Link
-              href={`/login?callbackUrl=${encodeURIComponent(`/qr/${params.id}`)}`}
+              href={`/login?callbackUrl=${encodeURIComponent(`/tech?ac=${ac.acCode}`)}`}
               className="inline-flex items-center justify-center gap-2 w-full bg-slate-900 text-white rounded-xl py-2.5 font-bold hover:bg-slate-800 transition-colors"
             >
               <LogIn className="w-4 h-4" />
-              เข้าสู่ระบบ
+              เข้าสู่ระบบสำหรับช่าง
             </Link>
           </div>
         ) : null}

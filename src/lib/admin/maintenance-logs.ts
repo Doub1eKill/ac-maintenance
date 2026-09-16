@@ -46,6 +46,7 @@ export async function getAirConditionerHistory(airConditionerId: string) {
           btu: true,
           status: true,
           installedAt: true,
+          photoUrl: true,
           acBrand: { select: { name: true, deletedAt: true } },
           acModel: { select: { name: true, deletedAt: true } },
           room: {
@@ -68,6 +69,7 @@ export async function getAirConditionerHistory(airConditionerId: string) {
         status: ac.status,
         location: formatUnitLocation(ac.room),
         installedAt: ac.installedAt ? ac.installedAt.toISOString() : null,
+        photoUrl: ac.photoUrl,
       },
       history,
     };
