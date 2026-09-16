@@ -1,0 +1,34 @@
+import type { MaintenanceAction } from "@/generated/prisma/enums";
+
+// Thai wording shared by more than one screen. Kept in a module with no
+// server-side imports so a client component can pull a label without dragging
+// Prisma along, and so changing a word is one edit rather than a hunt for
+// every copy — the action labels below used to live separately in the sticker
+// page and the history modal, spelled identically, which is exactly the setup
+// that lets two pages drift apart the first time one of them is edited.
+
+/** What a maintenance log's `action` is called on screen. */
+export const MAINTENANCE_ACTION_LABEL: Record<MaintenanceAction, string> = {
+  cleaning: "ล้างแอร์",
+  repair: "ซ่อมแซม",
+  refill_refrigerant: "เติมน้ำยาแอร์",
+};
+
+/** What a user account's `status` is called on the team and approvals pages. */
+export const USER_STATUS_LABEL: Record<string, string> = {
+  active: "ใช้งานอยู่",
+  pending: "รออนุมัติ",
+  suspended: "ถูกระงับ",
+};
+
+/**
+ * A calendar date the way the admin tables show it, in the viewer's locale
+ * settings for Thai. Client-side only: the tables that call this render in
+ * the browser, where the local time zone is the right one. Server components
+ * go through `inAppTimeZone()` in @/lib/maintenance instead, because Vercel
+ * runs in UTC.
+ */
+export function formatThaiDate(value: string | Date | null | undefined, fallback = "-"): string {
+  if (!value) return fallback;
+  return new Date(value).toLocaleDateString("th-TH");
+}

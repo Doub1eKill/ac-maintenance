@@ -3,12 +3,7 @@
 import Image from "next/image";
 import { Building2, Wrench } from "lucide-react";
 import type { PendingUser } from "@/components/admin/types";
-
-const STATUS_LABELS: Record<string, string> = {
-  active: "ใช้งานอยู่",
-  pending: "รออนุมัติ",
-  suspended: "ถูกระงับ",
-};
+import { USER_STATUS_LABEL } from "@/lib/labels";
 
 function statusClasses(status: string) {
   if (status === "active") return "bg-success/20 text-success-foreground border-success/30";
@@ -101,7 +96,7 @@ export function UserCard({ user, onOpen, meta, actions }: UserCardProps) {
             {user.role === "technician" ? "ช่างเทคนิค" : "ผู้ดูแลระบบ"}
           </span>
           <span className={`rounded-md border px-2 py-0.5 ${statusClasses(user.status)}`}>
-            {STATUS_LABELS[user.status] ?? user.status}
+            {USER_STATUS_LABEL[user.status] ?? user.status}
           </span>
         </div>
 

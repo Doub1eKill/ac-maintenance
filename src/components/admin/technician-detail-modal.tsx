@@ -32,6 +32,7 @@ import { useEscapeToClose } from "@/hooks/use-escape-to-close";
 import { adminResetUserPasswordAction, getTechnicianDetail } from "@/app/admin/actions";
 import type { TechnicianLogRow } from "@/lib/admin/users";
 import type { PendingUser } from "@/components/admin/types";
+import { USER_STATUS_LABEL } from "@/lib/labels";
 
 interface TechnicianDetail {
   id: string;
@@ -56,12 +57,6 @@ const ACTION_LABELS: Record<string, { label: string; icon: typeof Wrench }> = {
   cleaning: { label: "ล้างแอร์", icon: Sparkles },
   repair: { label: "ซ่อมแอร์", icon: Wrench },
   refill_refrigerant: { label: "เติมน้ำยาแอร์", icon: Droplets },
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  active: "ใช้งานอยู่",
-  pending: "รออนุมัติ",
-  suspended: "ถูกระงับ",
 };
 
 /**
@@ -249,7 +244,7 @@ export function TechnicianDetailModal({
                 {user.role === "technician" ? "ช่างเทคนิค" : "ผู้ดูแลระบบ"}
               </span>
               <span className="rounded-md border border-border bg-muted px-2 py-0.5 text-foreground">
-                {STATUS_LABELS[user.status] ?? user.status}
+                {USER_STATUS_LABEL[user.status] ?? user.status}
               </span>
             </div>
 

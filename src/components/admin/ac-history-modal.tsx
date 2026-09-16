@@ -7,6 +7,8 @@ import { getAirConditionerHistory, updateMaintenanceLogAction } from "@/app/admi
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
 import { useEscapeToClose } from "@/hooks/use-escape-to-close";
+import { MAINTENANCE_ACTION_LABEL, formatThaiDate } from "@/lib/labels";
+import type { MaintenanceAction } from "@/generated/prisma/enums";
 
 interface AcHistoryModalProps {
   airConditionerId: string;
@@ -35,7 +37,7 @@ interface HistoryUnit {
 
 interface HistoryEntry {
   id: string;
-  action: "cleaning" | "repair" | "refill_refrigerant";
+  action: MaintenanceAction;
   performedAt: string;
   technicianId: string;
   technicianName: string;
@@ -44,12 +46,6 @@ interface HistoryEntry {
   beforePhotoUrl: string | null;
   afterPhotoUrl: string | null;
 }
-
-const ACTION_LABEL: Record<HistoryEntry["action"], string> = {
-  cleaning: "ล้างแอร์",
-  repair: "ซ่อมแซม",
-  refill_refrigerant: "เติมน้ำยาแอร์",
-};
 
 export function AcHistoryModal({ airConditionerId, onClose, currentUserId, isAdmin = false }: AcHistoryModalProps) {
   const [unit, setUnit] = useState<HistoryUnit | null>(null);
@@ -167,7 +163,7 @@ export function AcHistoryModal({ airConditionerId, onClose, currentUserId, isAdm
             </div>
             {unit.installedAt && (
               <div className="text-muted-foreground">
-                ติดตั้งเมื่อ {new Date(unit.installedAt).toLocaleDateString("th-TH")}
+                ติดตั้งเมื่อ {formatThaiDate(unit.installedAt)}
               </div>
             )}
           </div>
@@ -244,7 +240,7 @@ export function AcHistoryModal({ airConditionerId, onClose, currentUserId, isAdm
                       <div className="flex items-start justify-between gap-2 mb-1">
                         <div className="text-xs font-bold text-foreground flex items-center gap-1.5">
                           <Wrench className="h-3.5 w-3.5 text-muted-foreground" />
-                          {ACTION_LABEL[log.action]}
+                          {MAINTENANCE_ACTION_LABEL[log.action]}
                         </div>
                         {(isAdmin || log.technicianId === currentUserId) && (
                           <button

@@ -14,6 +14,7 @@ import {
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
 import { useCreateWorkOrder } from "@/components/admin/create-work-order-provider";
 import type { WorkOrderItem, WorkOrderPageInfo } from "@/components/admin/types";
+import { formatThaiDate } from "@/lib/labels";
 
 interface WorkOrderBoardProps {
   workOrders: WorkOrderItem[];
@@ -258,7 +259,7 @@ export function WorkOrderBoard({
                               )}
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
-                              {wo.createdAt ? new Date(wo.createdAt).toLocaleDateString("th-TH") : "-"}
+                              {formatThaiDate(wo.createdAt)}
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap">
                               {wo.claimedByName ? (

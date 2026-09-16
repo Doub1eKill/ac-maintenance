@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ArrowUpDown, CalendarRange, ChevronDown, Copy, UserPlus, Wrench, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatThaiDate } from "@/lib/labels";
 import {
   BuildingGroupList,
   FloorGroupList,
@@ -244,7 +245,7 @@ export const columns: ColumnDef<MaintenanceRow>[] = [
     cell: ({ row }) => {
       const item = row.original;
       if (item.kind === "urgent") {
-        const label = item.reportedAt ? new Date(item.reportedAt).toLocaleDateString("th-TH") : "-";
+        const label = formatThaiDate(item.reportedAt);
         return (
           <div className="text-right text-xs space-y-0.5">
             <div>
@@ -253,7 +254,7 @@ export const columns: ColumnDef<MaintenanceRow>[] = [
             </div>
             {item.nextDueDate && (
               <div className="text-[10px] text-muted-foreground">
-                กำหนดล้าง: {new Date(item.nextDueDate).toLocaleDateString("th-TH")}
+                กำหนดล้าง: {formatThaiDate(item.nextDueDate)}
               </div>
             )}
           </div>
@@ -263,7 +264,7 @@ export const columns: ColumnDef<MaintenanceRow>[] = [
       const isOverdue = date.getTime() < new Date().getTime();
       return (
         <div className={`text-right text-xs font-medium ${isOverdue ? "text-red-500" : "text-foreground"}`}>
-          {date.toLocaleDateString("th-TH")}
+          {formatThaiDate(date)}
         </div>
       );
     },

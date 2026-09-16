@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { getMaintenanceHistory, inAppTimeZone } from "@/lib/maintenance";
-import type { MaintenanceAction } from "@/generated/prisma/enums";
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
 import { ArrowLeft, Clock, CalendarClock, Settings2, ShieldCheck, ClipboardPen, LogIn, Wind, Wrench, Image as ImageIcon } from "lucide-react";
@@ -10,16 +9,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { catalogueFlags } from "@/lib/catalogue-status";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
-
-// Thai wording for the log's action, kept here with the rest of this page's
-// copy rather than beside the query — same split as JOB_TYPE_LABEL in the
-// maintenance calendar, so changing the wording never means editing a
-// server module.
-const MAINTENANCE_ACTION_LABEL: Record<MaintenanceAction, string> = {
-  cleaning: "ล้างแอร์",
-  repair: "ซ่อมแซม",
-  refill_refrigerant: "เติมน้ำยาแอร์",
-};
+import { MAINTENANCE_ACTION_LABEL } from "@/lib/labels";
 
 /**
  * Reached by scanning the QR sticker on a unit, so it is deliberately
