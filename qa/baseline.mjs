@@ -23,11 +23,11 @@
 // snapshot lives outside the repo (next to the run output), because a file
 // written inside it makes Next dev reload every open page.
 //
-// Connection: follows the engine the app itself is on. If the repo's .env has
-// a postgres:// DATABASE_URL, statements go through psql to that database
-// (QA_PSQL for the binary); otherwise through the same mysql client and flags
-// the HANDOFF uses (QA_MYSQL="path/to/mysql -h ... -u ... db" to override).
-// The URL is passed to psql as an argument and never printed.
+// Connection: statements go through psql (QA_PSQL for the binary) to the
+// postgres:// DATABASE_URL in the repo's .env — since 17 September that is the
+// Aiven database production runs on, so a sweep writes into the same rows the
+// owner is testing against; snapshot before, restore after, and do not run two
+// sweeps at once. The URL is passed to psql as an argument and never printed.
 
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -67,11 +67,10 @@ async function listBlobs() {
   return names;
 }
 
-const MYSQL = (process.env.QA_MYSQL ?? "C:\\xampp\\mysql\\bin\\mysql.exe -h 127.0.0.1 -P 3306 -u root ac_maintenance").split(" ");
 const PSQL = process.env.QA_PSQL ?? "C:\\Program Files\\PostgreSQL\\16\\bin\\psql.exe";
 
-// The postgres:// DATABASE_URL from the repo's .env, or null when the app is
-// on MariaDB. Read once; kept in a closure, never logged.
+// The postgres:// DATABASE_URL from the repo's .env. Read once; kept in a
+// closure, never logged.
 const POSTGRES_URL = (() => {
   try {
     return fs.readFileSync(path.join(repo, ".env"), "utf8").match(/^DATABASE_URL="?(postgres(?:ql)?:\/\/[^"\r\n]+)"?/m)?.[1] ?? null;
@@ -79,22 +78,20 @@ const POSTGRES_URL = (() => {
     return null;
   }
 })();
-const ENGINE = POSTGRES_URL ? "postgres" : "mysql";
+if (!POSTGRES_URL) throw new Error("no postgres:// DATABASE_URL in .env — the harness only knows PostgreSQL now");
 
 function sql(query) {
   // Fed on stdin rather than -e: a restore is a few hundred UPDATEs, well past
-  // what a Windows command line can carry. Both clients are asked for the
-  // same shape back: no headers, one row per line, tab-separated, NULL spelt
-  // out (psql prints it as an empty string unless told otherwise).
-  const r = POSTGRES_URL
-    ? spawnSync(PSQL, ["-X", "-q", "-At", "-F", "\t", "-P", "null=NULL", "-v", "ON_ERROR_STOP=1", "-d", POSTGRES_URL], {
-        input: query,
-        encoding: "utf8",
-        env: { ...process.env, PGCLIENTENCODING: "UTF8" },
-      })
-    : spawnSync(MYSQL[0], [...MYSQL.slice(1), "--default-character-set=utf8mb4", "-N", "-B"], { input: query, encoding: "utf8" });
+  // what a Windows command line can carry. No headers, one row per line,
+  // tab-separated, NULL spelt out (psql prints it as an empty string unless
+  // told otherwise).
+  const r = spawnSync(PSQL, ["-X", "-q", "-At", "-F", "\t", "-P", "null=NULL", "-v", "ON_ERROR_STOP=1", "-d", POSTGRES_URL], {
+    input: query,
+    encoding: "utf8",
+    env: { ...process.env, PGCLIENTENCODING: "UTF8" },
+  });
   if (r.error) throw r.error;
-  if (r.status !== 0) throw new Error(`${ENGINE} client exited ${r.status}: ${r.stderr || r.stdout}`);
+  if (r.status !== 0) throw new Error(`psql exited ${r.status}: ${r.stderr || r.stdout}`);
   return r.stdout
     .split(/\r?\n/)
     .filter((l) => l.length)
@@ -171,11 +168,9 @@ async function snapshot() {
 
 function quote(v) {
   if (v === null) return "NULL";
-  // MariaDB reads backslash escapes inside a string literal; PostgreSQL (with
-  // standard_conforming_strings, the default) takes a backslash literally and
-  // only doubles the quote.
-  if (ENGINE === "postgres") return `'${String(v).replace(/'/g, "''")}'`;
-  return `'${String(v).replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
+  // PostgreSQL (standard_conforming_strings, the default) takes a backslash
+  // literally and only doubles the quote.
+  return `'${String(v).replace(/'/g, "''")}'`;
 }
 
 async function restore() {
@@ -187,10 +182,8 @@ async function restore() {
   // order claimed by a QA technician, a unit moved onto a QA brand), and the
   // foreign keys on those columns are RESTRICT. Restoring first takes the
   // reference away, so the delete never meets it. PostgreSQL has no session
-  // switch for foreign keys and Prisma's constraints are not deferrable;
-  // MariaDB keeps its switch below only as a belt for the same braces.
+  // switch for foreign keys and Prisma's constraints are not deferrable.
   const statements = [];
-  if (ENGINE === "mysql") statements.push("SET FOREIGN_KEY_CHECKS=0");
 
   // 1. Rows the run changed. One UPDATE per row; the tables are small.
   for (const [table, cols] of Object.entries(MUTABLE)) {
@@ -212,14 +205,11 @@ async function restore() {
       const names = ["id", ...cols].join(", ");
       const vals = [id, ...values.map(quote)].join(", ");
       statements.push(
-        ENGINE === "postgres"
-          ? `insert into ${table} (${names}) select ${vals} where not exists (select 1 from ${table} where id = ${id})`
-          : `insert ignore into ${table} (${names}) values (${vals})`
+        `insert into ${table} (${names}) select ${vals} where not exists (select 1 from ${table} where id = ${id})`
       );
     }
   }
 
-  if (ENGINE === "mysql") statements.push("SET FOREIGN_KEY_CHECKS=1");
   sql(statements.join(";\n") + ";");
 
   // 4. Files the run added.

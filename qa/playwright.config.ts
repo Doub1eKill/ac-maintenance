@@ -4,8 +4,7 @@ import path from "node:path";
 // See qa/lib.ts: anything written inside the repo makes Next dev reload the page.
 const OUT = process.env.QA_OUT ?? path.resolve(__dirname, "..", "..", "ac-maintenance-qa");
 // Where the app under test is. Defaults to the dev server's own port; set it
-// (with QA_OUT) to sweep a second checkout — the PostgreSQL worktree on :3001
-// — while the MariaDB one keeps :3000.
+// (with QA_OUT) to sweep a server running somewhere else.
 const BASE_URL = process.env.QA_BASE_URL ?? "http://localhost:3000";
 
 export default defineConfig({

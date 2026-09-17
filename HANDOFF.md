@@ -1,5 +1,28 @@
 # Project Handoff & Technical Summary
 
+# 🐘 ฐานข้อมูลเดียว — master = PostgreSQL บน Aiven, เลิก MariaDB บนเครื่อง (17 ก.ย. 2026, DoubleKill)
+
+เจ้าของสั่ง: "ลบตัวบนเครื่องได้เลย ให้เหลือแค่ตัว Production จะได้ใช้ทดสอบจริงไปเลย ค่อยมาลบข้อมูลทิ้งทีหลังตอนจะไปใช้จริง" — คือ backlog E ที่เคยรอ · เจ้าของเริ่มใช้ production จริงแล้ว (Aiven มี user 7, 8 = Akarin Noochoo / นายปุกปิก จับไข่ สมัครวันนี้, WO 130-131, log 621-622 วันนี้) — **ข้อมูลใน Aiven ไม่ได้แตะ** ยังเป็น seed เดิม + ที่เจ้าของทดสอบ ค่อยล้างตอนเริ่มใช้จริง
+
+## ทำอะไร
+1. **`git merge --ff-only feat/postgres` เข้า master** — master = `a8e7b06` + commit นี้ · 8 commit ฝั่ง Postgres (schema PG, adapter-pg, partial unique index, CA cert, migration PG 3 โฟลเดอร์) อยู่ใน master แล้ว · `prisma/migrations` เหลือชุด PostgreSQL ชุดเดียว (`20260907120918_init`, `20260915090000_one_open_work_order_per_unit_type`, `20260916090000_add_unit_photo`) — **กติกา "migration 2 ชุด" ยกเลิก**
+2. **harness เหลือ Postgres อย่างเดียว** — `qa/baseline.mjs` + `qa/lib.ts` ตัด branch mysql/ENGINE ออก (ถ้า .env ไม่มี postgres:// จะ throw) · ลบ `qa/copy-mariadb-to-postgres.mjs` · `DB_ENGINE` export ออก (ไม่มีใครใช้) · comment ใน playwright.config
+3. **`.env` ของ repo หลักชี้ Aiven** (คัดลอกจาก worktree: `DATABASE_URL`, `DATABASE_POOL_MAX`, `DATABASE_CA_CERT`, `AUTH_SECRET`) + `aiven-ca.pem` (gitignored) · `.env.local` มี Blob token อยู่แล้ว · `npm install` → `@prisma/adapter-mariadb` หายจาก node_modules, `pg` เข้ามา · `prisma migrate status` บน Aiven = up to date
+4. **MariaDB บนเครื่อง:** dump สุดท้าย → `C:\Project\ac-maintenance-qa\mariadb-final\ac_maintenance-2026-09-17.sql` (105 KB, 13 INSERT block) + `baseline-last-mariadb.json` · `DROP DATABASE ac_maintenance` · `mysqladmin shutdown` · XAMPP ยังติดตั้งอยู่ (เจ้าของถอนเองได้ ไม่มีอะไรใช้แล้ว) · `.env` เดิมของ MariaDB เก็บไว้ใน scratchpad ของ session นี้เท่านั้น
+5. worktree `C:\Project\ac-maintenance-pg` — **ยังอยู่** (คำสั่ง `git worktree remove` โดน auto-mode ปฏิเสธ) ไม่ได้ใช้แล้ว เจ้าของลบได้ด้วย `git worktree remove C:\Project\ac-maintenance-pg` จาก repo หลัก
+
+## ทดสอบ
+- tsc + eslint --max-warnings=0 ผ่าน · dev server :3000 บน Aiven: `/qr/…` guest, login demo-role admin, `/admin/team` เห็น 7 คนรวม Akarin/ปุกปิก, `/admin/work-orders` — ไม่มี error · ไม่รัน Playwright เพราะ setup จะสมัคร QA_TEST_USER_* ลง production (ดูกติกาใหม่)
+- production ก่อน merge = `a8e7b06` เดียวกัน (ไม่มี code เปลี่ยนนอกจาก harness) · push master + ff `feat/postgres` = master
+
+## กติกาใหม่ (แทนของเดิม)
+- **DB เดียว = Aiven** ทั้ง dev บนเครื่องและ production → ทุกอย่างที่กดบน localhost:3000 เขียนลง production จริง
+- **Playwright harness:** รันได้แต่เขียน QA_TEST_* ลง Aiven · ต้อง `baseline.mjs snapshot` ก่อน + `restore` หลัง **ทุกครั้ง** และ**ห้ามรันขณะเจ้าของกำลังทดสอบ** (restore ลบทุก row ที่ id > snapshot รวมของที่เจ้าของเพิ่งเพิ่ม) · ตัวเลข baseline เดิม (users 5 · acs 73 · logs 230 · WO 62) **ไม่ใช้แล้ว** — snapshot ใหม่ทุกรอบ · latency Aiven ทำให้ sweep ช้ากว่าเดิม
+- **Vercel Production Branch ยังเป็น `feat/postgres`** → หลังงานทุกครั้ง push master แล้ว `git push origin master:feat/postgres` ด้วย (ff) จนกว่าเจ้าของเปลี่ยน setting เป็น master → ตอนนั้นลบ branch feat/postgres ได้
+- migration ชุดเดียว (PostgreSQL) · `npx prisma migrate deploy` บน Aiven ก่อน push (ไม่มี DB อื่นแล้ว) · ห้าม prisma seed (ยิ่งกว่าเดิม — จะล้าง production)
+- Aiven Free ดับเองเมื่อไม่ใช้ → request แรกช้า/ล้ม P1001 ทั้ง dev และ prod · Mandatory update 13 ต.ค. 09:16 UTC (postgis security fix) DB ดับสั้นๆ
+
+
 # 🗑️ ลบเศษไฟล์ 3 กลุ่มที่ไม่มีใครอ้างถึง (17 ก.ย. 2026, DoubleKill)
 
 เจ้าของขอแผนที่ไฟล์ทั้ง repo แล้วสั่ง "เช็คให้ชัวร์ว่าไม่ใช้แล้ว แล้วลบได้เลย" · commit `0147c32` บน `chore/leftover-files` ff-merge master

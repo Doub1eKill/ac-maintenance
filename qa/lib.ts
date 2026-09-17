@@ -166,9 +166,9 @@ export async function loginViaForm(page: Page, email: string, password: string) 
 }
 
 /**
- * The postgres:// DATABASE_URL from the repo's .env, or null when the app is
- * on MariaDB. Decides which client db() talks to, the same way
- * qa/baseline.mjs decides. Never logged.
+ * The postgres:// DATABASE_URL from the repo's .env — the Aiven database
+ * production runs on, since 17 September. Same source qa/baseline.mjs reads.
+ * Never logged.
  */
 const POSTGRES_URL: string | null = (() => {
   try {
@@ -178,34 +178,24 @@ const POSTGRES_URL: string | null = (() => {
   }
 })();
 
-/** Which engine the sweep is running against — for the ledger's benefit. */
-export const DB_ENGINE = POSTGRES_URL ? "postgres" : "mysql";
-
 /**
  * Read (or, sparingly, write) the database directly — the "DB" method in the
- * ledger. Same clients and flags as qa/baseline.mjs: psql when the app is on
- * PostgreSQL (QA_PSQL for the binary), mysql otherwise (QA_MYSQL). Rows come
- * back as arrays of strings, NULL as null, on both. Never logs the query.
+ * ledger. Same client and flags as qa/baseline.mjs: psql (QA_PSQL for the
+ * binary). Rows come back as arrays of strings, NULL as null. Never logs the
+ * query.
  *
- * Specs write SQL that both engines read the same way: no MySQL-only
- * shorthand such as sum(boolean) — spell it as sum(case when … then 1 else 0
- * end) — and no backslash escapes in string literals.
+ * Specs keep to plain SQL: spell sum(boolean) as sum(case when … then 1 else 0
+ * end), and no backslash escapes in string literals.
  */
 export function db(query: string): (string | null)[][] {
-  const r = POSTGRES_URL
-    ? spawnSync(process.env.QA_PSQL ?? "C:\\Program Files\\PostgreSQL\\16\\bin\\psql.exe", ["-X", "-q", "-At", "-F", "\t", "-P", "null=NULL", "-v", "ON_ERROR_STOP=1", "-d", POSTGRES_URL], {
-        input: query,
-        encoding: "utf8",
-        env: { ...process.env, PGCLIENTENCODING: "UTF8" },
-      })
-    : (() => {
-        const argv = (process.env.QA_MYSQL ?? "C:\\xampp\\mysql\\bin\\mysql.exe -h 127.0.0.1 -P 3306 -u root ac_maintenance").split(" ");
-        // utf8mb4 spelt out: the client's default charset on Windows garbles Thai
-        // text on the way out, and the specs compare it against the page.
-        return spawnSync(argv[0], [...argv.slice(1), "--default-character-set=utf8mb4", "-N", "-B"], { input: query, encoding: "utf8" });
-      })();
+  if (!POSTGRES_URL) throw new Error("no postgres:// DATABASE_URL in .env");
+  const r = spawnSync(process.env.QA_PSQL ?? "C:\\Program Files\\PostgreSQL\\16\\bin\\psql.exe", ["-X", "-q", "-At", "-F", "\t", "-P", "null=NULL", "-v", "ON_ERROR_STOP=1", "-d", POSTGRES_URL], {
+    input: query,
+    encoding: "utf8",
+    env: { ...process.env, PGCLIENTENCODING: "UTF8" },
+  });
   if (r.error) throw r.error;
-  if (r.status !== 0) throw new Error(`${DB_ENGINE} client exited ${r.status}: ${r.stderr}`);
+  if (r.status !== 0) throw new Error(`psql exited ${r.status}: ${r.stderr}`);
   return r.stdout
     .split(/\r?\n/)
     .filter((l) => l.length)
