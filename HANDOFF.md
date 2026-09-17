@@ -1,5 +1,25 @@
 # Project Handoff & Technical Summary
 
+# 🔁 Retry ตอน DB ยังไม่ตื่น — ทุก query ลองใหม่เองเมื่อต่อ Aiven ไม่ได้ (17 ก.ย. 2026, DoubleKill)
+
+เจ้าของถาม "จะไม่มีปัญหาเรื่อง DB ปิดเองแล้วใช่มั้ย" → อธิบายว่า MariaDB ดับหลังรีบูตหมดไปแล้ว แต่ Aiven Free พักตัวเองเมื่อไม่มี traffic แล้ว request แรกล้ม (P1001/pool timeout) → เสนอ 2 ทาง (อัปเกรด Aiven / retry ในโค้ด) เจ้าของเลือก **retry ในโค้ด** · branch `fix/db-connect-retry` commit `5adeb91` ff-merge master
+
+## ทำอะไร
+- **`src/lib/db-retry.ts`** เพิ่ม `isConnectionRefusal(error)` — จับเฉพาะ error ที่เกิด**ก่อน** statement ถึง server: Prisma `P1001` (reach ไม่ได้) / `P1002` (timeout) / `P2024` (pool ว่างไม่ทัน), pg `57P03` ("database system is starting up"), socket `ECONNREFUSED`/`ETIMEDOUT`/`ENOTFOUND`, และ `meta.driverAdapterError` / ข้อความ "pool timeout" ที่ adapter ห่อมาเป็น P2039 · **ไม่จับ** ECONNRESET / 57P01 / connection closed เพราะอาจเกิดหลังส่ง statement แล้ว → retry write ซ้ำไม่ได้ · `CONNECT_RETRY_DELAYS_MS = [2000, 4000, 8000]`
+- **`src/lib/prisma.ts`** `new PrismaClient({ adapter }).$extends({ query: { $allOperations } })` — ทุก query ของทุกหน้า/action/route ผ่านจุดเดียว ลองใหม่สูงสุด 4 ครั้ง (รอรวม 14 วิ + เวลา timeout ต่อครั้ง ~10 วิ) แล้ว throw error เดิม · log `[db-retry] Model.op: database not reachable on attempt n/4, retrying in X ms` · query ใน interactive transaction ที่ล้มแบบนี้จะ throw error ของ transaction เอง (ถูกต้อง ไม่ retry ครึ่งๆ)
+- **`src/app/admin/error.tsx`** ข้อความเปลี่ยนจาก "ตรวจสอบว่าเซิร์ฟเวอร์ PostgreSQL เปิดใช้งานอยู่" เป็น "ฐานข้อมูลอาจกำลังเปิดตัวเองอยู่ รอประมาณหนึ่งนาทีแล้วกดลองใหม่"
+- type ของ `prisma` เป็น extended client — tsc ผ่านทั้ง repo โดยไม่ต้องแก้ call site ใดๆ
+
+## พิสูจน์ (script ใน scratchpad, ใช้ pg driver จริง + Postgres 16 local ผ่าน TCP proxy)
+1. ชี้ client ไป 127.0.0.1:5999 ที่ปิดอยู่ → เปิด proxy → 5432 ตอน t+5s: attempt 1 refused t+0.5s → รอ 2s → attempt 2 refused t+2.5s → รอ 4s → **attempt 3 สำเร็จ t+6.6s ได้ users = 5** ✓
+2. port ที่ไม่มีใครฟังเลย: attempt 1-4 ที่ t+0.3/2.3/6.3/14.3s แล้ว **throw P1001 เดิม** ✓
+3. dev server บน Aiven หลัง HMR: `/admin` KPI 73, `/qr/…` 200, ไม่มี retry log (Aiven ตื่นอยู่) · tsc + eslint 0/0
+
+## ข้อจำกัดที่ต้องรู้
+- ช่วยเฉพาะกรณี DB กลับมาภายใน ~25 วิ (14 วิ delay + timeout ต่อครั้ง) — Aiven ตื่นใช้เวลาราวหนึ่งนาที บางครั้ง request แรกยังล้มแต่ครั้งที่สอง (กด "ลองใหม่") จะติดแล้ว · ทางแก้ขาด = อัปเกรด Aiven ออกจาก Free
+- Vercel Fluid Compute default max duration 300 s บน Hobby → retry 25 วิ ไม่ชน timeout · ถ้าวันหนึ่งปิด Fluid Compute (default 10 s) ต้องลด delay หรือตั้ง `maxDuration`
+
+
 # 🐘 ฐานข้อมูลเดียว — master = PostgreSQL บน Aiven, เลิก MariaDB บนเครื่อง (17 ก.ย. 2026, DoubleKill)
 
 เจ้าของสั่ง: "ลบตัวบนเครื่องได้เลย ให้เหลือแค่ตัว Production จะได้ใช้ทดสอบจริงไปเลย ค่อยมาลบข้อมูลทิ้งทีหลังตอนจะไปใช้จริง" — คือ backlog E ที่เคยรอ · เจ้าของเริ่มใช้ production จริงแล้ว (Aiven มี user 7, 8 = Akarin Noochoo / นายปุกปิก จับไข่ สมัครวันนี้, WO 130-131, log 621-622 วันนี้) — **ข้อมูลใน Aiven ไม่ได้แตะ** ยังเป็น seed เดิม + ที่เจ้าของทดสอบ ค่อยล้างตอนเริ่มใช้จริง
