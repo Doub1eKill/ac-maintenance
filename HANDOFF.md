@@ -1,5 +1,31 @@
 # Project Handoff & Technical Summary
 
+# ✉️ ตรวจอีเมลตอนพิมพ์ในฟอร์มสมัคร (ส่วนที่ 1) + SMTP ใช้ได้ทั้ง local/production (17 ก.ย. 2026, DoubleKill)
+
+เจ้าของขอ "ระบบตรวจสอบ Email ที่สมัครเข้ามาว่ามีอยู่จริง แจ้งเตือนตั้งแต่ตอนกรอก" → วางแผน 3 ระดับ (รูปแบบ+สะกดโดเมน / DNS MX / OTP ทางอีเมล) อธิบายว่าระดับ 1-2 ทำตอนพิมพ์ได้ ระดับ 3 คือหลักฐานเดียวที่แท้จริง ต้องทำตอน submit · รอบนี้ทำ**ระดับ 1-2** · branch `feat/email-check-on-type` 2 commit ff-merge master
+
+## SMTP (ทำก่อนเพราะ OTP ต้องใช้)
+- `s6710886118@pkru.ac.th` เป็น Google Workspace (MX = aspmx.l.google.com) → `smtp.gmail.com:587` + App Password (เจ้าของสร้างเอง หลังเปิด 2SV — หน้า App passwords ขึ้น "not available" จนกว่า 2SV จะเปิด)
+- `.env.local` (gitignored) มี `SMTP_HOST/PORT/USER/PASSWORD/FROM` แล้ว · Vercel env 5 ตัวเดียวกัน (PASSWORD = Secret) + Redeploy แล้ว
+- พิสูจน์: local `sendMail()` → `{"status":"sent"}` 3.4 วิ · production `/request-password-reset` ตอบข้อความแบบ "ส่งลิงก์แล้ว" (ขึ้นเฉพาะ `isMailConfigured()` จริง) — เจ้าของยังไม่ได้ยืนยันว่าเมลถึงกล่อง `akarlnnochoo@gmail.com` (ถามค้างไว้)
+
+## `f7e0270` feat(register): ตรวจอีเมลตอนพิมพ์
+- **`src/lib/email-check.ts`** (pure, client-safe): `EmailCheck` union (invalid / suggestion / no-mx{blocking} / taken / ok{institutional,verified}), `normaliseEmail`, `isWellFormed`, `isInstitutionalDomain` + `PUBLIC_EMAIL_DOMAINS` (ย้ายมาจาก register/actions), `suggestDomain` (Levenshtein ≤2 เทียบ gmail/hotmail/outlook/yahoo/icloud/live/aol/**pkru.ac.th**) — **ห้าม import node:dns ในไฟล์นี้** เคยทำแล้ว webpack ล้ม "Reading from node:dns is not handled" เพราะ form import มัน
+- **`src/lib/email-mx.ts`** (server): `domainAcceptsMail` = `dns.resolveMx` → fallback `resolve4`, timeout 3 วิ, ENOTFOUND/ENODATA = ไม่รับ, error อื่น = **unknown → ปล่อยผ่าน** (DNS ล้มไม่ควรกันคนจริง), cache 10 นาที/โดเมน · `checkEmailShape()` · `enforceMxOnRegister()` = production หรือ `EMAIL_MX_CHECK=on`
+- **`register/actions.ts`**: `checkEmailAction(raw)` — rate limit 20/นาที/IP (in-memory), shape → **DB taken ก่อน** → คืน suggestion/no-mx/ok ("taken" ชนะเพราะเป็นคำตอบของ DB เราเอง) · `registerUser` เรียก `checkEmailShape` ซ้ำ ปฏิเสธ no-mx **เฉพาะเมื่อ enforce** (production) — dev ปล่อยเพราะ QA account อยู่บน `qa-run.ac.th`/`example.invalid` ที่ไม่มี MX
+- **`register-form.tsx`**: `onChange` debounce 500ms + `onBlur` ทันที → บรรทัดสถานะใต้ช่อง (`#email-check`, aria-live) ไอคอน lucide Loader2/AlertCircle/Lightbulb/CheckCircle2 · ปุ่ม "ใช้ somchai@gmail.com" ใส่ค่าให้แล้วตรวจซ้ำ · ok บอกต่อท้ายว่า "เปิดใช้งานทันที" (สถาบัน+technician) หรือ "รอผู้ดูแลระบบอนุมัติ" ตาม role ที่เลือก · submit disabled เมื่อ invalid/taken/(no-mx && blocking) · `checkedFor` ref กันคำตอบเก่าทับใหม่ · **บั๊กที่เจอ:** คลิกปุ่ม suggestion ทำให้ช่อง blur → blur schedule ตรวจค่าเก่า 0ms → ทับผล suggestion → `runEmailCheck` ต้อง clear timer ก่อนเสมอ
+
+## `4bb3985` qa
+- `registerViaForm` เคยรอ `text=/…|กรุณา/` = ข้อความ no-mx ใหม่ match ก่อน submit → setup ล้มทั้งชุด · ตอนนี้: fill email → รอ 700ms + รอ "กำลังตรวจสอบ" หาย → ถ้า taken คืน body เลย (ปุ่มถูก hold) → ไม่งั้น submit แล้วรอ `h3 ลงทะเบียนสำเร็จ` หรือ `form > [role=alert]`
+- `auth.setup.ts` `waitForURL(/admin)` 60→120 วิ — ล้ม 2/4 รอบวันนี้ตอน dev server เย็น (`GET /admin` next.js 56 วิ) ไม่เกี่ยวกับฟีเจอร์
+- spec ใหม่ `public/regressions.spec.ts` "email check while typing" 5 check: typo→suggest, คลิก suggest→เติม+ตรวจซ้ำ, no-mx เตือน, taken (อ่านอีเมลจาก DB ไม่พึ่ง setup → รัน `--no-deps` ได้), สถาบัน→ปล่อยปุ่ม — **5/5 PASS** run `emailcheck-20260917-2339` (7 วิ) · Aiven snapshot/restore ทุกรอบ users กลับเป็น 7
+- ยังไม่ได้รัน full sweep (Aiven ช้า ~8 นาทีแค่ setup) — setup 5/5 ผ่านใน run 2257 หลังแก้ helper
+
+## ต่อไป (ส่วนที่ 2 — OTP) รอเจ้าของยืนยัน 3 ข้อ
+1. บล็อก login จนกว่าจะยืนยันอีเมล (แนะนำ) หรือแค่เตือน · 2. คง auto-approve technician @*.ac.th หลังยืนยัน · 3. อีเมลทดสอบถึง akarlnnochoo@gmail.com ไหม
+แผน: ตาราง `email_verification_codes` (user_id, code_hash, expires_at 15 นาที, attempts) migration PG 1 ชุด · `registerUser` สร้าง pending + `emailVerifiedAt=null` → ส่งรหัส 6 หลัก → หน้า OTP → ถูก = `emailVerifiedAt=now()` แล้วค่อยใช้กฎ active/pending · `auth.ts` ปฏิเสธ `emailVerifiedAt==null` · resend cooldown 60 วิ · สมัครซ้ำอีเมลที่ยังไม่ยืนยัน = ลบแถวเก่า · harness: dev ไม่มี SMTP → action คืนรหัสในผลลัพธ์ (pattern เดียวกับ reset link ใน dev) — แต่ตอนนี้ `.env.local` มี SMTP แล้ว ต้องมีทาง bypass อื่น เช่น `QA_EMAIL_CODE_ECHO=1` เฉพาะ non-production
+
+
 # 🔁 Retry ตอน DB ยังไม่ตื่น — ทุก query ลองใหม่เองเมื่อต่อ Aiven ไม่ได้ (17 ก.ย. 2026, DoubleKill)
 
 เจ้าของถาม "จะไม่มีปัญหาเรื่อง DB ปิดเองแล้วใช่มั้ย" → อธิบายว่า MariaDB ดับหลังรีบูตหมดไปแล้ว แต่ Aiven Free พักตัวเองเมื่อไม่มี traffic แล้ว request แรกล้ม (P1001/pool timeout) → เสนอ 2 ทาง (อัปเกรด Aiven / retry ในโค้ด) เจ้าของเลือก **retry ในโค้ด** · branch `fix/db-connect-retry` commit `5adeb91` ff-merge master
