@@ -32,8 +32,8 @@ export default function AdminError({
       <AlertTitle className="font-bold text-warning-foreground">ไม่สามารถโหลดข้อมูลหน้านี้ได้</AlertTitle>
       <AlertDescription className="text-warning-foreground/90 font-normal space-y-3">
         <p>
-          หน้านี้อ่านข้อมูลจากฐานข้อมูลไม่สำเร็จ กรุณาตรวจสอบว่าเซิร์ฟเวอร์ PostgreSQL
-          เปิดใช้งานอยู่ แล้วลองใหม่อีกครั้ง
+          หน้านี้อ่านข้อมูลจากฐานข้อมูลไม่สำเร็จ — ถ้าไม่มีใครใช้ระบบมาสักพัก
+          ฐานข้อมูลอาจกำลังเปิดตัวเองอยู่ รอประมาณหนึ่งนาทีแล้วกดลองใหม่
         </p>
         <button
           onClick={reset}

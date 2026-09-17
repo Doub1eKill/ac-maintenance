@@ -56,6 +56,52 @@ function isDeadlock(error: unknown): boolean {
   return e.message.includes("deadlock detected") || e.message.includes("Deadlock found");
 }
 
+/**
+ * Recognises a failure that happened before the statement reached the server,
+ * so running it again cannot apply anything twice.
+ *
+ * Aiven's free plan powers the service down after a stretch of no traffic and
+ * brings it back on the first connection, which takes on the order of a
+ * minute; every query in that window fails at connect time. The same shapes
+ * come from a pool that could not hand out a connection and from a server
+ * that is restarting (the scheduled maintenance windows). Anything that could
+ * have fired after the statement was sent — a reset mid-query, a closed
+ * connection — is deliberately not here: a write that may already have landed
+ * must not be repeated.
+ */
+export function isConnectionRefusal(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const e = error as { code?: unknown; message?: unknown; meta?: { driverAdapterError?: unknown } };
+
+  // Prisma: P1001 can't reach the server, P1002 the server did not answer in
+  // time, P2024 no connection free in the pool within the pool timeout.
+  if (e.code === "P1001" || e.code === "P1002" || e.code === "P2024") return true;
+
+  // pg driver: 57P03 is "the database system is starting up" — the process is
+  // there, the database is not yet. The socket-level codes are a connect that
+  // never opened.
+  if (e.code === "57P03" || e.code === "ECONNREFUSED" || e.code === "ETIMEDOUT" || e.code === "ENOTFOUND") return true;
+
+  // A driver adapter wraps the driver's error and keeps the text; Prisma files
+  // it under P2039 with the cause in meta. Check the cause first, then the text.
+  if (e.meta?.driverAdapterError && isConnectionRefusal(e.meta.driverAdapterError)) return true;
+  if (typeof e.message !== "string") return false;
+  return (
+    e.message.includes("pool timeout") ||
+    e.message.includes("Can't reach database server") ||
+    e.message.includes("the database system is starting up") ||
+    e.message.includes("ECONNREFUSED") ||
+    e.message.includes("ETIMEDOUT")
+  );
+}
+
+// The pauses between connection attempts. Long, unlike the deadlock backoff,
+// because what they wait for is a service coming up, not a lock letting go:
+// three retries span ~14 s of waiting on top of the ~10 s each attempt spends
+// timing out, which covers most of a wake-up without holding a request open
+// for minutes.
+export const CONNECT_RETRY_DELAYS_MS = [2_000, 4_000, 8_000];
+
 export async function withDeadlockRetry<T>(
   // Named so a retry that shows up in the logs says which transaction it was.
   label: string,

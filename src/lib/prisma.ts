@@ -1,5 +1,6 @@
 import { PrismaClient } from "@/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { CONNECT_RETRY_DELAYS_MS, isConnectionRefusal } from "@/lib/db-retry";
 
 function createPrismaClient() {
   const connectionString = process.env.DATABASE_URL;
@@ -32,7 +33,32 @@ function createPrismaClient() {
     max: Number(process.env.DATABASE_POOL_MAX ?? 5),
   });
 
-  return new PrismaClient({ adapter });
+  // Every query goes through this once, so a database that is waking up (or
+  // a pool that is momentarily full) is retried in one place rather than at
+  // each of the dozens of call sites. Only failures from before the statement
+  // was sent qualify — see isConnectionRefusal — which is what makes retrying
+  // a write here safe. A query inside an interactive transaction that fails
+  // this way fails the transaction with it; the retry then throws the
+  // transaction's own error, which is the right outcome.
+  return new PrismaClient({ adapter }).$extends({
+    name: "connect-retry",
+    query: {
+      async $allOperations({ model, operation, args, query }) {
+        for (let attempt = 0; ; attempt++) {
+          try {
+            return await query(args);
+          } catch (error) {
+            if (!isConnectionRefusal(error) || attempt >= CONNECT_RETRY_DELAYS_MS.length) throw error;
+            const wait = CONNECT_RETRY_DELAYS_MS[attempt];
+            console.warn(
+              `[db-retry] ${model ?? "raw"}.${operation}: database not reachable on attempt ${attempt + 1}/${CONNECT_RETRY_DELAYS_MS.length + 1}, retrying in ${wait} ms`
+            );
+            await new Promise((resolve) => setTimeout(resolve, wait));
+          }
+        }
+      },
+    },
+  });
 }
 
 const globalForPrisma = globalThis as unknown as {
