@@ -6,6 +6,9 @@ import { prisma } from "@/lib/prisma";
 import { UserRole } from "@/generated/prisma/client";
 import { saveUpload, deleteUpload } from "@/lib/upload";
 import { avatarRejectionReason } from "@/lib/avatar";
+import { headers } from "next/headers";
+import { isInstitutionalDomain, normaliseEmail, type EmailCheck } from "@/lib/email-check";
+import { checkEmailShape, enforceMxOnRegister } from "@/lib/email-mx";
 
 export type RegisterState = {
   success?: boolean;
@@ -42,26 +45,59 @@ const registerSchema = z.object({
     ),
 });
 
-const PUBLIC_EMAIL_DOMAINS = [
-  "gmail.com",
-  "hotmail.com",
-  "outlook.com",
-  "yahoo.com",
-  "icloud.com",
-  "live.com",
-  "aol.com",
-];
+// Inline checks from the form: a small allowance per address, because each
+// one may cost a DNS round trip and a database read, and a form does not need
+// more than a few per minute.
+const CHECK_LIMIT = 20;
+const CHECK_WINDOW_MS = 60_000;
+const checkHits = new Map<string, { count: number; resetAt: number }>();
 
-function isInstitutionalDomain(emailDomain: string): boolean {
-  const domain = emailDomain.toLowerCase();
-
-  // Public webmail domains require manual Org Admin verification
-  if (PUBLIC_EMAIL_DOMAINS.includes(domain)) {
+function overCheckLimit(key: string): boolean {
+  const now = Date.now();
+  const hit = checkHits.get(key);
+  if (!hit || hit.resetAt < now) {
+    checkHits.set(key, { count: 1, resetAt: now + CHECK_WINDOW_MS });
     return false;
   }
+  hit.count += 1;
+  return hit.count > CHECK_LIMIT;
+}
 
-  // Official educational domains (.ac.th, .edu, .edu.th)
-  return domain.endsWith(".ac.th") || domain.endsWith(".edu") || domain.endsWith(".edu.th");
+/**
+ * What the form shows under the email field as the address is typed.
+ *
+ * Everything the registration itself will say about the address, said
+ * early: the shape, a likely typo in the domain, a domain that takes no
+ * mail, and — the one answer that needs the database — whether it is
+ * already registered. That last one is told to anyone who asks, which is
+ * the same thing registerUser has always done on submit, so nothing new is
+ * revealed; it is just revealed sooner.
+ */
+export async function checkEmailAction(raw: unknown): Promise<EmailCheck> {
+  if (typeof raw !== "string" || raw.length > 254) {
+    return { status: "invalid", message: "รูปแบบอีเมลไม่ถูกต้อง" };
+  }
+  const ip = (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
+  if (overCheckLimit(ip)) {
+    // Neither a refusal nor a pass: the form treats an unknown as "nothing to
+    // say" and lets the submit decide.
+    return { status: "ok", institutional: false, verified: false, message: "" };
+  }
+
+  const shape = await checkEmailShape(raw);
+  if (shape.status === "invalid") return shape;
+
+  // Asked before the domain's verdict is returned: "already registered" is
+  // this database's own answer and settles the matter, whereas a typo
+  // suggestion or a missing MX record is only a doubt about the address.
+  const existing = await prisma.user.findUnique({
+    where: { email: normaliseEmail(raw) },
+    select: { id: true },
+  });
+  if (existing) {
+    return { status: "taken", message: "อีเมลนี้ถูกลงทะเบียนในระบบเรียบร้อยแล้ว" };
+  }
+  return shape;
 }
 
 export async function registerUser(
@@ -111,6 +147,16 @@ export async function registerUser(
 
     if (existingUser) {
       return { error: "อีเมลนี้ถูกลงทะเบียนในระบบเรียบร้อยแล้ว" };
+    }
+
+    // The same question the form asked while the address was typed, asked
+    // again here because the form can be bypassed. A domain that takes no
+    // mail is refused in production; in development it is let through so
+    // the QA harness can register its made-up accounts (see the note on
+    // enforceMxOnRegister).
+    const shape = await checkEmailShape(cleanEmail);
+    if (shape.status === "no-mx" && enforceMxOnRegister()) {
+      return { error: shape.message };
     }
 
     const emailDomain = cleanEmail.split("@")[1] || "";

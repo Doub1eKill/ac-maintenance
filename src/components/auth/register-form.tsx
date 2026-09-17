@@ -3,10 +3,12 @@
 import { useEffect, useRef, useState, useActionState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { registerUser, type RegisterState } from "@/app/register/actions";
+import { checkEmailAction, registerUser, type RegisterState } from "@/app/register/actions";
+import type { EmailCheck } from "@/lib/email-check";
+import { isWellFormed, normaliseEmail } from "@/lib/email-check";
 import { avatarRejectionReason } from "@/lib/avatar";
 import { shrinkImage } from "@/lib/client-image";
-import { Wrench, Building2, Eye, EyeOff, AlertTriangle, Clock, CheckCircle2, ArrowLeft, UserPlus, Camera, Phone, User } from "lucide-react";
+import { Wrench, Building2, Eye, EyeOff, AlertTriangle, Clock, CheckCircle2, ArrowLeft, UserPlus, Camera, Phone, User, Loader2, AlertCircle, Lightbulb } from "lucide-react";
 import {
   Alert,
   AlertTitle,
@@ -19,6 +21,62 @@ export function RegisterForm() {
   );
 
   const [showPassword, setShowPassword] = useState(false);
+
+  // What the server said about the address last typed, or that it is being
+  // asked. "idle" covers both an empty field and one whose contents are not
+  // yet an address — the browser's own validation speaks for those.
+  const emailInputRef = useRef<HTMLInputElement>(null);
+  const [emailCheck, setEmailCheck] = useState<{ status: "idle" } | { status: "checking" } | EmailCheck>({
+    status: "idle",
+  });
+  // The address the last answer was about, so an answer that arrives after
+  // the field has moved on is dropped rather than shown against new text.
+  const checkedFor = useRef<string>("");
+  const checkTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const runEmailCheck = (raw: string) => {
+    // Also cancels a check still waiting its turn: clicking the suggestion
+    // blurs the field, and the blur schedules a check of the value the field
+    // held before the click — which would land after this one and undo it.
+    if (checkTimer.current) clearTimeout(checkTimer.current);
+    const email = normaliseEmail(raw);
+    checkedFor.current = email;
+    if (!isWellFormed(email)) {
+      setEmailCheck({ status: "idle" });
+      return;
+    }
+    setEmailCheck({ status: "checking" });
+    checkEmailAction(email)
+      .then((result) => {
+        if (checkedFor.current === email) setEmailCheck(result);
+      })
+      .catch(() => {
+        // A failed round trip is not a verdict on the address.
+        if (checkedFor.current === email) setEmailCheck({ status: "idle" });
+      });
+  };
+
+  // Half a second after the last keystroke, and at once on leaving the field.
+  const scheduleEmailCheck = (raw: string, delayMs: number) => {
+    if (checkTimer.current) clearTimeout(checkTimer.current);
+    checkTimer.current = setTimeout(() => runEmailCheck(raw), delayMs);
+  };
+  useEffect(() => () => { if (checkTimer.current) clearTimeout(checkTimer.current); }, []);
+
+  const applySuggestion = (suggestion: string) => {
+    if (emailInputRef.current) emailInputRef.current.value = suggestion;
+    runEmailCheck(suggestion);
+  };
+
+  // The button is held exactly when the server would refuse: a malformed or
+  // already-registered address always, a domain that takes no mail only
+  // where registration enforces that (production). Elsewhere the warning
+  // shows and the submit is still allowed — the QA harness registers its
+  // accounts on domains that do not exist.
+  const emailBlocksSubmit =
+    emailCheck.status === "invalid" ||
+    emailCheck.status === "taken" ||
+    (emailCheck.status === "no-mx" && emailCheck.blocking);
   const [selectedRole, setSelectedRole] = useState<"technician" | "org_admin">("technician");
 
   // The picture rides along in the form's own FormData — the input keeps its
@@ -269,13 +327,57 @@ export function RegisterForm() {
           อีเมล (Email Address)
         </label>
         <input
+          ref={emailInputRef}
           id="email"
           name="email"
           type="email"
           required
           placeholder="somchai@pkru.ac.th"
+          onChange={(e) => scheduleEmailCheck(e.target.value, 500)}
+          onBlur={(e) => scheduleEmailCheck(e.target.value, 0)}
+          aria-describedby="email-check"
           className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:border-slate-950 focus:outline-none shadow-2xs"
         />
+        {/* One line under the field, in the voice of whichever answer came
+            back. Rendered even when empty so the field does not jump. */}
+        <div id="email-check" aria-live="polite" className="mt-1.5 min-h-[1rem] text-[11px] leading-4">
+          {emailCheck.status === "checking" && (
+            <span className="inline-flex items-center gap-1 text-slate-500">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              กำลังตรวจสอบอีเมล...
+            </span>
+          )}
+          {(emailCheck.status === "invalid" || emailCheck.status === "no-mx" || emailCheck.status === "taken") && (
+            <span className="inline-flex items-start gap-1 font-bold text-red-600">
+              <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
+              {emailCheck.message}
+            </span>
+          )}
+          {emailCheck.status === "suggestion" && (
+            <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-amber-700">
+              <Lightbulb className="h-3 w-3 shrink-0" />
+              {emailCheck.message}
+              <button
+                type="button"
+                onClick={() => applySuggestion(emailCheck.suggestion)}
+                className="font-bold underline underline-offset-2 hover:text-amber-900"
+              >
+                ใช้ {emailCheck.suggestion}
+              </button>
+            </span>
+          )}
+          {emailCheck.status === "ok" && emailCheck.message && (
+            <span className="inline-flex items-center gap-1 text-emerald-700">
+              <CheckCircle2 className="h-3 w-3 shrink-0" />
+              {emailCheck.message}
+              <span className="text-slate-500">
+                {emailCheck.institutional && selectedRole === "technician"
+                  ? "· เปิดใช้งานทันทีหลังลงทะเบียน"
+                  : "· รอผู้ดูแลระบบอนุมัติ"}
+              </span>
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Password Input */}
@@ -306,7 +408,7 @@ export function RegisterForm() {
       {/* Submit Button */}
       <button
         type="submit"
-        disabled={isPending}
+        disabled={isPending || emailBlocksSubmit}
         className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-950 py-3 font-bold text-xs text-white hover:bg-slate-800 disabled:opacity-50 transition-all shadow-md active:scale-[0.99] mt-2"
       >
         <UserPlus className="h-4 w-4" />
