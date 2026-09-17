@@ -1,4 +1,4 @@
-import { test, expect, ledger, shot, note, loginViaForm, db, QA } from "../../lib";
+import { test, expect, ledger, shot, note, loginViaForm, hydrated, db, QA } from "../../lib";
 
 // Regressions for the sign-in findings of run 20260913-1742. Each check names
 // the bug it guards; the fix commits are in HANDOFF.md.
@@ -87,4 +87,42 @@ test("guest view: a scanned sticker shows the unit's picture and record, nothing
   ledger("Guest", "no claim/close/log controls for a visitor", "UI", !/รับงานทันที|บันทึกและปิดงาน|บันทึกงานซ่อมบำรุง|รูปหลังซ่อม/.test(t) ? "PASS" : "FAIL", "runs/" + process.env.QA_RUN + "/reg-guest-view.png");
   const href = await page.getByRole("link", { name: /เข้าสู่ระบบสำหรับช่าง/ }).getAttribute("href");
   ledger("Guest", `technician sign-in link carries the unit: ${href}`, "UI", !!href && href.startsWith("/login?callbackUrl=") && decodeURIComponent(href).includes(`/tech?ac=${acCode}`) ? "PASS" : "FAIL", "runs/" + process.env.QA_RUN + "/reg-guest-view.png");
+});
+
+test("email check while typing: a domain typo is suggested, a dead domain warned about, a registered address held", async ({ page }) => {
+  await page.goto("/register");
+  await hydrated(page, "form");
+  const email = page.locator("#email");
+  const status = page.locator("#email-check");
+  const submit = page.locator('button[type="submit"]');
+
+  // A slip in a well-known domain: offered, not applied.
+  await email.fill("somchai@gmial.com");
+  await expect(status).toContainText("gmail.com", { timeout: 10_000 });
+  const suggested = await status.innerText();
+  ledger("Register", "typo in a known domain suggests the right one", "UI", /gmail\.com/.test(suggested) ? "PASS" : "FAIL", await shot(page, "email-check-typo"));
+  await status.getByRole("button", { name: /somchai@gmail\.com/ }).click();
+  await expect(email).toHaveValue("somchai@gmail.com");
+  await expect(status).toContainText("ใช้งานได้", { timeout: 10_000 });
+  ledger("Register", "the suggestion fills the field and is re-checked", "UI", (await email.inputValue()) === "somchai@gmail.com" ? "PASS" : "FAIL", await shot(page, "email-check-applied"));
+
+  // A domain the resolver knows nothing about: warned. Whether it also holds
+  // the button depends on where the server enforces it (production), so only
+  // the warning is asserted here.
+  await email.fill("somchai@abcxyz-notreal-9981.com");
+  await expect(status).toContainText("ไม่มีเซิร์ฟเวอร์รับอีเมล", { timeout: 15_000 });
+  ledger("Register", "a domain with no MX record is warned about", "UI", "PASS", await shot(page, "email-check-no-mx"));
+
+  // Any address already in the table: the field says so before any submit,
+  // and the button is held. Read from the database rather than assumed from
+  // setup, so the check holds with --no-deps and after a restore.
+  const [[existing]] = db("select email from users order by id limit 1");
+  await email.fill(existing!);
+  await expect(status).toContainText("ลงทะเบียนในระบบเรียบร้อยแล้ว", { timeout: 15_000 });
+  ledger("Register", "an already registered address is reported and holds the button", "UI", (await submit.isDisabled()) ? "PASS" : "FAIL", await shot(page, "email-check-taken"));
+
+  // And a good institutional address says what will happen to it.
+  await email.fill("somchai.new@pkru.ac.th");
+  await expect(status).toContainText("อีเมลสถาบัน", { timeout: 15_000 });
+  ledger("Register", "an institutional address is marked and the button released", "UI", !(await submit.isDisabled()) ? "PASS" : "FAIL", note("email-check-ok.txt", await status.innerText()));
 });

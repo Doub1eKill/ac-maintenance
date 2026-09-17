@@ -87,7 +87,9 @@ setup("admin session: pending refusal, approval by the seeded admin, then login"
     await admin.goto("/login");
     await hydrated(admin);
     await admin.getByRole("button", { name: /ผู้บริหารองค์กร/ }).click();
-    await admin.waitForURL(/\/admin/, { timeout: 60_000 });
+    // 120 s like the other cold-route waits: the first /admin of a run is a
+    // compile plus a round of Aiven queries, and 60 s has not always covered it.
+    await admin.waitForURL(/\/admin/, { timeout: 120_000 });
     await admin.goto("/admin/approvals");
     await admin.locator("main").waitFor({ timeout: 120_000 });
     await hydrated(admin, "main");

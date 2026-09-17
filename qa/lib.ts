@@ -242,9 +242,21 @@ export async function registerViaForm(
   await page.locator('input[name="name"]').fill(opts.name);
   await page.locator('input[name="phone"]').fill(opts.phone);
   await page.locator("#email").fill(opts.email);
+  // The field checks the address as it is typed (half a second after the
+  // last keystroke, then a round trip). Let that settle so the button is in
+  // its final state — and if the answer is "already registered" the button
+  // is held, so that is the outcome, without a submit.
+  const status = page.locator("#email-check");
+  await page.waitForTimeout(700);
+  await status.locator("text=/กำลังตรวจสอบ/").waitFor({ state: "hidden", timeout: 20_000 }).catch(() => {});
+  if (/ลงทะเบียนในระบบเรียบร้อยแล้ว/.test(await status.innerText())) {
+    return (await page.evaluate(() => document.body.innerText)).replace(/\s+/g, " ");
+  }
   await page.locator("#password").fill(opts.password);
   await page.getByRole("button", { name: /ยืนยันลงทะเบียน/ }).click();
-  await page.locator("text=/ลงทะเบียนสำเร็จ|เรียบร้อยแล้ว|ข้อผิดพลาด|กรุณา/").first().waitFor({ timeout: 45_000 }).catch(() => {});
+  // The outcome is either the success screen or the form-level alert — not
+  // the inline email status, whose warnings share words with both.
+  await page.locator('h3:has-text("ลงทะเบียนสำเร็จ"), form > [role="alert"]').first().waitFor({ timeout: 45_000 }).catch(() => {});
   await page.waitForTimeout(500);
   return (await page.evaluate(() => document.body.innerText)).replace(/\s+/g, " ");
 }
