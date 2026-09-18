@@ -392,3 +392,22 @@ enum AirConditionerStatus {
 
   @@map("air_conditioners_status")
 }
+
+// A code sent to an address that is about to be registered, kept until it
+// is used or expires. Keyed by the address rather than a user, because the
+// whole point is that no user exists yet: the form proves the mailbox is
+// read before registerUser creates anything. Only the hash of the code is
+// stored — the table is not a place to read codes back from.
+model EmailVerificationCode {
+  id         BigInt    @id @default(autoincrement())
+  email      String    @db.VarChar(255)
+  codeHash   String    @map("code_hash") @db.VarChar(64)
+  expiresAt  DateTime  @map("expires_at") @db.Timestamp(0)
+  // Wrong guesses against this code; the code dies at a small number of them.
+  attempts   Int       @default(0)
+  verifiedAt DateTime? @map("verified_at") @db.Timestamp(0)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
+
+  @@index([email], map: "email_verification_codes_email_index")
+  @@map("email_verification_codes")
+}

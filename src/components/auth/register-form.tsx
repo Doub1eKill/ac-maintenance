@@ -3,12 +3,18 @@
 import { useEffect, useRef, useState, useActionState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { checkEmailAction, registerUser, type RegisterState } from "@/app/register/actions";
+import {
+  checkEmailAction,
+  registerUser,
+  sendEmailCodeAction,
+  verifyEmailCodeAction,
+  type RegisterState,
+} from "@/app/register/actions";
 import type { EmailCheck } from "@/lib/email-check";
 import { isWellFormed, normaliseEmail } from "@/lib/email-check";
 import { avatarRejectionReason } from "@/lib/avatar";
 import { shrinkImage } from "@/lib/client-image";
-import { Wrench, Building2, Eye, EyeOff, AlertTriangle, Clock, CheckCircle2, ArrowLeft, UserPlus, Camera, Phone, User, Loader2, AlertCircle, Lightbulb } from "lucide-react";
+import { Wrench, Building2, Eye, EyeOff, AlertTriangle, Clock, CheckCircle2, ArrowLeft, UserPlus, Camera, Phone, User, Loader2, AlertCircle, Lightbulb, MailCheck, Send, ShieldCheck } from "lucide-react";
 import {
   Alert,
   AlertTitle,
@@ -33,6 +39,9 @@ export function RegisterForm() {
   // the field has moved on is dropped rather than shown against new text.
   const checkedFor = useRef<string>("");
   const checkTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // What the (uncontrolled) field holds, normalised, for the render below —
+  // the verification step is shown only against the address it belongs to.
+  const [emailValue, setEmailValue] = useState("");
 
   const runEmailCheck = (raw: string) => {
     // Also cancels a check still waiting its turn: clicking the suggestion
@@ -40,6 +49,9 @@ export function RegisterForm() {
     // held before the click — which would land after this one and undo it.
     if (checkTimer.current) clearTimeout(checkTimer.current);
     const email = normaliseEmail(raw);
+    setEmailValue(email);
+    // A different address than the one the code went to starts over.
+    setVerify((v) => (v.phase !== "idle" && v.email !== email ? { phase: "idle" } : v));
     checkedFor.current = email;
     if (!isWellFormed(email)) {
       setEmailCheck({ status: "idle" });
@@ -58,6 +70,7 @@ export function RegisterForm() {
 
   // Half a second after the last keystroke, and at once on leaving the field.
   const scheduleEmailCheck = (raw: string, delayMs: number) => {
+    setEmailValue(normaliseEmail(raw));
     if (checkTimer.current) clearTimeout(checkTimer.current);
     checkTimer.current = setTimeout(() => runEmailCheck(raw), delayMs);
   };
@@ -68,6 +81,72 @@ export function RegisterForm() {
     runEmailCheck(suggestion);
   };
 
+  // The proof step. `verify.email` is the address the code was sent to; any
+  // edit to the field that changes the address throws the step away, so a
+  // token can never end up vouching for a different address than the one
+  // in the form (registerUser checks that too).
+  type VerifyStep =
+    | { phase: "idle" }
+    | { phase: "sending"; email: string }
+    | { phase: "code"; email: string; cooldownUntil: number; notice: string | null; busy: boolean }
+    | { phase: "verified"; email: string; token: string };
+  const [verify, setVerify] = useState<VerifyStep>({ phase: "idle" });
+  const [codeInput, setCodeInput] = useState("");
+  // Ticks once a second while a cooldown is showing, so the countdown moves.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (verify.phase !== "code" || verify.cooldownUntil <= now) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [verify, now]);
+
+  const verifyIsFor = (email: string) => verify.phase !== "idle" && verify.email === email;
+
+  const sendCode = async () => {
+    const email = emailValue;
+    setVerify({ phase: "sending", email });
+    setCodeInput("");
+    const result = await sendEmailCodeAction(email);
+    if (result.status === "sent") {
+      setVerify({ phase: "code", email, cooldownUntil: Date.now() + result.cooldownSeconds * 1000, notice: null, busy: false });
+    } else if (result.status === "cooldown") {
+      setVerify({ phase: "code", email, cooldownUntil: Date.now() + result.retryInSeconds * 1000, notice: "เพิ่งส่งรหัสไปแล้ว กรุณารอสักครู่ก่อนขอใหม่", busy: false });
+    } else if (result.status === "limited") {
+      setVerify({ phase: "code", email, cooldownUntil: Date.now() + 60 * 60 * 1000, notice: "ขอรหัสบ่อยเกินไป กรุณาลองใหม่ในอีกหนึ่งชั่วโมง", busy: false });
+    } else {
+      setVerify({ phase: "idle" });
+      setEmailCheck({ status: "invalid", message: result.message });
+    }
+    setNow(Date.now());
+  };
+
+  const submitCode = async () => {
+    if (verify.phase !== "code") return;
+    const { email } = verify;
+    setVerify({ ...verify, busy: true, notice: null });
+    const result = await verifyEmailCodeAction(email, codeInput);
+    if (result.status === "verified") {
+      setVerify({ phase: "verified", email, token: result.token });
+      return;
+    }
+    const notice =
+      result.status === "wrong"
+        ? `รหัสไม่ถูกต้อง (ลองได้อีก ${result.attemptsLeft} ครั้ง)`
+        : result.status === "expired"
+          ? "รหัสหมดอายุหรือลองผิดครบแล้ว กรุณาขอรหัสใหม่"
+          : "ยังไม่ได้ส่งรหัสไปที่อีเมลนี้ กรุณากดส่งรหัสก่อน";
+    setVerify({ ...verify, busy: false, notice });
+  };
+
+  const emailVerified = verify.phase === "verified" && verify.email === emailValue;
+  // An address a code may be sent to: the same set sendEmailCodeAction
+  // accepts — anything not refused outright. A typo suggestion is only a
+  // guess, and a domain without mail is refused only where registration is.
+  const emailAcceptable =
+    emailCheck.status === "ok" ||
+    emailCheck.status === "suggestion" ||
+    (emailCheck.status === "no-mx" && !emailCheck.blocking);
+
   // The button is held exactly when the server would refuse: a malformed or
   // already-registered address always, a domain that takes no mail only
   // where registration enforces that (production). Elsewhere the warning
@@ -76,7 +155,9 @@ export function RegisterForm() {
   const emailBlocksSubmit =
     emailCheck.status === "invalid" ||
     emailCheck.status === "taken" ||
-    (emailCheck.status === "no-mx" && emailCheck.blocking);
+    (emailCheck.status === "no-mx" && emailCheck.blocking) ||
+    // And, always: the address has to have been proven readable first.
+    !emailVerified;
   const [selectedRole, setSelectedRole] = useState<"technician" | "org_admin">("technician");
 
   // The picture rides along in the form's own FormData — the input keeps its
@@ -378,6 +459,88 @@ export function RegisterForm() {
             </span>
           )}
         </div>
+
+        {/* Proof that the address is read: a code goes out, comes back typed,
+            and only then does the submit button work. Offered once the
+            address itself has passed; withdrawn if the address changes. */}
+        {emailAcceptable && !emailVerified && (verify.phase === "idle" || !verifyIsFor(emailValue)) && (
+          <button
+            type="button"
+            onClick={sendCode}
+            className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-slate-900 bg-slate-950 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-slate-800 transition-colors"
+          >
+            <Send className="h-3 w-3" />
+            ส่งรหัสยืนยันไปที่อีเมลนี้
+          </button>
+        )}
+        {verify.phase === "sending" && (
+          <span className="mt-2 inline-flex items-center gap-1 text-[11px] text-slate-500">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            กำลังส่งรหัส...
+          </span>
+        )}
+        {verify.phase === "code" && verifyIsFor(emailValue) && (
+          <div id="email-verify" className="mt-2 space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <p className="text-[11px] text-slate-700">
+              ส่งรหัส 6 หลักไปที่ <span className="font-bold">{verify.email}</span> แล้ว กรอกรหัสภายใน 15 นาที
+              (ถ้าไม่พบ ดูในโฟลเดอร์อีเมลขยะ)
+            </p>
+            <div className="flex gap-2">
+              <input
+                id="email-code"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern="[0-9]{6}"
+                maxLength={6}
+                value={codeInput}
+                onChange={(e) => setCodeInput(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                onKeyDown={(e) => {
+                  // Enter here confirms the code; it must not submit the form.
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    if (codeInput.length === 6 && !verify.busy) void submitCode();
+                  }
+                }}
+                placeholder="000000"
+                aria-label="รหัสยืนยัน 6 หลัก"
+                className="w-32 rounded-lg border border-slate-200 bg-white px-3 py-2 text-center font-mono text-sm tracking-[0.3em] text-slate-900 placeholder-slate-300 focus:border-slate-950 focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={submitCode}
+                disabled={codeInput.length !== 6 || verify.busy}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-slate-950 px-3 py-2 text-[11px] font-bold text-white hover:bg-slate-800 disabled:opacity-40 transition-colors"
+              >
+                {verify.busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <ShieldCheck className="h-3 w-3" />}
+                ยืนยันรหัส
+              </button>
+              <button
+                type="button"
+                onClick={sendCode}
+                disabled={verify.cooldownUntil > now}
+                className="ml-auto text-[11px] font-bold text-slate-700 underline underline-offset-2 hover:text-slate-950 disabled:no-underline disabled:opacity-50"
+              >
+                {verify.cooldownUntil > now
+                  ? `ส่งรหัสใหม่ได้ใน ${Math.max(1, Math.ceil((verify.cooldownUntil - now) / 1000))} วิ`
+                  : "ส่งรหัสใหม่"}
+              </button>
+            </div>
+            {verify.notice && (
+              <p className="inline-flex items-start gap-1 text-[11px] font-bold text-red-600">
+                <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
+                {verify.notice}
+              </p>
+            )}
+          </div>
+        )}
+        {emailVerified && (
+          <p id="email-verified" className="mt-2 inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700">
+            <MailCheck className="h-3.5 w-3.5" />
+            ยืนยันอีเมลแล้ว
+          </p>
+        )}
+        {/* Carried with the submission; registerUser refuses without it. */}
+        {verify.phase === "verified" && <input type="hidden" name="emailVerificationToken" value={verify.token} />}
       </div>
 
       {/* Password Input */}

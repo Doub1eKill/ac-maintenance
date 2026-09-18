@@ -9,6 +9,14 @@ import { avatarRejectionReason } from "@/lib/avatar";
 import { headers } from "next/headers";
 import { isInstitutionalDomain, normaliseEmail, type EmailCheck } from "@/lib/email-check";
 import { checkEmailShape, enforceMxOnRegister } from "@/lib/email-mx";
+import {
+  discardCodesFor,
+  sendVerificationCode,
+  verifyCode,
+  verifyProofToken,
+  type SendCodeResult,
+  type VerifyCodeResult,
+} from "@/lib/email-verification";
 
 export type RegisterState = {
   success?: boolean;
@@ -100,6 +108,44 @@ export async function checkEmailAction(raw: unknown): Promise<EmailCheck> {
   return shape;
 }
 
+// Sends per IP, on top of the per-address limits the library keeps: one
+// browser must not be able to spray codes at many addresses.
+const SEND_LIMIT = 10;
+const SEND_WINDOW_MS = 10 * 60_000;
+const sendHits = new Map<string, { count: number; resetAt: number }>();
+
+async function clientKey(): Promise<string> {
+  return (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
+}
+
+/**
+ * Mails a code to the address in the form. The address is put through the
+ * same checks the field shows first, so a code is never sent to an address
+ * the registration would refuse anyway.
+ */
+export async function sendEmailCodeAction(raw: unknown): Promise<SendCodeResult> {
+  if (typeof raw !== "string" || raw.length > 254) {
+    return { status: "failed", message: "รูปแบบอีเมลไม่ถูกต้อง" };
+  }
+  const ip = await clientKey();
+  const now = Date.now();
+  const hit = sendHits.get(ip);
+  if (!hit || hit.resetAt < now) sendHits.set(ip, { count: 1, resetAt: now + SEND_WINDOW_MS });
+  else if (++hit.count > SEND_LIMIT) return { status: "limited" };
+
+  const check = await checkEmailAction(raw);
+  if (check.status === "invalid" || check.status === "taken" || (check.status === "no-mx" && check.blocking)) {
+    return { status: "failed", message: check.message };
+  }
+  return sendVerificationCode(raw);
+}
+
+/** Checks the typed code; a pass returns the token the submit must carry. */
+export async function verifyEmailCodeAction(rawEmail: unknown, rawCode: unknown): Promise<VerifyCodeResult> {
+  if (typeof rawEmail !== "string" || typeof rawCode !== "string") return { status: "none" };
+  return verifyCode(rawEmail, rawCode);
+}
+
 export async function registerUser(
   _prevState: RegisterState,
   formData: FormData
@@ -159,6 +205,14 @@ export async function registerUser(
       return { error: shape.message };
     }
 
+    // The address must have been proven readable on this form: the token
+    // verifyEmailCodeAction handed back names it and is signed. Without it
+    // the .ac.th auto-activation below would be open to any address typed
+    // in, which is the hole the codes exist to close.
+    if (!verifyProofToken(formData.get("emailVerificationToken"), cleanEmail)) {
+      return { error: "กรุณายืนยันอีเมลด้วยรหัสที่ส่งไปให้ก่อนลงทะเบียน" };
+    }
+
     const emailDomain = cleanEmail.split("@")[1] || "";
     const isVerifiedDomain = isInstitutionalDomain(emailDomain);
     
@@ -197,6 +251,9 @@ export async function registerUser(
             role: role as UserRole,
             status: initialStatus,
             avatarUrl,
+            // Proven a moment ago by the code; recorded so the column means
+            // what it says for accounts made from here on.
+            emailVerifiedAt: new Date(),
           },
         });
 
@@ -213,6 +270,8 @@ export async function registerUser(
       if (avatarUrl) await deleteUpload(avatarUrl);
       throw error;
     }
+
+    await discardCodesFor(cleanEmail);
 
     if (initialStatus === "active") {
       return {
