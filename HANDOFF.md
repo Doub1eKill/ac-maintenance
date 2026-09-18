@@ -22,6 +22,9 @@
 - dev :3000 (SMTP pkru) ส่งรหัสไป `s6710886118@pkru.ac.th` → เจ้าของอ่านได้ **051484** → `verifyCode` = verified, token ผูกอีเมลนั้น (อีเมลอื่น = false), ใช้ซ้ำ = none · หน้า UI หลุดไป /login ก่อนกรอกทัน (dev server รีโหลด) จึงพิสูจน์ปลดล็อกปุ่มด้วย harness แทน · เจ้าของจะสมัครช่างบน production หลัง deploy เพื่อลองรหัสจริง
 - production SMTP: env 5 ตัวใส่แล้ว + redeploy · reset-password ตอบ "ส่งลิงก์แล้ว" (= configured) แต่ยิงไปอีเมลปลอม จึงยังไม่เห็นเมลถึงจาก production — การสมัครช่างของเจ้าของจะเป็นตัวพิสูจน์
 
+## ตามงาน: วางรหัสจากเมลได้ (`fix(register)` บน branch `fix/otp-paste`)
+- เจ้าของลองบน production: วาง "0 5 1 4 8 4" จากเมลแล้วเหลือ "0514" — `maxLength={6}` ตัดข้อความที่วาง**ก่อน** onChange จะลบช่องว่าง · แก้: เอา maxLength ออก, `onPaste` อ่าน clipboard เอง เก็บเฉพาะตัวเลข 6 ตัว · พิสูจน์ในเบราว์เซอร์ + spec เพิ่ม check "a spaced code pasted … lands as six digits" PASS
+
 ## กติกา/ข้อควรรู้
 - ห้าม import `@/lib/email-verification` หรือ `email-mx` ใน client component (มี prisma/node:dns) — form import ได้แค่ `@/lib/email-check`
 - ถ้าเปลี่ยน `hashCode()` ต้องแก้ `plantEmailCode` ใน qa/lib.ts ให้ตรง
