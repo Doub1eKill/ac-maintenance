@@ -491,9 +491,16 @@ export function RegisterForm() {
                 inputMode="numeric"
                 autoComplete="one-time-code"
                 pattern="[0-9]{6}"
-                maxLength={6}
                 value={codeInput}
+                // Digits only, six at most — kept here rather than as a
+                // maxLength on the input: the mail shows the code spaced
+                // out, and a browser applies maxLength to pasted text before
+                // any handler runs, so "0 5 1 4 8 4" arrived cut to "0514".
                 onChange={(e) => setCodeInput(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                onPaste={(e) => {
+                  e.preventDefault();
+                  setCodeInput(e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6));
+                }}
                 onKeyDown={(e) => {
                   // Enter here confirms the code; it must not submit the form.
                   if (e.key === "Enter") {

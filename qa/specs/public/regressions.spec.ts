@@ -147,7 +147,16 @@ test("email verification: the submit waits for a code, a wrong code is counted, 
   ledger("Register", "requesting a code stores one hashed row for the address", "DB", rows === "1" ? "PASS" : "FAIL", note("otp-row.txt", `rows=${rows}`));
 
   plantEmailCode(email);
-  await page.locator("#email-code").fill("111111");
+  // The mail shows the code spaced out, so it is pasted that way; the field
+  // has to take the digits and drop the rest (a maxLength would cut first).
+  await page.locator("#email-code").focus();
+  await page.evaluate(() => {
+    const dt = new DataTransfer();
+    dt.setData("text/plain", "1 1 1 1 1 1");
+    document.getElementById("email-code")!.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+  });
+  await expect(page.locator("#email-code")).toHaveValue("111111");
+  ledger("Register", "a spaced code pasted from the mail lands as six digits", "UI", "PASS", await shot(page, "otp-paste"));
   await page.getByRole("button", { name: /^ยืนยันรหัส$/ }).click();
   await expect(page.locator("#email-verify")).toContainText("ลองได้อีก 4 ครั้ง", { timeout: 15_000 });
   ledger("Register", "a wrong code is refused and counted, button still held", "UI", (await submit.isDisabled()) ? "PASS" : "FAIL", await shot(page, "otp-wrong"));
