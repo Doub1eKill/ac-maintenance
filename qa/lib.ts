@@ -1,5 +1,6 @@
 import { test as base, type Page } from "@playwright/test";
 import { spawnSync } from "node:child_process";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import zlib from "node:zlib";
@@ -252,6 +253,12 @@ export async function registerViaForm(
   if (/ลงทะเบียนในระบบเรียบร้อยแล้ว/.test(await status.innerText())) {
     return (await page.evaluate(() => document.body.innerText)).replace(/\s+/g, " ");
   }
+  // The address has to be proven readable before the button works: a code
+  // is mailed and typed back. The harness cannot read the mailbox, so it
+  // asks for a code the normal way and then overwrites the stored hash with
+  // one it knows — the same sha256(email:code) the app writes — through the
+  // database, which nothing outside this harness can do.
+  await verifyEmailInForm(page, opts.email);
   await page.locator("#password").fill(opts.password);
   await page.getByRole("button", { name: /ยืนยันลงทะเบียน/ }).click();
   // The outcome is either the success screen or the form-level alert — not
@@ -259,6 +266,27 @@ export async function registerViaForm(
   await page.locator('h3:has-text("ลงทะเบียนสำเร็จ"), form > [role="alert"]').first().waitFor({ timeout: 45_000 }).catch(() => {});
   await page.waitForTimeout(500);
   return (await page.evaluate(() => document.body.innerText)).replace(/\s+/g, " ");
+}
+
+/** The code the harness plants; hashed the way src/lib/email-verification.ts does. */
+export const QA_EMAIL_CODE = "246810";
+export function plantEmailCode(email: string) {
+  const hash = crypto.createHash("sha256").update(`${email.toLowerCase()}:${QA_EMAIL_CODE}`).digest("hex");
+  db(`update email_verification_codes set code_hash = '${hash}', attempts = 0, expires_at = now() + interval '15 minutes' where email = '${email.toLowerCase()}' and verified_at is null`);
+}
+
+/**
+ * Walks the proof step on /register for an address already typed into the
+ * field: request a code, plant a known one, type it, wait for the tick.
+ * Assumes the inline check has already settled on the address.
+ */
+export async function verifyEmailInForm(page: Page, email: string) {
+  await page.getByRole("button", { name: /ส่งรหัสยืนยัน/ }).click();
+  await page.locator("#email-code").waitFor({ timeout: 30_000 });
+  plantEmailCode(email);
+  await page.locator("#email-code").fill(QA_EMAIL_CODE);
+  await page.getByRole("button", { name: /^ยืนยันรหัส$/ }).click();
+  await page.locator("#email-verified").waitFor({ timeout: 30_000 });
 }
 
 /**

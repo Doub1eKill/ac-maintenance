@@ -1,4 +1,4 @@
-import { test, expect, ledger, shot, note, loginViaForm, hydrated, db, QA } from "../../lib";
+import { test, expect, ledger, shot, note, loginViaForm, hydrated, db, QA, QA_EMAIL_CODE, plantEmailCode, pngBuffer } from "../../lib";
 
 // Regressions for the sign-in findings of run 20260913-1742. Each check names
 // the bug it guards; the fix commits are in HANDOFF.md.
@@ -124,5 +124,64 @@ test("email check while typing: a domain typo is suggested, a dead domain warned
   // And a good institutional address says what will happen to it.
   await email.fill("somchai.new@pkru.ac.th");
   await expect(status).toContainText("อีเมลสถาบัน", { timeout: 15_000 });
-  ledger("Register", "an institutional address is marked and the button released", "UI", !(await submit.isDisabled()) ? "PASS" : "FAIL", note("email-check-ok.txt", await status.innerText()));
+  // Marked as institutional — but the button stays held until the address
+  // is proven with a code; what appears instead is the offer to send one.
+  const offersCode = (await page.getByRole("button", { name: /ส่งรหัสยืนยัน/ }).count()) === 1;
+  ledger("Register", "an institutional address is marked, offers a code, and the button waits for it", "UI", offersCode && (await submit.isDisabled()) ? "PASS" : "FAIL", note("email-check-ok.txt", await status.innerText()));
+});
+
+test("email verification: the submit waits for a code, a wrong code is counted, the right one unlocks, a changed address withdraws it", async ({ page }) => {
+  const email = `qa.otp.${Date.now()}@qa-run.ac.th`;
+  await page.goto("/register");
+  await hydrated(page, "form");
+  const submit = page.locator('button[type="submit"]');
+  const emailField = page.locator("#email");
+
+  await emailField.fill(email);
+  await expect(page.locator("#email-check")).toContainText(/ใช้งานได้|ไม่มีเซิร์ฟเวอร์/, { timeout: 15_000 });
+  ledger("Register", "before any code the submit button is held", "UI", (await submit.isDisabled()) ? "PASS" : "FAIL", await shot(page, "otp-locked"));
+
+  await page.getByRole("button", { name: /ส่งรหัสยืนยัน/ }).click();
+  await page.locator("#email-code").waitFor({ timeout: 30_000 });
+  const [[rows]] = db(`select count(*) from email_verification_codes where email = '${email}' and verified_at is null`);
+  ledger("Register", "requesting a code stores one hashed row for the address", "DB", rows === "1" ? "PASS" : "FAIL", note("otp-row.txt", `rows=${rows}`));
+
+  plantEmailCode(email);
+  await page.locator("#email-code").fill("111111");
+  await page.getByRole("button", { name: /^ยืนยันรหัส$/ }).click();
+  await expect(page.locator("#email-verify")).toContainText("ลองได้อีก 4 ครั้ง", { timeout: 15_000 });
+  ledger("Register", "a wrong code is refused and counted, button still held", "UI", (await submit.isDisabled()) ? "PASS" : "FAIL", await shot(page, "otp-wrong"));
+
+  await page.locator("#email-code").fill(QA_EMAIL_CODE);
+  await page.getByRole("button", { name: /^ยืนยันรหัส$/ }).click();
+  await page.locator("#email-verified").waitFor({ timeout: 15_000 });
+  const tokenPresent = (await page.locator('input[name="emailVerificationToken"]').count()) === 1;
+  ledger("Register", "the right code shows the tick, carries a token and releases the button", "UI", tokenPresent && !(await submit.isDisabled()) ? "PASS" : "FAIL", await shot(page, "otp-verified"));
+
+  // The proof is for that address only: editing it takes the tick away.
+  await emailField.fill(email.replace("qa.otp", "qa.other"));
+  await page.waitForTimeout(900);
+  const tickGone = (await page.locator("#email-verified").count()) === 0;
+  ledger("Register", "changing the address withdraws the verification", "UI", tickGone && (await submit.isDisabled()) ? "PASS" : "FAIL", await shot(page, "otp-withdrawn"));
+
+  // And the server does not take the form's word for it: a submit that
+  // carries no token is refused whatever the button state was.
+  await emailField.fill(email);
+  await page.waitForTimeout(900);
+  await page.locator('input[name="avatar"]').setInputFiles({ name: "avatar.png", mimeType: "image/png", buffer: pngBuffer() });
+  await page.locator('input[name="name"]').fill("QA_OTP_NO_TOKEN");
+  await page.locator('input[name="phone"]').fill("081-000-1999");
+  await page.locator("#password").fill(QA.password);
+  await page.evaluate(() => {
+    const form = document.querySelector("form") as HTMLFormElement;
+    form.querySelector('input[name="emailVerificationToken"]')?.remove();
+    (form.querySelector('button[type="submit"]') as HTMLButtonElement).disabled = false;
+    form.requestSubmit();
+  });
+  await page.locator('form > [role="alert"]').waitFor({ timeout: 45_000 });
+  const alert = await page.locator('form > [role="alert"]').innerText();
+  const [[created]] = db(`select count(*) from users where email = '${email}'`);
+  ledger("Register", "a submit without the proof token is refused by the server and creates nothing", "UI", /ยืนยันอีเมล/.test(alert) && created === "0" ? "PASS" : "FAIL", await shot(page, "otp-no-token"));
+
+  db(`delete from email_verification_codes where email like 'qa.otp.%' or email like 'qa.other.%'`);
 });
