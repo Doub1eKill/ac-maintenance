@@ -1,5 +1,33 @@
 # Project Handoff & Technical Summary
 
+# 🔐 ยืนยันอีเมลด้วยรหัส 6 หลักก่อนสมัคร (ส่วนที่ 2) + ล้างบัญชีทดสอบบน production (18 ก.ย. 2026, DoubleKill)
+
+เจ้าของเลือก **A แบบเข้มกว่าที่เสนอ**: "บังคับให้กรอกรหัสยืนยันก่อนถึงจะกดสมัครได้" → พิสูจน์อีเมล**ก่อน**สร้างบัญชี ไม่มีบัญชีค้างที่ยังไม่ยืนยันในระบบเลย ไม่ต้องบล็อก login/ลบทิ้งทีหลัง · คง auto-approve technician @*.ac.th (ปลอดภัยแล้วเพราะเกิดหลังพิสูจน์) · branch `feat/email-otp` 2 commit ff-merge master
+
+## ล้างร่องรอยบัญชีทดสอบบน Aiven (ก่อนเริ่ม — เจ้าของสั่ง)
+- users 7 (Akarin Noochoo) / 8 (นายปุกปิก จับไข่) อีเมลปลอม: ใบงาน 45 ใบที่ 7 มอบหมาย/8 รับ → pending, ล้าง claimed_by/claimed_at/completed_at · ลบ WO 131 (7 สร้างลอง) · WO 130 (ระบบสร้างเอง) เก็บเป็น pending · ลบ log 621, 622 · คืนผลข้างเคียงจาก backup MariaDB: AC 26 → `broken`, schedule AC 19 → 12 มี.ค./12 มิ.ย., AC 26 → 18 ก.ค./18 ต.ค. · ลบ audit 47 แถว · ลบ users + phones · ลบ Blob 6 ไฟล์ → store ว่าง · transaction เดียวมี assertion ทุกขั้น (script ใน scratchpad `rollback-test-accounts.sql`) · ผล users 5 · WO 63 · logs 230 · audit max 34
+- หลังจากนั้นเจ้าของสมัคร **user 26 `kobayachikoby@gmail.com` (org_admin) เพื่อใช้ทดสอบจริง** → approve ผ่าน psql เป็น active แล้ว (ต้อง active ซ้ำหลัง harness restore เพราะ snapshot จับตอน pending)
+
+## `a7d0041` feat(register): OTP ก่อนสร้างบัญชี
+- **schema + migration PG** `20260918010000_add_email_verification_codes` — ตาราง `email_verification_codes` (email, code_hash sha256(email:code), expires_at, attempts, verified_at) keyed ด้วยอีเมลไม่ใช่ user (ยังไม่มี user) · `migrate deploy` บน Aiven แล้ว, `migrate diff` = No difference
+- **`src/lib/email-verification.ts`**: `sendVerificationCode` (retire code เก่า → สร้าง 6 หลัก → `sendMail`; dev ไม่มี SMTP → log code ใน terminal เหมือน reset link; production ไม่มี SMTP → error), `verifyCode` (ล่าสุดที่ยังไม่ verify, หมดอายุ 15 นาที, ผิดได้ 5 — ครั้งที่ 5 retire code, timingSafeEqual), `createProofToken`/`verifyProofToken` (HMAC `email|exp|sig` base64url ด้วย AUTH_SECRET, 30 นาที, ผูกอีเมล), `discardCodesFor` · limit: ส่งซ้ำ 60 วิ, 5 ครั้ง/ชม./อีเมล · sweep row เก่ากว่า 1 วันตอนส่ง · เมล subject "รหัสยืนยันอีเมล — ระบบซ่อมบำรุงเครื่องปรับอากาศ" inline style
+- **`register/actions.ts`**: `sendEmailCodeAction` (limit 10/10 นาที/IP + ผ่าน `checkEmailAction` ก่อน — ไม่ส่งให้ invalid/taken/no-mx blocking), `verifyEmailCodeAction` · `registerUser` ต้องมี `emailVerificationToken` ที่ verify ตรงกับ cleanEmail ไม่งั้น "กรุณายืนยันอีเมลด้วยรหัสที่ส่งไปให้ก่อนลงทะเบียน" · สร้าง user พร้อม `emailVerifiedAt = now()` · `discardCodesFor` หลังสำเร็จ
+- **`register-form.tsx`**: state `verify` (idle/sending/code/verified) + `emailValue` mirror ของช่อง (uncontrolled) เพราะ React Compiler lint ห้ามอ่าน ref ตอน render · ปุ่ม "ส่งรหัสยืนยันไปที่อีเมลนี้" โผล่เมื่อ `emailAcceptable` (ok / suggestion / no-mx ที่ไม่ block — **บั๊กที่เจอ:** ตอนแรกให้เฉพาะ ok ทำให้ QA domain ไม่มีปุ่ม setup ล้ม) · กล่อง `#email-verify`: input `#email-code` (numeric, autocomplete one-time-code, Enter = ยืนยันไม่ submit form), ปุ่มยืนยัน, "ส่งรหัสใหม่ได้ใน N วิ" นับถอยหลัง, notice ผิด/หมดอายุ · ผ่าน → `#email-verified` "ยืนยันอีเมลแล้ว" + `<input hidden name=emailVerificationToken>` · เปลี่ยนอีเมล → reset ทั้งหมด · submit disabled จนกว่า `emailVerified`
+
+## `317dc6e` qa
+- `registerViaForm` → `verifyEmailInForm`: กดส่งรหัส → `plantEmailCode(email)` เขียน hash ของ `QA_EMAIL_CODE="246810"` ทับใน DB ผ่าน psql (harness อ่านเมลไม่ได้) → พิมพ์ → รอ `#email-verified` · spec "email verification" 6 check รวม strip token แล้ว requestSubmit → server ปฏิเสธ ไม่สร้าง user · check เดิม "institutional … button released" แก้เป็น "offers a code, button waits"
+- run `otp-20260918-2232`: setup 5/5 (สมัคร QA 4 บัญชีผ่าน OTP gate จริง) + public 3/3 = **8/8** · restore แล้ว users 6 (5 seed + owner 26)
+
+## พิสูจน์กับเมลจริง
+- dev :3000 (SMTP pkru) ส่งรหัสไป `s6710886118@pkru.ac.th` → เจ้าของอ่านได้ **051484** → `verifyCode` = verified, token ผูกอีเมลนั้น (อีเมลอื่น = false), ใช้ซ้ำ = none · หน้า UI หลุดไป /login ก่อนกรอกทัน (dev server รีโหลด) จึงพิสูจน์ปลดล็อกปุ่มด้วย harness แทน · เจ้าของจะสมัครช่างบน production หลัง deploy เพื่อลองรหัสจริง
+- production SMTP: env 5 ตัวใส่แล้ว + redeploy · reset-password ตอบ "ส่งลิงก์แล้ว" (= configured) แต่ยิงไปอีเมลปลอม จึงยังไม่เห็นเมลถึงจาก production — การสมัครช่างของเจ้าของจะเป็นตัวพิสูจน์
+
+## กติกา/ข้อควรรู้
+- ห้าม import `@/lib/email-verification` หรือ `email-mx` ใน client component (มี prisma/node:dns) — form import ได้แค่ `@/lib/email-check`
+- ถ้าเปลี่ยน `hashCode()` ต้องแก้ `plantEmailCode` ใน qa/lib.ts ให้ตรง
+- code row ใน Aiven ไม่ถูก restore ลบ (ไม่อยู่ใน GROWTH_TABLES) แต่ sweep เองเมื่อเก่ากว่า 1 วัน · spec ลบ row ของตัวเองท้าย test
+
+
 # ✉️ ตรวจอีเมลตอนพิมพ์ในฟอร์มสมัคร (ส่วนที่ 1) + SMTP ใช้ได้ทั้ง local/production (17 ก.ย. 2026, DoubleKill)
 
 เจ้าของขอ "ระบบตรวจสอบ Email ที่สมัครเข้ามาว่ามีอยู่จริง แจ้งเตือนตั้งแต่ตอนกรอก" → วางแผน 3 ระดับ (รูปแบบ+สะกดโดเมน / DNS MX / OTP ทางอีเมล) อธิบายว่าระดับ 1-2 ทำตอนพิมพ์ได้ ระดับ 3 คือหลักฐานเดียวที่แท้จริง ต้องทำตอน submit · รอบนี้ทำ**ระดับ 1-2** · branch `feat/email-check-on-type` 2 commit ff-merge master
