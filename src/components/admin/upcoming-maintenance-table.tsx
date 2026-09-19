@@ -165,6 +165,26 @@ function GroupTypeBadges({ items }: { items: { row: Row<MaintenanceRow> }[] }) {
   );
 }
 
+/**
+ * The tick at the head of one room's table: all, some or none of that
+ * room's assignable rows, and toggling it touches only those.
+ */
+function RoomSelectAll({ rows }: { rows: Row<MaintenanceRow>[] }) {
+  const selectable = rows.filter((r) => r.getCanSelect());
+  if (selectable.length === 0) return null;
+  const picked = selectable.filter((r) => r.getIsSelected()).length;
+  const state = picked === selectable.length ? true : picked > 0 ? "indeterminate" : false;
+  return (
+    <Checkbox
+      checked={state}
+      onCheckedChange={(value) => {
+        for (const r of selectable) r.toggleSelected(!!value);
+      }}
+      aria-label="เลือกทั้งห้อง"
+    />
+  );
+}
+
 export const columns: ColumnDef<MaintenanceRow>[] = [
   {
     id: "select",
@@ -626,9 +646,15 @@ export function UpcomingMaintenanceTable({ data, onViewDetails, onCreateWorkOrde
                           <TableRow key={headerGroup.id}>
                             {headerGroup.headers.map((header) => (
                               <TableHead key={header.id} className="h-10 px-4 whitespace-normal text-xs">
-                                {header.isPlaceholder
-                                  ? null
-                                  : flexRender(header.column.columnDef.header, header.getContext())}
+                                {header.isPlaceholder ? null : header.column.id === "select" ? (
+                                  // The header is the whole table's, drawn once per room,
+                                  // so the column's own tick would select every row on the
+                                  // page — 45 from a room of two. This one is scoped to the
+                                  // rows under it.
+                                  <RoomSelectAll rows={room.items.map((i) => i.row)} />
+                                ) : (
+                                  flexRender(header.column.columnDef.header, header.getContext())
+                                )}
                               </TableHead>
                             ))}
                           </TableRow>
