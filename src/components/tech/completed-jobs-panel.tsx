@@ -13,7 +13,7 @@ import {
 import type { TechJobItem } from "@/components/tech/types";
 import { filterJobs } from "@/components/tech/types";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
-import { JobTypeBadge } from "@/components/tech/job-type-badge";
+import { WorkOrderTypeBadge } from "@/components/shared/work-order-badges";
 
 interface CompletedJobsPanelProps {
   completedJobs: TechJobItem[];
@@ -63,7 +63,7 @@ export function CompletedJobsPanel({ completedJobs, searchQuery, selectedBuildin
                                   className="ml-1"
                                 />
                               </span>
-                              <JobTypeBadge type={job.type} />
+                              {job.type && <WorkOrderTypeBadge type={job.type} size="sm" />}
                               {job.priority === "critical" && (
                                 <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-800">
                                   <AlertTriangle className="h-3 w-3" /> ด่วนที่สุด

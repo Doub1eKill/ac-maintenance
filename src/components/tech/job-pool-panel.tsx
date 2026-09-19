@@ -15,7 +15,7 @@ import {
 import type { TechJobItem } from "@/components/tech/types";
 import { filterJobs } from "@/components/tech/types";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
-import { JobTypeBadge } from "@/components/tech/job-type-badge";
+import { WorkOrderTypeBadge } from "@/components/shared/work-order-badges";
 import { MotionCard } from "@/components/ui/motion";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -129,7 +129,7 @@ export function JobPoolPanel({ jobPool, searchQuery, selectedBuilding, isPending
                                     className="ml-1"
                                   />
                                 </span>
-                                <JobTypeBadge type={job.type} />
+                                {job.type && <WorkOrderTypeBadge type={job.type} size="sm" />}
                               </div>
                             </div>
                           </div>
