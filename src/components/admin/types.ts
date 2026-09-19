@@ -7,6 +7,8 @@ export interface WorkOrderItem {
   brandDeleted: boolean;
   modelDeleted: boolean;
   btu: number | null;
+  // The unit's picture, for the detail dialog's unit line.
+  photoUrl: string | null;
   location: string;
   // The same place without the building, for lists grouped under a building
   // header. See @/lib/location.
@@ -25,6 +27,8 @@ export interface WorkOrderItem {
   issueDescription: string | null;
   resolutionNotes: string | null;
   images: unknown;
+  // The before/after pictures of the log that closed the order, if any.
+  logPhotos: { before: string | null; after: string | null } | null;
   reportedByName: string | null;
   assignedToName: string | null;
   assignedAt: string | null;
@@ -45,6 +49,8 @@ export interface ACUnit {
   brandDeleted: boolean;
   modelDeleted: boolean;
   btu: number | null;
+  // The unit's picture, or null for one registered before pictures existed.
+  photoUrl: string | null;
   status: string;
   qrCode: string;
   maintenanceSchedule: {

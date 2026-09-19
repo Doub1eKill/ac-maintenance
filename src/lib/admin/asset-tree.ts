@@ -38,6 +38,7 @@ export const buildingTreeSelect = {
           brand: true,
           model: true,
           btu: true,
+          photoUrl: true,
           status: true,
           acBrand: { select: { name: true, deletedAt: true } },
           acModel: { select: { name: true, deletedAt: true } },
@@ -184,6 +185,7 @@ export function shapeBuildingTree(
             model: ac.acModel?.name || ac.model || null,
             ...catalogueFlags(ac),
             btu: ac.btu,
+            photoUrl: ac.photoUrl,
             status: ac.status,
             qrCode: ac.qrCode,
             maintenanceSchedule: activeSchedule

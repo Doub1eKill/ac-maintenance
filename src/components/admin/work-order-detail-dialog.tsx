@@ -20,6 +20,8 @@ import {
 } from "@/components/ui/dialog";
 import type { WorkOrderItem } from "@/components/admin/types";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
+import { UnitThumb } from "@/components/shared/unit-thumb";
+import { EvidencePhotos } from "@/components/shared/evidence-photos";
 import {
   WorkOrderPriorityBadge,
   WorkOrderStatusBadge,
@@ -118,6 +120,9 @@ export function WorkOrderDetailDialog({ workOrder, isPending, onClose, onCancelW
 
   const canCancel = !!workOrder && (workOrder.status === "pending" || workOrder.status === "claimed");
   const evidenceImages = workOrder ? normalizeWorkOrderImages(workOrder.images) : [];
+  // What the technician photographed when closing the order.
+  const logPhotos = workOrder?.logPhotos ?? null;
+  const hasLogPhotos = Boolean(logPhotos?.before || logPhotos?.after);
 
   return (
     <Dialog open={!!workOrder} onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -147,6 +152,7 @@ export function WorkOrderDetailDialog({ workOrder, isPending, onClose, onCancelW
                   key/value pairs: three facts an admin reads once, and the
                   right-aligned values used to wrap the code mid-way. */}
               <dl className="mt-4 flex min-w-0 flex-wrap items-center gap-x-5 gap-y-1.5 text-sm">
+                <UnitThumb src={workOrder.photoUrl} alt={`เครื่อง ${workOrder.acCode}`} size="sm" />
                 <div className="inline-flex items-center gap-1.5">
                   <dt className="sr-only">ยี่ห้อ</dt>
                   <Snowflake className="h-4 w-4 text-primary" aria-hidden />
@@ -246,6 +252,13 @@ export function WorkOrderDetailDialog({ workOrder, isPending, onClose, onCancelW
                       <span className="text-xs font-medium text-muted-foreground">({evidenceImages.length})</span>
                     )}
                   </h3>
+                  {/* The closing log's before/after first: for a finished
+                      order that is the evidence an admin opens this for. */}
+                  {hasLogPhotos && (
+                    <div className={evidenceImages.length > 0 ? "mb-3" : ""}>
+                      <EvidencePhotos before={logPhotos?.before} after={logPhotos?.after} size="md" />
+                    </div>
+                  )}
                   {evidenceImages.length > 0 ? (
                     <div className="grid grid-cols-3 gap-2">
                       {evidenceImages.map((img) => (
@@ -268,7 +281,7 @@ export function WorkOrderDetailDialog({ workOrder, isPending, onClose, onCancelW
                         </div>
                       ))}
                     </div>
-                  ) : (
+                  ) : hasLogPhotos ? null : (
                     <p className="text-sm text-muted-foreground">ไม่มีรูปภาพประกอบ</p>
                   )}
                 </section>

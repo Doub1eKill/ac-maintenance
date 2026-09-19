@@ -46,6 +46,7 @@ export const workOrderBoardSelect = {
       acCode: true,
       brand: true,
       btu: true,
+      photoUrl: true,
       // The unit's own condition, surfaced as `acStatus` below so the board
       // can label a row repair vs. cleaning. Nothing stores a job type for a
       // work order itself, so this is the same signal the technician view and
@@ -72,6 +73,13 @@ export const workOrderBoardSelect = {
   claimedByUser: { select: { name: true } },
   reportedByUser: { select: { name: true } },
   assignedToUser: { select: { name: true } },
+  // The log that closed this order, for its before/after pictures. One per
+  // order in practice; newest first in case a correction ever adds another.
+  maintenanceLogs: {
+    select: { beforePhotoUrl: true, afterPhotoUrl: true },
+    orderBy: { performedAt: "desc" },
+    take: 1,
+  },
 } as const;
 
 // Newest first, with id as a tiebreaker — and the tiebreaker is not optional.
@@ -95,6 +103,7 @@ export function toWorkOrderBoardRow(wo: WorkOrderBoardRow) {
     brand: wo.airConditioner.acBrand?.name || wo.airConditioner.brand || "ไม่ระบุ",
     ...catalogueFlags(wo.airConditioner),
     btu: wo.airConditioner.btu,
+    photoUrl: wo.airConditioner.photoUrl,
     acStatus: wo.airConditioner.status,
     location: formatUnitLocation(wo.airConditioner.room, { withAbbreviation: true }),
     // The same location without the building, for the lists that group their
@@ -122,6 +131,9 @@ export function toWorkOrderBoardRow(wo: WorkOrderBoardRow) {
     issueDescription: wo.issueDescription,
     resolutionNotes: wo.resolutionNotes,
     images: wo.images,
+    logPhotos: wo.maintenanceLogs[0]
+      ? { before: wo.maintenanceLogs[0].beforePhotoUrl, after: wo.maintenanceLogs[0].afterPhotoUrl }
+      : null,
     reportedByName: wo.reportedByUser?.name || null,
     assignedToName: wo.assignedToUser?.name || null,
     assignedAt: wo.assignedAt ? wo.assignedAt.toISOString() : null,

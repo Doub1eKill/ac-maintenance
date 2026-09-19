@@ -6,6 +6,7 @@ import { X, Clock, MapPin, Wrench, Loader2, Pencil } from "lucide-react";
 import { getAirConditionerHistory, updateMaintenanceLogAction } from "@/app/admin/actions";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
+import { UnitThumb } from "@/components/shared/unit-thumb";
 import { EvidencePhotos } from "@/components/shared/evidence-photos";
 import { useEscapeToClose } from "@/hooks/use-escape-to-close";
 import { MAINTENANCE_ACTION_LABEL, formatThaiDate } from "@/lib/labels";
@@ -31,6 +32,7 @@ interface HistoryUnit {
   brandDeleted: boolean;
   modelDeleted: boolean;
   btu: number | null;
+  photoUrl: string | null;
   status: string;
   location: string;
   installedAt: string | null;
@@ -154,19 +156,22 @@ export function AcHistoryModal({ airConditionerId, onClose, currentUserId, isAdm
         )}
 
         {unit && (
-          <div className="rounded-xl border border-border bg-muted p-3.5 text-xs space-y-1.5">
-            <div className="font-bold text-foreground text-sm">
-              {unit.brand} {unit.model ? `• ${unit.model}` : ""} {unit.btu ? `(${unit.btu.toLocaleString()} BTU)` : ""}
-              <CatalogueMark brandDeleted={unit.brandDeleted} modelDeleted={unit.modelDeleted} className="ml-1" />
-            </div>
-            <div className="flex items-center gap-1.5 text-muted-foreground">
-              <MapPin className="h-3.5 w-3.5" /> {unit.location}
-            </div>
-            {unit.installedAt && (
-              <div className="text-muted-foreground">
-                ติดตั้งเมื่อ {formatThaiDate(unit.installedAt)}
+          <div className="flex items-start gap-3 rounded-xl border border-border bg-muted p-3.5 text-xs">
+            <UnitThumb src={unit.photoUrl} alt={`เครื่อง ${unit.acCode}`} size="lg" />
+            <div className="min-w-0 space-y-1.5">
+              <div className="font-bold text-foreground text-sm">
+                {unit.brand} {unit.model ? `• ${unit.model}` : ""} {unit.btu ? `(${unit.btu.toLocaleString()} BTU)` : ""}
+                <CatalogueMark brandDeleted={unit.brandDeleted} modelDeleted={unit.modelDeleted} className="ml-1" />
               </div>
-            )}
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <MapPin className="h-3.5 w-3.5" /> {unit.location}
+              </div>
+              {unit.installedAt && (
+                <div className="text-muted-foreground">
+                  ติดตั้งเมื่อ {formatThaiDate(unit.installedAt)}
+                </div>
+              )}
+            </div>
           </div>
         )}
 

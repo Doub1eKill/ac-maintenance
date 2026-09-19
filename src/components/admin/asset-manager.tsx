@@ -37,6 +37,7 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
+import { UnitThumb } from "@/components/shared/unit-thumb";
 import { FloorGroupList, groupByFloor } from "@/components/shared/building-groups";
 
 interface ACUnit {
@@ -49,6 +50,7 @@ interface ACUnit {
   brandDeleted: boolean;
   modelDeleted: boolean;
   btu: number | null;
+  photoUrl: string | null;
   status: string;
   qrCode: string;
   maintenanceSchedule: {
@@ -470,12 +472,15 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                       {r.acUnits.map((ac) => (
                         <div key={ac.id} className="rounded-lg border border-border bg-muted p-3 text-xs flex flex-col gap-3">
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <div className="font-mono font-bold text-foreground text-sm">{ac.acCode}</div>
-                              <div className="text-[11px] text-muted-foreground mt-0.5">
-                                {ac.brand} {ac.model ? `• ${ac.model}` : ""}
-                                <CatalogueMark brandDeleted={ac.brandDeleted} modelDeleted={ac.modelDeleted} className="ml-1" />
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex min-w-0 items-start gap-2.5">
+                              <UnitThumb src={ac.photoUrl} size="sm" />
+                              <div className="min-w-0">
+                                <div className="font-mono font-bold text-foreground text-sm break-all">{ac.acCode}</div>
+                                <div className="text-[11px] text-muted-foreground mt-0.5">
+                                  {ac.brand} {ac.model ? `• ${ac.model}` : ""}
+                                  <CatalogueMark brandDeleted={ac.brandDeleted} modelDeleted={ac.modelDeleted} className="ml-1" />
+                                </div>
                               </div>
                             </div>
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-success/20 text-success-foreground border border-success/30 whitespace-nowrap">
