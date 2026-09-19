@@ -4,7 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Loader2, QrCode, X } from "lucide-react";
 import { toast } from "sonner";
-import { SearchableSelect } from "@/components/shared/searchable-select";
+import { RoomCascadePicker } from "@/components/shared/room-cascade-picker";
 import {
   BrandModelPicker,
   appendBrandModel,
@@ -154,14 +154,7 @@ export function RegisterUnitModal({ rooms, onClose }: RegisterUnitModalProps) {
               <label className="mb-1 block text-[11px] font-bold text-foreground">
                 ห้องที่ติดตั้ง <span className="text-red-500">*</span>
               </label>
-              <SearchableSelect
-                options={rooms.map((room) => ({ value: room.id, label: room.label }))}
-                value={roomId}
-                onChange={setRoomId}
-                placeholder="เลือกห้อง"
-                searchPlaceholder="พิมพ์ชื่ออาคาร ชั้น หรือเลขห้อง..."
-                emptyLabel="ไม่พบห้องที่ค้นหา"
-              />
+              <RoomCascadePicker rooms={rooms} value={roomId} onChange={setRoomId} />
               <p className="mt-1 text-[10px] text-muted-foreground">
                 ย้ายห้องทีหลังไม่ได้ เพราะรหัสเครื่องถูกสร้างจากอาคารและห้องนี้
               </p>

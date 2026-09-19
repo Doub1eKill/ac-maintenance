@@ -142,11 +142,17 @@ export interface RoomOption {
   id: string;
   label: string;
   buildingName: string;
+  // The parts the label is built from, for a picker that narrows by
+  // building, then floor, then room rather than searching one long list.
+  buildingId: string;
+  floor: number | null;
+  roomName: string;
 }
 
 async function listRoomOptions(): Promise<RoomOption[]> {
   const buildings = await prisma.building.findMany({
     select: {
+      id: true,
       name: true,
       abbreviation: true,
       rooms: { select: { id: true, name: true, floor: true } },
@@ -161,6 +167,9 @@ async function listRoomOptions(): Promise<RoomOption[]> {
         // building abbreviation, a floor or a room number all narrow the list.
         label: `${building.name} · ${room.floor === null ? "ไม่ระบุชั้น" : `ชั้น ${room.floor}`} · ห้อง ${room.name}`,
         buildingName: building.name,
+        buildingId: building.id.toString(),
+        floor: room.floor,
+        roomName: room.name,
         sortKey: [building.name, room.floor ?? 9999, room.name] as const,
       }))
     )
@@ -173,7 +182,7 @@ async function listRoomOptions(): Promise<RoomOption[]> {
       if (a.sortKey[1] !== b.sortKey[1]) return Number(a.sortKey[1]) - Number(b.sortKey[1]);
       return String(a.sortKey[2]).localeCompare(String(b.sortKey[2]), "th");
     })
-    .map(({ id, label, buildingName }) => ({ id, label, buildingName }));
+    .map(({ id, label, buildingName, buildingId, floor, roomName }) => ({ id, label, buildingName, buildingId, floor, roomName }));
 }
 
 /**
