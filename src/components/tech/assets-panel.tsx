@@ -1,7 +1,7 @@
 "use client";
 
 import { format } from "date-fns";
-import { CalendarClock, Clock, Droplets, Snowflake, Wrench } from "lucide-react";
+import { CalendarClock, Camera, Clock, Droplets, Snowflake, Wrench } from "lucide-react";
 import {
   BuildingGroupList,
   FloorGroupList,
@@ -13,6 +13,7 @@ import {
 import type { TechnicianAssetUnit, TechnicianAssetSummary } from "@/lib/maintenance";
 import { filterJobs } from "@/components/tech/types";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
+import { UnitThumb } from "@/components/shared/unit-thumb";
 
 interface AssetsPanelProps {
   assetList: TechnicianAssetUnit[];
@@ -24,6 +25,9 @@ interface AssetsPanelProps {
   onViewHistory?: (airConditionerId: string) => void;
   // Opens the cleaning-cycle modal. Optional for the same reason.
   onEditSchedule?: (unit: TechnicianAssetUnit) => void;
+  // Opens the unit editor — the way a unit registered before pictures
+  // existed gets one. Optional for the same reason.
+  onEditUnit?: (unit: TechnicianAssetUnit) => void;
 }
 
 // The open work on a group of units, as the two badges the cards themselves
@@ -57,6 +61,7 @@ export function AssetsPanel({
   selectedBuilding,
   onViewHistory,
   onEditSchedule,
+  onEditUnit,
 }: AssetsPanelProps) {
   const filteredAssets = filterJobs(assetList, searchQuery, selectedBuilding);
   const groups = groupByBuilding(filteredAssets);
@@ -120,8 +125,25 @@ export function AssetsPanel({
                               <Clock className="w-3 h-3" /> {unit.status === "broken" ? "รอซ่อม" : "รอล้าง"}
                             </div>
                           )}
-                          <div className="pr-8 space-y-1">
-                            <div className="flex items-center gap-2">
+                          <div className="flex items-start gap-3 pr-8">
+                            {/* The picture, or — for the units registered before
+                                pictures existed — the one tap that adds it. This
+                                list is where a technician can fix that without
+                                waiting for a job on the unit. */}
+                            {unit.photoUrl || !onEditUnit ? (
+                              <UnitThumb src={unit.photoUrl} size="md" />
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => onEditUnit(unit)}
+                                aria-label={`เพิ่มรูป ${unit.acCode}`}
+                                className="flex h-14 w-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-dashed border-muted-foreground/50 bg-muted text-[9px] font-bold text-muted-foreground hover:border-primary hover:text-primary"
+                              >
+                                <Camera className="h-4 w-4" />
+                                เพิ่มรูป
+                              </button>
+                            )}
+                            <div className="min-w-0 flex flex-wrap items-center gap-2">
                               <span className="font-mono text-xs font-bold text-muted-foreground">{unit.acCode}</span>
                               <span className="rounded-md bg-secondary px-2 py-0.5 text-[10px] font-bold text-foreground">
                                 {unit.brand} {unit.btu ? `(${unit.btu} BTU)` : ""}

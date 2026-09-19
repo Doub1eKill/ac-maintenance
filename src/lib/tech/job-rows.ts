@@ -48,6 +48,9 @@ export function toTechJobRow(wo: TechJobRecord) {
     brand: wo.airConditioner.acBrand?.name || wo.airConditioner.brand || "ไม่ระบุ",
     ...catalogueFlags(wo.airConditioner),
     btu: wo.airConditioner.btu,
+    // The unit's own picture, so the card can confirm which machine the
+    // job is about before the technician walks to it.
+    photoUrl: wo.airConditioner.photoUrl,
     airConditionerId: wo.airConditionerId.toString(),
     status: wo.airConditioner.status,
     // What the job actually is. Read off the work order rather than inferred

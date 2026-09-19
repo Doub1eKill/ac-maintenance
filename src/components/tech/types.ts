@@ -10,6 +10,9 @@ export interface TechJobItem {
   brandDeleted?: boolean;
   modelDeleted?: boolean;
   btu: number | null;
+  // The unit's picture, when one has been taken. Optional for the same
+  // reason as the catalogue flags: the QR scan result builds a job without it.
+  photoUrl?: string | null;
   status: string;
   // Repair or cleaning, straight off the work order. Optional for the same
   // reason as the catalogue flags above: the QR scan result builds a job

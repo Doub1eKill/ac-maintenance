@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { X, Sparkles, Wrench, Droplets, PencilLine } from "lucide-react";
 import { PhotoPickerField } from "@/components/shared/photo-picker-field";
+import { UnitThumb } from "@/components/shared/unit-thumb";
 import { MAINTENANCE_ACTION_LABEL } from "@/lib/labels";
 import { UnitCataloguePanel } from "@/components/tech/unit-catalogue-panel";
 import {
@@ -93,7 +94,9 @@ export function LogActionModal({ job, isPending, onClose, onSubmit, onValidation
           {job.airConditionerId && (
             <div>
               <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <UnitThumb src={job.photoUrl} size="sm" />
+                  <div className="min-w-0">
                   <span className="block font-bold text-foreground">เครื่องที่กำลังบันทึก</span>
                   <span className="block truncate text-[11px] text-muted-foreground">
                     {unitOverride?.label ?? job.brand}
@@ -102,6 +105,7 @@ export function LogActionModal({ job, isPending, onClose, onSubmit, onValidation
                       return btu ? ` · ${btu.toLocaleString()} BTU` : "";
                     })()}
                   </span>
+                  </div>
                 </div>
                 <button
                   type="button"

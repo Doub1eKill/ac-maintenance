@@ -13,6 +13,7 @@ import {
 import type { TechJobItem } from "@/components/tech/types";
 import { filterJobs } from "@/components/tech/types";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
+import { UnitThumb } from "@/components/shared/unit-thumb";
 import { WorkOrderPriorityBadge, WorkOrderTypeBadge } from "@/components/shared/work-order-badges";
 
 interface CompletedJobsPanelProps {
@@ -51,9 +52,10 @@ export function CompletedJobsPanel({ completedJobs, searchQuery, selectedBuildin
                         onClick={() => job.airConditionerId && onViewHistory?.(job.airConditionerId)}
                         className="biz-card p-5 space-y-4 hover:border-muted-foreground transition-all bg-muted cursor-pointer"
                       >
-                        <div className="flex items-center justify-between opacity-80">
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
+                        <div className="flex items-start justify-between gap-3 opacity-80">
+                          <UnitThumb src={job.photoUrl} size="md" />
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
                               <span className="font-mono text-xs font-bold text-muted-foreground">{job.acCode}</span>
                               <span className="rounded-md bg-accent px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
                                 {job.brand}

@@ -303,6 +303,9 @@ export interface TechnicianAssetUnit {
   brand: string;
   model: string | null;
   btu: number | null;
+  // The unit's picture, or null for one registered before pictures existed
+  // — the list shows a "เพิ่มรูป" placeholder for those.
+  photoUrl: string | null;
   status: string;
   location: string;
   // The same place without the building, for lists grouped under a building
@@ -360,6 +363,7 @@ export async function getTechnicianAssetList(): Promise<{
       brand: true,
       model: true,
       btu: true,
+      photoUrl: true,
       status: true,
       acBrand: { select: { name: true, deletedAt: true } },
       acModel: { select: { name: true, defaultBtu: true, deletedAt: true } },
@@ -392,6 +396,7 @@ export async function getTechnicianAssetList(): Promise<{
       acCode: u.acCode,
       brand: u.acBrand?.name ?? u.brand ?? "ไม่ระบุ",
       model: u.acModel?.name ?? u.model,
+      photoUrl: u.photoUrl,
       ...catalogueFlags(u),
       btu: u.btu ?? u.acModel?.defaultBtu ?? null,
       status: u.status,

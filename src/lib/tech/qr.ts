@@ -63,6 +63,7 @@ export async function scanQrCodeAction(scanned: string) {
         brand: ac.acBrand?.name || ac.brand || "ไม่ระบุ",
         ...catalogueFlags(ac),
         btu: ac.btu,
+        photoUrl: ac.photoUrl,
         status: ac.status,
         location: formatUnitLocation(ac.room),
         lastMaintenance: lastLog ? lastLog.performedAt.toISOString() : null,

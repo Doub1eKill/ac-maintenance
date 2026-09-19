@@ -5,6 +5,7 @@ import { format } from "date-fns";
 import { QrCode, X, CheckCircle2, AlertTriangle, Camera, CameraOff, ClipboardPen, History, Loader2 } from "lucide-react";
 import { scanQrCodeAction } from "@/app/tech/actions";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
+import { UnitThumb } from "@/components/shared/unit-thumb";
 
 // The shape scanQrCodeAction returns when it finds the unit — the success
 // half of its union, so the result panel below is typed against the action
@@ -391,10 +392,16 @@ function QrScanModalBody({ isPending, onClose, onClaim, onClaimAndLog, onLogWork
         ) : (
           <div className="space-y-4 animate-in zoom-in-95">
             <div className="bg-muted border border-border p-4 rounded-xl space-y-3">
-              <div className="flex justify-between items-start">
-                <div>
-                  <div className="font-mono text-lg font-bold text-foreground">{qrResult.acDetails.acCode}</div>
-                  <div className="text-xs text-muted-foreground font-medium">{qrResult.acDetails.location}</div>
+              <div className="flex justify-between items-start gap-3">
+                {/* Picture first: the sticker just scanned should match the
+                    machine in front of the technician, and this is the
+                    fastest way to tell. */}
+                <div className="flex min-w-0 items-start gap-3">
+                  <UnitThumb src={qrResult.acDetails.photoUrl} alt={`เครื่อง ${qrResult.acDetails.acCode}`} size="lg" />
+                  <div className="min-w-0">
+                    <div className="font-mono text-lg font-bold text-foreground break-all">{qrResult.acDetails.acCode}</div>
+                    <div className="text-xs text-muted-foreground font-medium">{qrResult.acDetails.location}</div>
+                  </div>
                 </div>
                 <span className="bg-accent text-foreground text-[10px] font-bold px-2 py-1 rounded-md">
                   {qrResult.acDetails.brand}
