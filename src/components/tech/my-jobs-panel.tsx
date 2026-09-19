@@ -1,7 +1,7 @@
 "use client";
 
 import { format } from "date-fns";
-import { AlertTriangle, Clock } from "lucide-react";
+import { Clock } from "lucide-react";
 import {
   BuildingGroupList,
   FloorGroupList,
@@ -13,7 +13,7 @@ import {
 import type { TechJobItem } from "@/components/tech/types";
 import { filterJobs } from "@/components/tech/types";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
-import { WorkOrderTypeBadge } from "@/components/shared/work-order-badges";
+import { WorkOrderPriorityBadge, WorkOrderTypeBadge } from "@/components/shared/work-order-badges";
 
 interface MyJobsPanelProps {
   myJobs: TechJobItem[];
@@ -59,18 +59,7 @@ export function MyJobsPanel({
                         key={job.id}
                         className="biz-card p-5 space-y-4 hover:border-muted-foreground transition-all relative overflow-hidden"
                       >
-                        {job.priority === "critical" ? (
-                          <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1 shadow-sm">
-                            <AlertTriangle className="w-3 h-3" /> ด่วนที่สุด
-                          </div>
-                        ) : job.priority === "high" ? (
-                          <div className="absolute top-0 right-0 bg-orange-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1 shadow-sm">
-                            <AlertTriangle className="w-3 h-3" /> ด่วน
-                          </div>
-                        ) : null}
-                        {/* pr-8 keeps this clear of the priority ribbon pinned
-                            to the card's top-right corner. */}
-                        <div className="flex items-center pr-8">
+                        <div className="flex items-center">
                           <div className="space-y-1">
                             <div className="flex items-center gap-2">
                               <span className="font-mono text-xs font-bold text-muted-foreground">
@@ -85,7 +74,10 @@ export function MyJobsPanel({
                                 />
                               </span>
                             </div>
-                            {job.type && <WorkOrderTypeBadge type={job.type} size="sm" />}
+                            <div className="flex flex-wrap items-center gap-2">
+                              {job.type && <WorkOrderTypeBadge type={job.type} size="sm" />}
+                              <WorkOrderPriorityBadge priority={job.priority ?? null} size="sm" />
+                            </div>
                           </div>
                         </div>
 

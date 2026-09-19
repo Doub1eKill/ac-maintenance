@@ -1,7 +1,7 @@
 "use client";
 
 import { format } from "date-fns";
-import { AlertTriangle, CheckCircle2 } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import {
   BuildingGroupList,
   FloorGroupList,
@@ -13,7 +13,7 @@ import {
 import type { TechJobItem } from "@/components/tech/types";
 import { filterJobs } from "@/components/tech/types";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
-import { WorkOrderTypeBadge } from "@/components/shared/work-order-badges";
+import { WorkOrderPriorityBadge, WorkOrderTypeBadge } from "@/components/shared/work-order-badges";
 
 interface CompletedJobsPanelProps {
   completedJobs: TechJobItem[];
@@ -64,16 +64,7 @@ export function CompletedJobsPanel({ completedJobs, searchQuery, selectedBuildin
                                 />
                               </span>
                               {job.type && <WorkOrderTypeBadge type={job.type} size="sm" />}
-                              {job.priority === "critical" && (
-                                <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-800">
-                                  <AlertTriangle className="h-3 w-3" /> ด่วนที่สุด
-                                </span>
-                              )}
-                              {job.priority === "high" && (
-                                <span className="inline-flex items-center gap-1 rounded-full border border-orange-200 bg-orange-100 px-2 py-0.5 text-[10px] font-bold text-orange-800">
-                                  <AlertTriangle className="h-3 w-3" /> ด่วน
-                                </span>
-                              )}
+                              <WorkOrderPriorityBadge priority={job.priority ?? null} size="sm" />
                             </div>
                           </div>
                           <CheckCircle2 className="h-5 w-5 text-success" />

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { format } from "date-fns";
-import { AlertTriangle, Clock } from "lucide-react";
+import { Clock } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   BuildingGroupList,
@@ -15,7 +15,7 @@ import {
 import type { TechJobItem } from "@/components/tech/types";
 import { filterJobs } from "@/components/tech/types";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
-import { WorkOrderTypeBadge } from "@/components/shared/work-order-badges";
+import { WorkOrderPriorityBadge, WorkOrderTypeBadge } from "@/components/shared/work-order-badges";
 import { MotionCard } from "@/components/ui/motion";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -98,19 +98,14 @@ export function JobPoolPanel({ jobPool, searchQuery, selectedBuilding, isPending
                           className="biz-card p-5 space-y-4 hover:border-muted-foreground transition-all relative overflow-hidden flex flex-col justify-between"
                         >
                           <div>
-                            {job.priority === "critical" ? (
-                              <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1 shadow-sm">
-                                <AlertTriangle className="w-3 h-3" /> ด่วนที่สุด
-                              </div>
-                            ) : job.priority === "high" ? (
-                              <div className="absolute top-0 right-0 bg-orange-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1 shadow-sm">
-                                <AlertTriangle className="w-3 h-3" /> ด่วน
-                              </div>
-                            ) : isUrgent(job.createdAt) ? (
+                            {/* How long the job has waited is the ribbon; what
+                                priority it was raised with is a pill in the badge
+                                row below, the same pill the admin's board shows. */}
+                            {isUrgent(job.createdAt) && (
                               <div className="absolute top-0 right-0 bg-amber-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1 shadow-sm">
                                 <Clock className="w-3 h-3" /> รอนาน
                               </div>
-                            ) : null}
+                            )}
                             <div className="pr-8 space-y-1">
                               <div className="flex items-center gap-2">
                                 <Checkbox
@@ -119,7 +114,7 @@ export function JobPoolPanel({ jobPool, searchQuery, selectedBuilding, isPending
                                   aria-label={`เลือก ${job.acCode}`}
                                 />
                               </div>
-                              <div className="flex items-center gap-2">
+                              <div className="flex flex-wrap items-center gap-2">
                                 <span className="font-mono text-xs font-bold text-muted-foreground">{job.acCode}</span>
                                 <span className="rounded-md bg-secondary px-2 py-0.5 text-[10px] font-bold text-foreground">
                                   {job.brand} {job.btu ? `(${job.btu} BTU)` : ""}
@@ -130,6 +125,7 @@ export function JobPoolPanel({ jobPool, searchQuery, selectedBuilding, isPending
                                   />
                                 </span>
                                 {job.type && <WorkOrderTypeBadge type={job.type} size="sm" />}
+                                <WorkOrderPriorityBadge priority={job.priority ?? null} size="sm" />
                               </div>
                             </div>
                           </div>
