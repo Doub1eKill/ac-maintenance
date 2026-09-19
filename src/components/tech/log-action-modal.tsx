@@ -2,10 +2,8 @@
 
 import { useState } from "react";
 import { X, Sparkles, Wrench, Droplets, PencilLine } from "lucide-react";
-import { PhotoUpload } from "@/components/tech/photo-upload";
-import { shrinkImage } from "@/lib/client-image";
+import { PhotoPickerField } from "@/components/shared/photo-picker-field";
 import { MAINTENANCE_ACTION_LABEL } from "@/lib/labels";
-import type { FileWithPreview } from "@/hooks/use-file-upload";
 import { UnitCataloguePanel } from "@/components/tech/unit-catalogue-panel";
 import {
   NativeSelect,
@@ -23,8 +21,10 @@ interface LogActionModalProps {
 
 export function LogActionModal({ job, isPending, onClose, onSubmit, onValidationError }: LogActionModalProps) {
   const [selectedActions, setSelectedActions] = useState<string[]>([]);
-  const [beforePhotos, setBeforePhotos] = useState<FileWithPreview[]>([]);
-  const [afterPhotos, setAfterPhotos] = useState<FileWithPreview[]>([]);
+  // Already shrunk by the field; held here (as well as in the form's own
+  // inputs) so the submit does not depend on the DataTransfer write-back.
+  const [beforePhoto, setBeforePhoto] = useState<File | null>(null);
+  const [afterPhoto, setAfterPhoto] = useState<File | null>(null);
   const [repairDetail, setRepairDetail] = useState("");
   const [editingUnit, setEditingUnit] = useState(false);
   // What the unit says after an in-modal correction. null until one is made,
@@ -53,13 +53,12 @@ export function LogActionModal({ job, isPending, onClose, onSubmit, onValidation
     const formData = new FormData(e.currentTarget);
     formData.append("actions", JSON.stringify(selectedActions));
 
-    // A FileWithPreview may wrap stored-file metadata rather than a File;
-    // only a real File can travel in the form. Shrunk first: two camera
-    // originals in one request is more than a Vercel function will read.
-    const before = beforePhotos[0]?.file;
-    if (before instanceof File) formData.append("beforePhoto", await shrinkImage(before));
-    const after = afterPhotos[0]?.file;
-    if (after instanceof File) formData.append("afterPhoto", await shrinkImage(after));
+    // set, not append: the form already carries the two inputs, and a second
+    // copy of each would double a request that has a 4.5 MB ceiling.
+    if (beforePhoto) formData.set("beforePhoto", beforePhoto);
+    else formData.delete("beforePhoto");
+    if (afterPhoto) formData.set("afterPhoto", afterPhoto);
+    else formData.delete("afterPhoto");
 
     // Add parts to notes
     const parts = formData.get("parts") as string;
@@ -178,22 +177,22 @@ export function LogActionModal({ job, isPending, onClose, onSubmit, onValidation
           <div>
             <label className="mb-2 block font-bold text-foreground">รูปภาพหลักฐาน (ก่อนทำ/หลังทำ)</label>
             <div className="flex flex-col gap-3">
-              <div className="border border-border p-2 rounded-xl bg-muted">
-                <div className="text-[10px] font-bold text-muted-foreground mb-1">ภาพก่อนซ่อมบำรุง:</div>
-                <PhotoUpload
-                  maxFiles={1}
-                  multiple={false}
-                  className="w-full"
-                  onFilesChange={(files) => setBeforePhotos(files)}
+              <div className="rounded-xl border border-border bg-muted p-3">
+                <PhotoPickerField
+                  name="beforePhoto"
+                  label="ภาพก่อนซ่อมบำรุง"
+                  hint="ถ่ายตอนถึงหน้าเครื่อง ก่อนลงมือ (ไม่บังคับ)"
+                  disabled={isPending}
+                  onPick={setBeforePhoto}
                 />
               </div>
-              <div className="border border-border p-2 rounded-xl bg-muted">
-                <div className="text-[10px] font-bold text-muted-foreground mb-1">ภาพหลังซ่อมบำรุง:</div>
-                <PhotoUpload
-                  maxFiles={1}
-                  multiple={false}
-                  className="w-full"
-                  onFilesChange={(files) => setAfterPhotos(files)}
+              <div className="rounded-xl border border-border bg-muted p-3">
+                <PhotoPickerField
+                  name="afterPhoto"
+                  label="ภาพหลังซ่อมบำรุง"
+                  hint="ถ่ายเมื่อทำเสร็จแล้ว (ไม่บังคับ)"
+                  disabled={isPending}
+                  onPick={setAfterPhoto}
                 />
               </div>
             </div>

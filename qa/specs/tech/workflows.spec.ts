@@ -102,9 +102,10 @@ test.describe("technician on a phone", () => {
     await dlg.waitFor({ timeout: 10_000 });
     await dlg.getByText(/^ซ่อมแซม$/).click();
     await dlg.locator('textarea[name="repairDetail"], input[name="repairDetail"]').first().fill("QA_TEST: เปลี่ยนคาปาซิเตอร์");
-    const files = dlg.locator('input[type="file"]');
-    await files.nth(0).setInputFiles({ name: "before.png", mimeType: "image/png", buffer: pngBuffer([200, 60, 60], 96) });
-    await files.nth(1).setInputFiles({ name: "after.png", mimeType: "image/png", buffer: pngBuffer([60, 200, 60], 96) });
+    // By name: on a touch device each field also has a nameless camera input
+    // (capture="environment"), so counting file inputs no longer finds them.
+    await dlg.locator('input[name="beforePhoto"]').setInputFiles({ name: "before.png", mimeType: "image/png", buffer: pngBuffer([200, 60, 60], 96) });
+    await dlg.locator('input[name="afterPhoto"]').setInputFiles({ name: "after.png", mimeType: "image/png", buffer: pngBuffer([60, 200, 60], 96) });
     await page.waitForTimeout(800);
     await dlg.locator('select[name="acStatus"]').selectOption("normal");
     await dlg.locator('textarea[name="notes"], input[name="notes"]').first().fill("QA_TEST_LOG_001");
