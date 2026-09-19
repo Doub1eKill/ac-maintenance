@@ -27,6 +27,7 @@ export function WorkOrdersClient({
         globalSearch={search}
         onOpenDetails={assignment.openDetail}
         onAssign={assignment.assignOne}
+        onAssignMany={assignment.assignMany}
       />
 
       <AssignWorkOrderModal

@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Ban, CheckCircle2, ClipboardList, Clock, Sparkles, Wrench } from "lucide-react";
+import { Ban, CheckCircle2, ClipboardList, Clock, Sparkles, UserPlus, Wrench } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import {
   BuildingGroupList,
@@ -22,6 +24,9 @@ interface WorkOrderBoardProps {
   globalSearch: string;
   onOpenDetails: (workOrder: WorkOrderItem) => void;
   onAssign: (workOrderId: string) => void;
+  // Several pending orders at once, from the toolbar that appears when rows
+  // are ticked — the same flow the dashboard's urgent table offers.
+  onAssignMany: (workOrderIds: string[]) => void;
 }
 
 type StatusFilter = "" | "pending" | "claimed" | "completed" | "cancelled";
@@ -133,8 +138,28 @@ export function WorkOrderBoard({
   globalSearch,
   onOpenDetails,
   onAssign,
+  onAssignMany,
 }: WorkOrderBoardProps) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("");
+
+  // Ticked rows, by order id. Only a pending order can be assigned, so only
+  // those get a tick; and the count shown is taken from the orders as they
+  // are now, so an order that was assigned (and so stopped being pending)
+  // falls out of the selection by itself when the board refreshes.
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const selectedPending = useMemo(
+    () => workOrders.filter((wo) => wo.status === "pending" && selected.has(wo.id)),
+    [workOrders, selected]
+  );
+  const setTicked = (ids: string[], on: boolean) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) {
+        if (on) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
 
   const filtered = useMemo(
     () =>
@@ -220,6 +245,13 @@ export function WorkOrderBoard({
                     <table className="w-full text-sm text-left">
                       <thead className="border-b border-border text-muted-foreground font-semibold">
                         <tr>
+                          <th className="w-10 px-4 py-3">
+                            <RoomSelectAll
+                              items={room.items}
+                              selected={selected}
+                              onChange={setTicked}
+                            />
+                          </th>
                           <th className="px-4 py-3 whitespace-nowrap">รหัสแอร์</th>
                           <th className="px-4 py-3">ยี่ห้อ / ขนาด</th>
                           <th className="px-4 py-3 whitespace-nowrap">ประเภทงาน</th>
@@ -236,6 +268,28 @@ export function WorkOrderBoard({
                             className={`hover:bg-muted transition-colors cursor-pointer ${getWorkOrderRowClassName(wo)}`}
                             onClick={() => onOpenDetails(wo)}
                           >
+                            {/* The whole cell is the target, and it swallows the
+                                row's own click, as the dashboard table does: aiming
+                                for a 16px box and landing beside it must not open
+                                the detail dialog instead. No tick on a row that
+                                cannot be assigned. */}
+                            <td
+                              className={`w-10 px-4 py-3 ${wo.status === "pending" ? "cursor-pointer" : ""}`}
+                              onClick={(e) => {
+                                if (wo.status !== "pending") return;
+                                e.stopPropagation();
+                                setTicked([wo.id], !selected.has(wo.id));
+                              }}
+                            >
+                              {wo.status === "pending" && (
+                                <Checkbox
+                                  checked={selected.has(wo.id)}
+                                  onCheckedChange={(v) => setTicked([wo.id], !!v)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  aria-label="เลือกใบงาน"
+                                />
+                              )}
+                            </td>
                             <td className="px-4 py-3 whitespace-nowrap font-mono font-bold text-base text-foreground">
                               {wo.acCode}
                             </td>
@@ -330,6 +384,56 @@ export function WorkOrderBoard({
           />
         )}
       />
+
+      {selectedPending.length > 0 && (
+        <div className="sticky bottom-4 z-10 rounded-2xl border border-border bg-card/95 px-4 py-3 shadow-lg backdrop-blur">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="text-xs font-bold text-foreground">
+              เลือกแล้ว {selectedPending.length} ใบงาน
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button variant="ghost" size="sm" className="h-8 text-xs px-2" onClick={() => setSelected(new Set())}>
+                ล้างการเลือก
+              </Button>
+              <Button
+                size="sm"
+                className="h-8 text-xs px-3 gap-1.5"
+                onClick={() => onAssignMany(selectedPending.map((wo) => wo.id))}
+              >
+                <UserPlus className="h-3.5 w-3.5" />
+                จ่ายงาน ({selectedPending.length})
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+/**
+ * The tick at the head of one room's table: all, some or none of the room's
+ * pending orders, and toggling it touches only those. Nothing at all when
+ * the room has no pending order to tick.
+ */
+function RoomSelectAll({
+  items,
+  selected,
+  onChange,
+}: {
+  items: WorkOrderItem[];
+  selected: Set<string>;
+  onChange: (ids: string[], on: boolean) => void;
+}) {
+  const pending = items.filter((wo) => wo.status === "pending").map((wo) => wo.id);
+  if (pending.length === 0) return null;
+  const picked = pending.filter((id) => selected.has(id)).length;
+  const state = picked === pending.length ? true : picked > 0 ? "indeterminate" : false;
+  return (
+    <Checkbox
+      checked={state}
+      onCheckedChange={(v) => onChange(pending, !!v)}
+      aria-label="เลือกทั้งห้อง"
+    />
   );
 }
