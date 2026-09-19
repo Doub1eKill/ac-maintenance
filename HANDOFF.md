@@ -1,5 +1,9 @@
 # Project Handoff & Technical Summary
 
+# ☑️ ติ๊ก "เลือกทั้งหมด" ในตารางห้องบน dashboard เลือกเฉพาะห้องนั้น (19 ก.ย. 2026, DoubleKill)
+
+เจ้าของเจอบน production: เปิดห้อง 1-19179 (2 แถว) ติ๊กหัวตาราง → "เลือกแล้ว 45 รายการ" · สาเหตุ: `upcoming-maintenance-table.tsx` render `table.getHeaderGroups()` ซ้ำในทุกห้อง แต่ header ของคอลัมน์ `select` คือ `table.toggleAllPageRowsSelected` ของทั้งตาราง · แก้: ใน room view แทนที่ header ของคอลัมน์ select ด้วย `<RoomSelectAll rows={room.items.map(i => i.row)} />` — นับเฉพาะแถวที่ `getCanSelect()` ในห้อง, สถานะ checked/indeterminate/unchecked, toggle เฉพาะแถวเหล่านั้น (aria-label "เลือกทั้งห้อง") · header เดิมของ column def คงไว้ · พิสูจน์ด้วย Playwright script (login demo-role → อาคาร → ชั้น 1 → ห้อง 1-19179 → ติ๊ก): เลือกแล้ว 1 รายการ (ห้องมีแถว assignable 1 แถว) → ติ๊กซ้ำ = 0 · tsc/eslint 0/0 · ff-merge master, push
+
 # 🏢 หัวอาคารบน /admin/assets บอกจำนวนชั้น (19 ก.ย. 2026, DoubleKill)
 
 เจ้าของขอ: "เพิ่มส่วนที่บอกว่ามีกี่ชั้นด้วย" · commit `feat(assets)` บน `fix/building-floor-count` ff-merge master · `asset-manager.tsx` บรรทัดใต้ชื่ออาคาร: `B467711 • 5 ชั้น • 10 ห้อง • 23 แอร์` — นับ `new Set(b.rooms.map(r => r.floor)).size` จาก rooms ชุดเดียวกับที่นับห้อง/แอร์ (เคารพ filter) และ null แยกจาก 0 เหมือน `groupByFloor` · ฝั่งช่าง (`tech/assets-panel.tsx`) มีอยู่แล้ว · ตรวจในเบราว์เซอร์: 5 อาคาร = 5/2/6/4/5 ชั้น ตรงกับแถวชั้นที่แสดง · tsc/eslint 0/0
