@@ -6,7 +6,9 @@ import {
   NativeSelect,
   NativeSelectOption,
 } from "@/components/ui/native-select";
+import { RoomCascadePicker } from "@/components/shared/room-cascade-picker";
 import type { BuildingItem, PendingUser } from "@/components/admin/types";
+import type { RoomOption } from "@/lib/tech/pages";
 
 interface CreateWorkOrderModalProps {
   open: boolean;
@@ -18,16 +20,30 @@ interface CreateWorkOrderModalProps {
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
 }
 
-function findLocationForAc(buildings: BuildingItem[], acId: string | null) {
+function findRoomForAc(buildings: BuildingItem[], acId: string | null) {
   if (!acId) return null;
   for (const building of buildings) {
     for (const room of building.rooms) {
-      if (room.acUnits.some((ac) => ac.id === acId)) {
-        return { buildingId: building.id, roomId: room.id };
-      }
+      if (room.acUnits.some((ac) => ac.id === acId)) return room.id;
     }
   }
   return null;
+}
+
+// The picker takes the flat shape the technician pages load; the admin
+// already holds the same rooms nested under their buildings, so they are
+// flattened here rather than fetched a second time.
+function toRoomOptions(buildings: BuildingItem[]): RoomOption[] {
+  return buildings.flatMap((building) =>
+    building.rooms.map((room) => ({
+      id: room.id,
+      label: `${building.name} · ${room.floor === null ? "ไม่ระบุชั้น" : `ชั้น ${room.floor}`} · ห้อง ${room.name}`,
+      buildingName: building.name,
+      buildingId: building.id,
+      floor: room.floor,
+      roomName: room.name,
+    }))
+  );
 }
 
 export function CreateWorkOrderModal({
@@ -43,36 +59,31 @@ export function CreateWorkOrderModal({
   // the initialisers; if the unit it was opened for changes while open, the
   // selection is re-seeded during render (React's "adjust state on prop
   // change" form) rather than from an effect a frame later.
-  const seed = () => {
-    const location = findLocationForAc(buildings, defaultAcId);
-    return {
-      buildingId: location?.buildingId ?? "",
-      roomId: location?.roomId ?? "",
-      acId: defaultAcId ?? "",
-    };
-  };
-  const [selectedBuildingId, setSelectedBuildingId] = useState(() => seed().buildingId);
-  const [selectedRoomId, setSelectedRoomId] = useState(() => seed().roomId);
+  const seed = () => ({
+    roomId: findRoomForAc(buildings, defaultAcId),
+    acId: defaultAcId ?? "",
+  });
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(() => seed().roomId);
   const [selectedAcId, setSelectedAcId] = useState(() => seed().acId);
   const [seededFor, setSeededFor] = useState(defaultAcId);
   if (seededFor !== defaultAcId) {
     setSeededFor(defaultAcId);
     const next = seed();
-    setSelectedBuildingId(next.buildingId);
     setSelectedRoomId(next.roomId);
     setSelectedAcId(next.acId);
   }
   void open;
 
-  const roomsForBuilding = useMemo(
-    () => buildings.find((b) => b.id === selectedBuildingId)?.rooms ?? [],
-    [buildings, selectedBuildingId]
-  );
+  const rooms = useMemo(() => toRoomOptions(buildings), [buildings]);
 
-  const acUnitsForRoom = useMemo(
-    () => roomsForBuilding.find((r) => r.id === selectedRoomId)?.acUnits ?? [],
-    [roomsForBuilding, selectedRoomId]
-  );
+  const acUnitsForRoom = useMemo(() => {
+    if (!selectedRoomId) return [];
+    for (const building of buildings) {
+      const room = building.rooms.find((r) => r.id === selectedRoomId);
+      if (room) return room.acUnits;
+    }
+    return [];
+  }, [buildings, selectedRoomId]);
 
   if (!open) return null;
 
@@ -88,45 +99,20 @@ export function CreateWorkOrderModal({
 
         <form onSubmit={onSubmit} className="space-y-4 text-xs">
           <div>
-            <label className="mb-1.5 block font-bold text-foreground">เลือกอาคาร</label>
-            <NativeSelect
-              value={selectedBuildingId}
-              onChange={(e) => {
-                setSelectedBuildingId(e.target.value);
-                setSelectedRoomId("");
-                setSelectedAcId("");
-              }}
-              className="w-full h-auto py-3 px-3.5 rounded-xl border-border bg-muted text-xs text-foreground"
-            >
-              <NativeSelectOption value="" disabled>-- เลือกอาคาร --</NativeSelectOption>
-              {buildings.map((b) => (
-                <NativeSelectOption key={b.id} value={b.id}>
-                  {b.name}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
-          </div>
-
-          <div>
-            <label className="mb-1.5 block font-bold text-foreground">เลือกห้อง</label>
-            <NativeSelect
+            <label className="mb-1.5 block font-bold text-foreground">ห้องที่ติดตั้งเครื่อง</label>
+            {/* Building, floor, room — the same narrowing picker the
+                technician's register-unit form uses, so the two screens
+                pick a room the same way. A step above the room changing
+                hands back null, and the unit chosen for the old room goes
+                with it. */}
+            <RoomCascadePicker
+              rooms={rooms}
               value={selectedRoomId}
-              disabled={!selectedBuildingId}
-              onChange={(e) => {
-                setSelectedRoomId(e.target.value);
+              onChange={(roomId) => {
+                setSelectedRoomId(roomId);
                 setSelectedAcId("");
               }}
-              className="w-full h-auto py-3 px-3.5 rounded-xl border-border bg-muted text-xs text-foreground disabled:opacity-50"
-            >
-              <NativeSelectOption value="" disabled>
-                {selectedBuildingId ? "-- เลือกห้อง --" : "-- เลือกอาคารก่อน --"}
-              </NativeSelectOption>
-              {roomsForBuilding.map((r) => (
-                <NativeSelectOption key={r.id} value={r.id}>
-                  ห้อง {r.name}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
+            />
           </div>
 
           <div>
@@ -139,7 +125,11 @@ export function CreateWorkOrderModal({
               className="w-full h-auto py-3 px-3.5 rounded-xl border-border bg-muted text-xs text-foreground disabled:opacity-50"
             >
               <NativeSelectOption value="" disabled>
-                {selectedRoomId ? "-- เลือกเครื่องปรับอากาศ --" : "-- เลือกห้องก่อน --"}
+                {selectedRoomId
+                  ? acUnitsForRoom.length === 0
+                    ? "-- ห้องนี้ยังไม่มีเครื่องปรับอากาศ --"
+                    : "-- เลือกเครื่องปรับอากาศ --"
+                  : "-- เลือกห้องก่อน --"}
               </NativeSelectOption>
               {acUnitsForRoom.map((unit) => (
                 <NativeSelectOption key={unit.id} value={unit.id}>
