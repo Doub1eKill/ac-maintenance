@@ -45,6 +45,10 @@ interface TechFiltersValue {
   openLogFor: (job: TechJobItem) => void;
   openHistoryFor: (airConditionerId: string) => void;
   claim: (workOrderId: string) => void;
+  // The banner's action row, for a page to add its own button beside
+  // "สแกน QR Code" (through a portal) rather than floating one under the
+  // banner. null until the banner has mounted.
+  pageActionsSlot: HTMLElement | null;
 }
 
 const TechFiltersContext = createContext<TechFiltersValue>({
@@ -54,6 +58,7 @@ const TechFiltersContext = createContext<TechFiltersValue>({
   openLogFor: () => {},
   openHistoryFor: () => {},
   claim: () => {},
+  pageActionsSlot: null,
 });
 
 export function useTechFilters() {
@@ -124,6 +129,9 @@ export function TechShell({ user, universityName, buildings, badges, children }:
   const [showQrModal, setShowQrModal] = useState(false);
   const [jobForLog, setJobForLog] = useState<TechJobItem | null>(null);
   const [historyAcId, setHistoryAcId] = useState<string | null>(null);
+  // Set from the slot's callback ref once it exists, so a page rendering
+  // into it never has to wait for an effect.
+  const [pageActionsSlot, setPageActionsSlot] = useState<HTMLElement | null>(null);
 
   // Both filters reset when the page changes, for the reason the admin search
   // does: each list searches different text, so a term left over from the
@@ -270,6 +278,7 @@ export function TechShell({ user, universityName, buildings, badges, children }:
         openLogFor: setJobForLog,
         openHistoryFor: setHistoryAcId,
         claim,
+        pageActionsSlot,
       }}
     >
       <DashboardLayout
@@ -303,6 +312,11 @@ export function TechShell({ user, universityName, buildings, badges, children }:
             </h1>
           </div>
 
+          {/* A page's own action sits beside the filter and the scan button on
+              a wide screen, and on a row of its own under them on a phone. */}
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:shrink-0 sm:flex-row sm:items-center">
+          {/* Where a page puts that action; empty on pages that have none. */}
+          <div ref={setPageActionsSlot} className="contents" />
           <div className="flex gap-2 w-full sm:w-auto">
             {showFilters && (
               <NativeSelect
@@ -328,6 +342,7 @@ export function TechShell({ user, universityName, buildings, badges, children }:
               <QrCode className="h-4 w-4 text-primary-foreground" />
               <span className="hidden sm:inline">สแกน QR Code</span>
             </motion.button>
+          </div>
           </div>
         </div>
 
