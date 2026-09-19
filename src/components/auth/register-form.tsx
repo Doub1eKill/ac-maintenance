@@ -13,8 +13,9 @@ import {
 import type { EmailCheck } from "@/lib/email-check";
 import { isWellFormed, normaliseEmail } from "@/lib/email-check";
 import { avatarRejectionReason } from "@/lib/avatar";
+import { PhotoSource } from "@/components/shared/photo-source";
 import { shrinkImage } from "@/lib/client-image";
-import { Wrench, Building2, Eye, EyeOff, AlertTriangle, Clock, CheckCircle2, ArrowLeft, UserPlus, Camera, Phone, User, Loader2, AlertCircle, Lightbulb, MailCheck, Send, ShieldCheck } from "lucide-react";
+import { Wrench, Building2, Eye, EyeOff, AlertTriangle, Clock, CheckCircle2, ArrowLeft, UserPlus, Phone, User, Loader2, AlertCircle, Lightbulb, MailCheck, Send, ShieldCheck } from "lucide-react";
 import {
   Alert,
   AlertTitle,
@@ -309,22 +310,18 @@ export function RegisterForm() {
             </span>
           )}
         </div>
-        <button
-          type="button"
-          onClick={() => avatarInputRef.current?.click()}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-bold text-slate-800 hover:bg-slate-50 transition-colors shadow-2xs"
-        >
-          <Camera className="h-3 w-3" />
-          {avatarPreview ? "เปลี่ยนรูปโปรไฟล์" : "เลือกรูปโปรไฟล์"}
-        </button>
-        <input
-          ref={avatarInputRef}
+        {/* Front camera or the photo library; the form submits the named
+            input inside, and handlePickAvatar writes the shrunk file back
+            into it through avatarInputRef as before. */}
+        <PhotoSource
           id="avatar"
           name="avatar"
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={(e) => handlePickAvatar(e.target.files?.[0] ?? null)}
+          facing="user"
+          inputRef={avatarInputRef}
+          onFile={(file) => void handlePickAvatar(file)}
+          labels={{ camera: "ถ่ายรูป", gallery: avatarPreview ? "เปลี่ยนรูปโปรไฟล์" : "เลือกรูปโปรไฟล์" }}
+          className="justify-center"
+          buttonClassName="min-h-8 rounded-lg border-slate-200 bg-white px-2.5 text-[11px] text-slate-800 hover:bg-slate-50 shadow-2xs"
         />
         <span className="text-[10px] text-slate-400">
           จำเป็นต้องใส่ · ไฟล์รูปภาพ ขนาดไม่เกิน 8 MB

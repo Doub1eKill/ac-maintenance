@@ -3,12 +3,13 @@
 import { useEffect, useRef, useState, useSyncExternalStore, useTransition, useActionState } from "react";
 import Image from "next/image";
 import { useTheme } from "next-themes";
-import { User, Mail, Phone, Building2, KeyRound, AlertTriangle, CheckCircle2, Sun, Moon, Monitor, Camera, Pencil } from "lucide-react";
+import { User, Mail, Phone, Building2, KeyRound, AlertTriangle, CheckCircle2, Sun, Moon, Monitor, Pencil } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { requestPasswordReset, type RequestResetState } from "@/app/request-password-reset/actions";
 import { updateProfileAction } from "@/app/admin/actions";
 import { avatarRejectionReason } from "@/lib/avatar";
 import { shrinkImage } from "@/lib/client-image";
+import { PhotoSource } from "@/components/shared/photo-source";
 
 interface ProfilePanelProps {
   profile: {
@@ -177,20 +178,14 @@ export function ProfilePanel({ profile, universityName }: ProfilePanelProps) {
                 </span>
               )}
             </div>
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-1 whitespace-nowrap rounded-lg border border-border bg-card px-2 py-1 text-[11px] font-bold text-foreground hover:bg-secondary transition-colors"
-            >
-              <Camera className="h-3 w-3" />
-              เปลี่ยนรูป
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => handlePickAvatar(e.target.files?.[0] ?? null)}
+            {/* Front camera or the photo library, stacked under the picture. */}
+            <PhotoSource
+              facing="user"
+              inputRef={fileInputRef}
+              onFile={(file) => void handlePickAvatar(file)}
+              labels={{ camera: "ถ่ายรูป", gallery: "เลือกรูป" }}
+              className="flex-col items-stretch gap-1.5"
+              buttonClassName="min-h-8 justify-center whitespace-nowrap rounded-lg px-2 text-[11px] hover:bg-secondary"
             />
           </div>
           <div>
