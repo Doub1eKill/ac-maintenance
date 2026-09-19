@@ -405,7 +405,12 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
                       count for the whole building. Identical when nothing is
                       filtered, which is why it went unnoticed. */}
                   <p className="truncate text-xs text-muted-foreground">
-                    <span className="font-mono">{b.abbreviation}</span> • {b.rooms.length} ห้อง •{" "}
+                    <span className="font-mono">{b.abbreviation}</span> •{" "}
+                    {/* Floors are whatever distinct `floor` the rooms carry — there
+                        is no floors table — so this counts off the same rooms as
+                        the other two figures, and a room without a floor is one
+                        floor of its own, as groupByFloor shows it below. */}
+                    {new Set(b.rooms.map((r) => r.floor)).size} ชั้น • {b.rooms.length} ห้อง •{" "}
                     {b.rooms.reduce((n, r) => n + r.acUnits.length, 0)} แอร์
                   </p>
                 </div>
