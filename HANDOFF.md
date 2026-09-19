@@ -1,5 +1,9 @@
 # Project Handoff & Technical Summary
 
+# 🏢 หัวอาคารบน /admin/assets บอกจำนวนชั้น (19 ก.ย. 2026, DoubleKill)
+
+เจ้าของขอ: "เพิ่มส่วนที่บอกว่ามีกี่ชั้นด้วย" · commit `feat(assets)` บน `fix/building-floor-count` ff-merge master · `asset-manager.tsx` บรรทัดใต้ชื่ออาคาร: `B467711 • 5 ชั้น • 10 ห้อง • 23 แอร์` — นับ `new Set(b.rooms.map(r => r.floor)).size` จาก rooms ชุดเดียวกับที่นับห้อง/แอร์ (เคารพ filter) และ null แยกจาก 0 เหมือน `groupByFloor` · ฝั่งช่าง (`tech/assets-panel.tsx`) มีอยู่แล้ว · ตรวจในเบราว์เซอร์: 5 อาคาร = 5/2/6/4/5 ชั้น ตรงกับแถวชั้นที่แสดง · tsc/eslint 0/0
+
 # 🔐 ยืนยันอีเมลด้วยรหัส 6 หลักก่อนสมัคร (ส่วนที่ 2) + ล้างบัญชีทดสอบบน production (18 ก.ย. 2026, DoubleKill)
 
 เจ้าของเลือก **A แบบเข้มกว่าที่เสนอ**: "บังคับให้กรอกรหัสยืนยันก่อนถึงจะกดสมัครได้" → พิสูจน์อีเมล**ก่อน**สร้างบัญชี ไม่มีบัญชีค้างที่ยังไม่ยืนยันในระบบเลย ไม่ต้องบล็อก login/ลบทิ้งทีหลัง · คง auto-approve technician @*.ac.th (ปลอดภัยแล้วเพราะเกิดหลังพิสูจน์) · branch `feat/email-otp` 2 commit ff-merge master
