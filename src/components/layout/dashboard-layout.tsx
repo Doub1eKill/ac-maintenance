@@ -97,7 +97,7 @@ export function DashboardLayout({
   setActiveTab,
   navItems,
   onCreateAction,
-  createActionLabel = "+ เพิ่มรายการ",
+  createActionLabel = "เพิ่มรายการ",
   searchPlaceholder = "ค้นหารายการ...",
   onSearchChange,
   searchValue = "",

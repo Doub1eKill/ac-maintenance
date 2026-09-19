@@ -123,7 +123,7 @@ function AdminShellInner({ user, universityName, badges, children }: AdminShellP
         if (entry.href) router.push(entry.href);
       }}
       onCreateAction={createWorkOrder.openBlank}
-      createActionLabel="+ สร้างใบงานซ่อมบำรุง"
+      createActionLabel="สร้างใบงานซ่อมบำรุง"
     >
       {children}
     </DashboardLayout>
