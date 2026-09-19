@@ -42,6 +42,11 @@ export function PhotoLightbox({ photos, index, onClose }: PhotoLightboxProps) {
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogContent
+        // The lightbox usually opens over one of the app's hand-rolled modals,
+        // which close themselves on a document-level Escape. Radix sees the
+        // key first (capture phase); stopping it here means one Escape closes
+        // the picture and the modal underneath stays.
+        onEscapeKeyDown={(event) => event.stopPropagation()}
         className="max-w-[calc(100%-1rem)] gap-3 bg-card p-3 sm:max-w-3xl sm:p-4 [&_[data-slot=dialog-close]]:top-2 [&_[data-slot=dialog-close]]:right-2 sm:[&_[data-slot=dialog-close]]:top-3 sm:[&_[data-slot=dialog-close]]:right-3"
       >
         <DialogHeader className="sr-only">
