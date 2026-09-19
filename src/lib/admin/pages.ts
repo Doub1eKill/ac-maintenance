@@ -117,7 +117,9 @@ export async function getAdminOverviewData() {
   return {
     metrics: {
       ...unitCounts,
-      pendingWorkOrders: pendingJobs.size,
+      // The map now also carries claimed jobs (so the urgent rows can name
+      // who holds them); the badge still counts only the ones still waiting.
+      pendingWorkOrders: [...pendingJobs.values()].filter((j) => j.status === "pending").length,
       activeTechsCount,
     },
     urgentUnits,

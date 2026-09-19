@@ -32,7 +32,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ArrowUpDown, CalendarRange, ChevronDown, Copy, UserPlus, Wrench, Sparkles } from "lucide-react";
+import { ArrowUpDown, CalendarRange, ChevronDown, Copy, UserCheck, UserPlus, Wrench, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatThaiDate } from "@/lib/labels";
 import {
@@ -93,6 +93,9 @@ export interface UrgentMaintenanceAC {
   // one a caller reaches for.
   workOrderId?: string | null;
   pendingWorkOrderId?: string | null;
+  // Set when the unit's open job is already a technician's: nothing to raise
+  // and nothing to assign, so the row says who has it instead.
+  claimedByName?: string | null;
   nextDueDate?: string | null;
 }
 
@@ -324,7 +327,18 @@ export const columns: ColumnDef<MaintenanceRow>[] = [
             assign — and had no control to raise one either, so the row was a
             dead end. This is the action those rows need.
           */}
-          {!item.pendingWorkOrderId && (
+          {/* A job someone already holds: raising another would be refused
+              (one open job per unit and type), so the row says who has it
+              rather than offering a button that only ever toasts an error. */}
+          {item.kind === "urgent" && item.claimedByName ? (
+            <span
+              className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-[11px] font-bold text-primary whitespace-nowrap"
+              title={`มอบหมายให้ ${item.claimedByName} แล้ว`}
+            >
+              <UserCheck className="h-3 w-3 shrink-0" />
+              มอบหมายแล้ว · {item.claimedByName}
+            </span>
+          ) : !item.pendingWorkOrderId ? (
             <Button
               variant="outline"
               size="sm"
@@ -336,7 +350,7 @@ export const columns: ColumnDef<MaintenanceRow>[] = [
             >
               {item.kind === "upcoming" ? "สร้างใบงานล้างแอร์" : "สร้างใบงาน"}
             </Button>
-          )}
+          ) : null}
         </div>
       );
     },

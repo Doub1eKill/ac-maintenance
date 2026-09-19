@@ -77,8 +77,8 @@ export function OverviewPanel({
         // missing date as the beginning of time — so the rows nobody has
         // ticketed yet outranked jobs reported in July, and the first thing an
         // admin saw was the only rows the "มอบหมายช่าง" button cannot act on.
-        const aHasJob = a.workOrderId !== null;
-        const bHasJob = b.workOrderId !== null;
+        const aHasJob = a.workOrderId !== null || a.claimedByName !== null;
+        const bHasJob = b.workOrderId !== null || b.claimedByName !== null;
         if (aHasJob !== bHasJob) return aHasJob ? -1 : 1;
 
         const rankDiff = priorityRank(a.priority) - priorityRank(b.priority);

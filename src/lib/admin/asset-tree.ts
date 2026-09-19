@@ -64,6 +64,10 @@ export interface PendingJobRef {
   priority: string | null;
   issueDescription: string | null;
   createdAt: Date | null;
+  // "pending" is a job the admin can still hand out; "claimed" is one a
+  // technician already holds, whose name rides along so the row can say so.
+  status: "pending" | "claimed";
+  claimedByName: string | null;
 }
 
 export interface UrgentUnit {
@@ -87,6 +91,10 @@ export interface UrgentUnit {
   buildingName: string;
   type: MaintenanceJobType;
   workOrderId: string | null;
+  // The technician holding the unit's open job, when it has been claimed or
+  // assigned and so cannot be handed out (or raised) again. Exclusive with
+  // workOrderId above: a job is either still waiting or already someone's.
+  claimedByName: string | null;
   priority: string | null;
   issueDescription: string | null;
   reportedAt: string | null;
@@ -155,7 +163,8 @@ export function shapeBuildingTree(
             // urgent list ticks units but assignment happens on a job, so the
             // board needs this to know which rows it can actually send to
             // bulkAssignWorkOrdersAction.
-            workOrderId: pendingWo?.id.toString() ?? null,
+            workOrderId: pendingWo?.status === "pending" ? pendingWo.id.toString() : null,
+            claimedByName: pendingWo?.status === "claimed" ? pendingWo.claimedByName : null,
             priority: pendingWo?.priority ?? null,
             issueDescription: pendingWo?.issueDescription ?? null,
             reportedAt: pendingWo?.createdAt ? pendingWo.createdAt.toISOString() : null,
@@ -245,7 +254,7 @@ export async function getBuildingTree() {
 /** Shared by the pages that do need the open jobs: the overview and the board. */
 export async function getPendingJobsByAcId() {
   const rows = await prisma.workOrder.findMany({
-    where: { status: "pending" },
+    where: { status: { in: ["pending", "claimed"] } },
     select: {
       id: true,
       airConditionerId: true,
@@ -253,9 +262,27 @@ export async function getPendingJobsByAcId() {
       priority: true,
       issueDescription: true,
       createdAt: true,
+      status: true,
+      claimedByUser: { select: { name: true } },
     },
   });
-  return new Map<string, PendingJobRef>(
-    rows.map((wo) => [wo.airConditionerId.toString(), wo])
-  );
+  // One entry per unit. A unit may hold a waiting job and a claimed one at
+  // once (one open job per type), and the waiting one wins: it is the one
+  // the admin can still act on, so the row stays assignable.
+  const byAc = new Map<string, PendingJobRef>();
+  for (const wo of rows) {
+    const key = wo.airConditionerId.toString();
+    const ref: PendingJobRef = {
+      id: wo.id,
+      type: wo.type,
+      priority: wo.priority,
+      issueDescription: wo.issueDescription,
+      createdAt: wo.createdAt,
+      status: wo.status === "pending" ? "pending" : "claimed",
+      claimedByName: wo.claimedByUser?.name ?? null,
+    };
+    const existing = byAc.get(key);
+    if (!existing || (existing.status === "claimed" && ref.status === "pending")) byAc.set(key, ref);
+  }
+  return byAc;
 }
