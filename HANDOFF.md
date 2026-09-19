@@ -1,5 +1,9 @@
 # Project Handoff & Technical Summary
 
+# 👤 Dashboard: แถวที่ใบงานถูกมอบหมายแล้วแสดงชื่อช่างแทนปุ่ม "สร้างใบงาน" (19 ก.ย. 2026, DoubleKill)
+
+เจ้าของกด "สร้างใบงาน" บนแถวที่มีใบงาน `claimed` อยู่แล้ว → toast "เครื่องนี้มีใบงานซ่อมที่ยังเปิดอยู่ (กำลังดำเนินการ)" · สาเหตุ: `getPendingJobsByAcId()` (asset-tree.ts) ดึงเฉพาะ `status: pending` → unit ที่งานถูกรับ/มอบหมายแล้วดูเหมือนไม่มีงาน · แก้: query `pending` + `claimed` พร้อม `claimedByUser.name`; map ต่อ unit เลือก pending ก่อน claimed (unit มี open ได้ทั้ง repair+cleaning) · `UrgentUnit.claimedByName` (exclusive กับ `workOrderId` ที่ยังหมายถึง pending id เท่านั้น → bulk assign ไม่เปลี่ยน) · `upcoming-maintenance-table.tsx` cell: urgent + claimedByName → badge lucide `UserCheck` "มอบหมายแล้ว · ชื่อ" ไม่มีปุ่ม ไม่มีติ๊ก · `overview-panel.tsx` sort นับ claimed เป็น has-job · `pages.ts` badge `pendingWorkOrders` นับเฉพาะ pending (map มี claimed แล้ว) · พิสูจน์ Playwright: ห้อง 7-970896 → -03 pending มีติ๊ก ไม่มีปุ่ม, -01/-02 "มอบหมายแล้ว · Craig Yost" ไม่มีติ๊ก · badge sidebar 46 = pending จริง · screenshot `runs/assigned-row.png`
+
 # ➕ ปุ่มสร้างใบงานมี + ซ้อนสองอัน (19 ก.ย. 2026, DoubleKill)
 
 `dashboard-layout.tsx` วาดไอคอน lucide `Plus` หน้า label อยู่แล้ว แต่ `admin-shell.tsx` ส่ง `createActionLabel="+ สร้างใบงานซ่อมบำรุง"` (และ default ของ layout `"+ เพิ่มรายการ"`) → เห็นเป็น "+ + สร้าง…" · ตัด `+` ในข้อความออกทั้งสองที่ · harness match ด้วย regex ที่คำ ไม่กระทบ · ตรวจในเบราว์เซอร์: text = "สร้างใบงานซ่อมบำรุง", svg 1 อัน
