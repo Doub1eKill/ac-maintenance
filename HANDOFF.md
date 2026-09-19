@@ -1,5 +1,9 @@
 # Project Handoff & Technical Summary
 
+# ➕ ปุ่มสร้างใบงานมี + ซ้อนสองอัน (19 ก.ย. 2026, DoubleKill)
+
+`dashboard-layout.tsx` วาดไอคอน lucide `Plus` หน้า label อยู่แล้ว แต่ `admin-shell.tsx` ส่ง `createActionLabel="+ สร้างใบงานซ่อมบำรุง"` (และ default ของ layout `"+ เพิ่มรายการ"`) → เห็นเป็น "+ + สร้าง…" · ตัด `+` ในข้อความออกทั้งสองที่ · harness match ด้วย regex ที่คำ ไม่กระทบ · ตรวจในเบราว์เซอร์: text = "สร้างใบงานซ่อมบำรุง", svg 1 อัน
+
 # 📋 กระดานใบงาน: จ่ายงานหลายใบพร้อมกัน (19 ก.ย. 2026, DoubleKill)
 
 เจ้าของขอ: "เพิ่มระบบจ่ายหลายงานพร้อมกันในหน้านี้" (/admin/work-orders) · commit `feat(admin)` บน `feat/board-bulk-assign` ff-merge master · `work-order-board.tsx`: state `selected: Set<id>` + `selectedPending` (นับจาก workOrders ปัจจุบันที่ยัง pending → พอ assign แล้ว row กลายเป็น claimed จะหลุดจาก selection เองหลัง revalidate) · คอลัมน์ติ๊กใหม่: แถว pending เท่านั้น (cell ทั้งช่องเป็น target + stopPropagation เหมือน dashboard), หัวตารางแต่ละห้อง = `RoomSelectAll` เฉพาะ pending ในห้อง (checked/indeterminate) · แถบล่าง sticky "เลือกแล้ว N ใบงาน · ล้างการเลือก · จ่ายงาน (N)" → `onAssignMany` = `assignment.assignMany` ใน `work-orders-client.tsx` (hook `useWorkOrderAssignment` และ `AssignWorkOrderModal` รองรับ bulk อยู่แล้วจาก dashboard, action `bulkAssignWorkOrdersAction`) · ไม่แตะ server · พิสูจน์ Playwright script: ติ๊กห้อง 7-31951 = 2, ติ๊กอีกแถวในห้อง 7-970896 = 3, กด จ่ายงาน (3) → modal "มอบหมาย 3 ใบงานให้ช่างเทคนิค" (ไม่ได้ submit — production data) · screenshot `ac-maintenance-qa/runs/board-bulk-select.png` · tsc/eslint 0/0
