@@ -6,6 +6,7 @@ import { X, Clock, MapPin, Wrench, Loader2, Pencil } from "lucide-react";
 import { getAirConditionerHistory, updateMaintenanceLogAction } from "@/app/admin/actions";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
+import { EvidencePhotos } from "@/components/shared/evidence-photos";
 import { useEscapeToClose } from "@/hooks/use-escape-to-close";
 import { MAINTENANCE_ACTION_LABEL, formatThaiDate } from "@/lib/labels";
 import type { MaintenanceAction } from "@/generated/prisma/enums";
@@ -265,20 +266,9 @@ export function AcHistoryModal({ airConditionerId, onClose, currentUserId, isAdm
                           {log.notes}
                         </div>
                       )}
-                      {(log.beforePhotoUrl || log.afterPhotoUrl) && (
-                        <div className="flex gap-2 mt-1.5">
-                          {log.beforePhotoUrl && (
-                            <a href={log.beforePhotoUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-primary hover:underline">
-                              รูปก่อนซ่อม
-                            </a>
-                          )}
-                          {log.afterPhotoUrl && (
-                            <a href={log.afterPhotoUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-primary hover:underline">
-                              รูปหลังซ่อม
-                            </a>
-                          )}
-                        </div>
-                      )}
+                      <div className="mt-1.5">
+                        <EvidencePhotos before={log.beforePhotoUrl} after={log.afterPhotoUrl} size="sm" />
+                      </div>
                     </>
                   )}
                 </div>

@@ -4,11 +4,12 @@ import { auth } from "@/lib/auth";
 import { getMaintenanceHistory, inAppTimeZone } from "@/lib/maintenance";
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
-import { ArrowLeft, Clock, CalendarClock, Settings2, ShieldCheck, ClipboardPen, LogIn, Wind, Wrench, Image as ImageIcon } from "lucide-react";
+import { ArrowLeft, Clock, CalendarClock, Settings2, ShieldCheck, ClipboardPen, LogIn, Wind, Wrench } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { catalogueFlags } from "@/lib/catalogue-status";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
+import { EvidencePhotos } from "@/components/shared/evidence-photos";
 import { MAINTENANCE_ACTION_LABEL } from "@/lib/labels";
 
 /**
@@ -193,18 +194,12 @@ export default async function QRCodePage(props: { params: Promise<{ id: string }
                   {isSignedIn && log.notes && (
                     <div className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg border border-slate-100">{log.notes}</div>
                   )}
-                  {isSignedIn && (log.beforePhotoUrl || log.afterPhotoUrl) && (
-                    <div className="mt-2 flex gap-3 text-[11px] font-bold">
-                      {log.beforePhotoUrl && (
-                        <a href={log.beforePhotoUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sky-700 hover:underline">
-                          <ImageIcon className="w-3.5 h-3.5" /> รูปก่อนซ่อม
-                        </a>
-                      )}
-                      {log.afterPhotoUrl && (
-                        <a href={log.afterPhotoUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sky-700 hover:underline">
-                          <ImageIcon className="w-3.5 h-3.5" /> รูปหลังซ่อม
-                        </a>
-                      )}
+                  {/* Evidence stays behind sign-in, as before; only the
+                      form changed — thumbnails that open a lightbox instead
+                      of links to the raw files. */}
+                  {isSignedIn && (
+                    <div className="mt-2">
+                      <EvidencePhotos before={log.beforePhotoUrl} after={log.afterPhotoUrl} />
                     </div>
                   )}
                 </div>
