@@ -12,9 +12,7 @@ import {
   Images,
   MapPin,
   Snowflake,
-  Sparkles,
   UserCheck,
-  Wrench,
 } from "lucide-react";
 import {
   Dialog,
@@ -22,6 +20,11 @@ import {
 } from "@/components/ui/dialog";
 import type { WorkOrderItem } from "@/components/admin/types";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
+import {
+  WorkOrderPriorityBadge,
+  WorkOrderStatusBadge,
+  WorkOrderTypeBadge,
+} from "@/components/shared/work-order-badges";
 
 interface WorkOrderDetailDialogProps {
   workOrder: WorkOrderItem | null;
@@ -134,45 +137,9 @@ export function WorkOrderDetailDialog({ workOrder, isPending, onClose, onCancelW
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  {workOrder.type === "repair" ? (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-destructive/10 text-destructive border border-destructive/20">
-                      <Wrench className="h-3.5 w-3.5" /> งานซ่อม
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-sky-500/10 text-sky-600 border border-sky-500/20">
-                      <Sparkles className="h-3.5 w-3.5" /> งานล้างแอร์
-                    </span>
-                  )}
-                  {workOrder.priority === "critical" && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-800 border border-red-200">
-                      <AlertTriangle className="h-3.5 w-3.5" /> ด่วนที่สุด (Critical)
-                    </span>
-                  )}
-                  {workOrder.priority === "high" && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-800 border border-orange-200">
-                      <AlertTriangle className="h-3.5 w-3.5" /> ด่วน (High)
-                    </span>
-                  )}
-                  {workOrder.status === "pending" && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-warning/20 text-warning-foreground border border-warning/30">
-                      <Clock className="h-3.5 w-3.5" /> รอดำเนินการ
-                    </span>
-                  )}
-                  {workOrder.status === "claimed" && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-primary/20 text-primary border border-primary/30">
-                      <Wrench className="h-3.5 w-3.5" /> กำลังดำเนินการ
-                    </span>
-                  )}
-                  {workOrder.status === "completed" && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-success/20 text-success-foreground border border-success/30">
-                      <CheckCircle2 className="h-3.5 w-3.5" /> เสร็จสิ้น
-                    </span>
-                  )}
-                  {workOrder.status === "cancelled" && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-muted text-muted-foreground border border-border">
-                      <Ban className="h-3.5 w-3.5" /> ยกเลิกแล้ว
-                    </span>
-                  )}
+                  <WorkOrderTypeBadge type={workOrder.type} size="lg" />
+                  <WorkOrderPriorityBadge priority={workOrder.priority} size="lg" />
+                  <WorkOrderStatusBadge status={workOrder.status} size="lg" />
                 </div>
               </div>
 

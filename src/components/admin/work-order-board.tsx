@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Ban, CheckCircle2, ClipboardList, Clock, Sparkles, UserPlus, Wrench } from "lucide-react";
+import { ClipboardList, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
@@ -14,6 +14,7 @@ import {
   groupByRoom,
 } from "@/components/shared/building-groups";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
+import { WorkOrderStatusBadge, WorkOrderTypeBadge } from "@/components/shared/work-order-badges";
 import { useCreateWorkOrder } from "@/components/admin/create-work-order-provider";
 import type { WorkOrderItem, WorkOrderPageInfo } from "@/components/admin/types";
 import { formatThaiDate } from "@/lib/labels";
@@ -93,30 +94,10 @@ function GroupTypeBadges({ items }: { items: WorkOrderItem[] }) {
 
   return (
     <div className="flex flex-wrap items-center justify-end gap-1.5">
-      {repair > 0 && (
-        <span className="inline-flex items-center gap-1 rounded-full border border-destructive/20 bg-destructive/10 px-2 py-0.5 text-[10px] font-bold text-destructive whitespace-nowrap">
-          <Wrench className="h-3 w-3" />
-          งานซ่อม {repair}
-        </span>
-      )}
-      {cleaning > 0 && (
-        <span className="inline-flex items-center gap-1 rounded-full border border-sky-500/20 bg-sky-500/10 px-2 py-0.5 text-[10px] font-bold text-sky-600 whitespace-nowrap">
-          <Sparkles className="h-3 w-3" />
-          งานล้างแอร์ {cleaning}
-        </span>
-      )}
-      {pending > 0 && (
-        <span className="inline-flex items-center gap-1 rounded-full border border-warning/30 bg-warning/20 px-2 py-0.5 text-[10px] font-bold text-warning-foreground whitespace-nowrap">
-          <Clock className="h-3 w-3" />
-          รอดำเนินการ {pending}
-        </span>
-      )}
-      {claimed > 0 && (
-        <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/20 px-2 py-0.5 text-[10px] font-bold text-primary whitespace-nowrap">
-          <Wrench className="h-3 w-3" />
-          กำลังดำเนินการ {claimed}
-        </span>
-      )}
+      {repair > 0 && <WorkOrderTypeBadge type="repair" count={repair} size="sm" />}
+      {cleaning > 0 && <WorkOrderTypeBadge type="cleaning" count={cleaning} size="sm" />}
+      {pending > 0 && <WorkOrderStatusBadge status="pending" count={pending} size="sm" />}
+      {claimed > 0 && <WorkOrderStatusBadge status="claimed" count={claimed} size="sm" />}
     </div>
   );
 }
@@ -300,17 +281,7 @@ export function WorkOrderBoard({
                               </div>
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap">
-                              {wo.type === "repair" ? (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-destructive/10 text-destructive border border-destructive/20">
-                                  <Wrench className="h-3 w-3" />
-                                  งานซ่อม
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-sky-500/10 text-sky-600 border border-sky-500/20">
-                                  <Sparkles className="h-3 w-3" />
-                                  งานล้างแอร์
-                                </span>
-                              )}
+                              <WorkOrderTypeBadge type={wo.type} />
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
                               {formatThaiDate(wo.createdAt)}
@@ -328,30 +299,7 @@ export function WorkOrderBoard({
                               )}
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap text-center">
-                              {wo.status === "pending" && (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-warning/20 text-warning-foreground border border-warning/30">
-                                  <Clock className="h-3 w-3" />
-                                  รอดำเนินการ
-                                </span>
-                              )}
-                              {wo.status === "claimed" && (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary/20 text-primary border border-primary/30">
-                                  <Wrench className="h-3 w-3" />
-                                  กำลังดำเนินการ
-                                </span>
-                              )}
-                              {wo.status === "completed" && (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-success/20 text-success-foreground border border-success/30">
-                                  <CheckCircle2 className="h-3 w-3" />
-                                  เสร็จสิ้น
-                                </span>
-                              )}
-                              {wo.status === "cancelled" && (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-muted text-muted-foreground border border-border">
-                                  <Ban className="h-3 w-3" />
-                                  ยกเลิกแล้ว
-                                </span>
-                              )}
+                              <WorkOrderStatusBadge status={wo.status} />
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap text-right">
                               {wo.status === "pending" ? (

@@ -32,3 +32,23 @@ export function formatThaiDate(value: string | Date | null | undefined, fallback
   if (!value) return fallback;
   return new Date(value).toLocaleDateString("th-TH");
 }
+
+/** What a work order's `type` is called on the admin screens. */
+export const WORK_ORDER_TYPE_LABEL: Record<"repair" | "cleaning", string> = {
+  repair: "งานซ่อม",
+  cleaning: "งานล้างแอร์",
+};
+
+/** What a work order's `status` is called on the admin screens. */
+export const WORK_ORDER_STATUS_LABEL: Record<"pending" | "claimed" | "completed" | "cancelled", string> = {
+  pending: "รอดำเนินการ",
+  claimed: "กำลังดำเนินการ",
+  completed: "เสร็จสิ้น",
+  cancelled: "ยกเลิกแล้ว",
+};
+
+/** The two priorities worth a badge; "low"/"normal" show nothing. */
+export const WORK_ORDER_PRIORITY_LABEL: Record<"critical" | "high", string> = {
+  critical: "ด่วนที่สุด (Critical)",
+  high: "ด่วน (High)",
+};
