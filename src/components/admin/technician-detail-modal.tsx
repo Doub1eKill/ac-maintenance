@@ -14,7 +14,6 @@ import {
   Phone,
   ShieldCheck,
   ShieldOff,
-  Snowflake,
   Sparkles,
   Wrench,
   X,
@@ -27,6 +26,9 @@ import {
   groupByFloor,
   groupByRoom,
 } from "@/components/shared/building-groups";
+import { EvidencePhotos } from "@/components/shared/evidence-photos";
+import { UnitThumb } from "@/components/shared/unit-thumb";
+import { WorkOrderPriorityBadge, WorkOrderTypeBadge } from "@/components/shared/work-order-badges";
 import { ConfirmActionDialog } from "@/components/ui/thai-alert-dialogs";
 import { useEscapeToClose } from "@/hooks/use-escape-to-close";
 import { adminResetUserPasswordAction, getTechnicianDetail } from "@/app/admin/actions";
@@ -166,7 +168,7 @@ export function TechnicianDetailModal({
                 onClick={() => setOpenUnitId(open ? null : acId)}
                 className="flex w-full items-center gap-2.5 bg-muted px-3 py-2.5 text-left hover:bg-secondary"
               >
-                <Snowflake className="h-3.5 w-3.5 shrink-0 text-primary" />
+                <UnitThumb src={logs[0].acPhotoUrl} alt={`เครื่อง ${logs[0].acCode}`} size="sm" />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-mono text-xs font-bold text-foreground">
                     {logs[0].acCode}
@@ -187,7 +189,7 @@ export function TechnicianDetailModal({
                     const meta = { label: MAINTENANCE_ACTION_LABEL[action] ?? log.action, icon: ACTION_ICONS[action] ?? Wrench };
                     const ActionIcon = meta.icon;
                     return (
-                      <li key={log.id} className="px-3 py-2.5">
+                      <li key={log.id} className="space-y-1.5 px-3 py-2.5">
                         <div className="flex items-center gap-1.5 text-[11px] font-bold text-foreground">
                           <ActionIcon className="h-3 w-3 shrink-0" />
                           {meta.label}
@@ -195,13 +197,32 @@ export function TechnicianDetailModal({
                             {format(new Date(log.performedAt), "dd/MM/yyyy HH:mm")}
                           </span>
                         </div>
+                        {/* Which order the visit closed, if it closed one —
+                            a walk-up visit has none and simply shows nothing. */}
+                        {log.workOrder && (
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <WorkOrderTypeBadge type={log.workOrder.type} size="sm" />
+                            <WorkOrderPriorityBadge priority={log.workOrder.priority} size="sm" />
+                          </div>
+                        )}
+                        {log.workOrder?.issueDescription && (
+                          <p className="text-[11px] text-muted-foreground">
+                            อาการที่แจ้ง: {log.workOrder.issueDescription}
+                          </p>
+                        )}
                         {log.repairDetail && (
-                          <p className="mt-1 text-[11px] text-muted-foreground">
+                          <p className="text-[11px] text-muted-foreground">
                             ซ่อม: {log.repairDetail}
                           </p>
                         )}
-                        {log.notes && (
-                          <p className="mt-1 text-[11px] text-muted-foreground">{log.notes}</p>
+                        {log.notes && <p className="text-[11px] text-muted-foreground">{log.notes}</p>}
+                        {/* The evidence itself. Said in words when there is
+                            none, so an admin can tell "no pictures taken" from
+                            "pictures that failed to load". */}
+                        {log.beforePhotoUrl || log.afterPhotoUrl ? (
+                          <EvidencePhotos before={log.beforePhotoUrl} after={log.afterPhotoUrl} size="sm" />
+                        ) : (
+                          <p className="text-[11px] text-muted-foreground">ไม่มีรูปจากการทำงาน</p>
                         )}
                       </li>
                     );

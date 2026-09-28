@@ -111,9 +111,22 @@ export interface TechnicianLogRow {
   airConditionerId: string;
   acCode: string;
   acLabel: string;
+  // The unit's own picture, for the thumbnail on the unit header.
+  acPhotoUrl: string | null;
   action: string;
   notes: string | null;
   repairDetail: string | null;
+  // What the technician photographed on the visit.
+  beforePhotoUrl: string | null;
+  afterPhotoUrl: string | null;
+  // The order this visit closed, when it closed one. A walk-up visit — a
+  // technician scanning a sticker and recording work on the spot — has none.
+  workOrder: {
+    id: string;
+    type: "repair" | "cleaning";
+    priority: string | null;
+    issueDescription: string | null;
+  } | null;
   performedAt: string;
   // The fields groupByBuilding / groupByFloor / groupByRoom expect, so the
   // whole building > floor > room tree comes from the shared components rather
@@ -175,12 +188,18 @@ export async function getTechnicianDetail(userId: string) {
           action: true,
           notes: true,
           repairDetail: true,
+          beforePhotoUrl: true,
+          afterPhotoUrl: true,
           performedAt: true,
+          workOrder: {
+            select: { id: true, type: true, priority: true, issueDescription: true },
+          },
           airConditioner: {
             select: {
               id: true,
               acCode: true,
               brand: true,
+              photoUrl: true,
               acBrand: { select: { name: true } },
               acModel: { select: { name: true } },
               room: {
@@ -206,9 +225,20 @@ export async function getTechnicianDetail(userId: string) {
         airConditionerId: unit.id.toString(),
         acCode: unit.acCode,
         acLabel: [unit.acBrand?.name ?? unit.brand, unit.acModel?.name].filter(Boolean).join(" "),
+        acPhotoUrl: unit.photoUrl,
         action: log.action,
         notes: log.notes,
         repairDetail: log.repairDetail,
+        beforePhotoUrl: log.beforePhotoUrl,
+        afterPhotoUrl: log.afterPhotoUrl,
+        workOrder: log.workOrder
+          ? {
+              id: log.workOrder.id.toString(),
+              type: log.workOrder.type,
+              priority: log.workOrder.priority,
+              issueDescription: log.workOrder.issueDescription,
+            }
+          : null,
         performedAt: log.performedAt.toISOString(),
         buildingId: unit.room.building.id.toString(),
         buildingName: unit.room.building.name,
