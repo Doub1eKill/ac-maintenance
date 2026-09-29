@@ -1,5 +1,33 @@
 # Project Handoff & Technical Summary
 
+# 🔌 harness หา psql เองได้ + รหัสผ่าน Aiven ไม่หลุดตอน spawn ล้ม (29 ก.ย. 2026, DoubleKill)
+
+กลับมาทำงานบนเครื่องหลักหลังหายไป 3 สัปดาห์ (187 commit) · `git pull` → `npm install` (adapter-mariadb ออก, adapter-pg + pg เข้า) → `prisma generate` → tsc/eslint 0/0 → ต่อ Aiven อ่านอย่างเดียวผ่าน · เจ้าของเอา `.env` + `.env.local` + โฟลเดอร์ `ac-maintenance-qa` มาจากอีกเครื่องให้ครบแล้ว
+
+## 🔴 harness รันไม่ได้เลยบนเครื่องนี้ — path ของ psql ถูกปักเป็นเวอร์ชัน 16
+
+`qa/baseline.mjs` และ `qa/lib.ts` ต่างมีสำเนา ``process.env.QA_PSQL ?? "C:\\Program Files\\PostgreSQL\\16\\bin\\psql.exe"`` ของตัวเอง · เครื่องนี้ลง **17** → `spawnSync ENOENT` ตั้งแต่ query แรก harness ตายก่อนเริ่ม
+
+**แก้:** โมดูลกลางใหม่ `qa/psql.mjs` (+ `qa/psql.d.mts` ให้ tsc เห็น type — ตัวโมดูลคง JS ไว้เพราะ `node qa/baseline.mjs` ต้องรันได้โดยไม่มี build step) export `resolvePsql()` + `runPsql(url, query)` · ลำดับการหา: `QA_PSQL` → ไล่โฟลเดอร์ ``C:\\Program Files\\PostgreSQL\\<เลข>`` **เอาเวอร์ชันสูงสุดที่มี psql.exe จริง** → `psql` บน PATH · เลือกใหม่สุดเพราะ client ใหม่กว่า server คุยกันได้ และการปักเวอร์ชันคือต้นเหตุเดิม · ทั้งสองไฟล์เหลือเรียก `runPsql()` บรรทัดเดียว (−30/+6)
+
+## 🔴 รหัสผ่าน Aiven หลุดออก console ตอน psql หาย
+
+คอมเมนต์เดิมเขียนว่า *"The URL is passed to psql as an argument and never printed"* — **จริงเฉพาะตอนทำงานปกติ** · พอ `spawnSync` ล้มแบบ ENOENT **Node แนบ argv ทั้งชุดมากับ error** และ argv มี `-d <connection string>` ซึ่งมี user/password ของ Aiven เต็มๆ · โค้ดเดิม `if (r.error) throw r.error;` จึงพ่นรหัสผ่าน production ลง log (และจะลง CI log ด้วยถ้าวันหนึ่งรันบน CI) — **เจอตอนรัน `baseline.mjs check` ครั้งแรกวันนี้ หลุดจริงมาแล้วหนึ่งครั้ง**
+
+**แก้:** `runPsql()` ดัก `result.error` แล้วโยน error ใหม่ที่บอกแค่ชื่อ binary กับวิธีแก้ ไม่แตะ argv เลย · ENOENT → `psql not found at <path> — install the PostgreSQL client tools, or set QA_PSQL to the full path of psql.exe`
+
+## ทดสอบ (อ่านอย่างเดียว ไม่เขียน Aiven)
+
+| ทดสอบ | ผล |
+|---|---|
+| ไม่ตั้ง `QA_PSQL` เลย | หา psql 17 เจอเอง → `baseline.mjs check` ผ่าน |
+| `QA_PSQL` ชี้ path ที่ไม่มีจริง | error อ่านรู้เรื่อง · **grep หา `AVNS_`/`avnadmin`/`aivencloud` ใน output = ไม่เจอเลย** |
+| `db()` ของ `qa/lib.ts` (ทาง Playwright) | เรียกผ่าน tsx ได้จริง — import `.mjs` จาก TS ทำงานทั้ง tsc และ runtime |
+
+`baseline.mjs check` บน Aiven ตอนนี้: users 9 · phones 11 · buildings 5 · rooms 32 · **acs 73** · brands 5 · models 189 · **logs 233** · **WO 72** · schedules 73 · audit max 113 · pending 0 · tsc/eslint 0/0 · commit `88a8bd4`
+
+> **ยังไม่ได้รัน sweep เต็ม** — เขียนลง production ต้องคร่อมด้วย snapshot/restore และห้ามรันตอนเจ้าของกำลังทดสอบ รอเจ้าของสั่งว่าจะให้รันตอนไหน
+
 # 👷 การ์ด "ข้อมูลเจ้าหน้าที่" แสดงรายละเอียดงานและรูปจากการทำงาน (28 ก.ย. 2026, DoubleKill)
 
 เจ้าของ (ส่งภาพหน้าจอ): "หน้าข้อมูลเจ้าหน้าที่ยังไม่แสดงรายละเอียดของงานและรูปจากการทำงาน" — log ของเจ้าของเอง (**#624** ล้างแอร์ 28 ก.ย. 21:53 ผูก WO 105 มีรูปก่อน/หลังครบ) โชว์แค่ "ล้างแอร์ + วันเวลา" · สาเหตุ: `getTechnicianDetail` (`src/lib/admin/users.ts`) select แค่ `notes/repairDetail` (log นี้ว่างทั้งคู่) **ไม่ได้ select รูปหรือ work order เลย** และ modal ก็ render แค่ 2 ฟิลด์นั้น · แก้: select เพิ่ม `beforePhotoUrl/afterPhotoUrl`, `airConditioner.photoUrl`, `workOrder {id,type,priority,issueDescription}` → `TechnicianLogRow` เพิ่ม `acPhotoUrl/beforePhotoUrl/afterPhotoUrl/workOrder|null` (walk-up log ที่สแกน QR บันทึกเองไม่มี workOrder → null ไม่โชว์อะไร) · `technician-detail-modal.tsx`: หัวเครื่องใช้ `UnitThumb sm` แทนไอคอน Snowflake · แต่ละ log เพิ่ม `WorkOrderTypeBadge`+`WorkOrderPriorityBadge`, บรรทัด "อาการที่แจ้ง: …" จาก `issueDescription`, และ `EvidencePhotos size="sm"` — **ไม่มีรูปเขียน "ไม่มีรูปจากการทำงาน"** ให้แยกออกจากกรณีรูปโหลดไม่ขึ้น · ทดสอบ Playwright ชั่วคราว (ลบแล้ว) desktop: เปิดการ์ด Poramin khongrak → กาง building/floor/room/unit → เห็น "ล้างแอร์ | 28/09/2026 21:53 | งานล้างแอร์ | อาการที่แจ้ง: ครบกำหนดล้างแอร์ตามรอบบำรุงรักษา (ระบบสร้างอัตโนมัติ) | ก่อน | หลัง", thumbnail 2 รูป, กดเปิด lightbox "ก่อนซ่อมบำรุง 1/2", Escape ปิดเฉพาะ lightbox การ์ดเจ้าหน้าที่ยังเปิดอยู่ · screenshot `artifacts/photo-display/admin-technician-detail.png` · **ข้อควรรู้ทดสอบ:** modal โหลดประวัติแบบ async ต้องรอ "กำลังโหลดประวัติ" หายก่อนค่อยกางกลุ่ม · tsc/eslint 0/0 · commit `2e79199`
