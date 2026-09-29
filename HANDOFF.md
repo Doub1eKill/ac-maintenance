@@ -1,5 +1,52 @@
 # Project Handoff & Technical Summary
 
+# 🧪 Full sweep รอบแรกบนเครื่องหลัก run `20260929-1610` — 52 PASS / 3 FAIL / 22 ไม่ได้รัน (29 ก.ย. 2026, DoubleKill)
+
+เจ้าของสั่ง "รันได้เลย" · snapshot → sweep → restore ครบตามกติกา · **ทั้ง 3 ที่ fail เป็นปัญหาของ harness เอง ไม่ใช่บั๊กของแอป** — spec ตามโค้ดไม่ทันการเปลี่ยนเมื่อ 19 ก.ย.
+
+## ⛔ ก่อนรันได้ ต้องแก้ 2 อย่าง
+
+1. **psql path** — แก้ไปแล้วใน `88a8bd4` (ดูหัวข้อถัดไป)
+2. **เบราว์เซอร์ของ Playwright ล้าสมัย** — `npm install` อัป `@playwright/test` เป็นรุ่นที่ต้องการ chromium build **1243** แต่บนเครื่องมี **1228** → `browserType.launch: Executable doesn't exist …chromium_headless_shell-1243` · setup fail 5 ข้อ 72 ข้อไม่ได้รัน **ไม่มีอะไรถูกเขียนลง production เลย** (เบราว์เซอร์ไม่ทันเปิด ยืนยันด้วย `baseline.mjs check` ตัวเลขไม่ขยับ) · แก้ด้วย `npx playwright install chromium`
+
+> 📌 **กติกาเพิ่ม:** หลัง `npm install` ทุกครั้งที่ Playwright ขยับเวอร์ชัน ต้อง `npx playwright install chromium` ด้วย ไม่งั้น sweep ตายตั้งแต่ setup
+
+## ผลรอบจริง (24.3 นาที)
+
+| project | ผล |
+|---|---|
+| setup | ✅ ผ่านครบ (สมัคร QA account ผ่านฟอร์ม + code gate) |
+| public | ✅ ผ่านครบ (auth 20 ข้อรวม callbackUrl off-site, Back หลัง logout, demo-role panel) |
+| admin | ✅ 30 ผ่าน · ❌ 2 fail · ⏭️ 1 skip (BUG-008) |
+| admin-seed | ❌ 1 fail |
+| tech | ⏭️ **22 ข้อไม่ได้รันเลย** เพราะ depend on admin-seed ที่ fail |
+
+**รวม 52 passed · 3 failed · 22 did not run** · log เต็ม `C:\Project\ac-maintenance-qa\runs\sweep-20260929.log` · artifacts (screenshot/video/trace) อยู่ใน `artifacts/`
+
+## 🔴 FAIL 1 + 2 — spec ยังคิดว่า modal สร้างใบงานมี select ห้อง (เปลี่ยนไปตั้งแต่ 19 ก.ย.)
+
+`admin/regressions.spec.ts:157` (BUG-004) และ `admin/workflows.spec.ts:160` ใช้ helper `createOrder()` เดียวกัน ซึ่งทำ `dlg.locator("select").nth(1).selectOption(...)` โดยคิดว่า select ตัวที่สองคือ **ห้อง**
+
+แต่ `ecfdef5` (19 ก.ย.) เปลี่ยน `create-work-order-modal.tsx` ไปใช้ `RoomCascadePicker` แล้ว — **ห้องกลายเป็น chips `role=radio` ไม่ใช่ `<select>` อีกต่อไป** · ตอนนี้ select ใน modal คือ [0] อาคาร (ใน picker) · [1] `airConditionerId` · [2] `type` · spec จึงไปจับ select เครื่อง ซึ่ง **`disabled` จนกว่าจะเลือกห้อง** แล้วรอจน timeout 180 วิ (`element is not enabled` ซ้ำ 343 ครั้ง)
+
+> entry ของ `ecfdef5` เขียนว่าทดสอบด้วย "Playwright script ชั่วคราว (ลบแล้ว)" — **spec ถาวรไม่เคยถูกอัปเดตตาม** นี่คือช่องว่างที่ทำให้เพิ่งมาโผล่วันนี้
+
+## 🔴 FAIL 3 — spec ไม่ปิด modal เมื่ออาคารมีอยู่แล้ว
+
+`admin/workflows.spec.ts:46` "create building → room → unit" · **ผ่านตอนรันใน project `admin` (#55, 30.8 วิ) แต่ fail ตอน `admin-seed` รันซ้ำ** เพราะรอบสองอาคาร `QA_TEST_BLDG_001` มีอยู่แล้ว → toast เป็น "…ในระบบแล้ว" → **modal "เพิ่มอาคาร" ไม่ปิด** (ปิดเฉพาะตอนสำเร็จ) → คลิก "เพิ่มห้อง" ต่อไม่ได้ `<div class="fixed inset-0 z-50 …"> intercepts pointer events`
+
+spec รู้จักเคสนี้อยู่แล้วในส่วน ledger (ตัวแปร `existed` → บันทึกเป็น BLOCKED) **แต่ไม่ได้ปิด modal ก่อนไปขั้นต่อไป** · คอมเมนต์ใน `playwright.config.ts` ที่เขียนว่า *"Both tests cope with the rows already being there"* **ไม่จริงแล้ว**
+
+## ความสะอาดของ production
+
+`restore` สำเร็จ — คืนค่าตรงกับ snapshot ทุกตัว: **users 9 · phones 11 · buildings 5 · rooms 32 · acs 73 · brands 5 · models 189 · logs 233 · WO 72 · schedules 73 · audit max 113** · ลบ blob ที่ sweep อัปโหลด 7 ไฟล์ · ตรวจซ้ำด้วย Prisma: QA users 0 · QA buildings 0 · QA rooms 0 · QA acs 0 · **ไม่มีอะไรตกค้าง**
+
+## ต้องทำต่อ (ยังไม่ได้ทำ — รอเจ้าของสั่ง)
+
+1. `createOrder()` ใน 2 spec → เลิกใช้ `select.nth(1)` เปลี่ยนไปกดผ่าน `RoomCascadePicker` (ช่องค้นหาลัดน่าจะนิ่งสุด: พิมพ์เลขห้อง → กด option)
+2. spec "create building" → ปิด modal เมื่อเจอ "ในระบบแล้ว" ก่อนไปขั้นต่อไป
+3. รัน sweep ซ้ำให้ครบ — **22 ข้อฝั่งช่างยังไม่เคยถูกทดสอบบนโค้ดชุดปัจจุบันเลย**
+
 # 🔌 harness หา psql เองได้ + รหัสผ่าน Aiven ไม่หลุดตอน spawn ล้ม (29 ก.ย. 2026, DoubleKill)
 
 กลับมาทำงานบนเครื่องหลักหลังหายไป 3 สัปดาห์ (187 commit) · `git pull` → `npm install` (adapter-mariadb ออก, adapter-pg + pg เข้า) → `prisma generate` → tsc/eslint 0/0 → ต่อ Aiven อ่านอย่างเดียวผ่าน · เจ้าของเอา `.env` + `.env.local` + โฟลเดอร์ `ac-maintenance-qa` มาจากอีกเครื่องให้ครบแล้ว
