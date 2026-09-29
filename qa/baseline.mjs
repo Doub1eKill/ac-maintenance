@@ -29,10 +29,10 @@
 // owner is testing against; snapshot before, restore after, and do not run two
 // sweeps at once. The URL is passed to psql as an argument and never printed.
 
-import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { runPsql } from "./psql.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, "..");
@@ -67,8 +67,6 @@ async function listBlobs() {
   return names;
 }
 
-const PSQL = process.env.QA_PSQL ?? "C:\\Program Files\\PostgreSQL\\16\\bin\\psql.exe";
-
 // The postgres:// DATABASE_URL from the repo's .env. Read once; kept in a
 // closure, never logged.
 const POSTGRES_URL = (() => {
@@ -80,22 +78,10 @@ const POSTGRES_URL = (() => {
 })();
 if (!POSTGRES_URL) throw new Error("no postgres:// DATABASE_URL in .env — the harness only knows PostgreSQL now");
 
+// Binary resolution, the spawn and the row parsing all live in psql.mjs now —
+// see the note there about the pinned version and the leaked argv.
 function sql(query) {
-  // Fed on stdin rather than -e: a restore is a few hundred UPDATEs, well past
-  // what a Windows command line can carry. No headers, one row per line,
-  // tab-separated, NULL spelt out (psql prints it as an empty string unless
-  // told otherwise).
-  const r = spawnSync(PSQL, ["-X", "-q", "-At", "-F", "\t", "-P", "null=NULL", "-v", "ON_ERROR_STOP=1", "-d", POSTGRES_URL], {
-    input: query,
-    encoding: "utf8",
-    env: { ...process.env, PGCLIENTENCODING: "UTF8" },
-  });
-  if (r.error) throw r.error;
-  if (r.status !== 0) throw new Error(`psql exited ${r.status}: ${r.stderr || r.stdout}`);
-  return r.stdout
-    .split(/\r?\n/)
-    .filter((l) => l.length)
-    .map((l) => l.split("\t").map((v) => (v === "NULL" ? null : v)));
+  return runPsql(POSTGRES_URL, query);
 }
 
 // Tables the run can only ever add to, deepest child first so the deletes

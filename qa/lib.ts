@@ -1,9 +1,9 @@
 import { test as base, type Page } from "@playwright/test";
-import { spawnSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import zlib from "node:zlib";
+import { runPsql } from "./psql.mjs";
 
 /** One run id for every spec in an invocation; set QA_RUN to pin it. */
 export const RUN = process.env.QA_RUN ?? new Date().toISOString().replace(/[-:T]/g, "").slice(0, 13);
@@ -190,17 +190,7 @@ const POSTGRES_URL: string | null = (() => {
  */
 export function db(query: string): (string | null)[][] {
   if (!POSTGRES_URL) throw new Error("no postgres:// DATABASE_URL in .env");
-  const r = spawnSync(process.env.QA_PSQL ?? "C:\\Program Files\\PostgreSQL\\16\\bin\\psql.exe", ["-X", "-q", "-At", "-F", "\t", "-P", "null=NULL", "-v", "ON_ERROR_STOP=1", "-d", POSTGRES_URL], {
-    input: query,
-    encoding: "utf8",
-    env: { ...process.env, PGCLIENTENCODING: "UTF8" },
-  });
-  if (r.error) throw r.error;
-  if (r.status !== 0) throw new Error(`psql exited ${r.status}: ${r.stderr}`);
-  return r.stdout
-    .split(/\r?\n/)
-    .filter((l) => l.length)
-    .map((l) => l.split("\t").map((v) => (v === "NULL" ? null : v)));
+  return runPsql(POSTGRES_URL, query);
 }
 
 /** Toast text, if one shows within a few seconds. */
