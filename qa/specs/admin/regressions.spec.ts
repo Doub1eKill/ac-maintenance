@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { test, expect, ledger, shot, note, hydrated, toastText, clearToasts, db, unitPhoto } from "../../lib";
+import { test, expect, ledger, shot, note, hydrated, toastText, clearToasts, db, unitPhoto, pickRoom } from "../../lib";
 
 // Regressions for the admin-side findings of run 20260913-1742. These write
 // to the database on purpose; qa/baseline.mjs restore puts it back.
@@ -151,10 +151,11 @@ test.describe.serial("work orders", () => {
     await page.getByRole("button", { name: /สร้างใบงานซ่อมบำรุง/ }).first().click();
     const dlg = page.locator("div.fixed.inset-0").filter({ hasText: /สร้างใบงานซ่อมบำรุง/ }).first();
     await dlg.waitFor({ timeout: 15_000 });
-    await dlg.locator("select").nth(0).selectOption({ label: buildingName });
-    await page.waitForTimeout(400);
-    const rooms = await dlg.locator("select").nth(1).locator("option").allInnerTexts();
-    await dlg.locator("select").nth(1).selectOption({ index: rooms.findIndex((o) => o.includes(roomName)) });
+    // buildingName is implied by the room — the picker's search sets all three
+    // steps at once — but it stays in the signature so the call sites still
+    // read as "this unit, in this room, in this building".
+    void buildingName;
+    await pickRoom(dlg, roomName);
     await page.waitForTimeout(400);
     const units = await dlg.locator('select[name="airConditionerId"] option').allInnerTexts();
     await dlg.locator('select[name="airConditionerId"]').selectOption({ index: units.findIndex((o) => o.includes(acCode)) });

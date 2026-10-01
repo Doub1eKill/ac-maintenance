@@ -1,5 +1,61 @@
 # Project Handoff & Technical Summary
 
+# 🔧 แก้ harness ที่ตามโค้ดไม่ทัน — ฝั่งช่างได้รันครั้งแรก 16 ผ่าน (1 ต.ค. 2026, DoubleKill)
+
+ต่อจาก run `20260929-1610` · เจ้าของสั่ง "รันเลย" (แก้ spec แล้วรันใหม่) · **รันทั้งหมด 5 รอบ** คร่อม snapshot/restore ทุกรอบ
+
+## แก้อะไร — 2 สาเหตุ ครอบคลุม 4 จุด
+
+### 1. `pickRoom()` — spec ยังขับ modal สร้างใบงานด้วย `select` ห้องที่ไม่มีแล้ว
+
+`ecfdef5` (19 ก.ย.) เปลี่ยนไปใช้ `RoomCascadePicker` ห้องกลายเป็น chips `role=radio` · `select.nth(1)` จึงไปโดน select **เครื่อง** ซึ่ง disabled จนกว่าจะเลือกห้อง แล้วรอจน timeout
+
+helper ใหม่ใน `qa/lib.ts` ขับผ่าน**ช่องค้นหาลัด**ของ picker (`getByRole("searchbox", {name:"ค้นหาห้อง"})` → `getByRole("option")`) — ตั้งอาคาร+ชั้น+ห้องพร้อมกัน spec จึงไม่ต้องรู้ว่าห้องอยู่อาคารไหน · รอ `select[name="airConditionerId"]:not([disabled])` แทน `waitForTimeout` ให้นิ่งกับ latency ของ Aiven
+
+> **บทเรียน:** รอบแรกผมแก้แค่ 2 call site ที่เห็นใน log **ไม่ได้ grep หาที่เหลือ** → `tech/race.spec.ts` ยังค้างสำเนาที่ 3 แล้วไปพังตอนฝั่งช่างได้รันจริง · ตอนนี้ `grep -rn 'locator("select").nth('` ทั้ง repo = **ไม่เหลือแล้ว**
+
+### 2. `dismissModal()` — modal ฟอร์มไม่ปิดตัวเองเมื่อถูกปฏิเสธ
+
+modal เพิ่มอาคาร/เพิ่มห้อง/สร้างใบงาน **ปิดเฉพาะตอนสำเร็จ** · พอรันรอบสองของ seed เดิม (project `admin-seed` รันซ้ำจาก `admin`) ของมีอยู่แล้ว → toast "ในระบบแล้ว" → overlay ค้าง → คลิกถัดไปโดน `div.fixed.inset-0 intercepts pointer events` · **นี่คือตัวที่บล็อก project `tech` ทั้งก้อนใน run 20260929**
+
+helper กดปุ่ม X ที่หัว modal (Escape ใช้ไม่ได้ — ผูกไว้เฉพาะ modal อ่านอย่างเดียว ตั้งใจกันคีย์หลุดทิ้งฟอร์มที่กรอกค้าง) · no-op เมื่อไม่มีอะไรเปิด จึงเรียกก่อนทุกขั้นที่เปิด modal ได้ · comment ใน `playwright.config.ts` ที่เขียนว่า *"Both tests cope with the rows already being there"* **ไม่จริงมาก่อนหน้านี้แล้ว**
+
+## ผลแต่ละรอบ
+
+| รอบ | ขอบเขต | ผล |
+|---|---|---|
+| 20260929 (ก่อนแก้) | full | 52 ผ่าน · **3 fail** · 22 ไม่ได้รัน |
+| 20261001 | full | **63 ผ่าน** · 1 fail · 13 ไม่ได้รัน — `admin-seed` ผ่านแล้ว |
+| 20261001b | full | 63 ผ่าน · 1 fail (**dev server ตายกลางคัน** `ERR_CONNECTION_REFUSED` — คนละเรื่องกับ spec) |
+| tech-20261001 | `--project=tech` | 4 ผ่าน · 1 fail (**login ของ QA technician ไม่เด้งไป /tech** — flake, alert ว่างเปล่า) |
+| **tech-20261001b** | `--project=tech` | **16 ผ่าน · 2 fail** ← ฝั่งช่างได้รันจริงครั้งแรก |
+| tech-20261001c | `--project=tech` | 6 ผ่าน · 1 fail (`admin-seed` flake อีกรอบ บล็อก tech) |
+
+## 🎯 ฝั่งช่าง — ได้รันบนโค้ดชุดปัจจุบันครั้งแรก (16 ผ่าน / 2 fail)
+
+ผ่านทั้งหมด 16 ข้อ รวม QR scan ด้วยกล้องจำลอง, pool/my-jobs/history, permission, upload · **fail 2 ข้อ:**
+
+1. **`tech/race.spec.ts:7`** (ช่าง 2 คนแย่งรับงานพร้อมกัน) — สาเหตุคือสำเนาที่ 3 ของ `select.nth(1)` · **แก้แล้วแต่ยังไม่ได้ยืนยัน** (รอบถัดมาโดน flake ของ admin-seed บล็อกก่อนถึง)
+2. **`tech/workflows.spec.ts:97`** (บันทึกงานพร้อมรูปก่อน/หลัง) — หาปุ่ม "บันทึกและปิดงาน" บนการ์ด `QAB001-QA-101-01` ใน /tech/my-jobs ไม่เจอ · **ยังไม่ได้วิเคราะห์ ไม่รู้ว่าเป็น spec หรือเป็นบั๊กจริง**
+
+## ⚠️ สภาพแวดล้อมไม่นิ่ง — เรื่องที่ต้องรู้ก่อนรันรอบหน้า
+
+5 รอบ เจอ failure mode ต่างกัน 4 แบบ โดย **2 แบบไม่เกี่ยวกับ spec เลย**: dev server ตายกลางคัน (ขึ้นใหม่เองภายหลัง, log ไม่มี crash signature — มีแต่ `CredentialsSignin` ที่ auth spec ตั้งใจยิง) และ login ของ QA technician ไม่เด้งหน้า
+
+**โครงสร้าง dependency ขยายความเสียหาย:** `tech` → `admin-seed` → `setup` · flake ที่ไหนก็ได้ในสายนี้ทำให้ 13-22 ข้อปลายทางไม่ได้รันเลย · ถ้าจะให้ผลนิ่งกว่านี้ ต้องคิดเรื่องแยก `tech` ออกจาก `admin-seed` หรือให้ retry ระดับ project
+
+## ความสะอาดของ production
+
+**restore ครบทั้ง 5 รอบ** · ค่าสุดท้ายตรง snapshot ทุกตัว: users 9 · phones 11 · buildings 5 · rooms 32 · acs 73 · brands 5 · models 189 · logs 233 · **WO 73** · schedules 73 · audit max 113 · ลบ blob รวม 36 ไฟล์ · ตรวจซ้ำด้วย Prisma: QA users/buildings/rooms/acs/work orders = **0 ทั้งหมด**
+
+> 📌 **WO ขยับ 72 → 73 เองระหว่าง 29 ก.ย. → 1 ต.ค.** เป็นใบงานที่ระบบสร้างจากรอบล้างที่ถึงกำหนด ไม่ใช่ของค้างจาก QA — snapshot รอบใหม่นับรวมแล้ว
+
+## ค้างอยู่
+
+1. ยืนยัน `race.spec.ts` หลังแก้ (ยังไม่เคยรันผ่านจุดนั้น)
+2. หาสาเหตุ `tech/workflows.spec.ts:97` — **ข้อเดียวที่ยังเป็นไปได้ว่าเป็นบั๊กจริงของแอป**
+3. full sweep ที่เขียวทั้งแผงยังไม่เคยเกิดขึ้นสักรอบ
+
 # 🧪 Full sweep รอบแรกบนเครื่องหลัก run `20260929-1610` — 52 PASS / 3 FAIL / 22 ไม่ได้รัน (29 ก.ย. 2026, DoubleKill)
 
 เจ้าของสั่ง "รันได้เลย" · snapshot → sweep → restore ครบตามกติกา · **ทั้ง 3 ที่ fail เป็นปัญหาของ harness เอง ไม่ใช่บั๊กของแอป** — spec ตามโค้ดไม่ทันการเปลี่ยนเมื่อ 19 ก.ย.

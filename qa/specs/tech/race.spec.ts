@@ -1,6 +1,6 @@
 import path from "node:path";
 import { devices, type Page } from "@playwright/test";
-import { test, QA, OUT_ROOT, ledger, shot, note } from "../../lib";
+import { test, QA, OUT_ROOT, ledger, shot, note, pickRoom } from "../../lib";
 
 // Two technicians press รับงาน on the same pool job in the same instant.
 // Exactly one may win; the other must be told, not shown a success toast.
@@ -16,8 +16,7 @@ test("two technicians claim the same job at the same moment", async ({ browser }
   await ap.getByRole("button", { name: /สร้างใบงานซ่อมบำรุง/ }).first().click();
   const dlg = ap.locator("div.fixed.inset-0").filter({ hasText: /สร้างใบงานซ่อมบำรุง/ }).first();
   await dlg.waitFor({ timeout: 15_000 });
-  await dlg.locator("select").nth(0).selectOption({ label: QA.building.name }); await ap.waitForTimeout(400);
-  await dlg.locator("select").nth(1).selectOption({ index: 1 }); await ap.waitForTimeout(400);
+  await pickRoom(dlg, QA.room); await ap.waitForTimeout(400);
   await dlg.locator('select[name="airConditionerId"]').selectOption({ label: new RegExp(CODE2) as unknown as string }).catch(async () => dlg.locator('select[name="airConditionerId"]').selectOption({ index: 2 }));
   await dlg.locator('select[name="type"]').selectOption("cleaning");
   await dlg.getByRole("button", { name: /ยืนยันการสร้างใบงาน/ }).click();

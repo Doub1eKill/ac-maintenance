@@ -1,4 +1,4 @@
-import { test as base, type Page } from "@playwright/test";
+import { test as base, type Locator, type Page } from "@playwright/test";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -214,6 +214,58 @@ export async function clearToasts(page: Page) {
     .first()
     .waitFor({ state: "detached", timeout: 8000 })
     .catch(() => {});
+}
+
+/**
+ * Close a hand-rolled modal that is still open, if one is.
+ *
+ * The add-building and add-room forms close themselves only on success, so a
+ * refused duplicate leaves the overlay up — and the spec's next click then
+ * lands on "div.fixed.inset-0 intercepts pointer events" instead of the
+ * button it named. That is what blocked the whole tech project on run
+ * 20260929: the second pass over the same seed found the room already there.
+ *
+ * Escape is no help here on purpose — it is wired to the view-only modals
+ * only, so a stray key cannot throw away a half-filled form. Clicks the X in
+ * the modal header instead. A no-op when nothing is open, so it is safe to
+ * call before any step that opens one.
+ */
+export async function dismissModal(page: Page) {
+  const overlay = page.locator("div.fixed.inset-0").last();
+  if (!(await overlay.isVisible().catch(() => false))) return;
+  await overlay.locator("button").first().click({ timeout: 5000 }).catch(() => {});
+  await overlay.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+}
+
+/**
+ * Choose a room inside a RoomCascadePicker.
+ *
+ * The picker replaced the building/room pair of <select>s in the
+ * create-work-order modal on 19 Sep (ecfdef5); rooms are chips with
+ * role="radio" now, so the old `select.nth(1)` quietly resolved to the unit
+ * select instead — which stays disabled until a room is chosen, so the specs
+ * sat waiting for it to enable until the suite timed out.
+ *
+ * Driven through the picker's own search shortcut rather than the three
+ * cascading steps: one field, one click, and it sets building, floor and room
+ * together, so a spec does not have to know which building a room is in.
+ *
+ * `scope` is whatever contains the picker — the modal, or the page.
+ */
+export async function pickRoom(scope: Locator | Page, roomName: string) {
+  const search = scope.getByRole("searchbox", { name: "ค้นหาห้อง" });
+  await search.waitFor({ timeout: 15_000 });
+  await search.fill(roomName);
+  const option = scope.getByRole("option", { name: new RegExp(`ห้อง ${escapeForRegExp(roomName)}\\b`) }).first();
+  await option.waitFor({ timeout: 15_000 });
+  await option.click();
+  // The unit select is disabled until the room lands; waiting on that rather
+  // than on a timeout is what makes this stable on Aiven's latency.
+  await scope.locator('select[name="airConditionerId"]:not([disabled])').waitFor({ timeout: 15_000 }).catch(() => {});
+}
+
+function escapeForRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 /** Register through the real form. Returns the visible outcome text. */

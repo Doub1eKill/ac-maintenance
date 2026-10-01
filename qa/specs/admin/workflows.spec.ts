@@ -1,6 +1,6 @@
 import path from "node:path";
 import { devices, type Page } from "@playwright/test";
-import { test, QA, OUT_ROOT, ledger, shot, note, hydrated, loginViaForm, watchConsole, unitPhoto } from "../../lib";
+import { test, QA, OUT_ROOT, ledger, shot, note, hydrated, loginViaForm, watchConsole, unitPhoto, pickRoom, dismissModal } from "../../lib";
 
 // What the print test hangs off `window` inside the page.
 type PrintWindow = Window & { __printDoc: string };
@@ -58,7 +58,8 @@ test.describe("admin workflows", () => {
     const existed = /ในระบบแล้ว/.test(t1); // left over from an earlier run
     const onFirstPage = (await body(page)).includes(QA.building.name);
     ledger("Assets", "create building shows a toast" + (existed ? " (already existed from a previous run)" : ""), "UI", /เพิ่มอาคารสำเร็จ/.test(t1) ? "PASS" : existed ? "BLOCKED" : "FAIL", await shot(page, "assets-building-created"));
-    if (existed) { await page.getByRole("button", { name: /^เพิ่มอาคาร$/ }).waitFor({ state: "hidden", timeout: 1000 }).catch(() => {}); await page.locator("form").filter({ has: page.locator('input[name="abbreviation"]') }).locator("xpath=..").getByRole("button").first().click().catch(() => {}); await page.keyboard.press("Escape").catch(() => {}); }
+    // Left open when the save was refused — see dismissModal.
+    if (existed) await dismissModal(page);
     else ledger("Assets", "new building is visible without paging (list is 5/page; it landed on page 2 = " + !onFirstPage + ")", "UI", onFirstPage ? "PASS" : "FAIL", "runs/" + process.env.QA_RUN + "/assets-building-created.png");
     await filterAssets(page, QA.building.abbr);
     const b1 = await body(page);
@@ -80,6 +81,7 @@ test.describe("admin workflows", () => {
     ledger("Assets", "duplicate attempt created no second building row", "UI", dupCount === 1 ? "PASS" : "FAIL", await shot(page, "assets-building-after-dup"));
 
     // open the building and add a room on it
+    await dismissModal(page);
     const addRoom = page.locator("div").filter({ hasText: QA.building.name }).getByRole("button", { name: /เพิ่มชั้น|เพิ่มห้อง/ }).first();
     await addRoom.click();
     const rform = page.locator("form").filter({ has: page.locator('input[name="floor"]') });
@@ -91,6 +93,9 @@ test.describe("admin workflows", () => {
     ledger("Assets", "create room shows toast and appears under the building", "UI", /เพิ่มห้องสำเร็จ/.test(t3) && (await body(page)).includes(QA.room) ? "PASS" : "FAIL", await shot(page, "assets-room-created"));
 
     // negative floor — no unsigned guard on PostgreSQL later; Zod is the only gate
+    // The room above is already there on a second pass, which leaves this
+    // modal open on its refusal.
+    await dismissModal(page);
     await page.locator("div").filter({ hasText: QA.building.name }).getByRole("button", { name: /เพิ่มชั้น|เพิ่มห้อง/ }).first().click();
     await rform.locator('input[name="name"]').fill("QA-NEG");
     await rform.locator('input[name="floor"]').fill("-3");
@@ -164,9 +169,7 @@ test.describe("admin workflows", () => {
     await page.getByRole("button", { name: /สร้างใบงานซ่อมบำรุง/ }).first().click();
     const dlg = page.locator("div.fixed.inset-0").filter({ hasText: /สร้างใบงานซ่อมบำรุง/ }).first();
     await dlg.waitFor({ timeout: 15_000 });
-    await dlg.locator("select").nth(0).selectOption({ label: QA.building.name });
-    await page.waitForTimeout(500);
-    await dlg.locator("select").nth(1).selectOption({ index: 1 });
+    await pickRoom(dlg, QA.room);
     await page.waitForTimeout(500);
     await dlg.locator('select[name="airConditionerId"]').selectOption({ index: 1 });
     await dlg.locator('select[name="type"]').selectOption("repair");
@@ -176,6 +179,11 @@ test.describe("admin workflows", () => {
     const t = await toastText(page);
     await settle(page, 3000);
     ledger("Work orders", "create work order via header modal", "UI", /สำเร็จ|สร้าง/.test(t) || !(await dlg.isVisible().catch(() => false)) ? "PASS" : "FAIL", await shot(page, "wo-created"));
+
+    // Refused on a second pass — the QA unit already carries the open order
+    // this test raises — and the modal only closes itself on success, so the
+    // sidebar click below would land on its overlay.
+    await dismissModal(page);
 
     // The board first, by the sidebar (a client navigation): the shell
     // remembers the order it just raised and opens the board on the building
