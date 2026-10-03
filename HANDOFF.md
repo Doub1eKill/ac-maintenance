@@ -46,6 +46,26 @@
 
 **ผลระยะ 4:** run `phase4-20261004` (production build) **83/83 · ledger PASS 227 · FAIL 0 · SKIP 5** · unit 37/37 · tsc/eslint 0/0 · restore ครบ
 
+# 🛡️ ระงับสิทธิ์แล้วคืนงานที่ค้าง + ลบบัญชีที่ถูกระงับออกจากระบบ + audit การเปลี่ยนสถานะ (4 ต.ค. 2026 ตี 2, DoubleKill)
+
+เจ้าของสั่ง: (1) บันทึก audit ตอนระงับ/เปิดใช้งาน (2) ตอนระงับให้เตือนว่ามีงานค้าง พร้อมปุ่ม "คืนงานและระงับสิทธิ์" (3) บัญชีที่ถูกระงับมีปุ่มลบออกจากระบบ: ลบรหัส เก็บชื่อ/โปรไฟล์/ประวัติงาน ไม่มีการ์ดให้เห็นอีก
+
+**ฝั่ง server (`src/lib/admin/users.ts`)**
+- `updateUserStatusByOrgAdminAction` เขียน audit ใน transaction เดียวกัน: `APPROVE_USER` (จาก pending) / `ACTIVATE_USER` / `SUSPEND_USER` (old/new status) · เดิมแค่ console.log · คืน `{ success, releasedCount }` · สถานะเดิม = ใหม่ → no-op
+- **ระงับ = คืนงานทุกครั้ง** (ไม่ใช่แค่เมื่อ dialog เห็นงาน): `releaseHeldWorkOrders` → `updateManyAndReturn` งาน claimed ของคนนั้นเป็น pending, ล้าง claimed_by/claimed_at/assigned_to_id/assigned_at + audit `RELEASE_WORKORDER` ต่องาน · เขียน work_orders ก่อน users ตามลำดับ lock เดิม (FK ของ maintenance_logs เป็น KEY SHARE ไม่ชนกับ UPDATE users.status บน PostgreSQL) · `withDeadlockRetry`
+- `getHeldWorkOrders(userId)` ให้ dialog ถามตอนเปิด (query เดียวบน index claimed_by) แทนการแบกจำนวนงานไปกับทุกการ์ด
+- `deleteUserByOrgAdminAction`: ต้องเป็น suspended ก่อน · ห้ามลบตัวเอง · คืนงานที่ยังค้าง (บัญชีที่ถูกระงับก่อนมีฟีเจอร์นี้) · ลบ user_phones · password/remember_token/presence = NULL · **email → `removed-<id>@deleted.invalid`** (สมัครใหม่ด้วยอีเมลเดิมได้) · `deleted_at` = now · audit `DELETE_USER` (oldValues เก็บชื่อ/อีเมล/role) · ล้าง email_verification_codes ของอีเมลเดิม · **row ยังอยู่** เพราะ maintenance_logs/work_orders/audit ชี้มาที่ id นี้ → ชื่อในประวัติงานยังขึ้นเหมือนเดิม
+- `users.deleted_at` ไม่เคยถูกใช้มาก่อน ตอนนี้ใช้: team list + admin search กรอง `deletedAt: null` · `getTechnicianDetail` / `adminResetUserPasswordAction` / เปลี่ยนสถานะ ปฏิเสธ row ที่ถูกลบ · login ไม่ได้อยู่แล้ว (password NULL + email ถูกแทน + status suspended)
+- แก้บั๊กเล็กใน admin search: บัญชี suspended เคยขึ้นว่า "รออนุมัติ" และลิงก์ไปหน้า approvals → ตอนนี้ "ถูกระงับ" และไปหน้าทีม
+
+**ฝั่ง UI**
+- `src/components/admin/user-account-dialogs.tsx` ใหม่: `SuspendUserDialog` (ไม่มีงาน = ยืนยันแบบเดิม · มีงาน = หัวข้อ "ช่างคนนี้มีงานค้างอยู่" + รายการ (5 งานแรก + "และอีก N งาน") + ปุ่ม "คืนงานและระงับสิทธิ์" · ตรวจไม่สำเร็จ = แจ้งว่าระบบจะคืนให้อัตโนมัติ) · `DeleteUserDialog` บอกสิ่งที่ถูกลบ/เก็บไว้ · ใช้ร่วมกันทั้งการ์ดและ modal
+- การ์ด/ modal ของบัญชี suspended: ปุ่มที่สองเปลี่ยนจาก "รีเซ็ตรหัสผ่าน" เป็น "ลบออกจากระบบ" · `useUserStatus` เพิ่ม `deleteUser` + toast บอกจำนวนงานที่คืน
+
+**เช็ค (dev + headless Playwright, ข้อมูลชั่วคราวบน Aiven แล้วคืนค่า):** ช่างชั่วคราว (id 191) ถือ WO 12, 13 → dialog แสดงงานค้าง 2 งาน → คืนงานและระงับ: WO 12, 13 กลับเป็น pending, audit RELEASE×2 + SUSPEND · การ์ดแสดง "ถูกระงับ" + ปุ่ม เปิดใช้งาน / ลบออกจากระบบ · เปิดใช้งาน (ACTIVATE_USER) · ระงับอีกครั้งตอนไม่มีงาน → dialog แบบเดิม · ลบ → การ์ดหาย, email แทนแล้ว, password NULL, phones 0, DELETE_USER · dialog ดูดีทั้ง 1366px และ 390px · server error 0 · tsc/eslint 0/0 · unit 46/46 · **คืนค่าแล้ว**: WO 12, 13 ตรงกับก่อนทดสอบ (updated_at เดิม), ลบ user 191, 192 + audit id > 113, users 9 · phones max 95 · audit max 113 · WO max 297 · claimed 25 · ไม่ได้รัน full sweep
+
+**ข้อจำกัด:** ช่างที่กดรับงานในเสี้ยววินาทีเดียวกับที่ถูกระงับอาจยังถืองานนั้นอยู่ (การรับงานไม่ล็อก row ของ users) — session ตายภายใน 1 นาที และการลบบัญชีคืนงานให้อีกรอบ
+
 # 🟢 ป้ายบัญชีบนการ์ดผู้ใช้เป็น Online / Offline แทน "ใช้งานอยู่" (4 ต.ค. 2026 ตี 2, DoubleKill)
 
 เจ้าของขอให้ป้ายบอกว่าเข้าระบบอยู่หรือไม่ · เลือกนิยาม **"มี session + ใช้งานใน 5 นาที"** และคำว่า **Online** · pending/suspended ยังแสดง "รออนุมัติ"/"ถูกระงับ" เหมือนเดิม

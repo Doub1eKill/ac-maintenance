@@ -16,7 +16,7 @@ export function TeamClient({
   currentUserId?: string | null;
 }) {
   const search = useDashboardSearch();
-  const { isPending, setUserStatus } = useUserStatus();
+  const { isPending, setUserStatus, deleteUser } = useUserStatus();
   const users = useLivePresence(allUsers);
   // Held here rather than inside the panel so the modal is not re-created when
   // the grid re-renders after a status change. Kept as an id and looked up, so
@@ -31,6 +31,7 @@ export function TeamClient({
         globalSearch={search}
         isPending={isPending}
         onUserStatus={setUserStatus}
+        onDeleteUser={deleteUser}
         currentUserId={currentUserId}
         onOpenDetail={(user: PendingUser) => setDetailUserId(user.id)}
       />
@@ -41,6 +42,7 @@ export function TeamClient({
           currentUserId={currentUserId}
           isPending={isPending}
           onUserStatus={setUserStatus}
+          onDeleteUser={deleteUser}
           onClose={() => setDetailUserId(null)}
         />
       )}

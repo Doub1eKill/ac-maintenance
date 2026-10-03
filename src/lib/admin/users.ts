@@ -4,48 +4,256 @@ import { logAudit } from "@/lib/audit";
 import { verifyOrgAdmin } from "@/lib/auth-guards";
 import { forgetAccountStatus } from "@/lib/account-status";
 import { formatUnitLocation } from "@/lib/location";
+import { withDeadlockRetry } from "@/lib/db-retry";
+import { discardCodesFor } from "@/lib/email-verification";
 
 // What an org admin can do to somebody else's account: approve or suspend it,
-// and clear its password when they are locked out. Split out of the former
+// remove it once suspended, and clear its password when they are locked out. Split out of the former
 // settings.ts, which held these alongside profile editing, organisation
 // settings and the audit log in one 448-line file.
+function parseUserId(userId: string): bigint | null {
+  try {
+    return BigInt(userId);
+  } catch {
+    return null;
+  }
+}
+
+/** A job someone is holding, as the suspend dialog lists it. */
+export interface HeldWorkOrder {
+  id: string;
+  type: "repair" | "cleaning";
+  acCode: string;
+  location: string;
+  claimedAt: string | null;
+}
+
+/**
+ * The jobs this person has claimed and not finished, for the warning shown
+ * before suspending them. Asked when the dialog opens rather than carried on
+ * every card: it is one indexed query (work_orders.claimed_by), and the answer
+ * has to be current at the moment the admin decides.
+ */
+export async function getHeldWorkOrders(userId: string): Promise<{ workOrders: HeldWorkOrder[] } | { error: string }> {
+  await verifyOrgAdmin();
+  const id = parseUserId(userId);
+  if (id === null) return { error: "ไม่พบผู้ใช้" };
+
+  try {
+    const rows = await prisma.workOrder.findMany({
+      where: { claimedBy: id, status: "claimed" },
+      orderBy: { claimedAt: "asc" },
+      select: {
+        id: true,
+        type: true,
+        claimedAt: true,
+        airConditioner: {
+          select: {
+            acCode: true,
+            room: { select: { name: true, floor: true, building: { select: { name: true, abbreviation: true } } } },
+          },
+        },
+      },
+    });
+    return {
+      workOrders: rows.map((row) => ({
+        id: row.id.toString(),
+        type: row.type,
+        acCode: row.airConditioner.acCode,
+        location: formatUnitLocation(row.airConditioner.room),
+        claimedAt: row.claimedAt ? row.claimedAt.toISOString() : null,
+      })),
+    };
+  } catch (error) {
+    console.error("Failed to load held work orders:", error);
+    return { error: "ไม่สามารถตรวจสอบงานที่ค้างอยู่ได้ กรุณาลองใหม่อีกครั้ง" };
+  }
+}
+
+/**
+ * Puts every job this person holds back in the pool, inside the caller's
+ * transaction, and writes one RELEASE_WORKORDER audit row per job.
+ *
+ * Work orders are written before the user row on purpose: the app's lock order
+ * is work_orders first (see the note on logMaintenanceAction). The FK locks a
+ * maintenance log insert takes on users are KEY SHARE, which an UPDATE of
+ * users.status does not conflict with on PostgreSQL.
+ *
+ * A technician claiming a job in the instant between this and the commit can
+ * still end up holding it; their session dies within a minute, and removing
+ * the account runs this again.
+ */
+// The extended client (lib/prisma.ts) does not fit Prisma.TransactionClient,
+// so the transaction handle is typed by the two models it touches.
+type ReleaseTx = Pick<typeof prisma, "workOrder" | "systemAuditLog">;
+
+async function releaseHeldWorkOrders(tx: ReleaseTx, userId: bigint, actorId: bigint) {
+  const released = await tx.workOrder.updateManyAndReturn({
+    where: { claimedBy: userId, status: "claimed" },
+    data: { status: "pending", claimedBy: null, claimedAt: null, assignedToId: null, assignedAt: null },
+    select: { id: true },
+  });
+  if (released.length > 0) {
+    await tx.systemAuditLog.createMany({
+      data: released.map((wo) => ({
+        userId: actorId,
+        action: "RELEASE_WORKORDER",
+        entityType: "workOrder",
+        entityId: wo.id,
+        oldValues: { status: "claimed", claimedBy: userId.toString() },
+        newValues: { status: "pending", claimedBy: null },
+        ipAddress: "server_action",
+      })),
+    });
+  }
+  return released.map((wo) => wo.id.toString());
+}
+
+/**
+ * Approves, reactivates or suspends an account, with an audit row for each.
+ *
+ * Suspending also hands back every job the person is holding, in the same
+ * transaction: a suspended technician cannot finish them, and left alone they
+ * would sit claimed in a name nobody can sign in as. The dialog warns about
+ * them first; this does it regardless, so a job claimed after the dialog
+ * opened is not stranded either.
+ */
 export async function updateUserStatusByOrgAdminAction(
   targetUserId: string,
   newStatus: "active" | "suspended"
-) {
+): Promise<{ success: true; releasedCount: number } | { error: string }> {
   const session = await verifyOrgAdmin();
+  const actorId = BigInt(session.user.id!);
+  const targetId = parseUserId(targetUserId);
+  if (targetId === null) return { error: "ไม่พบผู้ใช้" };
 
-  if (newStatus === "suspended" && targetUserId === session.user.id) {
+  if (newStatus === "suspended" && targetId === actorId) {
     return { error: "ระงับสิทธิ์บัญชีตัวเองไม่ได้" };
   }
 
   try {
-    const targetUser = await prisma.user.findUnique({
-      where: { id: BigInt(targetUserId) },
-      select: { id: true },
+    const target = await prisma.user.findUnique({
+      where: { id: targetId },
+      select: { status: true, deletedAt: true },
     });
-
-    if (!targetUser) {
+    if (!target || target.deletedAt) {
       return { error: "ไม่พบผู้ใช้" };
     }
+    if (target.status === newStatus) {
+      return { success: true, releasedCount: 0 };
+    }
 
-    await prisma.user.update({
-      where: { id: BigInt(targetUserId) },
-      data: { status: newStatus },
-    });
+    const action =
+      newStatus === "suspended" ? "SUSPEND_USER" : target.status === "pending" ? "APPROVE_USER" : "ACTIVATE_USER";
+
+    const releasedIds = await withDeadlockRetry("updateUserStatusByOrgAdminAction", () =>
+      prisma.$transaction(async (tx) => {
+        const released = newStatus === "suspended" ? await releaseHeldWorkOrders(tx, targetId, actorId) : [];
+        await tx.user.update({ where: { id: targetId }, data: { status: newStatus } });
+        await tx.systemAuditLog.create({
+          data: {
+            userId: actorId,
+            action,
+            entityType: "user",
+            entityId: targetId,
+            oldValues: { status: target.status },
+            newValues: { status: newStatus, ...(released.length > 0 ? { releasedWorkOrders: released } : {}) },
+            ipAddress: "server_action",
+          },
+        });
+        return released;
+      })
+    );
     // The account's next request on this instance re-reads it rather than
     // waiting out the cache (see account-status.ts).
     forgetAccountStatus(targetUserId);
 
-    console.log(
-      `[AUDIT TRAIL] User status updated by OrgAdmin (AdminID: ${session.user.id}): TargetUser ${targetUserId} -> Status: ${newStatus} at ${new Date().toISOString()}`
-    );
-
     revalidatePath("/admin", "layout");
-    return { success: true };
+    // Released jobs reappear in every technician's pool.
+    if (releasedIds.length > 0) revalidatePath("/tech", "layout");
+    return { success: true, releasedCount: releasedIds.length };
   } catch (error) {
     console.error("Failed to update user status by org admin:", error);
     return { error: "ไม่สามารถอัปเดตสถานะผู้ใช้ได้ กรุณาลองใหม่อีกครั้ง" };
+  }
+}
+
+/**
+ * Removes a suspended account from the system for good.
+ *
+ * What goes: the means to sign in (password, the email address as a login,
+ * remember token), the phone numbers, and the card on the team page. The email
+ * is replaced with a placeholder rather than kept, so the same person can
+ * register again later as a new account instead of hitting "already in use".
+ *
+ * What stays: the users row itself with the name and photo, because every
+ * maintenance log, work order and audit row that person touched points at it,
+ * and those should go on saying who did the work. deleted_at marks it; the
+ * team list, the search and the detail panel skip such rows.
+ *
+ * Only a suspended account can be removed, so it is always two deliberate
+ * steps, and nobody is removed while signed in and working.
+ */
+export async function deleteUserByOrgAdminAction(
+  targetUserId: string
+): Promise<{ success: true; releasedCount: number } | { error: string }> {
+  const session = await verifyOrgAdmin();
+  const actorId = BigInt(session.user.id!);
+  const targetId = parseUserId(targetUserId);
+  if (targetId === null) return { error: "ไม่พบผู้ใช้" };
+  if (targetId === actorId) return { error: "ลบบัญชีตัวเองไม่ได้" };
+
+  try {
+    const target = await prisma.user.findUnique({
+      where: { id: targetId },
+      select: { name: true, email: true, role: true, status: true, deletedAt: true },
+    });
+    if (!target || target.deletedAt) return { error: "ไม่พบผู้ใช้" };
+    if (target.status !== "suspended") {
+      return { error: "ต้องระงับสิทธิ์บัญชีนี้ก่อนจึงจะลบออกจากระบบได้" };
+    }
+
+    const releasedIds = await withDeadlockRetry("deleteUserByOrgAdminAction", () =>
+      prisma.$transaction(async (tx) => {
+        // An account suspended before suspending released jobs may still hold some.
+        const released = await releaseHeldWorkOrders(tx, targetId, actorId);
+        await tx.userPhone.deleteMany({ where: { userId: targetId } });
+        await tx.user.update({
+          where: { id: targetId },
+          data: {
+            email: `removed-${targetId}@deleted.invalid`,
+            password: null,
+            rememberToken: null,
+            lastSeenAt: null,
+            signedOutAt: null,
+            deletedAt: new Date(),
+          },
+        });
+        await tx.systemAuditLog.create({
+          data: {
+            userId: actorId,
+            action: "DELETE_USER",
+            entityType: "user",
+            entityId: targetId,
+            oldValues: { name: target.name, email: target.email, role: target.role, status: target.status },
+            newValues: { deleted: true, ...(released.length > 0 ? { releasedWorkOrders: released } : {}) },
+            ipAddress: "server_action",
+          },
+        });
+        return released;
+      })
+    );
+
+    // Codes sent to the old address are of no use to anyone now.
+    await discardCodesFor(target.email).catch(() => {});
+    forgetAccountStatus(targetUserId);
+
+    revalidatePath("/admin", "layout");
+    if (releasedIds.length > 0) revalidatePath("/tech", "layout");
+    return { success: true, releasedCount: releasedIds.length };
+  } catch (error) {
+    console.error("Failed to delete user:", error);
+    return { error: "ไม่สามารถลบผู้ใช้ออกจากระบบได้ กรุณาลองใหม่อีกครั้ง" };
   }
 }
 
@@ -79,10 +287,10 @@ export async function adminResetUserPasswordAction(userId: string) {
   try {
     const target = await prisma.user.findUnique({
       where: { id: targetId },
-      select: { id: true, email: true, password: true },
+      select: { id: true, email: true, password: true, deletedAt: true },
     });
 
-    if (!target) return { error: "ไม่พบผู้ใช้" };
+    if (!target || target.deletedAt) return { error: "ไม่พบผู้ใช้" };
     if (target.password === null) {
       return { error: "ผู้ใช้รายนี้ต้องตั้งรหัสผ่านใหม่อยู่แล้ว" };
     }
@@ -178,6 +386,7 @@ export async function getTechnicianDetail(userId: string) {
           status: true,
           avatarUrl: true,
           createdAt: true,
+          deletedAt: true,
           phones: {
             select: { phoneNumber: true, isPrimary: true },
             orderBy: { isPrimary: "desc" },
@@ -220,7 +429,8 @@ export async function getTechnicianDetail(userId: string) {
       }),
     ]);
 
-    if (!user) return { error: "ไม่พบผู้ใช้งาน" };
+    // A removed account has no card to open; this keeps a stale link from showing one.
+    if (!user || user.deletedAt) return { error: "ไม่พบผู้ใช้งาน" };
 
     const history: TechnicianLogRow[] = logs.map((log) => {
       const unit = log.airConditioner;

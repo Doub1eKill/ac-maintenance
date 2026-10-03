@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   ShieldOff,
   Sparkles,
+  Trash2,
   Wrench,
   X,
 } from "lucide-react";
@@ -36,6 +37,7 @@ import type { TechnicianLogRow } from "@/lib/admin/users";
 import type { PendingUser } from "@/components/admin/types";
 import { MAINTENANCE_ACTION_LABEL } from "@/lib/labels";
 import { UserStatusBadge } from "@/components/admin/user-card";
+import { DeleteUserDialog, SuspendUserDialog } from "@/components/admin/user-account-dialogs";
 import type { MaintenanceAction } from "@/generated/prisma/enums";
 
 interface TechnicianDetail {
@@ -54,6 +56,7 @@ interface TechnicianDetailModalProps {
   currentUserId?: string | null;
   isPending: boolean;
   onUserStatus: (userId: string, status: "active" | "suspended") => void;
+  onDeleteUser: (userId: string) => void;
   onClose: () => void;
 }
 
@@ -80,6 +83,7 @@ export function TechnicianDetailModal({
   currentUserId,
   isPending,
   onUserStatus,
+  onDeleteUser,
   onClose,
 }: TechnicianDetailModalProps) {
   const [detail, setDetail] = useState<TechnicianDetail | null>(null);
@@ -88,6 +92,7 @@ export function TechnicianDetailModal({
   const [openUnitId, setOpenUnitId] = useState<string | null>(null);
   const [resetOpen, setResetOpen] = useState(false);
   const [suspendOpen, setSuspendOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [isResetting, startResetTransition] = useTransition();
 
   // Escape backs out one layer: a unit's entries close before the panel does,
@@ -286,7 +291,7 @@ export function TechnicianDetailModal({
               </p>
             </div>
 
-            {/* The same two actions the card carries. Duplicated on purpose:
+            {/* The same actions the card carries. Duplicated on purpose:
                 whichever of the two is on screen should be able to act. */}
             <div className="flex gap-2">
               {user.status === "active" ? (
@@ -311,14 +316,26 @@ export function TechnicianDetailModal({
                   เปิดใช้งาน
                 </button>
               )}
-              <button
-                type="button"
-                onClick={() => setResetOpen(true)}
-                className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg border border-border bg-muted px-2.5 py-2 text-[11px] font-bold text-foreground transition-colors hover:bg-secondary"
-              >
-                <KeyRound className="h-3 w-3" />
-                รีเซ็ตรหัสผ่าน
-              </button>
+              {user.status === "suspended" ? (
+                <button
+                  type="button"
+                  onClick={() => setDeleteOpen(true)}
+                  disabled={isPending}
+                  className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg border border-destructive/30 bg-background px-2.5 py-2 text-[11px] font-bold text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-40"
+                >
+                  <Trash2 className="h-3 w-3" />
+                  ลบออกจากระบบ
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setResetOpen(true)}
+                  className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg border border-border bg-muted px-2.5 py-2 text-[11px] font-bold text-foreground transition-colors hover:bg-secondary"
+                >
+                  <KeyRound className="h-3 w-3" />
+                  รีเซ็ตรหัสผ่าน
+                </button>
+              )}
             </div>
           </div>
 
@@ -382,15 +399,22 @@ export function TechnicianDetailModal({
         isProcessing={isResetting}
       />
 
-      <ConfirmActionDialog
-        isOpen={suspendOpen}
+      <SuspendUserDialog
+        target={suspendOpen ? user : null}
         onOpenChange={setSuspendOpen}
-        title="ยืนยันการระงับสิทธิ์"
-        description={`ต้องการระงับสิทธิ์เข้าใช้งานของ ${user.name} หรือไม่? ผู้ใช้จะไม่สามารถเข้าสู่ระบบได้จนกว่าจะเปิดใช้งานอีกครั้ง`}
-        confirmText="ระงับสิทธิ์"
         onConfirm={() => {
           onUserStatus(user.id, "suspended");
           setSuspendOpen(false);
+        }}
+        isProcessing={isPending}
+      />
+
+      <DeleteUserDialog
+        target={deleteOpen ? user : null}
+        onOpenChange={setDeleteOpen}
+        onConfirm={() => {
+          onDeleteUser(user.id);
+          setDeleteOpen(false);
         }}
         isProcessing={isPending}
       />

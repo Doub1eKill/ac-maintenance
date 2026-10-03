@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { KeyRound, ShieldOff, ShieldCheck, Users } from "lucide-react";
+import { KeyRound, ShieldOff, ShieldCheck, Trash2, Users } from "lucide-react";
 import {
   Pagination,
   PaginationContent,
@@ -13,6 +13,7 @@ import {
 import { ConfirmActionDialog } from "@/components/ui/thai-alert-dialogs";
 import { adminResetUserPasswordAction } from "@/app/admin/actions";
 import { UserCard } from "@/components/admin/user-card";
+import { DeleteUserDialog, SuspendUserDialog } from "@/components/admin/user-account-dialogs";
 import type { PendingUser } from "@/components/admin/types";
 
 interface TeamPanelProps {
@@ -20,6 +21,8 @@ interface TeamPanelProps {
   globalSearch: string;
   isPending: boolean;
   onUserStatus: (userId: string, status: "active" | "suspended") => void;
+  /** Removes a suspended account (deleteUserByOrgAdminAction). */
+  onDeleteUser: (userId: string) => void;
   currentUserId?: string | null;
   /** Opens the detail panel for one person. */
   onOpenDetail?: (user: PendingUser) => void;
@@ -34,18 +37,26 @@ export function TeamPanel({
   globalSearch,
   isPending,
   onUserStatus,
+  onDeleteUser,
   currentUserId,
   onOpenDetail,
 }: TeamPanelProps) {
   const [teamPage, setTeamPage] = useState(1);
   const [resetTarget, setResetTarget] = useState<PendingUser | null>(null);
   const [suspendTarget, setSuspendTarget] = useState<PendingUser | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<PendingUser | null>(null);
   const [isResetting, startResetTransition] = useTransition();
 
   function handleConfirmSuspend() {
     if (!suspendTarget) return;
     onUserStatus(suspendTarget.id, "suspended");
     setSuspendTarget(null);
+  }
+
+  function handleConfirmDelete() {
+    if (!deleteTarget) return;
+    onDeleteUser(deleteTarget.id);
+    setDeleteTarget(null);
   }
 
   function handleConfirmReset() {
@@ -133,14 +144,28 @@ export function TeamPanel({
                       เปิดใช้งาน
                     </button>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => setResetTarget(u)}
-                    className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg border border-border bg-muted px-2.5 py-1.5 text-[11px] font-bold text-foreground transition-colors hover:bg-secondary"
-                  >
-                    <KeyRound className="h-3 w-3" />
-                    รีเซ็ตรหัสผ่าน
-                  </button>
+                  {/* A suspended account trades the password reset, which only
+                      matters to someone who will sign in again, for removal. */}
+                  {u.status === "suspended" ? (
+                    <button
+                      type="button"
+                      onClick={() => setDeleteTarget(u)}
+                      disabled={isPending}
+                      className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg border border-destructive/30 bg-background px-2.5 py-1.5 text-[11px] font-bold text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-40"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      ลบออกจากระบบ
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setResetTarget(u)}
+                      className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg border border-border bg-muted px-2.5 py-1.5 text-[11px] font-bold text-foreground transition-colors hover:bg-secondary"
+                    >
+                      <KeyRound className="h-3 w-3" />
+                      รีเซ็ตรหัสผ่าน
+                    </button>
+                  )}
                 </>
               }
             />
@@ -196,17 +221,17 @@ export function TeamPanel({
         isProcessing={isResetting}
       />
 
-      <ConfirmActionDialog
-        isOpen={suspendTarget !== null}
+      <SuspendUserDialog
+        target={suspendTarget}
         onOpenChange={(open) => !open && setSuspendTarget(null)}
-        title="ยืนยันการระงับสิทธิ์"
-        description={
-          suspendTarget
-            ? `ต้องการระงับสิทธิ์เข้าใช้งานของ ${suspendTarget.name} หรือไม่? ผู้ใช้จะไม่สามารถเข้าสู่ระบบได้จนกว่าจะเปิดใช้งานอีกครั้ง`
-            : ""
-        }
-        confirmText="ระงับสิทธิ์"
         onConfirm={handleConfirmSuspend}
+        isProcessing={isPending}
+      />
+
+      <DeleteUserDialog
+        target={deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        onConfirm={handleConfirmDelete}
         isProcessing={isPending}
       />
     </div>

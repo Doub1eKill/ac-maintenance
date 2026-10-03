@@ -3,6 +3,7 @@ import { formatUnitLocation } from "@/lib/location";
 import type { SearchEntry } from "@/lib/search";
 import { verifyOrgAdmin } from "@/lib/auth-guards";
 import { isOnline } from "@/lib/presence";
+import { USER_STATUS_LABEL } from "@/lib/labels";
 import { syncOverdueMaintenanceWorkOrders } from "@/lib/maintenance";
 import { getOrganisationName, getOrganisationInfo, getDefaultMaintenanceFrequency } from "@/lib/organisation";
 import { getAcMasterData } from "@/lib/admin/master-data";
@@ -233,6 +234,9 @@ export async function getApprovalsPageData() {
 export async function getTeamPageData() {
   await verifyOrgAdmin();
   const rows = await prisma.user.findMany({
+    // Removed accounts keep their row for the history that points at it, but
+    // no longer have a card (deleteUserByOrgAdminAction).
+    where: { deletedAt: null },
     select: userListSelect,
     orderBy: { createdAt: "desc" },
   });
@@ -385,6 +389,7 @@ export async function getAdminSearchIndex(): Promise<SearchEntry[]> {
       },
     }),
     prisma.user.findMany({
+      where: { deletedAt: null },
       select: { id: true, name: true, email: true, role: true, status: true },
     }),
   ]);
@@ -460,13 +465,13 @@ export async function getAdminSearchIndex(): Promise<SearchEntry[]> {
       hint: [
         person.email,
         person.role === "org_admin" ? "ผู้ดูแลระบบ" : "ช่างเทคนิค",
-        person.status === "active" ? null : "รออนุมัติ",
+        person.status === "active" ? null : USER_STATUS_LABEL[person.status],
       ]
         .filter(Boolean)
         .join(" · "),
       // Pending accounts live on the approvals page, not the team list.
       href:
-        person.status === "active"
+        person.status !== "pending"
           ? `/admin/team?q=${encodeURIComponent(person.name)}`
           : "/admin/approvals",
     });

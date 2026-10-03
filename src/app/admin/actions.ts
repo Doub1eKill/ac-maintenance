@@ -69,6 +69,18 @@ export async function updateUserStatusByOrgAdminAction(
   return users.updateUserStatusByOrgAdminAction(...args);
 }
 
+export async function getHeldWorkOrders(
+  ...args: Parameters<typeof users.getHeldWorkOrders>
+) {
+  return users.getHeldWorkOrders(...args);
+}
+
+export async function deleteUserByOrgAdminAction(
+  ...args: Parameters<typeof users.deleteUserByOrgAdminAction>
+) {
+  return users.deleteUserByOrgAdminAction(...args);
+}
+
 export async function updateProfileAction(
   ...args: Parameters<typeof profile.updateProfileAction>
 ) {

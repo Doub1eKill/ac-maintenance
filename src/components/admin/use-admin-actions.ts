@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import {
   updateUserStatusByOrgAdminAction,
+  deleteUserByOrgAdminAction,
   assignWorkOrderAction,
   bulkAssignWorkOrdersAction,
   cancelWorkOrderAction,
@@ -17,24 +18,44 @@ import type { WorkOrderItem } from "@/components/admin/types";
  * component rendering everything.
  */
 
-/** Approving or suspending an account: the approvals page and the team page. */
+function releasedNote(count: number) {
+  return count > 0 ? ` และคืนงาน ${count} งานเข้ากองกลางแล้ว` : "";
+}
+
+/**
+ * Approving, suspending and removing an account: the approvals page, the team
+ * page and the technician panel.
+ */
 export function useUserStatus() {
   const [isPending, startTransition] = useTransition();
 
   function setUserStatus(userId: string, newStatus: "active" | "suspended") {
     startTransition(async () => {
       const res = await updateUserStatusByOrgAdminAction(userId, newStatus);
-      if (res.error) {
+      if ("error" in res) {
         toast.error(res.error);
       } else {
         toast.success(
-          newStatus === "active" ? "อนุมัติสิทธิ์เข้าใช้งานสำเร็จ" : "ระงับสิทธิ์เข้าใช้งานสำเร็จ"
+          newStatus === "active"
+            ? "อนุมัติสิทธิ์เข้าใช้งานสำเร็จ"
+            : `ระงับสิทธิ์เข้าใช้งานสำเร็จ${releasedNote(res.releasedCount)}`
         );
       }
     });
   }
 
-  return { isPending, setUserStatus };
+  function deleteUser(userId: string) {
+    startTransition(async () => {
+      const res = await deleteUserByOrgAdminAction(userId);
+      if ("error" in res) {
+        toast.error(res.error);
+      } else {
+        toast.success(`ลบผู้ใช้ออกจากระบบแล้ว${releasedNote(res.releasedCount)}`);
+      }
+    });
+  }
+
+  return { isPending, setUserStatus, deleteUser };
 }
 
 /**
