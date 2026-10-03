@@ -1,5 +1,6 @@
 import type { NextAuthConfig } from "next-auth";
 import { nextMidnightAfter, isPastExpiry } from "@/lib/session-expiry";
+import type { UserRole, UserStatus } from "@/generated/prisma/enums";
 
 /**
  * The lightweight half of the NextAuth config — no Providers, no Prisma.
@@ -64,8 +65,14 @@ export const authConfig = {
         session.expires = new Date(token.expiresAt).toISOString() as typeof session.expires;
       }
       session.user.id = token.sub as string;
-      session.user.role = token.role;
-      session.user.status = token.status;
+      // Typed here rather than through the JWT augmentation in
+      // types/next-auth.d.ts alone: since nodemailer 10, npm nests @auth/core
+      // under next-auth (its optional nodemailer peer is ^7 || ^8), so
+      // "@auth/core/jwt" no longer resolves from the app and that augmentation
+      // stops applying without a word. The jwt callbacks only ever store these
+      // two enums.
+      session.user.role = token.role as UserRole;
+      session.user.status = token.status as UserStatus;
       return session;
     },
     authorized({ auth, request }) {

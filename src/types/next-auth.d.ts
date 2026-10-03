@@ -23,6 +23,12 @@ declare module "next-auth" {
 // reaches the original declaration. Augmenting "next-auth/jwt" here compiled
 // without complaint and did nothing: token.role stayed `unknown` in the
 // session callback, which is where the `as any` casts came from.
+//
+// Since nodemailer 10 this augmentation is inert too: npm nests @auth/core
+// under next-auth (its optional nodemailer peer is ^7 || ^8), so
+// "@auth/core/jwt" no longer resolves from here and TypeScript treats this as
+// a new, unrelated module. auth.config.ts types role/status explicitly; kept so
+// it applies again if @auth/core is hoisted back.
 declare module "@auth/core/jwt" {
   interface JWT {
     role: UserRole;
