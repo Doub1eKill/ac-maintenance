@@ -7,6 +7,12 @@ import path from "path";
 // work order. Downscale and re-encode before writing to disk.
 const MAX_IMAGE_DIMENSION = 1600;
 const IMAGE_QUALITY = 80;
+// The most pixels sharp will decode. Its own default is 16384² (~268 M): a
+// few-kilobyte file declaring dimensions like that is decoded in full before
+// the resize, and can take the function's memory with it. 100 M still clears
+// any phone camera — a 48 MP iPhone frame is 8064 x 6048 (~48.8 M) — and a
+// larger one is refused like any file sharp cannot read.
+const MAX_INPUT_PIXELS = 100_000_000;
 
 // Everything this module writes lives in one of two places, and nothing
 // outside them may be deleted — see deleteUpload().
@@ -71,7 +77,7 @@ export async function saveUpload(file: File | null): Promise<string | null> {
     // not checked here: sharp reads the bytes, and a file it cannot decode is
     // refused whatever it was called.
     const { default: sharp } = await import("sharp");
-    const processed = await sharp(buffer)
+    const processed = await sharp(buffer, { limitInputPixels: MAX_INPUT_PIXELS })
       // withoutEnlargement: a photo already smaller than the cap is left
       // at its own size rather than being upscaled into a bigger file.
       .rotate() // honour EXIF orientation before stripping metadata
