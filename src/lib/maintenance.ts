@@ -290,11 +290,14 @@ export interface MaintenanceHistoryEntry {
 //
 // Everything here is already visible to anyone who scans the unit's QR code,
 // so callers decide who may *reach* it, not what it may contain.
+//
+// Takes the unit's sticker code as well as its id, so the QR page can read the
+// history alongside the unit instead of waiting for the unit's id first.
 export async function getMaintenanceHistory(
-  airConditionerId: bigint
+  unit: bigint | { qrCode: string }
 ): Promise<MaintenanceHistoryEntry[]> {
   const logs = await prisma.maintenanceLog.findMany({
-    where: { airConditionerId },
+    where: typeof unit === "bigint" ? { airConditionerId: unit } : { airConditioner: { qrCode: unit.qrCode } },
     orderBy: { performedAt: "desc" },
     select: {
       id: true,

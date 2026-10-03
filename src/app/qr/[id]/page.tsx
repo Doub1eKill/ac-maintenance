@@ -36,51 +36,28 @@ import { MAINTENANCE_ACTION_LABEL } from "@/lib/labels";
  */
 export default async function QRCodePage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const session = await auth();
+  // The session, the unit and its history are independent reads, so they go
+  // out together rather than one round trip to the database after another —
+  // this is the page a guest waits on after scanning a sticker.
+  const [session, ac, history] = await Promise.all([
+    auth(),
+    findUnit(params.id),
+    // Same helper the asset manager's history panel uses, so the two views
+    // can't drift apart in what they consider this unit's record.
+    getMaintenanceHistory({ qrCode: params.id }),
+  ]);
   const isSignedIn = Boolean(session?.user && session.user.status === "active");
   const isTechnician = isSignedIn && session!.user.role === "technician";
-
-  const ac = await prisma.airConditioner.findUnique({
-    where: { qrCode: params.id },
-    select: {
-      id: true,
-      acCode: true,
-      brand: true,
-      model: true,
-      btu: true,
-      status: true,
-      photoUrl: true,
-      room: {
-        select: { name: true, building: { select: { name: true } } },
-      },
-      // deleted_at comes along so this page can mark a retired brand or model
-      // like the other ten places do (backlog #4 phase 2). This is the only one
-      // of the eleven that queries Prisma directly from the page instead of
-      // going through a lib mapper, so there is no shape to add the flags to —
-      // the markup calls catalogueFlags(ac) itself, from @/lib/catalogue-status,
-      // rather than testing deletedAt inline and inventing a twelfth rule.
-      acBrand: { select: { name: true, deletedAt: true } },
-      acModel: { select: { name: true, deletedAt: true } },
-      maintenanceSchedules: {
-        where: { isActive: true },
-        take: 1,
-        select: { frequencyValue: true, frequencyUnit: true, nextDueDate: true },
-      },
-    }
-  });
 
   if (!ac) {
     return notFound();
   }
 
   // Same rule as the ten places that go through a mapper in src/lib — see the
-  // note on the select above, and catalogue-status.ts.
+  // note on the select in findUnit, and catalogue-status.ts.
   const { brandDeleted, modelDeleted } = catalogueFlags(ac);
 
   const activeSchedule = ac.maintenanceSchedules[0];
-  // Same helper the asset manager's history panel uses, so the two views
-  // can't drift apart in what they consider this unit's record.
-  const history = await getMaintenanceHistory(ac.id);
 
   return (
     <div className="min-h-screen bg-slate-50 pb-12">
@@ -245,4 +222,36 @@ export default async function QRCodePage(props: { params: Promise<{ id: string }
       </div>
     </div>
   );
+}
+
+// The unit behind a sticker code, with what the page shows of it.
+function findUnit(qrCode: string) {
+  return prisma.airConditioner.findUnique({
+    where: { qrCode },
+    select: {
+      id: true,
+      acCode: true,
+      brand: true,
+      model: true,
+      btu: true,
+      status: true,
+      photoUrl: true,
+      room: {
+        select: { name: true, building: { select: { name: true } } },
+      },
+      // deleted_at comes along so this page can mark a retired brand or model
+      // like the other ten places do (backlog #4 phase 2). This is the only one
+      // of the eleven that queries Prisma directly from the page instead of
+      // going through a lib mapper, so there is no shape to add the flags to —
+      // the markup calls catalogueFlags(ac) itself, from @/lib/catalogue-status,
+      // rather than testing deletedAt inline and inventing a twelfth rule.
+      acBrand: { select: { name: true, deletedAt: true } },
+      acModel: { select: { name: true, deletedAt: true } },
+      maintenanceSchedules: {
+        where: { isActive: true },
+        take: 1,
+        select: { frequencyValue: true, frequencyUnit: true, nextDueDate: true },
+      },
+    }
+  });
 }
