@@ -40,7 +40,13 @@ function createPrismaClient() {
   // a write here safe. A query inside an interactive transaction that fails
   // this way fails the transaction with it; the retry then throws the
   // transaction's own error, which is the right outcome.
-  return new PrismaClient({ adapter }).$extends({
+  // Interactive transactions get more room than Prisma's defaults (2 s to get
+  // a connection, 5 s to finish). A connection here is a TLS handshake to
+  // Aiven, and the pool above holds five: under a burst of page renders the
+  // wait for one can pass 2 s, and the transaction then fails outright — the
+  // suspected cause of the one claim that failed with the generic error on
+  // 1 Oct 2026 (HANDOFF). Ceilings only; nothing waits longer when it need not.
+  return new PrismaClient({ adapter, transactionOptions: { maxWait: 5_000, timeout: 10_000 } }).$extends({
     name: "connect-retry",
     query: {
       async $allOperations({ model, operation, args, query }) {
