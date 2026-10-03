@@ -356,7 +356,10 @@ export async function getAdminSearchIndex(): Promise<SearchEntry[]> {
       },
     }),
     prisma.workOrder.findMany({
-      where: { status: { not: "completed" } },
+      // Open orders only. This was `not: "completed"`, which also took every
+      // cancelled order — listed in the omnibox as "กำลังดำเนินการ", since the
+      // label below only tells pending from the rest, and growing without end.
+      where: { status: { in: ["pending", "claimed"] } },
       select: {
         id: true,
         status: true,

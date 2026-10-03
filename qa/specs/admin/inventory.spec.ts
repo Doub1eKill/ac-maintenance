@@ -1,4 +1,4 @@
-import { test, ledger, shot, note, watchConsole } from "../../lib";
+import { test, expect, ledger, shot, note, watchConsole, db } from "../../lib";
 
 const PAGES: Array<[string, string, RegExp]> = [
   ["/admin", "ภาพรวมระบบ", /เครื่องปรับอากาศทั้งหมด/],
@@ -64,5 +64,27 @@ test.describe("admin inventory", () => {
     await page.waitForTimeout(1200);
     const t3 = await page.evaluate(() => document.body.innerText);
     ledger("Omnibox", "typing a menu word lists the menu entry", "UI", /จัดการ QR Code/.test(t3) ? "PASS" : "FAIL", await shot(page, "admin-omnibox-menu"));
+  });
+
+  test("header omnibox lists no cancelled order as an open one", async ({ page }) => {
+    // The index took every order but the completed ones, so a cancelled order
+    // showed up as "กำลังดำเนินการ" (lib/admin/pages.ts getAdminSearchIndex).
+    // A unit whose only order is cancelled must list as a unit and nothing else.
+    const rows = db("select a.ac_code from work_orders w join air_conditioners a on a.id = w.air_conditioner_id where w.status = 'cancelled' and a.deleted_at is null and not exists (select 1 from work_orders o where o.air_conditioner_id = a.id and o.status in ('pending','claimed')) order by w.id limit 1");
+    const acCode = rows[0]?.[0];
+    if (!acCode) { ledger("Omnibox", "cancelled order not listed as open (no unit with only a cancelled order to try)", "UI", "SKIP"); return; }
+    await page.goto("/admin");
+    await page.locator("main").last().waitFor({ timeout: 60_000 });
+    const box = page.locator("header input[type=text]").first();
+    await box.fill(acCode);
+    await page.waitForTimeout(1500);
+    // The dropdown only: the dashboard behind it has its own "กำลังดำเนินการ"
+    // card, which the first run of this test matched.
+    const dropdown = page.locator("div.z-50.shadow-2xl").filter({ hasText: /กรองรายการในหน้านี้ด้วย/ }).first();
+    await dropdown.waitFor({ timeout: 10_000 });
+    const text = await dropdown.innerText();
+    const asOpen = /กำลังดำเนินการ|รอรับงาน/.test(text);
+    ledger("Omnibox", `${acCode} (only a cancelled order) lists as a unit, not as an open order`, "UI", text.includes(acCode) && !asOpen ? "PASS" : "FAIL", await shot(page, "admin-omnibox-cancelled"));
+    expect(asOpen, "cancelled order listed as open").toBe(false);
   });
 });
