@@ -1,6 +1,6 @@
 # Project Handoff & Technical Summary
 
-# 🗺️ แผน Optimize + Refactor (วาง 3 ต.ค. 2026, DoubleKill) — ระยะ 1 ✅ · ระยะ 2 ✅ · ระยะ 3 ✅ (3 ต.ค.) · **⚠️ เจ้าของต้องตั้ง `CRON_SECRET` บน Vercel**
+# 🗺️ แผน Optimize + Refactor (วาง 3 ต.ค. 2026, DoubleKill) — ระยะ 1 ✅ · ระยะ 2 ✅ · ระยะ 3 ✅ (3 ต.ค.) · ระยะ 4 ยังไม่เริ่ม
 
 > ที่มา: สำรวจโค้ด + production จริง 3 ต.ค. · เรียงตามความเร่งด่วน · **ทุกข้อ:** 1 commit ต่อข้อ · tsc/eslint 0/0 · full sweep (production build) 77/77 ledger FAIL 0 คร่อม snapshot/restore · หลัง push เช็ค deploy success · ระยะ 4 ห้ามเปลี่ยนพฤติกรรม
 
@@ -26,14 +26,15 @@
 
 ## ระยะ 3 — ประสิทธิภาพ/ความน่าเชื่อถือ ✅ เสร็จ (`3603ebb` `1f4adff` `c9b5a82` `6fddcf0`)
 
-> ### ⚠️ งานของเจ้าของ: ตั้ง `CRON_SECRET` บน Vercel
+> ### ✅ `CRON_SECRET` ตั้งแล้ว (เจ้าของ, 3 ต.ค. ~16:15Z) — production ตอบ 401 แทน 503 (ไม่มี/ผิด secret) · **ยังต้องยืนยันการรันจริงครั้งแรก 18:00Z** (`overdue_sync_at` ไม่ NULL)
+> วิธีตั้ง (เก็บไว้อ้างอิง):
 > Vercel → Project → Settings → Environment Variables → เพิ่ม `CRON_SECRET` (Production) เป็นสตริงสุ่มยาว ≥ 32 ตัว เช่นผลของ `openssl rand -hex 32` → **Redeploy** (env ใหม่มีผลหลัง deploy) · Vercel จะส่ง `Authorization: Bearer <CRON_SECRET>` ให้ cron เอง · **ก่อนตั้ง:** route ตอบ 503 ทุก request และหน้าเว็บสร้างใบงานแบบเดิม (ไม่มีช่องว่าง) · **ตรวจหลังตั้ง:** หลัง 01:00 น. วันถัดไป `select overdue_sync_at from system_settings` ต้องไม่ NULL และ Vercel → Cron Jobs มีประวัติการรัน
 
 9. **cron รายวัน** (`3603ebb`) — `src/app/api/cron/overdue-maintenance/route.ts` + `vercel.json` `0 18 * * *` (= 01:00 น. ไทย; Hobby รันวันละครั้ง คลาดได้ภายในชั่วโมง) · ตรวจ `CRON_SECRET` แบบ constant-time · สำเร็จ → บันทึก `system_settings.overdue_sync_at` (คอลัมน์ใหม่ migration `20261003160000_add_overdue_sync_at` **apply ลง Aiven แล้ว**) · `syncOverdueMaintenanceWorkOrders` (ที่หน้าเว็บเรียก) **ข้ามการเขียนถ้า cron สำเร็จภายใน 26 ชม.** ไม่งั้นทำแบบเดิม (fallback) · query+transaction เดิมย้ายไป `materializeOverdueWorkOrders` ไม่เปลี่ยน · `baseline.mjs` MUTABLE คืน `overdue_sync_at` (QA เรียก route แล้วต้องไม่ทำให้ production คิดว่า cron รันแล้ว) · harness ตั้ง `CRON_SECRET=qa-cron-secret` ให้ server ของมันเอง
 10. **`/qr/[id]`** (`1f4adff`) — session + เครื่อง + ประวัติ ใน `Promise.all` เดียว (`getMaintenanceHistory` รับ `{ qrCode }` ได้)
 11. **ขอบเขต query** (`c9b5a82`) — audit log มี pagination อยู่แล้ว · ประวัติช่างมี `take: 50` แล้ว · คลังงาน/งานของฉันมีขอบเขตตามธรรมชาติ (งานเปิด) · **เจอบั๊ก:** ดัชนี omnibox ของ admin เอาใบงาน `not: "completed"` → ใบงานที่**ยกเลิก**ขึ้นเป็น "กำลังดำเนินการ" (4 ใบบน production) และโตไม่หยุด → แก้เป็น pending+claimed · **ปล่อยไว้โดยตั้งใจ:** ประวัติทั้งหมดใน modal รายละเอียดช่าง (`users.ts`) — UI ใช้จำนวนรวมคำนวณตัวเลข ถ้า take จะผิด; โตตามงานของช่างคนเดียว ถ้าวันหนึ่งเยอะค่อยแยก query นับ
 12. **`transactionOptions`** (`6fddcf0`) — `maxWait` 5 วิ / `timeout` 10 วิ (default 2/5) — ผูกกับเคส claim ล้ม 1 ต.ค.
-13. (ทางเลือก) donut SVG แทน recharts — **ยังไม่ทำ**
+13. **donut เป็น SVG + ถอด recharts** (`bdb57d2`) — วงแหวน `stroke-dasharray` 4 ช่วง สี/legend/ตัวเลขเดิม · hover ช่วง → ตรงกลางแสดงจำนวน+ชื่อ (+ `<title>`) · ข้อความกลาง `pointer-events-none` · `role="img"` + aria-label · ลบ `recharts` และ `src/components/ui/chart.tsx` · chunk ใหญ่สุดเหลือ framework 240 KB (เดิม recharts 330 KB) · test ใหม่ใน `admin/inventory.spec.ts`: ตัวเลขตรง DB + เมาส์จริงบนช่วงรอดำเนินการ → "36รอดำเนินการ" · **กับดัก:** `locator.hover()` เล็งกลางกล่องของวงกลม = รูตรงกลาง → test ต้องคำนวณจุดบนวงแหวนเอง
 
 **ผลระยะ 3:** run `phase3-20261003` (production build) **81 ผ่าน · 1 ล้ม** — ที่ล้มคือ test omnibox ใหม่ที่**อ่านข้อความทั้งหน้า** ไปเจอการ์ด "กำลังดำเนินการ" ของ dashboard (โค้ดถูก: screenshot มีแต่ "เครื่องแอร์") → แก้ test ให้อ่านแค่ dropdown → run `phase3b-20261003` (setup + omnibox ทั้งสอง) **7/7 PASS** · Cron: ไม่มี secret 401 · ผิด 401 · ถูก 200 + `overdue_sync_at` ถูกบันทึก · หลัง restore `overdue_sync_at` = NULL ตามเดิม
 
