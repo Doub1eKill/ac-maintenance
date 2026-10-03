@@ -136,7 +136,7 @@ export function OverviewMetricsGrid({ metrics }: OverviewMetricsGridProps) {
           </div>
 
           <div className="mt-4 pt-3 border-t border-border/60 flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">สถานะบัญชี Active</span>
+            <span className="text-muted-foreground">บัญชี Approved</span>
             <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
               พร้อมปฏิบัติงาน
