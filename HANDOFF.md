@@ -1,6 +1,6 @@
 # Project Handoff & Technical Summary
 
-# ❓ งานค้างฝั่ง QA — เหลือ 2 ข้อ (อัปเดต 3 ต.ค. 2026, DoubleKill)
+# ❓ งานค้างฝั่ง QA — เหลือ 2 ข้อ (อัปเดต 3 ต.ค. 2026 บ่าย, DoubleKill)
 
 > หัวข้อนี้คือ **ที่เดียว** ที่รวมของค้างฝั่ง QA ไว้
 
@@ -29,11 +29,24 @@ run `tech-20261003`: test ผ่าน และ ledger แถว 24–25 PASS �
 
 ดูข้อแรกด้านบน · รอให้เกิดซ้ำพร้อม log แล้วค่อยแก้ตามสาเหตุ (ถ้าเป็น `P2028` / transaction timeout จริง → ตั้ง `transactionOptions` ใน `src/lib/prisma.ts`) · **อย่าแก้ล่วงหน้าโดยไม่มี error จริง**
 
-## 2. 🟡 ยังไม่เคยมี full sweep ที่เขียวทั้งแผง
+## 2. 🟡 ยังไม่เคยมี full sweep ที่เขียวทั้งแผง — ต้นเหตุตัวใหม่: `/tech` reload วนบน dev server (3 ต.ค., DoubleKill)
 
-ฝั่ง `tech` เขียวครบแล้ว (`tech-20261003`) แต่ยังไม่ได้รัน full ทั้ง `public` + `admin` + `tech` หลังแก้ · flake ที่เคยเห็น: dev server ตายกลางคัน (`ERR_CONNECTION_REFUSED`) และ login ของ QA technician ไม่เด้งไป `/tech` — **รอบหน้ามี server log แล้ว** ถ้าเกิดซ้ำจะเห็นสาเหตุ
+**run `full-20261003`: 56 ผ่าน · 2 ล้ม · 19 ไม่ได้รัน** · ล้มที่ test เดียวกันทั้ง `[admin]` และ `[admin-seed]`: `admin/workflows.spec.ts:165` บรรทัด `const pool = await body(tp)` → `Execution context was destroyed` · `admin-seed` ล้ม → tech 19 ข้อไม่ได้รัน
 
-**สาเหตุเชิงโครงสร้างที่ขยายความเสียหาย:** `tech` → `admin-seed` → `setup` · flake จุดไหนก็ได้ทำให้ปลายทาง 13–22 ข้อไม่ได้รัน · ทางเลือก: (ก) ให้ `tech` seed ของตัวเอง หรือ (ข) ตั้ง `retries` ใน `qa/playwright.config.ts` (ตอนนี้ = 0)
+**อาการ:** context ช่าง (Pixel 7) เปิด `/tech` แล้วหน้า **full reload ตัวเองทุก ~0.5–1 วิ ไม่หยุด** (server log: `GET /tech 200` ติดกัน 20+ ครั้ง · navigation `type=reload`) · test ผ่านหรือล้มแค่ขึ้นกับว่า `innerText` อ่านทันระหว่าง reload ไหม — `--project=admin` 5 รอบ: loop เกิด **ทุกรอบ** แต่ test ผ่าน 3 ล้ม 2 · รอบ `tech-20261003` (tech-only) **ไม่เกิด**
+
+**สิ่งที่พิสูจน์แล้ว** (ตัวดักชั่วคราวใน spec, ถอดออกแล้ว ไม่ได้ commit):
+- คนสั่ง reload = webpack runtime ของ React Refresh ใน Next dev (`.next/dev/static/chunks/webpack.js`): `if (!originalFactory) { document.location.reload(); }` — CDP `Network.requestWillBeSent` initiator stack ชี้บรรทัดนั้น ผ่าน `requireModule` ของ `react-server-dom-webpack-client` ตอน parse RSC
+- module ที่หาไม่เจอ **ทุกครั้ง** = `(app-pages-browser)/./src/app/admin/error.tsx` — RSC ของหน้า `/tech` อ้าง error boundary ของฝั่ง admin ซึ่งไม่อยู่ใน chunk ของ `/tech` · ไม่มีไฟล์ไหนฝั่ง tech import มัน · server ไม่มี error ก่อนหน้า
+- **ไม่ใช่** HMR (hash คงที่, ไม่มี `reloadPage`, client ไม่ได้ส่ง `client-full-reload`) · **ไม่ใช่** `debug-channel.js` (transferSize > 0 ทุกรอบ) · **ไม่ใช่** route ถูกทิ้ง/compile ใหม่ (ตั้ง `onDemandEntries` ให้เก็บ 1 ชม. แล้วยังเกิด) · **ไม่ใช่** React debug channel (`experimental.reactDebugChannel: false` แล้วยังเกิด หนักกว่าเดิม 137 ครั้ง) — config ทั้งสองถอนกลับแล้ว
+- ทุกอย่างชี้ว่าเป็นบั๊กของ **Next 16.2 webpack dev mode** (client reference ของ route หนึ่งรั่วเข้า RSC ของอีก route) · production build ไม่มี React Refresh runtime → **ไม่น่ากระทบ Vercel** แต่ยังไม่ได้ยืนยันบน `next start`
+- น่าจะกระทบคนที่ dev บนเครื่องด้วย: เปิด admin แล้วเปิด `/tech` ใน dev server เดียวกัน อาจเจอหน้าช่างกระพริบไม่หยุด
+
+**ทางเลือกที่ยังไม่ได้ทำ (รอเจ้าของเลือก):** (ก) ให้ harness รันกับ `next build && next start` แทน dev — ตัดปัญหานี้ + server ตายกลางคันได้พร้อมกัน แต่ทุก sweep ต้อง build ก่อน · (ข) ไล่หาต้นเหตุใน Next ต่อ (ลองเพิ่ม `src/app/tech/error.tsx` / ทำ repro เล็ก / ดู issue ของ Next) · (ค) ย้ายเช็ค "ช่างเห็นใบงาน" ออกจาก `admin-seed` ไม่ให้บล็อก tech
+
+**สาเหตุเชิงโครงสร้างที่ขยายความเสียหาย (เดิม):** `tech` → `admin-seed` → `setup` · ตั้ง `retries` ไม่ช่วยข้อนี้เพราะ loop เกิดทุกรอบ
+
+**WO ระบบสร้างเองหายหลัง restore (3 ต.ค.):** WO 193 (`B120345-3-590314-01` ล้างแอร์ครบรอบ, ระบบสร้างอัตโนมัติ) ถูกสร้าง 06:48:06Z แค่ 5 วิก่อน snapshot → restore รอบถัดไปลบทิ้ง น่าจะเพราะ `baseline.mjs` อ่าน `maxIds` ก่อนแถวนี้ commit แต่อ่าน count หลัง (count บอก 74 แต่ restore ได้ 73) · ไม่เสียหายถาวร: เครื่องยังเลยรอบ (`next_due_date` 2026-10-03) ไม่มีใบงานเปิด → `syncOverdueMaintenanceWorkOrders` จะสร้างคืนเองเมื่อมีคนเปิดหน้า admin/tech · ถ้าจะกันจริงต้องให้ snapshot อ่าน maxIds กับ count ใน transaction/statement เดียว
 
 ## กติกาที่ได้จากรอบนี้
 
