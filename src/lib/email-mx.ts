@@ -107,8 +107,12 @@ export async function checkEmailShape(raw: string): Promise<EmailCheck> {
  * registers live on domains that do not exist (qa-run.ac.th, example.invalid)
  * — there the form's inline warning still shows and still disables its
  * button; only the server's last word is withheld. EMAIL_MX_CHECK=on forces
- * it in development for a manual test of the server-side path.
+ * it in development for a manual test of the server-side path, and
+ * EMAIL_MX_CHECK=off lifts it from a local production build — the QA harness
+ * sweeps one (`next start`, see qa/playwright.config.ts) and registers on those
+ * same domains. Not set on Vercel.
  */
 export function enforceMxOnRegister(): boolean {
+  if (process.env.EMAIL_MX_CHECK === "off") return false;
   return process.env.NODE_ENV === "production" || process.env.EMAIL_MX_CHECK === "on";
 }

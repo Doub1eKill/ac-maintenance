@@ -11,6 +11,9 @@ const BASE_URL = process.env.QA_BASE_URL ?? "http://localhost:3000";
 // traces of a run live under artifacts/<id> where the next run cannot wipe them.
 process.env.QA_RUN ??= new Date().toISOString().replace(/[-:T]/g, "").slice(0, 13);
 const RUN = process.env.QA_RUN;
+// "start" (a production build) or "dev"; read by the specs too, so pinned here.
+process.env.QA_SERVER ??= "start";
+const QA_SERVER = process.env.QA_SERVER;
 
 export default defineConfig({
   testDir: "./specs",
@@ -59,13 +62,25 @@ export default defineConfig({
     },
   ],
   webServer: {
-    // The 6 GB heap Next dev needs for a full sweep is part of the dev script
-    // itself (see package.json), so a server someone already started by hand or
-    // from the editor is the same server this would start.
-    command: "npm run dev",
+    // A production build by default, not `next dev`. Under dev, once the admin
+    // pages had been visited, /tech reloaded itself every half second: its RSC
+    // named src/app/admin/error.tsx, which /tech's chunks do not carry, and
+    // React Refresh's runtime answers a missing module factory with
+    // document.location.reload() (QA full-20261003; traced in HANDOFF.md). That
+    // runtime does not exist in a build, and a build is what Vercel serves.
+    // QA_SERVER=dev sweeps the dev server instead — which a server someone
+    // already started on the port still is, since an existing one is reused.
+    //
+    // A build lacks two dev-only crutches the setup leaned on: the demo-role
+    // login (auth.setup.ts approves the QA admin through SQL there) and the
+    // registration MX check being off (lifted by EMAIL_MX_CHECK=off, which only
+    // this command sets). AUTH_TRUST_HOST because Auth.js trusts the request's
+    // host only in development or on Vercel.
+    command: QA_SERVER === "dev" ? "npm run dev" : "npm run build && npm run start",
     url: `${BASE_URL}/login`,
     reuseExistingServer: true,
-    timeout: 180_000,
+    timeout: QA_SERVER === "dev" ? 180_000 : 900_000,
+    env: QA_SERVER === "dev" ? {} : { AUTH_TRUST_HOST: "true", EMAIL_MX_CHECK: "off" },
     // Into the sweep's own output, prefixed [WebServer]: a server action that
     // fails reports only a generic toast to the page, and the console.error
     // naming the real cause is otherwise lost with the terminal. (Nothing is

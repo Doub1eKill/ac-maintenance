@@ -1,6 +1,6 @@
 import { test as setup, expect } from "@playwright/test";
 import path from "node:path";
-import { QA, OUT_ROOT, ledger, shot, note, registerViaForm, loginViaForm, hydrated } from "../lib";
+import { QA, OUT_ROOT, ledger, shot, note, registerViaForm, loginViaForm, hydrated, db } from "../lib";
 
 const AUTH = path.join(OUT_ROOT, "auth");
 
@@ -79,8 +79,16 @@ setup("admin session: pending refusal, approval by the seeded admin, then login"
   );
 
   // 2. The seeded org_admin approves the request. The demo-role button is the
-  //    dev-only way into that account (it has no password).
-  if (!alreadyActive) {
+  //    dev-only way into that account (it has no password), so a production
+  //    build (the default, see playwright.config.ts) approves through SQL
+  //    instead. The approvals page itself is still driven through the UI by
+  //    admin/workflows.spec.ts, as the QA admin.
+  if (!alreadyActive && process.env.QA_SERVER !== "dev") {
+    db(`update users set status = 'active' where email = '${QA.admin}' and status = 'pending'`);
+    const [[status]] = db(`select status from users where email = '${QA.admin}'`);
+    ledger("Approvals", `QA org_admin approved through SQL (production build has no demo-role login): status ${status}`, "DB", status === "active" ? "PASS" : "FAIL");
+    expect(status, "QA admin status after SQL approval").toBe("active");
+  } else if (!alreadyActive) {
     const ctx = await browser.newContext();
     await ctx.addInitScript(() => sessionStorage.setItem("ac-maintenance.browser-session", "1"));
     const admin = await ctx.newPage();

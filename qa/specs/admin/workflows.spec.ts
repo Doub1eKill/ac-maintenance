@@ -318,6 +318,9 @@ test.describe("admin workflows", () => {
     ledger("Catalogue", "renaming Panasonic to 'daikin' (case/space variant) is refused as duplicate", "UI", /มียี่ห้อนี้อยู่ในระบบแล้ว/.test(t1) ? "PASS" : "FAIL", await shot(page, "settings-rename-dup"));
     await input.fill("Panasonic QA");
     await page.getByRole("button", { name: /^บันทึก$/ }).last().click();
+    // The duplicate toast above is still up, so toastText() alone returned at
+    // once with that one, before this rename's toast had rendered.
+    await page.locator("[data-sonner-toaster]").getByText(/แก้ชื่อยี่ห้อ/).first().waitFor({ timeout: 10_000 }).catch(() => {});
     const t2 = await toastText(page); await settle(page, 2500);
     ledger("Catalogue", "rename Panasonic → 'Panasonic QA' succeeds", "UI", /แก้ชื่อยี่ห้อ/.test(t2) && (await body(page)).includes("Panasonic QA") ? "PASS" : "FAIL", await shot(page, "settings-renamed"));
     await page.getByRole("button", { name: /แก้ไขชื่อยี่ห้อ Panasonic QA/ }).click();

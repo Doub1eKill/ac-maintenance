@@ -9,6 +9,18 @@ test("BUG-009: a submit before hydration never puts the password in the URL", as
   const ctx = await browser.newContext({ javaScriptEnabled: false });
   const page = await ctx.newPage();
   await page.goto("/login", { waitUntil: "domcontentloaded" });
+  // A production build prerenders /login with the form behind a Suspense
+  // fallback (useSearchParams, see src/app/login/page.tsx): the form only
+  // exists once JavaScript has run, so there is nothing to submit before
+  // hydration at all. Dev server-renders it, and the checks below apply.
+  if ((await page.locator("#email").count()) === 0) {
+    const html = await page.content();
+    const clientOnly = html.includes("BAILOUT_TO_CLIENT_SIDE_RENDERING") && !html.includes('name="password"');
+    ledger("Login", "no form in the server-rendered HTML (client-only behind Suspense) — nothing can be submitted before hydration", "UI", clientOnly ? "PASS" : "FAIL", await shot(page, "reg-login-nojs"));
+    expect(clientOnly, "login form absent from server HTML for a known reason").toBeTruthy();
+    await ctx.close();
+    return;
+  }
   await page.locator("#email").fill(QA.tech);
   await page.locator("#password").fill(QA.password);
   const submit = page.getByRole("button", { name: /เข้าสู่ระบบ \(Sign In\)/ });
