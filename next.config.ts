@@ -32,6 +32,29 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "images.unsplash.com" },
     ],
   },
+  // Sent on every response. Vercel already adds HSTS; these are the rest.
+  // Not a full Content-Security-Policy yet — Next's inline bootstrap scripts
+  // need nonces or 'unsafe-inline', and getting that wrong blanks the app — so
+  // only frame-ancestors, which carries none of that risk. "self" rather than
+  // "none": nothing frames these pages today (the sticker sheet prints from a
+  // window.open'd document, not an iframe), but a same-origin frame is not the
+  // clickjacking this is for.
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "Content-Security-Policy", value: "frame-ancestors 'self'" },
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          // The QR scanner opens the camera (getUserMedia, video only); nothing
+          // in the app asks for the microphone, location or payments.
+          { key: "Permissions-Policy", value: "camera=(self), microphone=(), geolocation=(), payment=(), usb=()" },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
