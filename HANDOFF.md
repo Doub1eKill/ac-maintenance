@@ -46,6 +46,27 @@
 
 **ผลระยะ 4:** run `phase4-20261004` (production build) **83/83 · ledger PASS 227 · FAIL 0 · SKIP 5** · unit 37/37 · tsc/eslint 0/0 · restore ครบ
 
+# 🟢 ป้ายบัญชีบนการ์ดผู้ใช้เป็น Online / Offline แทน "ใช้งานอยู่" (5 ต.ค. 2026 ตี 2, DoubleKill)
+
+เจ้าของขอให้ป้ายบอกว่าเข้าระบบอยู่หรือไม่ · เลือกนิยาม **"มี session + ใช้งานใน 5 นาที"** และคำว่า **Online** · pending/suspended ยังแสดง "รออนุมัติ"/"ถูกระงับ" เหมือนเดิม
+
+**ทำไมต้อง heartbeat:** session เป็น JWT ไม่มีบันทึกฝั่ง server และ cookie อยู่ถึงเที่ยงคืนแม้ปิดเบราว์เซอร์ (BrowserSessionGuard ตัดตอนเปิดใหม่เท่านั้น) → นับจาก login/logout อย่างเดียวจะขึ้น Online ค้างจนเที่ยงคืน
+
+**ทำอะไร**
+- migration `20261004120000_add_user_presence`: `users.last_seen_at`, `users.signed_out_at` (TIMESTAMP(0), nullable) · **apply ลง Aiven แล้ว** (migrate diff ตรงกับไฟล์ก่อน deploy, หลัง deploy diff ว่าง)
+- `src/lib/presence.ts` (ไม่มี Prisma): `isOnline()` = active + เห็นภายใน 5 นาที + หลังเที่ยงคืนวันนี้ (Bangkok) + เห็นหลัง sign-out ล่าสุด (strictly after) · heartbeat ทุก 2 นาที · unit test 9 ข้อใน `presence.test.ts` (รวม 46/46)
+- `src/lib/presence-store.ts`: `touchPresence` เขียน+throttle 60 วิใน statement เดียว (ไม่อ่านก่อน; ข้าม throttle ถ้า sign-out ใหม่กว่า เพื่อให้เครื่องที่สองที่ยังเปิดอยู่กลับ Online ทันที) · `markSignedOut` · `onlineUserIds` · error แค่ log ไม่ทำให้ login/หน้าเว็บพัง
+- `auth.ts` `events.signIn` (force touch) / `events.signOut` (token.sub) · เที่ยงคืนไม่มี event แต่กฎใน presence.ts ตัดให้
+- `POST /api/presence` = heartbeat (ต้อง active) · `GET /api/presence` = รายชื่อ id ที่ Online (org_admin เท่านั้น) · no-store
+- `PresenceHeartbeat` ใน layout `/admin` และ `/tech` (ข้าง BrowserSessionGuard): ตอนโหลด, ทุก 2 นาทีเมื่อแท็บมองเห็น, และทันทีที่แท็บกลับมา
+- หน้าทีม: `toUserRow` คำนวณ `online` ฝั่ง server · `useLivePresence` poll GET ทุก 60 วิเมื่อมองเห็น (ไม่ใช้ router.refresh ทั้งหน้า) · modal รายละเอียดเก็บ id แล้ว lookup จึงอัปเดตตาม · `UserStatusBadge` ใช้ร่วมระหว่างการ์ดกับ modal · คำอยู่ที่ `USER_PRESENCE_LABEL` ใน labels.ts
+
+**เช็ค (dev + headless Playwright 2 context, admin 1366px / tech มือถือ):** ช่าง Offline → login + heartbeat 204 → Online บนหน้าทีม **โดยไม่ reload** → modal แสดง Online → sign-out → Offline (live) · tech GET presence = 401, anonymous POST = 401, POST หลัง sign-out = 401 · server error 0 · tsc/eslint 0/0 · ไม่ได้รัน full sweep (รอเจ้าของสั่ง: sweep restore ลบ row ที่ id > snapshot) · คืนค่า `last_seen_at`/`signed_out_at` ของบัญชี seed id 2, 3 เป็น NULL แล้ว · ไม่มี row ใหม่ (audit max 113, WO max 297)
+
+**กับดักที่เจอ:** Browser pane ที่ถูกซ่อน → React 19 ไม่ reveal/hydrate เนื้อหา page ที่ stream มา (layout hydrate แต่ page ไม่) ทำให้ดูเหมือน hook ไม่ทำงาน · ใน dev, hydration ช้ากว่า `networkidle` ต้องรอ `__reactFiber` บน element ก่อนทดสอบ interaction
+
+**ข้อจำกัดที่ยอมรับ:** เปิดหลายเครื่องแล้ว sign-out เครื่องหนึ่ง → Offline จนเครื่องที่เหลือส่ง heartbeat ถัดไป (≤2 นาที) · แท็บถูกซ่อน/จอล็อก > 5 นาที = Offline แม้ cookie ยังอยู่ (ตั้งใจ)
+
 # 🏷️ การ์ด "ช่างเทคนิคในระบบ" (ภาพรวม admin) เปลี่ยนป้าย "สถานะบัญชี Active" → "บัญชี Approved" (4 ต.ค. 2026, DoubleKill)
 
 เจ้าของขอเปลี่ยนคำให้ตรงประเด็น (ลอง "Verify" ก่อน แล้วเลือก "Approved" เพราะบัญชีได้สถานะนี้จากการอนุมัติ และ "Verify" ปนกับการยืนยันอีเมล 6 หลัก) · แก้เฉพาะข้อความใน `overview-metrics-grid.tsx:139` · **ไม่แตะ enum `active` ใน DB** (ต้อง migrate Aiven + แก้ `status === "active"` หลายสิบจุด) · ป้ายไทย "ใช้งานอยู่" ใน `labels.ts` ไม่เปลี่ยน

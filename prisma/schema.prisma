@@ -77,6 +77,12 @@ model User {
   createdAt       DateTime?  @map("created_at") @db.Timestamp(0)
   updatedAt       DateTime?  @map("updated_at") @db.Timestamp(0)
   deletedAt       DateTime?  @map("deleted_at") @db.Timestamp(0)
+  // Presence for the Online/Offline badge (src/lib/presence.ts). The session
+  // is a JWT with no server-side record, so these two are the only trace of
+  // who is signed in: last_seen_at moves on sign-in and on the dashboards'
+  // heartbeat, signed_out_at on an explicit sign-out. NULL means never.
+  lastSeenAt      DateTime?  @map("last_seen_at") @db.Timestamp(0)
+  signedOutAt     DateTime?  @map("signed_out_at") @db.Timestamp(0)
 
   phones             UserPhone[]
   maintenanceLogs    MaintenanceLog[]

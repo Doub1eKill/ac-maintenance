@@ -5,6 +5,7 @@ import { TeamPanel } from "@/components/admin/team-panel";
 import { TechnicianDetailModal } from "@/components/admin/technician-detail-modal";
 import { useDashboardSearch } from "@/components/layout/dashboard-search";
 import { useUserStatus } from "@/components/admin/use-admin-actions";
+import { useLivePresence } from "@/components/admin/use-live-presence";
 import type { PendingUser } from "@/components/admin/types";
 
 export function TeamClient({
@@ -16,19 +17,22 @@ export function TeamClient({
 }) {
   const search = useDashboardSearch();
   const { isPending, setUserStatus } = useUserStatus();
+  const users = useLivePresence(allUsers);
   // Held here rather than inside the panel so the modal is not re-created when
-  // the grid re-renders after a status change.
-  const [detailUser, setDetailUser] = useState<PendingUser | null>(null);
+  // the grid re-renders after a status change. Kept as an id and looked up, so
+  // the open panel follows the same live Online flag as the grid.
+  const [detailUserId, setDetailUserId] = useState<string | null>(null);
+  const detailUser = detailUserId ? users.find((u) => u.id === detailUserId) ?? null : null;
 
   return (
     <>
       <TeamPanel
-        allUsers={allUsers}
+        allUsers={users}
         globalSearch={search}
         isPending={isPending}
         onUserStatus={setUserStatus}
         currentUserId={currentUserId}
-        onOpenDetail={setDetailUser}
+        onOpenDetail={(user: PendingUser) => setDetailUserId(user.id)}
       />
 
       {detailUser && (
@@ -37,7 +41,7 @@ export function TeamClient({
           currentUserId={currentUserId}
           isPending={isPending}
           onUserStatus={setUserStatus}
-          onClose={() => setDetailUser(null)}
+          onClose={() => setDetailUserId(null)}
         />
       )}
     </>

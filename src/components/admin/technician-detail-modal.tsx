@@ -34,7 +34,8 @@ import { useEscapeToClose } from "@/hooks/use-escape-to-close";
 import { adminResetUserPasswordAction, getTechnicianDetail } from "@/app/admin/actions";
 import type { TechnicianLogRow } from "@/lib/admin/users";
 import type { PendingUser } from "@/components/admin/types";
-import { MAINTENANCE_ACTION_LABEL, USER_STATUS_LABEL } from "@/lib/labels";
+import { MAINTENANCE_ACTION_LABEL } from "@/lib/labels";
+import { UserStatusBadge } from "@/components/admin/user-card";
 import type { MaintenanceAction } from "@/generated/prisma/enums";
 
 interface TechnicianDetail {
@@ -268,9 +269,7 @@ export function TechnicianDetailModal({
                 <RoleIcon className="h-3 w-3" />
                 {user.role === "technician" ? "ช่างเทคนิค" : "ผู้ดูแลระบบ"}
               </span>
-              <span className="rounded-md border border-border bg-muted px-2 py-0.5 text-foreground">
-                {USER_STATUS_LABEL[user.status] ?? user.status}
-              </span>
+              <UserStatusBadge user={user} />
             </div>
 
             <div className="space-y-2">

@@ -3,12 +3,41 @@
 import Image from "next/image";
 import { Building2, Wrench } from "lucide-react";
 import type { PendingUser } from "@/components/admin/types";
-import { USER_STATUS_LABEL } from "@/lib/labels";
+import { USER_PRESENCE_LABEL, USER_STATUS_LABEL } from "@/lib/labels";
 
-function statusClasses(status: string) {
-  if (status === "active") return "bg-success/20 text-success-foreground border-success/30";
-  if (status === "pending") return "bg-warning/20 text-warning-foreground border-warning/30";
-  return "bg-destructive/10 text-destructive border-destructive/30";
+/**
+ * The account's badge. An active account shows whether the person is Online
+ * now; pending and suspended accounts cannot be signed in, so they keep saying
+ * why. Shared with the detail panel so the two never disagree.
+ */
+export function UserStatusBadge({ user }: { user: Pick<PendingUser, "status" | "online"> }) {
+  if (user.status === "active") {
+    return (
+      <span
+        className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 ${
+          user.online
+            ? "border-success/30 bg-success/20 text-success-foreground"
+            : "border-border bg-muted text-muted-foreground"
+        }`}
+      >
+        <span
+          aria-hidden
+          className={`h-1.5 w-1.5 rounded-full ${user.online ? "bg-success" : "bg-muted-foreground/50"}`}
+        />
+        {user.online ? USER_PRESENCE_LABEL.online : USER_PRESENCE_LABEL.offline}
+      </span>
+    );
+  }
+
+  const classes =
+    user.status === "pending"
+      ? "bg-warning/20 text-warning-foreground border-warning/30"
+      : "bg-destructive/10 text-destructive border-destructive/30";
+  return (
+    <span className={`rounded-md border px-2 py-0.5 ${classes}`}>
+      {USER_STATUS_LABEL[user.status] ?? user.status}
+    </span>
+  );
 }
 
 function initialsOf(name: string) {
@@ -95,9 +124,7 @@ export function UserCard({ user, onOpen, meta, actions }: UserCardProps) {
             <RoleIcon className="h-3 w-3" />
             {user.role === "technician" ? "ช่างเทคนิค" : "ผู้ดูแลระบบ"}
           </span>
-          <span className={`rounded-md border px-2 py-0.5 ${statusClasses(user.status)}`}>
-            {USER_STATUS_LABEL[user.status] ?? user.status}
-          </span>
+          <UserStatusBadge user={user} />
         </div>
 
         {meta}

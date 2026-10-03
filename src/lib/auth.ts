@@ -5,6 +5,7 @@ import { z } from "zod";
 import { authConfig } from "@/lib/auth.config";
 import { prisma } from "@/lib/prisma";
 import { currentAccountState } from "@/lib/account-status";
+import { markSignedOut, touchPresence } from "@/lib/presence-store";
 import { clientIp, clearFailures, isThrottled, recordFailure } from "@/lib/login-throttle";
 import type { SignInCode } from "@/lib/sign-in-codes";
 
@@ -196,6 +197,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       token.role = state.role as typeof token.role;
       token.status = state.status as typeof token.status;
       return token;
+    },
+  },
+  // Presence for the team page's Online/Offline badge (lib/presence.ts). Only
+  // on this instance: sign-in and sign-out go through /api/auth, never proxy.ts.
+  // A session that simply reaches midnight fires neither; the rule in
+  // presence.ts drops it without being told.
+  events: {
+    async signIn({ user }) {
+      if (user.id) await touchPresence(user.id, { force: true });
+    },
+    async signOut(message) {
+      if ("token" in message && message.token?.sub) await markSignedOut(message.token.sub);
     },
   },
   providers:

@@ -22,6 +22,15 @@ export const USER_STATUS_LABEL: Record<string, string> = {
 };
 
 /**
+ * What an active account's badge says instead of USER_STATUS_LABEL.active:
+ * whether the person is signed in and on a dashboard now (lib/presence.ts).
+ */
+export const USER_PRESENCE_LABEL = {
+  online: "Online",
+  offline: "Offline",
+} as const;
+
+/**
  * A calendar date the way the admin tables show it, in the viewer's locale
  * settings for Thai. Client-side only: the tables that call this render in
  * the browser, where the local time zone is the right one. Server components

@@ -92,6 +92,8 @@ export interface PendingUser {
   status: string;
   avatarUrl: string | null;
   createdAt: string | null;
+  /** Signed in and on a dashboard within the last few minutes (lib/presence.ts). */
+  online: boolean;
 }
 
 /**

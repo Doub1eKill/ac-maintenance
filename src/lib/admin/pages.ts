@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { formatUnitLocation } from "@/lib/location";
 import type { SearchEntry } from "@/lib/search";
 import { verifyOrgAdmin } from "@/lib/auth-guards";
+import { isOnline } from "@/lib/presence";
 import { syncOverdueMaintenanceWorkOrders } from "@/lib/maintenance";
 import { getOrganisationName, getOrganisationInfo, getDefaultMaintenanceFrequency } from "@/lib/organisation";
 import { getAcMasterData } from "@/lib/admin/master-data";
@@ -172,6 +173,8 @@ function toUserRow(u: {
   status: string;
   avatarUrl: string | null;
   createdAt: Date | null;
+  lastSeenAt: Date | null;
+  signedOutAt: Date | null;
 }) {
   return {
     id: u.id.toString(),
@@ -181,6 +184,10 @@ function toUserRow(u: {
     status: u.status,
     avatarUrl: u.avatarUrl,
     createdAt: u.createdAt ? u.createdAt.toISOString() : null,
+    // Decided here rather than sent as timestamps, so the browser's clock and
+    // time zone never enter into it. The team page then keeps it current
+    // through /api/presence.
+    online: isOnline(u),
   };
 }
 
@@ -195,6 +202,9 @@ const userListSelect = {
   // fetching them for forty people to render none of them is wasted work.
   avatarUrl: true,
   createdAt: true,
+  // For the Online/Offline badge (lib/presence.ts).
+  lastSeenAt: true,
+  signedOutAt: true,
 } as const;
 
 /** One query. The old dashboard loaded the whole asset tree to render this. */
