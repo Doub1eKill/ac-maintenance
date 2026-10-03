@@ -64,6 +64,10 @@
 
 **เช็ค (dev + headless Playwright, ข้อมูลชั่วคราวบน Aiven แล้วคืนค่า):** ช่างชั่วคราว (id 191) ถือ WO 12, 13 → dialog แสดงงานค้าง 2 งาน → คืนงานและระงับ: WO 12, 13 กลับเป็น pending, audit RELEASE×2 + SUSPEND · การ์ดแสดง "ถูกระงับ" + ปุ่ม เปิดใช้งาน / ลบออกจากระบบ · เปิดใช้งาน (ACTIVATE_USER) · ระงับอีกครั้งตอนไม่มีงาน → dialog แบบเดิม · ลบ → การ์ดหาย, email แทนแล้ว, password NULL, phones 0, DELETE_USER · dialog ดูดีทั้ง 1366px และ 390px · server error 0 · tsc/eslint 0/0 · unit 46/46 · **คืนค่าแล้ว**: WO 12, 13 ตรงกับก่อนทดสอบ (updated_at เดิม), ลบ user 191, 192 + audit id > 113, users 9 · phones max 95 · audit max 113 · WO max 297 · claimed 25 · ไม่ได้รัน full sweep
 
+**Full sweep หลัง deploy ทั้งสองฟีเจอร์ (เจ้าของสั่ง 4 ต.ค. ตี 2–3):** run `presence-accounts-20261004` (production build) **83/83 · ledger PASS 227 · FAIL 0 · SKIP 5** (5 ข้อเดิม "already created earlier in this run" เหมือน phase4) · test ระงับ/ตัด session/กู้คืน (ledger 146–150) ผ่านด้วย SuspendUserDialog ตัวใหม่ · server log: "unsupported image format" 2 (test อัปโหลดไฟล์ปลอม, เท่าเดิม) และ "destination stream closed early" 6 (phase4 มี 4, เป็นการตัด stream ตอน navigate) · ไม่มี error ของ presence/สถานะบัญชี/การลบ · restore ครบ: users 9 · phones 11 · logs 233 · WO 75 · audit max 113 · presence เหลือแค่ของเจ้าของ (id 26, ใช้งานจริง)
+
+**ยังไม่มี spec ใน `qa/` สำหรับ:** dialog งานค้าง, ปุ่มลบบัญชี, ป้าย Online/Offline (ทดสอบด้วยสคริปต์ headless แยกแล้ว)
+
 **ข้อจำกัด:** ช่างที่กดรับงานในเสี้ยววินาทีเดียวกับที่ถูกระงับอาจยังถืองานนั้นอยู่ (การรับงานไม่ล็อก row ของ users) — session ตายภายใน 1 นาที และการลบบัญชีคืนงานให้อีกรอบ
 
 # 🟢 ป้ายบัญชีบนการ์ดผู้ใช้เป็น Online / Offline แทน "ใช้งานอยู่" (4 ต.ค. 2026 ตี 2, DoubleKill)
