@@ -12,6 +12,7 @@ export const SIGN_IN_CODES = [
   "account-pending",
   "account-suspended",
   "password-reset-required",
+  "too-many-attempts",
 ] as const;
 
 export type SignInCode = (typeof SIGN_IN_CODES)[number];

@@ -1,3 +1,6 @@
+import fs from "node:fs";
+import path from "node:path";
+import { createResetToken } from "../../../src/lib/reset-token";
 import { test, expect, ledger, shot, note, loginViaForm, hydrated, db, QA, QA_EMAIL_CODE, plantEmailCode, pngBuffer } from "../../lib";
 
 // Regressions for the sign-in findings of run 20260913-1742. Each check names
@@ -205,4 +208,78 @@ test("email verification: the submit waits for a code, a wrong code is counted, 
   ledger("Register", "a submit without the proof token is refused by the server and creates nothing", "UI", /ยืนยันอีเมล/.test(alert) && created === "0" ? "PASS" : "FAIL", await shot(page, "otp-no-token"));
 
   db(`delete from email_verification_codes where email like 'qa.otp.%' or email like 'qa.other.%'`);
+});
+
+test("password reset link works once: a second use is refused, the new password signs in", async ({ page }) => {
+  // The signature covers the account's current password hash (src/lib/reset-token.ts),
+  // so the link stops verifying as soon as it has set a password. Before, it
+  // stayed good for its whole hour. Built here with the app's own signer and
+  // secret, the same link the email would carry. tech2's password is "reset"
+  // to the one it already had, so nothing later in the sweep notices.
+  const secret = fs.readFileSync(path.resolve(__dirname, "..", "..", "..", ".env"), "utf8").match(/^AUTH_SECRET="?([^"\r\n]+)"?/m)?.[1];
+  expect(secret, "AUTH_SECRET in .env").toBeTruthy();
+  process.env.AUTH_SECRET = secret!;
+  const [[id, hash]] = db(`select id, password from users where email = '${QA.tech2}'`);
+  const link = `/reset-password?token=${createResetToken(Number(id), hash === "NULL" ? null : hash!)}`;
+
+  const submit = async () => {
+    await page.goto(link); await hydrated(page, "form");
+    await page.locator("#password").fill(QA.password);
+    await page.getByRole("button", { name: /บันทึกรหัสผ่านใหม่/ }).click();
+    await page.waitForTimeout(2500);
+    return page.evaluate(() => document.body.innerText);
+  };
+
+  const first = await submit();
+  ledger("Password reset", "first use of a reset link sets the password", "UI", /ตั้งรหัสผ่านใหม่เรียบร้อยแล้ว/.test(first) ? "PASS" : "FAIL", await shot(page, "reset-first-use"));
+  const [[hashAfter]] = db(`select password from users where email = '${QA.tech2}'`);
+  const second = await submit();
+  const refused = /invalid or has expired/i.test(second) && !/ตั้งรหัสผ่านใหม่เรียบร้อยแล้ว/.test(second);
+  const [[hashAfterSecond]] = db(`select password from users where email = '${QA.tech2}'`);
+  ledger("Password reset", `the same link a second time is refused and changes nothing (hash ${hashAfterSecond === hashAfter ? "unchanged" : "CHANGED"})`, "UI", refused && hashAfterSecond === hashAfter ? "PASS" : "FAIL", await shot(page, "reset-second-use"));
+  const url = await loginViaForm(page, QA.tech2, QA.password);
+  ledger("Password reset", "the password the link set signs in", "UI", /\/tech/.test(url) ? "PASS" : "FAIL", await shot(page, "reset-login"));
+
+  expect(first).toMatch(/ตั้งรหัสผ่านใหม่เรียบร้อยแล้ว/);
+  expect(refused, "second use of the link refused").toBe(true);
+  expect(hashAfterSecond).toBe(hashAfter);
+});
+
+test("sign-in throttle: the 11th wrong attempt for one address is refused, other addresses are not", async ({ page }) => {
+  // An address that does not exist, new on every run: the count is per
+  // address (src/lib/login-throttle.ts), so this never locks an account the
+  // rest of the sweep signs in with. Unknown addresses count like wrong
+  // passwords, or the throttle would tell which addresses exist.
+  const target = `qa.throttle.${Date.now()}@qa-run.ac.th`;
+  const message = async () => (await page.evaluate(() => document.body.innerText)).match(/พยายามเข้าสู่ระบบ[^\n]*|อีเมลหรือรหัสผ่านไม่ถูกต้อง[^\n]*/)?.[0] ?? "(no message)";
+  const seen: string[] = [];
+  for (let i = 1; i <= 10; i++) { await loginViaForm(page, target, `wrong-${i}`); seen.push(await message()); }
+  const generic = seen.every((m) => /อีเมลหรือรหัสผ่านไม่ถูกต้อง/.test(m));
+  ledger("Login throttle", `attempts 1-10 on one address get the ordinary refusal (${seen.filter((m) => /อีเมลหรือรหัสผ่าน/.test(m)).length}/10)`, "UI", generic ? "PASS" : "FAIL", await shot(page, "throttle-10"));
+  await loginViaForm(page, target, "wrong-11");
+  const eleventh = await message();
+  ledger("Login throttle", `attempt 11: "${eleventh}"`, "UI", /พยายามเข้าสู่ระบบ/.test(eleventh) ? "PASS" : "FAIL", await shot(page, "throttle-11"));
+  await loginViaForm(page, `qa.throttle.other.${Date.now()}@qa-run.ac.th`, "wrong");
+  const other = await message();
+  ledger("Login throttle", `another address right after: "${other}"`, "UI", /อีเมลหรือรหัสผ่านไม่ถูกต้อง/.test(other) ? "PASS" : "FAIL", await shot(page, "throttle-other"));
+  const [[rows]] = db(`select count(*) from login_failures where email = '${target}'`);
+  note("throttle.txt", `rows for ${target}: ${rows}\n${seen.join("\n")}\n11: ${eleventh}\nother: ${other}`);
+  expect(generic, "first ten attempts").toBe(true);
+  expect(eleventh).toMatch(/พยายามเข้าสู่ระบบ/);
+  expect(other).toMatch(/อีเมลหรือรหัสผ่านไม่ถูกต้อง/);
+});
+
+test("security headers are sent, and the camera stays allowed for the QR scanner", async ({ page }) => {
+  const res = await page.request.get("/login");
+  const h = res.headers();
+  const want: Array<[string, RegExp]> = [
+    ["content-security-policy", /frame-ancestors 'self'/],
+    ["x-frame-options", /^SAMEORIGIN$/i],
+    ["x-content-type-options", /^nosniff$/i],
+    ["referrer-policy", /strict-origin-when-cross-origin/],
+    ["permissions-policy", /camera=\(self\)/],
+  ];
+  const missing = want.filter(([k, re]) => !re.test(h[k] ?? "")).map(([k]) => `${k}=${h[k] ?? "(none)"}`);
+  ledger("Headers", `security headers on /login${missing.length ? ": missing " + missing.join(", ") : ""}`, "API", missing.length === 0 ? "PASS" : "FAIL", note("security-headers.txt", JSON.stringify(h, null, 1)));
+  expect(missing).toEqual([]);
 });

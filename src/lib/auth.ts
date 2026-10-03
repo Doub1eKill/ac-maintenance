@@ -5,6 +5,7 @@ import { z } from "zod";
 import { authConfig } from "@/lib/auth.config";
 import { prisma } from "@/lib/prisma";
 import { currentAccountState } from "@/lib/account-status";
+import { clientIp, clearFailures, isThrottled, recordFailure } from "@/lib/login-throttle";
 import type { SignInCode } from "@/lib/sign-in-codes";
 
 const credentialsSchema = z.object({
@@ -29,6 +30,9 @@ class AccountSuspended extends CredentialsSignin {
 class PasswordResetRequired extends CredentialsSignin {
   code: SignInCode = "password-reset-required";
 }
+class TooManyAttempts extends CredentialsSignin {
+  code: SignInCode = "too-many-attempts";
+}
 
 const passwordProvider = Credentials({
   credentials: {
@@ -45,21 +49,29 @@ const passwordProvider = Credentials({
   // matched, which is a ready-made account-enumeration trail. Sign-ins that
   // need a record have system_audit_logs; a debug trace of the login path
   // does not belong in the server console.
-  async authorize(rawCredentials) {
+  async authorize(rawCredentials, request) {
     const parsed = credentialsSchema.safeParse(rawCredentials);
     if (!parsed.success) {
       return null;
     }
 
     const email = parsed.data.email.toLowerCase().trim();
+    const ip = clientIp(request);
 
     try {
+      // Before the password is looked at, so a throttled guess learns nothing
+      // about whether it was right (lib/login-throttle.ts).
+      if (await isThrottled(email, ip)) {
+        throw new TooManyAttempts();
+      }
+
       const user = await prisma.user.findUnique({
         where: { email },
       });
 
       if (!user) {
         await bcrypt.compare(parsed.data.password, DUMMY_HASH);
+        await recordFailure(email, ip);
         return null;
       }
 
@@ -80,6 +92,7 @@ const passwordProvider = Credentials({
       const passwordMatches = await bcrypt.compare(parsed.data.password, user.password);
 
       if (!passwordMatches) {
+        await recordFailure(email, ip);
         return null;
       }
 
@@ -90,6 +103,7 @@ const passwordProvider = Credentials({
         throw new AccountPendingApproval();
       }
 
+      await clearFailures(email);
       return {
         id: String(user.id),
         email: user.email,
