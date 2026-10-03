@@ -114,7 +114,7 @@ const MUTABLE = {
   work_orders: ["status", "claimed_by", "claimed_at", "completed_at", "priority", "resolution_notes", "assigned_to_id", "assigned_at"],
   rooms: ["name", "floor"],
   buildings: ["name", "abbreviation"],
-  system_settings: ["default_frequency_value", "default_frequency_unit", "organisation_name", "organisation_address", "organisation_phone"],
+  system_settings: ["default_frequency_value", "default_frequency_unit", "organisation_name", "organisation_address", "organisation_phone", "overdue_sync_at"],
 };
 
 // Tables where a run can make a baseline row vanish rather than change it:

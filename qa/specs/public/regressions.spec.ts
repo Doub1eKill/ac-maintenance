@@ -283,3 +283,21 @@ test("security headers are sent, and the camera stays allowed for the QR scanner
   ledger("Headers", `security headers on /login${missing.length ? ": missing " + missing.join(", ") : ""}`, "API", missing.length === 0 ? "PASS" : "FAIL", note("security-headers.txt", JSON.stringify(h, null, 1)));
   expect(missing).toEqual([]);
 });
+
+test("daily cron route: refuses without the secret, runs with it and records the run", async ({ page }) => {
+  // src/app/api/cron/overdue-maintenance. The harness gives its server
+  // CRON_SECRET=qa-cron-secret (playwright.config.ts); restore puts
+  // system_settings.overdue_sync_at back, so production never sees this run.
+  const path_ = "/api/cron/overdue-maintenance";
+  const none = await page.request.get(path_);
+  const wrong = await page.request.get(path_, { headers: { authorization: "Bearer not-it" } });
+  const right = await page.request.get(path_, { headers: { authorization: "Bearer qa-cron-secret" } });
+  const body = await right.json().catch(() => ({}));
+  const [[age]] = db("select coalesce(extract(epoch from (now() at time zone 'UTC' - overdue_sync_at))::int, -1) from system_settings where id = 1");
+  const recorded = Number(age) >= 0 && Number(age) < 120;
+  ledger("Cron", `no secret → ${none.status()}, wrong secret → ${wrong.status()}, right secret → ${right.status()} ${JSON.stringify(body)}; overdue_sync_at ${recorded ? `set ${age}s ago` : `not set (${age})`}`, "API", none.status() === 401 && wrong.status() === 401 && right.status() === 200 && typeof body.created === "number" && recorded ? "PASS" : "FAIL", note("cron.txt", JSON.stringify({ none: none.status(), wrong: wrong.status(), right: right.status(), body, age })));
+  expect(none.status()).toBe(401);
+  expect(wrong.status()).toBe(401);
+  expect(right.status()).toBe(200);
+  expect(recorded, "overdue_sync_at recorded").toBe(true);
+});

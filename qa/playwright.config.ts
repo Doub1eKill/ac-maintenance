@@ -85,6 +85,9 @@ export default defineConfig({
     // plant their codes in the database (plantEmailCode) and never read mail.
     env: {
       MAIL_SUPPRESS_DOMAINS: "qa-run.ac.th,example.invalid",
+      // Lets public/regressions.spec.ts call the cron route as Vercel would.
+      // Local only; the real secret lives in the Vercel project settings.
+      CRON_SECRET: "qa-cron-secret",
       ...(QA_SERVER === "dev" ? {} : { AUTH_TRUST_HOST: "true", EMAIL_MX_CHECK: "off" }),
     },
     // Into the sweep's own output, prefixed [WebServer]: a server action that

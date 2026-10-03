@@ -338,6 +338,11 @@ model SystemSettings {
   organisationAddress String? @map("organisation_address") @db.VarChar(255)
   organisationPhone   String? @map("organisation_phone") @db.VarChar(255)
 
+  // When the daily cron (src/app/api/cron/overdue-maintenance) last raised
+  // the due cleaning orders. Dashboards only do it themselves when this is
+  // missing or stale — see syncOverdueMaintenanceWorkOrders.
+  overdueSyncAt DateTime? @map("overdue_sync_at") @db.Timestamp(0)
+
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
 
   @@map("system_settings")

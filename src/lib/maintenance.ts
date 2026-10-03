@@ -130,15 +130,22 @@ const OVERDUE_CHECK_TTL_MS = 5 * 60 * 1000;
 // Used to be keyed per tenant; with one organisation there is one timer.
 let lastOverdueCheckAt: number | null = null;
 
-// There is no cron/scheduler in this stack, so the "auto-check" that's
-// supposed to flag units overdue for cleaning is done lazily instead: every
-// time a tech- or admin-facing dashboard that cares about due dates loads,
-// this materializes a pending WorkOrder for any active MaintenanceSchedule
-// that has crossed nextDueDate and doesn't already have an open job. Idempotent —
-// safe to call on every request.
+// Raises a pending cleaning WorkOrder for every active MaintenanceSchedule
+// that has reached nextDueDate on a unit with no open job. Idempotent.
 //
-// Throttled (see OVERDUE_CHECK_TTL_MS) because it previously ran a query —
-// and sometimes a write transaction — on every single dashboard load.
+// Run once a day by the cron route (src/app/api/cron/overdue-maintenance,
+// scheduled in vercel.json), which records the run in
+// system_settings.overdue_sync_at. Dashboards used to run it on every load —
+// a GET that wrote, and that once raised an order seconds before a QA
+// snapshot (WO 193, 3 Oct 2026). They still call it, but it only does the
+// work when the scheduled run is missing or stale (SCHEDULED_SYNC_FRESH_MS):
+// a deploy without CRON_SECRET, or a cron that has stopped, still gets its
+// cleaning orders, and with the cron healthy a page view writes nothing.
+//
+// Throttled (OVERDUE_CHECK_TTL_MS) so even the freshness read is not paid on
+// every load.
+const SCHEDULED_SYNC_FRESH_MS = 26 * 60 * 60 * 1000;
+
 export async function syncOverdueMaintenanceWorkOrders() {
   if (lastOverdueCheckAt !== null && Date.now() - lastOverdueCheckAt < OVERDUE_CHECK_TTL_MS) {
     return;
@@ -147,72 +154,92 @@ export async function syncOverdueMaintenanceWorkOrders() {
   // window don't all pile onto the same check.
   lastOverdueCheckAt = Date.now();
 
-  // Compared against nextDueDate, which is a calendar day — so this has to be
-  // today's date here, not the UTC instant (see APP_TIME_ZONE above).
-  const today = businessDateToday();
-
   try {
-    const overdue = await prisma.maintenanceSchedule.findMany({
-      where: {
-        isActive: true,
-        nextDueDate: { lte: today },
-        airConditioner: {
-          deletedAt: null,
-          workOrders: { none: { status: { in: ["pending", "claimed"] } } },
-        },
-      },
-      select: { airConditionerId: true },
-    });
+    const settings = await prisma.systemSettings.findFirst({ select: { overdueSyncAt: true } });
+    const lastScheduled = settings?.overdueSyncAt?.getTime();
+    if (lastScheduled !== undefined && Date.now() - lastScheduled < SCHEDULED_SYNC_FRESH_MS) return;
 
-    if (overdue.length === 0) return;
-
-    const overdueIds = overdue.map((s) => s.airConditionerId);
-
-    // The unit update comes first, and the order matters: inserting a work
-    // order makes PostgreSQL take a FOR KEY SHARE lock on the air_conditioners
-    // row its foreign key points at, and asking for the exclusive row lock
-    // afterwards is an upgrade. logMaintenanceAction reaches the same row the
-    // same way, so with both holding the share lock and both wanting the
-    // exclusive one, neither can proceed — a reproducible deadlock (SQLSTATE
-    // 40P01, MySQL error 1213 before the port) that rolled this check back
-    // whenever a technician happened to close a job on a unit in this batch.
-    // Taking the exclusive lock up front means there's no upgrade to contend
-    // over.
-    //
-    // Nothing about the result changes: the insert doesn't read unit status,
-    // and the update is guarded on status = "normal" either way.
-    await withDeadlockRetry("syncOverdueMaintenanceWorkOrders", () =>
-      prisma.$transaction([
-        prisma.airConditioner.updateMany({
-          where: { id: { in: overdueIds }, status: "normal" },
-          data: { status: "needs_cleaning" },
-        }),
-        prisma.workOrder.createMany({
-          data: overdueIds.map((airConditionerId) => ({
-            airConditionerId,
-            status: "pending" as const,
-            // Not a judgement call: this path exists only to schedule the
-            // cleaning a MaintenanceSchedule has come due for.
-            type: "cleaning" as const,
-            priority: "low",
-            issueDescription: "ครบกำหนดล้างแอร์ตามรอบบำรุงรักษา (ระบบสร้างอัตโนมัติ)",
-          })),
-          // ON CONFLICT DO NOTHING. The findMany above excluded units that
-          // already have an open order, but an admin can raise a cleaning job
-          // for one of them between that read and this insert. The partial
-          // unique index work_orders_one_open_per_unit_type would then reject
-          // the whole batch; skipping the one row that lost is the outcome the
-          // findMany was reaching for anyway.
-          skipDuplicates: true,
-        }),
-      ])
-    );
+    await materializeOverdueWorkOrders();
   } catch (error) {
     // Don't let a failed run be cached as a successful one, or a transient DB
     // error would suppress the check for the rest of the TTL window.
     lastOverdueCheckAt = null;
     throw error;
   }
+}
+
+/** The daily run, for the cron route: not throttled, and recorded. Returns how many orders it raised. */
+export async function runScheduledOverdueSync(): Promise<number> {
+  const created = await materializeOverdueWorkOrders();
+  await prisma.systemSettings.upsert({
+    where: { id: 1 },
+    update: { overdueSyncAt: new Date() },
+    create: { id: 1, overdueSyncAt: new Date() },
+  });
+  return created;
+}
+
+async function materializeOverdueWorkOrders(): Promise<number> {
+  // Compared against nextDueDate, which is a calendar day — so this has to be
+  // today's date here, not the UTC instant (see APP_TIME_ZONE above).
+  const today = businessDateToday();
+
+  const overdue = await prisma.maintenanceSchedule.findMany({
+    where: {
+      isActive: true,
+      nextDueDate: { lte: today },
+      airConditioner: {
+        deletedAt: null,
+        workOrders: { none: { status: { in: ["pending", "claimed"] } } },
+      },
+    },
+    select: { airConditionerId: true },
+  });
+
+  if (overdue.length === 0) return 0;
+
+  const overdueIds = overdue.map((s) => s.airConditionerId);
+
+  // The unit update comes first, and the order matters: inserting a work
+  // order makes PostgreSQL take a FOR KEY SHARE lock on the air_conditioners
+  // row its foreign key points at, and asking for the exclusive row lock
+  // afterwards is an upgrade. logMaintenanceAction reaches the same row the
+  // same way, so with both holding the share lock and both wanting the
+  // exclusive one, neither can proceed — a reproducible deadlock (SQLSTATE
+  // 40P01, MySQL error 1213 before the port) that rolled this check back
+  // whenever a technician happened to close a job on a unit in this batch.
+  // Taking the exclusive lock up front means there's no upgrade to contend
+  // over.
+  //
+  // Nothing about the result changes: the insert doesn't read unit status,
+  // and the update is guarded on status = "normal" either way.
+  const [, created] = await withDeadlockRetry("materializeOverdueWorkOrders", () =>
+    prisma.$transaction([
+      prisma.airConditioner.updateMany({
+        where: { id: { in: overdueIds }, status: "normal" },
+        data: { status: "needs_cleaning" },
+      }),
+      prisma.workOrder.createMany({
+        data: overdueIds.map((airConditionerId) => ({
+          airConditionerId,
+          status: "pending" as const,
+          // Not a judgement call: this path exists only to schedule the
+          // cleaning a MaintenanceSchedule has come due for.
+          type: "cleaning" as const,
+          priority: "low",
+          issueDescription: "ครบกำหนดล้างแอร์ตามรอบบำรุงรักษา (ระบบสร้างอัตโนมัติ)",
+        })),
+        // ON CONFLICT DO NOTHING. The findMany above excluded units that
+        // already have an open order, but an admin can raise a cleaning job
+        // for one of them between that read and this insert. The partial
+        // unique index work_orders_one_open_per_unit_type would then reject
+        // the whole batch; skipping the one row that lost is the outcome the
+        // findMany was reaching for anyway.
+        skipDuplicates: true,
+      }),
+    ])
+  );
+  return created.count;
 }
 
 // Ordering shared by the admin urgent list and the technician asset list. Both
