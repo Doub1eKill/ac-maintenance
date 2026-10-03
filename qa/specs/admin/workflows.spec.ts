@@ -55,9 +55,9 @@ test.describe("admin workflows", () => {
     await bform.getByRole("button", { name: /บันทึกอาคาร/ }).click();
     const t1 = await toastText(page);
     await settle(page, 2500);
-    const existed = /ในระบบแล้ว/.test(t1); // left over from an earlier run
+    const existed = /ในระบบแล้ว/.test(t1); // created by the first pass of this run (see Result in lib.ts)
     const onFirstPage = (await body(page)).includes(QA.building.name);
-    ledger("Assets", "create building shows a toast" + (existed ? " (already existed from a previous run)" : ""), "UI", /เพิ่มอาคารสำเร็จ/.test(t1) ? "PASS" : existed ? "BLOCKED" : "FAIL", await shot(page, "assets-building-created"));
+    ledger("Assets", "create building shows a toast" + (existed ? " (already created earlier in this run)" : ""), "UI", /เพิ่มอาคารสำเร็จ/.test(t1) ? "PASS" : existed ? "SKIP" : "FAIL", await shot(page, "assets-building-created"));
     // Left open when the save was refused — see dismissModal.
     if (existed) await dismissModal(page);
     else ledger("Assets", "new building is visible without paging (list is 5/page; it landed on page 2 = " + !onFirstPage + ")", "UI", onFirstPage ? "PASS" : "FAIL", "runs/" + process.env.QA_RUN + "/assets-building-created.png");
@@ -90,7 +90,8 @@ test.describe("admin workflows", () => {
     await rform.getByRole("button", { name: /บันทึกห้อง/ }).click();
     const t3 = await toastText(page);
     await settle(page, 2500);
-    ledger("Assets", "create room shows toast and appears under the building", "UI", /เพิ่มห้องสำเร็จ/.test(t3) && (await body(page)).includes(QA.room) ? "PASS" : "FAIL", await shot(page, "assets-room-created"));
+    const roomExisted = /มีห้องนี้อยู่ในอาคารแล้ว/.test(t3);
+    ledger("Assets", "create room shows toast and appears under the building" + (roomExisted ? " (already created earlier in this run)" : ""), "UI", /เพิ่มห้องสำเร็จ/.test(t3) && (await body(page)).includes(QA.room) ? "PASS" : roomExisted ? "SKIP" : "FAIL", await shot(page, "assets-room-created"));
 
     // negative floor — no unsigned guard on PostgreSQL later; Zod is the only gate
     // The room above is already there on a second pass, which leaves this
@@ -178,7 +179,11 @@ test.describe("admin workflows", () => {
     await dlg.getByRole("button", { name: /ยืนยันการสร้างใบงาน/ }).click();
     const t = await toastText(page);
     await settle(page, 3000);
-    ledger("Work orders", "create work order via header modal", "UI", /สำเร็จ|สร้าง/.test(t) || !(await dlg.isVisible().catch(() => false)) ? "PASS" : "FAIL", await shot(page, "wo-created"));
+    // The QA unit is new in every run (restore removes it), so an open order
+    // on it can only be the one the first pass of this run raised.
+    const woExisted = /ที่ยังเปิดอยู่/.test(t);
+    const woSkip = woExisted ? " (already raised earlier in this run)" : "";
+    ledger("Work orders", "create work order via header modal" + woSkip, "UI", /สำเร็จ|สร้าง/.test(t) || !(await dlg.isVisible().catch(() => false)) ? "PASS" : woExisted ? "SKIP" : "FAIL", await shot(page, "wo-created"));
 
     // Refused on a second pass — the QA unit already carries the open order
     // this test raises — and the modal only closes itself on success, so the
@@ -194,7 +199,10 @@ test.describe("admin workflows", () => {
     await page.locator("main").last().waitFor({ timeout: 60_000 }); await page.waitForTimeout(2500);
     const board0 = await body(page);
     const pager0 = board0.match(/หน้า \d+ จาก \d+/)?.[0] ?? "(no pager)";
-    ledger("Work orders", `board opened from the shell shows the new order's building (${pager0})`, "UI", board0.includes(QA.building.name) && board0.includes(`${QA.building.abbr}-${QA.room}`) ? "PASS" : "FAIL", await shot(page, "wo-board"));
+    // Only a raise this pass made is remembered by the shell, so with none the
+    // board opens wherever it does and there is nothing to check.
+    const boardOk = board0.includes(QA.building.name) && board0.includes(`${QA.building.abbr}-${QA.room}`);
+    ledger("Work orders", `board opened from the shell shows the new order's building (${pager0})${woSkip}`, "UI", boardOk ? "PASS" : woExisted ? "SKIP" : "FAIL", await shot(page, "wo-board"));
     await filterAssets(page, QA.building.abbr);
     const board = await body(page);
     const grp = board.match(new RegExp(QA.building.name + String.raw`[\s\S]{0,80}?(\d+) ใบงาน`));
@@ -203,7 +211,8 @@ test.describe("admin workflows", () => {
     await page.goto("/admin"); await page.locator("main").last().waitFor({ timeout: 60_000 }); await page.waitForTimeout(3500);
     const after = await kpi(page);
     note("admin-kpi-after-wo.json", JSON.stringify({ before, after }));
-    ledger("Dashboard", `รอซ่อมด่วน counter moved ${before.repair} → ${after.repair} after a repair order`, "UI", after.repair === before.repair + 1 ? "PASS" : "FAIL", await shot(page, "admin-dashboard-after-wo"));
+    // No order raised on this pass, so the counter must stay where it was.
+    ledger("Dashboard", `รอซ่อมด่วน counter moved ${before.repair} → ${after.repair} after a repair order${woSkip}`, "UI", woExisted ? (after.repair === before.repair ? "SKIP" : "FAIL") : after.repair === before.repair + 1 ? "PASS" : "FAIL", await shot(page, "admin-dashboard-after-wo"));
 
     // cross-side: technician pool must show it without a restart
     const ctx = await browser.newContext({ ...devices["Pixel 7"], storageState: path.join(OUT_ROOT, "auth", "tech.json") });

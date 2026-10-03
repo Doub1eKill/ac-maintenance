@@ -25,7 +25,11 @@ if (!fs.existsSync(LEDGER)) {
 }
 let ledgerN = fs.readFileSync(LEDGER, "utf8").split("\n").filter((l) => /^\| \d+ \|/.test(l)).length;
 
-export type Result = "PASS" | "FAIL" | "BLOCKED";
+// SKIP: the check does not apply on this pass, because what it creates was
+// already created earlier in the same run — admin/workflows.spec.ts runs once
+// in [admin] and again as [admin-seed] in a full sweep. Only for a refusal
+// the app words as exactly that; any other outcome is still PASS or FAIL.
+export type Result = "PASS" | "FAIL" | "BLOCKED" | "SKIP";
 
 /** Append a ledger line the moment a check finishes. Returns the line number. */
 export function ledger(feature: string, check: string, method: "UI" | "API" | "DB" | "CODE", result: Result, artifact = "—") {

@@ -42,7 +42,7 @@ run `tech-20261003`: test ผ่าน และ ledger แถว 24–25 PASS �
 - `qa/specs/public/regressions.spec.ts` BUG-009 — production prerender `/login` โดยฟอร์มอยู่หลัง Suspense fallback (`BAILOUT_TO_CLIENT_SIDE_RENDERING`, ตั้งใจ — ดูคอมเมนต์ `src/app/login/page.tsx`) ปิด JS แล้ว **ไม่มีฟอร์มให้ submit เลย** → test เช็คกรณีนี้แยก (PASS พร้อมเหตุผล) · dev ยังตรวจแบบเดิม
 - `qa/specs/admin/workflows.spec.ts` rename Panasonic — ledger FAIL ตั้งแต่ 1 ต.ค. แต่ **แอปทำงานถูก** (screenshot มี toast + ชื่อเปลี่ยน) · `toastText()` คืนค่าทันทีเพราะ toast "ซ้ำ" ของขั้นก่อนยังค้าง → รอ toast ของขั้นนี้ก่อน
 
-**ledger FAIL ที่ยังเหลือ 4 แถว = noise ที่รู้ที่มา ไม่ใช่บั๊ก:** "create room…", "create work order via header modal", "board opened from the shell…", "รอซ่อมด่วน counter moved" — เป็น **รอบที่สอง** ของ test เดียวกันที่ `admin-seed` รันซ้ำหลัง `[admin]` (รอบแรก PASS ทุกแถว) ห้อง/ใบงานมีอยู่แล้ว ระบบปฏิเสธการสร้างซ้ำถูกต้อง (BUG-004) · ถ้าจะให้ ledger สะอาด: ให้ test รู้ว่าแถวถูกสร้างไปแล้วในรอบนี้ แล้วบันทึกเป็น "skipped" แทน
+**ledger ของ admin-seed รอบสองสะอาดแล้ว (run `prod3-20261003`: 77/77 · ledger PASS 216 · FAIL 0 · BLOCKED 0 · SKIP 5):** `admin/workflows.spec.ts` รันสองรอบใน full sweep (`[admin]` แล้ว `[admin-seed]`) · รอบสองสร้างอาคาร/ห้อง/ใบงานซ้ำไม่ได้ (ถูกต้อง) → ผลใหม่ `SKIP` ใน `qa/lib.ts` · ให้เฉพาะเมื่อแอปตอบด้วยข้อความปฏิเสธที่เจาะจง (`ในระบบแล้ว` · `มีห้องนี้อยู่ในอาคารแล้ว` · `ที่ยังเปิดอยู่`) อย่างอื่นยัง FAIL · counter รอซ่อมด่วนรอบสองได้ SKIP ก็ต่อเมื่อ**ไม่ขยับ** · รอบแรกยัง PASS ครบทั้ง 5 แถว (ตรวจแล้ว) · แถวอาคารเดิมใช้ `BLOCKED` กับเคสนี้ → เปลี่ยนเป็น `SKIP`
 
 **WO ที่ระบบสร้างเองกับ restore:** WO 193 (`B120345-3-590314-01` ครบรอบล้าง) ถูกสร้าง 5 วิก่อน snapshot → restore ถัดไปลบทิ้ง (น่าจะ `baseline.mjs` อ่าน `maxIds` ก่อนแถวนี้ commit แต่ count หลัง) · **self-heal แล้ว**: ระบบสร้างคืนเป็น WO 223 เมื่อมีคนเปิดหน้า (07:55Z) · ถ้าจะกันจริง ให้ snapshot อ่าน maxIds กับ count ใน statement เดียว
 
@@ -52,7 +52,7 @@ run `tech-20261003`: test ผ่าน และ ledger แถว 24–25 PASS �
 - แก้ harness ที่เกิดจาก UI เปลี่ยน ให้ **grep หาสำเนาทั้ง repo เสมอ**
 - **test ที่ test ถัดไปพึ่งผลของมัน ต้องมี `expect`** — ledger FAIL อย่างเดียวไม่ทำให้ test แดง · อ่าน ledger ทุกครั้ง อย่าเชื่อแค่ `ok` ใน log
 - รัน sweep ตอน **port 3000 ว่าง** เพื่อให้ Playwright เปิด server เองและเก็บ log ได้
-- sweep **build ก่อนเสมอ** (`next build` เขียนทับ `.next/` นอกจาก `.next/dev`) · ต้องการ dev แบบเดิม: `QA_SERVER=dev` · **ledger FAIL 4 แถวของ admin-seed รอบสอง = noise ที่รู้ที่มา** (ดูด้านบน) แถวอื่นที่ FAIL ต้องดูทุกครั้ง
+- sweep **build ก่อนเสมอ** (`next build` เขียนทับ `.next/` นอกจาก `.next/dev`) · ต้องการ dev แบบเดิม: `QA_SERVER=dev` · ledger ควรมี **FAIL 0** · `SKIP` = รอบสองของ admin-seed เท่านั้น (ดูด้านบน) · FAIL ทุกแถวต้องดู
 
 # 🔧 แก้ harness ที่ตามโค้ดไม่ทัน — ฝั่งช่างได้รันครั้งแรก 16 ผ่าน (1 ต.ค. 2026, DoubleKill)
 
