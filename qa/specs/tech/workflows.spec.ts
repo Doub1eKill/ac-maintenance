@@ -1,6 +1,6 @@
 import path from "node:path";
 import type { Page } from "@playwright/test";
-import { test, QA, OUT_ROOT, ledger, shot, note, hydrated, watchConsole, pngBuffer } from "../../lib";
+import { test, expect, QA, OUT_ROOT, ledger, shot, note, hydrated, watchConsole, pngBuffer } from "../../lib";
 
 const CODE1 = `${QA.building.abbr}-${QA.room}-01`;
 const body = (page: Page) => page.evaluate(() => document.body.innerText as string);
@@ -79,6 +79,10 @@ test.describe("technician on a phone", () => {
     const mj = await body(page);
     const mine = (mj.match(new RegExp(CODE1, "g")) || []).length;
     ledger("Job pool", `งานของฉัน lists the claimed order exactly once (found ${mine})`, "UI", mine === 1 ? "PASS" : "FAIL", await shot(page, "myjobs-after-claim"));
+    // Every later test in this serial file works on this claim. Without these
+    // a failed claim passed here and surfaced two tests on as a missing button.
+    expect(tt, "claim toast").toMatch(/รับงานเรียบร้อย/);
+    expect(mine, "claimed order in งานของฉัน").toBe(1);
     // back to pool: it must be gone
     await page.goto("/tech"); await page.locator("main").last().waitFor({ timeout: 60_000 }); await hydrated(page, "main");
     await search(page, QA.building.abbr);

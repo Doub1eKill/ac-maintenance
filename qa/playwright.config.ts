@@ -6,15 +6,20 @@ const OUT = process.env.QA_OUT ?? path.resolve(__dirname, "..", "..", "ac-mainte
 // Where the app under test is. Defaults to the dev server's own port; set it
 // (with QA_OUT) to sweep a server running somewhere else.
 const BASE_URL = process.env.QA_BASE_URL ?? "http://localhost:3000";
+// Pinned here, once, so every worker writes to the same runs/<id> folder (each
+// used to stamp its own from the clock when qa/lib.ts loaded), and so the
+// traces of a run live under artifacts/<id> where the next run cannot wipe them.
+process.env.QA_RUN ??= new Date().toISOString().replace(/[-:T]/g, "").slice(0, 13);
+const RUN = process.env.QA_RUN;
 
 export default defineConfig({
   testDir: "./specs",
-  outputDir: path.join(OUT, "artifacts"),
+  outputDir: path.join(OUT, "artifacts", RUN),
   timeout: 180_000, // Next dev compiles on first hit; /admin took >45s cold in this run
   expect: { timeout: 10_000 },
   fullyParallel: false, // shared database — parallel runs create phantom failures
   workers: 1,
-  reporter: [["list"], ["json", { outputFile: path.join(OUT, "artifacts", "results.json") }]],
+  reporter: [["list"], ["json", { outputFile: path.join(OUT, "artifacts", RUN, "results.json") }]],
   use: {
     baseURL: BASE_URL,
     screenshot: "only-on-failure",
@@ -61,5 +66,11 @@ export default defineConfig({
     url: `${BASE_URL}/login`,
     reuseExistingServer: true,
     timeout: 180_000,
+    // Into the sweep's own output, prefixed [WebServer]: a server action that
+    // fails reports only a generic toast to the page, and the console.error
+    // naming the real cause is otherwise lost with the terminal. (Nothing is
+    // captured when an already-running server is reused.)
+    stdout: "pipe",
+    stderr: "pipe",
   },
 });

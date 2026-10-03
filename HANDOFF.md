@@ -1,34 +1,46 @@
 # Project Handoff & Technical Summary
 
-# ❓ งานค้างฝั่ง QA — 3 ข้อ ยังไม่ได้ทำ (จด 1 ต.ค. 2026, DoubleKill)
+# ❓ งานค้างฝั่ง QA — เหลือ 2 ข้อ (อัปเดต 3 ต.ค. 2026, DoubleKill)
 
-> หัวข้อนี้คือ **ที่เดียว** ที่รวมของค้างฝั่ง QA ไว้ · เจ้าของสั่งให้จดก่อนลงมือ · **ไม่มีการแก้โค้ดในหัวข้อนี้** เป็น snapshot ของ backlog เฉยๆ
+> หัวข้อนี้คือ **ที่เดียว** ที่รวมของค้างฝั่ง QA ไว้
 
-## 1. 🔴 `tech/workflows.spec.ts:97` — ยังไม่รู้ว่าเป็นบั๊กของแอปหรือของ spec
+## ✅ ปิดแล้ว 3 ต.ค. — `tech/workflows.spec.ts:97` ไม่ใช่บั๊กของหน้า my-jobs
 
-**คุ้มที่สุดในสามข้อ เพราะเป็นข้อเดียวที่อาจเป็นบั๊กจริง**
+**ต้นเหตุอยู่ก่อนหน้านั้นสองข้อ:** ใน run `tech-20261001b` test `job pool: claim the QA order once` ขึ้น `ok` แต่ ledger (`runs/2026100114054/ledger.md` แถว 43–45) เป็น **FAIL ทั้ง 3 แถว** — toast **"เกิดข้อผิดพลาดในการรับงานหลายรายการ"** · งานของฉัน found 0 · ใบงานยังค้างในคลัง · test ไม่มี `expect` เลยเขียว แล้วไปพังสองข้อถัดไปเป็น "หาปุ่มไม่เจอ" เพราะช่าง QA ไม่มีงานสักใบ
 
-- test: `technician on a phone › record work with before/after photos on the claimed order; history + admin see it`
-- พังตรง: หาปุ่ม **"บันทึกและปิดงาน"** บนการ์ดของ `QAB001-QA-101-01` ใน `/tech/my-jobs` ไม่เจอ จน timeout 180 วิ
-- locator ที่ใช้: `main >> div` filter ด้วยรหัสแอร์ แล้ว filter ด้วยปุ่ม `/บันทึกและปิดงาน/` → `.last()`
-- **ที่ยังไม่รู้:** ใบงานถูก claim จริงไหม · การ์ดขึ้นแต่ปุ่มเปลี่ยนชื่อ/หาย หรือการ์ดไม่ขึ้นเลย · เป็นผลพวงจาก test ก่อนหน้าในไฟล์เดียวกันที่ล้มหรือเปล่า
-- artifact: `C:\Project\ac-maintenance-qa\artifacts\` (screenshot + video + trace) จาก run `tech-20261001b`
-- **ขั้นแรกที่ควรทำ:** เปิด trace ดูว่า `/tech/my-jobs` ตอนนั้นมีการ์ดอะไรอยู่บ้าง — ตอบได้ทันทีว่าเป็นฝั่งไหน
+- ข้อความนั้นมาจาก `catch` ใน `src/lib/tech/jobs.ts:87` = transaction ของ `bulkClaimWorkOrdersAction` **โยน exception** ไม่ใช่แค่แย่งงานแพ้
+- claim ผ่านทุกรอบสมัย MariaDB (14–17 ก.ย.) และในรอบเดียวกันเส้นทาง "รับงานและบันทึกเลย" (ฟังก์ชันเดียวกัน) ผ่าน → **ล้มตามจังหวะ ไม่ได้ล้มตายตัว**
+- **ตัว error จริงหายไปแล้ว** — `console.error` ออก stdout ของ dev server ซึ่งตอนนั้นไม่ได้เก็บ และ trace ถูก run `c` เขียนทับ
+- ผู้ต้องสงสัย (ยังไม่พิสูจน์): `src/lib/prisma.ts` ไม่ได้ตั้ง `transactionOptions` → ใช้ default ของ Prisma `maxWait` 2 วิ / `timeout` 5 วิ ขณะ pool มี 5 ช่อง · วัดตอนเครื่องว่าง: TLS connect ใหม่ไป Aiven ~0.5 วิ, BEGIN+select+ROLLBACK ~0.25 วิ (RTT ~80 ms) ขนาน 5 ก็ไม่ช้าลง → จะชนได้ก็ต่อเมื่อ pool ถูก render อื่นจองเต็มพร้อมกัน
+- **ถ้าเจออีก:** ดู `[WebServer] Failed to bulk claim work orders:` ใน `runs/sweep-*.log` — ตอนนี้ log ถูกเก็บแล้ว (ดูด้านล่าง)
 
-## 2. 🟡 `tech/race.spec.ts` — แก้แล้ว ยังไม่เคยเห็นเขียว
+**แก้ harness 3 จุด (ไม่แตะโค้ดแอป):**
+- `qa/specs/tech/workflows.spec.ts` — test claim มี `expect` toast สำเร็จ + พบใน งานของฉัน 1 ใบ → claim ล้มจะแดงที่ต้นเหตุ ไม่ใช่ปลายทาง
+- `qa/playwright.config.ts` — `webServer.stdout/stderr: "pipe"` → log ของ server ขึ้นใน sweep log นำหน้าด้วย `[WebServer]` (**ไม่มีผลถ้า reuse server ที่เปิดค้างไว้เอง** — ปิด port 3000 ก่อนรัน)
+- `qa/playwright.config.ts` — ตั้ง `QA_RUN` ครั้งเดียวใน config → ทุก worker ลง `runs/<id>/` โฟลเดอร์เดียว (เดิมแต่ละ worker stamp เวลาเอง รอบเดียวแตกเป็นหลายโฟลเดอร์) และ artifacts ไปอยู่ `artifacts/<id>/` → **trace ไม่ถูกรอบถัดไปลบทิ้งอีก**
 
-สำเนาที่ 3 ของ `select.nth(1)` ถูกเปลี่ยนเป็น `pickRoom()` ใน `8956188` แล้ว แต่รอบที่รันหลังแก้โดน flake ของ `admin-seed` บล็อกก่อนจะถึง test นี้ · **ยังไม่มีหลักฐานว่าแก้ถูก** ต้องรัน `--project=tech` ให้ผ่าน setup + admin-seed ก่อน
+**ยืนยันด้วย run `tech-20261003`** (`--project=tech`, snapshot → run → restore): **20/20 ผ่าน · ledger FAIL = 0 · 8.3 นาที** · restore ครบ ค่าตรง snapshot ทุกตัว (users 9 · phones 11 · buildings 5 · rooms 32 · acs 73 · brands 5 · models 189 · logs 233 · WO 73 · schedules 73 · audit max 113) · ลบ blob 8 ไฟล์
 
-## 3. 🟡 ยังไม่เคยมี full sweep ที่เขียวทั้งแผง
+## ✅ ปิดแล้ว 3 ต.ค. — `tech/race.spec.ts` เขียวแล้ว
 
-5 รอบ เจอ failure 4 แบบ · **2 แบบไม่เกี่ยวกับ spec**: dev server ตายกลางคัน (`ERR_CONNECTION_REFUSED`, ขึ้นใหม่เองภายหลัง, log ไม่มี crash signature) และ login ของ QA technician ไม่เด้งไป `/tech` (alert ว่างเปล่า)
+run `tech-20261003`: test ผ่าน และ ledger แถว 24–25 PASS ทั้งคู่ (เห็นงานเดียวกันทั้งสองช่าง · กดพร้อมกัน → success 1 / refusal 1) → `pickRoom()` ใน `8956188` แก้ถูก
 
-**สาเหตุเชิงโครงสร้างที่ขยายความเสียหาย:** `tech` → ขึ้นกับ → `admin-seed` → ขึ้นกับ → `setup` · flake ที่จุดไหนก็ได้ในสายนี้ทำให้ปลายทาง 13–22 ข้อ **ไม่ได้รันเลย** แทนที่จะล้มแค่ข้อเดียว · ถ้าจะให้ผลนิ่ง ควรพิจารณา (ก) ให้ `tech` seed ของตัวเองแทนการพึ่ง `admin-seed` หรือ (ข) เปิด retry ระดับ project ใน `playwright.config.ts` (ตอนนี้ไม่ได้ตั้ง `retries` เลย = 0)
+## 1. 🟡 claim ล้มแบบ transient — ยังไม่รู้สาเหตุจริง
 
-## กติกาที่ได้จากรอบนี้ (เพิ่มเข้าไปแล้ว)
+ดูข้อแรกด้านบน · รอให้เกิดซ้ำพร้อม log แล้วค่อยแก้ตามสาเหตุ (ถ้าเป็น `P2028` / transaction timeout จริง → ตั้ง `transactionOptions` ใน `src/lib/prisma.ts`) · **อย่าแก้ล่วงหน้าโดยไม่มี error จริง**
 
-- หลัง `npm install` ที่ Playwright ขยับเวอร์ชัน ต้อง **`npx playwright install chromium`** ไม่งั้น sweep ตายตั้งแต่ setup ด้วย `Executable doesn't exist …chromium_headless_shell-<build>`
-- แก้ harness ที่เกิดจาก UI เปลี่ยน ให้ **grep หาสำเนาทั้ง repo เสมอ** อย่าแก้เฉพาะจุดที่ log ชี้ — รอบนี้เสียเวลาไปหนึ่งรอบเต็มเพราะสำเนาที่ 3 ซ่อนอยู่ใน spec ที่ยังไม่เคยได้รัน
+## 2. 🟡 ยังไม่เคยมี full sweep ที่เขียวทั้งแผง
+
+ฝั่ง `tech` เขียวครบแล้ว (`tech-20261003`) แต่ยังไม่ได้รัน full ทั้ง `public` + `admin` + `tech` หลังแก้ · flake ที่เคยเห็น: dev server ตายกลางคัน (`ERR_CONNECTION_REFUSED`) และ login ของ QA technician ไม่เด้งไป `/tech` — **รอบหน้ามี server log แล้ว** ถ้าเกิดซ้ำจะเห็นสาเหตุ
+
+**สาเหตุเชิงโครงสร้างที่ขยายความเสียหาย:** `tech` → `admin-seed` → `setup` · flake จุดไหนก็ได้ทำให้ปลายทาง 13–22 ข้อไม่ได้รัน · ทางเลือก: (ก) ให้ `tech` seed ของตัวเอง หรือ (ข) ตั้ง `retries` ใน `qa/playwright.config.ts` (ตอนนี้ = 0)
+
+## กติกาที่ได้จากรอบนี้
+
+- หลัง `npm install` ที่ Playwright ขยับเวอร์ชัน ต้อง **`npx playwright install chromium`**
+- แก้ harness ที่เกิดจาก UI เปลี่ยน ให้ **grep หาสำเนาทั้ง repo เสมอ**
+- **test ที่ test ถัดไปพึ่งผลของมัน ต้องมี `expect`** — ledger FAIL อย่างเดียวไม่ทำให้ test แดง · อ่าน ledger ทุกครั้ง อย่าเชื่อแค่ `ok` ใน log
+- รัน sweep ตอน **port 3000 ว่าง** เพื่อให้ Playwright เปิด server เองและเก็บ log ได้
 
 # 🔧 แก้ harness ที่ตามโค้ดไม่ทัน — ฝั่งช่างได้รันครั้งแรก 16 ผ่าน (1 ต.ค. 2026, DoubleKill)
 
