@@ -57,8 +57,24 @@ function getTransporter(): Transporter | null {
 
 export type SendMailResult =
   | { status: "sent" }
+  | { status: "suppressed" }
   | { status: "not_configured" }
   | { status: "failed"; error: string };
+
+/**
+ * Recipient domains that are never sent to: MAIL_SUPPRESS_DOMAINS, a comma
+ * list. The QA harness sets it for the server it sweeps (qa/playwright.config.ts)
+ * because its accounts live on domains that do not exist — every registration
+ * bounced back into the sending mailbox, and the harness plants its own codes
+ * in the database rather than reading them from mail. Matched on the whole
+ * domain, so any other address still goes out as normal. Not set on Vercel.
+ */
+function isSuppressed(to: string): boolean {
+  const list = process.env.MAIL_SUPPRESS_DOMAINS;
+  if (!list) return false;
+  const domain = to.trim().toLowerCase().split("@").pop() ?? "";
+  return list.split(",").some((d) => d.trim().toLowerCase() === domain);
+}
 
 export async function sendMail(params: {
   to: string;
@@ -66,6 +82,13 @@ export async function sendMail(params: {
   text: string;
   html?: string;
 }): Promise<SendMailResult> {
+  // Before the transport check, so a suppressed address is handled the same
+  // whether SMTP is configured or not. Callers treat it like "sent".
+  if (isSuppressed(params.to)) {
+    console.log(`[mail] not sent to ${params.to}: domain listed in MAIL_SUPPRESS_DOMAINS`);
+    return { status: "suppressed" };
+  }
+
   const transporter = getTransporter();
   if (!transporter) return { status: "not_configured" };
 

@@ -80,7 +80,13 @@ export default defineConfig({
     url: `${BASE_URL}/login`,
     reuseExistingServer: true,
     timeout: QA_SERVER === "dev" ? 180_000 : 900_000,
-    env: QA_SERVER === "dev" ? {} : { AUTH_TRUST_HOST: "true", EMAIL_MX_CHECK: "off" },
+    // MAIL_SUPPRESS_DOMAINS on both: the QA accounts' domains do not exist,
+    // so each code mailed to them bounced into the sending inbox; the specs
+    // plant their codes in the database (plantEmailCode) and never read mail.
+    env: {
+      MAIL_SUPPRESS_DOMAINS: "qa-run.ac.th,example.invalid",
+      ...(QA_SERVER === "dev" ? {} : { AUTH_TRUST_HOST: "true", EMAIL_MX_CHECK: "off" }),
+    },
     // Into the sweep's own output, prefixed [WebServer]: a server action that
     // fails reports only a generic toast to the page, and the console.error
     // naming the real cause is otherwise lost with the terminal. (Nothing is
