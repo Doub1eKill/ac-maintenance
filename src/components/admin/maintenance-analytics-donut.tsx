@@ -1,8 +1,6 @@
 "use client";
 
-import * as React from "react";
-import { type CSSProperties } from "react";
-import { Label, Pie, PieChart } from "recharts";
+import { useState } from "react";
 import {
   CheckCircle2,
   Clock,
@@ -21,35 +19,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  ChartContainer,
-  ChartLegend,
-  ChartLegendContent,
-  ChartTooltip,
-  ChartTooltipContent,
-  type ChartConfig,
-} from "@/components/ui/chart";
 import type { WorkOrderStats } from "@/lib/admin/work-order-stats";
 
-const chartConfig = {
-  count: { label: "จำนวนใบสั่งงาน" },
-  completed: {
-    label: "เสร็จสิ้น",
-    color: "#10b981", // Emerald-500
-  },
-  claimed: {
-    label: "กำลังดำเนินการ",
-    color: "#3b82f6", // Blue-500
-  },
-  pending: {
-    label: "รอดำเนินการ",
-    color: "#f59e0b", // Amber-500
-  },
-  cancelled: {
-    label: "ยกเลิก",
-    color: "#94a3b8", // Slate-400
-  },
-} satisfies ChartConfig;
+// The four slices, in drawing order (clockwise from twelve o'clock).
+const SLICES = [
+  { key: "completed", label: "เสร็จสิ้น", color: "#10b981" }, // Emerald-500
+  { key: "claimed", label: "กำลังดำเนินการ", color: "#3b82f6" }, // Blue-500
+  { key: "pending", label: "รอดำเนินการ", color: "#f59e0b" }, // Amber-500
+  { key: "cancelled", label: "ยกเลิก", color: "#94a3b8" }, // Slate-400
+] as const;
+
+type SliceKey = (typeof SLICES)[number]["key"];
 
 interface MaintenanceAnalyticsDonutProps {
   stats?: WorkOrderStats;
@@ -68,39 +48,128 @@ const EMPTY_STATS: WorkOrderStats = {
   urgentOpen: 0,
 };
 
+// Drawn by hand rather than with recharts, which this ring was the app's only
+// use of: its chunk was 330 KB for four arcs. Each slice is one circle stroked
+// along part of its circumference (stroke-dasharray), turned to start where the
+// previous one ended, with a small gap between them.
+const SIZE = 220;
+const RADIUS = 80;
+const STROKE = 28;
+const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+const GAP = 6; // along the ring, in px, between neighbouring slices
+
+function DonutRing({
+  counts,
+  completionRate,
+}: {
+  counts: WorkOrderStats;
+  completionRate: number;
+}) {
+  const [hovered, setHovered] = useState<SliceKey | null>(null);
+  const visible = SLICES.filter((s) => counts[s.key] > 0);
+  const hoveredSlice = SLICES.find((s) => s.key === hovered);
+
+  let offset = 0;
+  const arcs = visible.map((slice) => {
+    const share = counts[slice.key] / counts.total;
+    const length = share * CIRCUMFERENCE;
+    // A lone slice is the whole ring and needs no gap.
+    const drawn = visible.length > 1 ? Math.max(length - GAP, 0.5) : length;
+    const arc = { ...slice, drawn, start: offset };
+    offset += length;
+    return arc;
+  });
+
+  const summary =
+    counts.total === 0
+      ? "ยังไม่มีใบงาน"
+      : SLICES.map((s) => `${s.label} ${counts[s.key]}`).join(", ");
+
+  return (
+    <div className="flex w-full flex-col items-center gap-3">
+      <svg
+        viewBox={`0 0 ${SIZE} ${SIZE}`}
+        className="w-full max-w-[260px]"
+        role="img"
+        aria-label={`สัดส่วนสถานะใบงาน: ${summary}; เสร็จสิ้น ${completionRate}%`}
+      >
+        <g transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}>
+          {counts.total === 0 ? (
+            <circle
+              cx={SIZE / 2}
+              cy={SIZE / 2}
+              r={RADIUS}
+              fill="none"
+              stroke="var(--muted)"
+              strokeWidth={STROKE}
+            />
+          ) : (
+            arcs.map((arc) => (
+              <circle
+                key={arc.key}
+                cx={SIZE / 2}
+                cy={SIZE / 2}
+                r={RADIUS}
+                fill="none"
+                stroke={arc.color}
+                strokeWidth={hovered === arc.key ? STROKE + 4 : STROKE}
+                strokeDasharray={`${arc.drawn} ${CIRCUMFERENCE - arc.drawn}`}
+                strokeDashoffset={-arc.start}
+                className="cursor-default transition-[stroke-width] duration-150"
+                onMouseEnter={() => setHovered(arc.key)}
+                onMouseLeave={() => setHovered(null)}
+              >
+                <title>{`${arc.label}: ${counts[arc.key].toLocaleString()} งาน`}</title>
+              </circle>
+            ))
+          )}
+        </g>
+        {/* The centre reads the completion rate, or the slice under the pointer. */}
+        <text
+          x={SIZE / 2}
+          y={SIZE / 2}
+          textAnchor="middle"
+          dominantBaseline="central"
+          className="pointer-events-none"
+        >
+          <tspan
+            x={SIZE / 2}
+            y={SIZE / 2 - 8}
+            className="fill-foreground text-3xl font-extrabold tabular-nums"
+          >
+            {hoveredSlice ? counts[hoveredSlice.key].toLocaleString() : `${completionRate}%`}
+          </tspan>
+          <tspan x={SIZE / 2} y={SIZE / 2 + 18} className="fill-muted-foreground text-[11px] font-medium">
+            {hoveredSlice ? hoveredSlice.label : "งานเสร็จสิ้น"}
+          </tspan>
+        </text>
+      </svg>
+      <ul className="flex flex-wrap justify-center gap-x-3.5 gap-y-1 text-xs text-muted-foreground">
+        {SLICES.map((s) => (
+          <li key={s.key} className="flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 shrink-0 rounded-xs" style={{ backgroundColor: s.color }} />
+            {s.label}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 /**
- * ReUI c-chart-20 based Donut Chart with center completion rate and status breakdown.
- * Visualizes maintenance operational performance based on live Work Orders.
+ * Donut of work orders by status, with the completion rate in the centre and
+ * the status breakdown beside it.
  */
 export function MaintenanceAnalyticsDonut({
-  stats,
   title = "สถิติสถานะใบสั่งงานซ่อมบำรุง (Work Order Analytics)",
   description = "สัดส่วนสถานะงานซ่อมบำรุงและอัตราความสำเร็จของทีมช่าง",
+  stats,
 }: MaintenanceAnalyticsDonutProps) {
   // Counted server-side over every work order (getWorkOrderStats); the
   // donut used to tally the board's first fifty rows and call that the total.
   const counts = stats ?? EMPTY_STATS;
 
   const completionRate = counts.total > 0 ? Math.round((counts.completed / counts.total) * 100) : 0;
-
-  const chartData = React.useMemo(() => {
-    if (counts.total === 0) {
-      return [
-        { status: "completed", count: 1, fill: "var(--color-completed)" },
-      ];
-    }
-
-    const items = [
-      { status: "completed", count: counts.completed, fill: "var(--color-completed)" },
-      { status: "claimed", count: counts.claimed, fill: "var(--color-claimed)" },
-      { status: "pending", count: counts.pending, fill: "var(--color-pending)" },
-      { status: "cancelled", count: counts.cancelled, fill: "var(--color-cancelled)" },
-    ];
-
-    // Keep items that have count > 0, or fallback to all items if all 0
-    const nonZero = items.filter((d) => d.count > 0);
-    return nonZero.length > 0 ? nonZero : items;
-  }, [counts]);
 
   return (
     <Card className="w-full border-border bg-card shadow-xs">
@@ -124,92 +193,9 @@ export function MaintenanceAnalyticsDonut({
 
       <CardContent className="pt-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-          {/* Left / Center: ReUI c-chart-20 Donut Chart */}
+          {/* Left / Center: status donut */}
           <div className="lg:col-span-5 flex flex-col items-center justify-center">
-            <ChartContainer
-              config={chartConfig}
-              className="mx-auto aspect-square w-full max-w-[320px] max-h-[280px]"
-            >
-              <PieChart accessibilityLayer>
-                <ChartTooltip
-                  content={
-                    <ChartTooltipContent
-                      className="min-w-44 gap-2.5"
-                      formatter={(value, name) => (
-                        <div className="flex w-full items-center justify-between gap-3">
-                          <div className="flex items-center gap-1.5">
-                            <div
-                              className="h-2.5 w-2.5 shrink-0 rounded-xs bg-(--color-bg)"
-                              style={
-                                {
-                                  "--color-bg": `var(--color-${name})`,
-                                } as CSSProperties
-                              }
-                            />
-                            <span className="text-muted-foreground text-xs">
-                              {chartConfig[name as keyof typeof chartConfig]?.label || name}
-                            </span>
-                          </div>
-                          <span className="text-foreground font-bold tabular-nums text-xs">
-                            {counts.total === 0 ? "0 งาน" : `${Number(value).toLocaleString()} งาน`}
-                          </span>
-                        </div>
-                      )}
-                    />
-                  }
-                />
-                <ChartLegend
-                  content={
-                    <ChartLegendContent
-                      nameKey="status"
-                      className="flex-wrap justify-center gap-x-3.5 gap-y-1 text-xs"
-                    />
-                  }
-                  className="-translate-y-1"
-                />
-                <Pie
-                  data={chartData}
-                  dataKey="count"
-                  nameKey="status"
-                  innerRadius={65}
-                  outerRadius={95}
-                  cornerRadius={5}
-                  paddingAngle={3}
-                  stroke="var(--card)"
-                  strokeWidth={3}
-                >
-                  <Label
-                    content={({ viewBox }) => {
-                      if (viewBox && "cx" in viewBox && "cy" in viewBox) {
-                        return (
-                          <text
-                            x={viewBox.cx}
-                            y={viewBox.cy}
-                            textAnchor="middle"
-                            dominantBaseline="central"
-                          >
-                            <tspan
-                              x={viewBox.cx}
-                              y={(viewBox.cy || 0) - 7}
-                              className="fill-foreground text-3xl font-extrabold tabular-nums"
-                            >
-                              {completionRate}%
-                            </tspan>
-                            <tspan
-                              x={viewBox.cx}
-                              y={(viewBox.cy || 0) + 17}
-                              className="fill-muted-foreground text-[11px] font-medium"
-                            >
-                              งานเสร็จสิ้น
-                            </tspan>
-                          </text>
-                        );
-                      }
-                    }}
-                  />
-                </Pie>
-              </PieChart>
-            </ChartContainer>
+            <DonutRing counts={counts} completionRate={completionRate} />
           </div>
 
           {/* Right: Quick Breakdown & KPI Cards */}

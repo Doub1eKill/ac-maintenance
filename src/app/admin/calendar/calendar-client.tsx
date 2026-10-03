@@ -5,8 +5,8 @@ import { Clock } from "lucide-react";
 import { AnimatedIcon } from "@/components/ui/animated-icon";
 import { useCreateWorkOrder } from "@/components/admin/create-work-order-provider";
 
-// Pulls in recharts and date-fns of its own, so it stays a separate chunk that
-// only this page pays for.
+// Pulls in date-fns and its Thai locale of its own, so it stays a separate
+// chunk that only this page pays for.
 const MaintenanceCalendar = dynamic(
   () => import("@/components/shared/maintenance-calendar").then((m) => m.MaintenanceCalendar),
   {

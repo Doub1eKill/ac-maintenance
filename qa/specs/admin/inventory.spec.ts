@@ -66,6 +66,41 @@ test.describe("admin inventory", () => {
     ledger("Omnibox", "typing a menu word lists the menu entry", "UI", /จัดการ QR Code/.test(t3) ? "PASS" : "FAIL", await shot(page, "admin-omnibox-menu"));
   });
 
+  test("dashboard donut: slices match the database, hovering one names it in the centre", async ({ page }) => {
+    // Drawn as SVG since recharts went (components/admin/maintenance-analytics-donut.tsx).
+    const [[completed, claimed, pending, cancelled]] = db("select count(*) filter (where status='completed'), count(*) filter (where status='claimed'), count(*) filter (where status='pending'), count(*) filter (where status='cancelled') from work_orders");
+    await page.goto("/admin");
+    const donut = page.locator('svg[role="img"][aria-label^="สัดส่วนสถานะใบงาน"]');
+    await donut.waitFor({ timeout: 60_000 });
+    const label = (await donut.getAttribute("aria-label")) ?? "";
+    const agrees = label.includes(`เสร็จสิ้น ${completed}`) && label.includes(`กำลังดำเนินการ ${claimed}`) && label.includes(`รอดำเนินการ ${pending}`) && label.includes(`ยกเลิก ${cancelled}`);
+    const centre = donut.locator("text");
+    const before = (await centre.textContent()) ?? "";
+    const pendingArc = donut.locator('circle[stroke="#f59e0b"]');
+    let during = "(no pending slice)";
+    if (Number(pending) > 0) {
+      // On the ring itself: hover() aims at the middle of the circle's box,
+      // which is the hole with the centre text in it.
+      const point = await pendingArc.evaluate((el) => {
+        const c = el as unknown as SVGCircleElement;
+        const svg = c.ownerSVGElement!;
+        const box = svg.getBoundingClientRect();
+        const scale = box.width / svg.viewBox.baseVal.width;
+        const r = c.r.baseVal.value;
+        const dash = c.getAttribute("stroke-dasharray")!.split(" ").map(Number);
+        const start = -Number(c.getAttribute("stroke-dashoffset"));
+        const angle = ((start + dash[0] / 2) / (2 * Math.PI * r)) * 2 * Math.PI - Math.PI / 2;
+        return { x: box.x + (c.cx.baseVal.value + r * Math.cos(angle)) * scale, y: box.y + (c.cy.baseVal.value + r * Math.sin(angle)) * scale };
+      });
+      await page.mouse.move(point.x, point.y);
+      await page.waitForTimeout(300);
+      during = (await centre.textContent()) ?? "";
+    }
+    ledger("Dashboard", `donut agrees with the database (${label}); centre "${before}" → hover "${during}"`, "UI", agrees && /%/.test(before) && (Number(pending) === 0 || during.includes(`${pending}รอดำเนินการ`)) ? "PASS" : "FAIL", await shot(page, "admin-donut-hover"));
+    expect(agrees, "donut counts match work_orders").toBe(true);
+    if (Number(pending) > 0) expect(during).toContain(`${pending}รอดำเนินการ`);
+  });
+
   test("header omnibox lists no cancelled order as an open one", async ({ page }) => {
     // The index took every order but the completed ones, so a cancelled order
     // showed up as "กำลังดำเนินการ" (lib/admin/pages.ts getAdminSearchIndex).
