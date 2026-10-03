@@ -68,11 +68,11 @@ export async function requestPasswordReset(
 
   const user = await prisma.user.findUnique({
     where: { email: parsed.data.email },
-    select: { id: true, email: true },
+    select: { id: true, email: true, password: true },
   });
 
   if (user) {
-    const token = createResetToken(Number(user.id));
+    const token = createResetToken(Number(user.id), user.password);
     const resetUrl = `${getAppUrl()}/reset-password?token=${token}`;
     const { text, html } = resetEmailBody(resetUrl);
 

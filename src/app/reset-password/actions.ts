@@ -3,7 +3,7 @@
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import { verifyResetToken } from "@/lib/reset-token";
+import { resetTokenUserId, verifyResetToken } from "@/lib/reset-token";
 
 const schema = z.object({
   token: z.string().min(1),
@@ -25,22 +25,32 @@ export async function resetPassword(
     return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
   }
 
-  const verified = verifyResetToken(parsed.data.token);
-  if (!verified) {
-    return { error: "This reset link is invalid or has expired. Please request a new one." };
-  }
+  const invalid = { error: "This reset link is invalid or has expired. Please request a new one." };
+
+  // The signature covers the account's current password hash (see
+  // reset-token.ts), so it is read first: a link that has already been used
+  // was signed over a hash that is no longer there and fails below.
+  const claimedUserId = resetTokenUserId(parsed.data.token);
+  if (!claimedUserId) return invalid;
+  const account = await prisma.user.findUnique({
+    where: { id: claimedUserId },
+    select: { password: true },
+  });
+  if (!account) return invalid;
+
+  const verified = verifyResetToken(parsed.data.token, account.password);
+  if (!verified) return invalid;
 
   const passwordHash = await bcrypt.hash(parsed.data.password, 12);
 
-  // No user existence check needed beyond this — verifyResetToken already
-  // proved the token was signed for this specific userId with our own
-  // secret, so a matching row is guaranteed unless the account was somehow
-  // deleted since the link was generated (this app never hard-deletes
-  // users, so that's not a real path).
-  await prisma.user.update({
-    where: { id: verified.userId },
+  // Guarded on the hash the link was checked against, so two submissions of
+  // the same link racing each other cannot both land: the second finds the
+  // password already changed and matches nothing.
+  const { count } = await prisma.user.updateMany({
+    where: { id: verified.userId, password: account.password },
     data: { password: passwordHash },
   });
+  if (count === 0) return invalid;
 
   return { success: true };
 }
