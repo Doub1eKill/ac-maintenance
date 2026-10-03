@@ -69,6 +69,14 @@ run `tech-20261003`: test ผ่าน และ ledger แถว 24–25 PASS �
 - **ข้อสรุปที่ใช้ได้:** ปัญหาอยู่ฝั่ง Next dev เท่านั้น ไม่กระทบ production (prod sweep 3 รอบไม่เกิด) และ dev ที่เจ้าของเปิดเองไม่น่าเจอบ่อย · ถ้าจะไล่ต่อ: ให้ Playwright เปิด server แบบ `stdout: "ignore"` เทียบกับ `"pipe"` · หรือรัน `warm` ด้วยลำดับ tech ก่อน admin · ถ้าทำซ้ำได้ด้วยโปรเจกต์เล็ก → เปิด issue ที่ vercel/next.js
 - ระหว่างไล่: กด "บันทึก" ข้อมูลองค์กรบน dev (ไม่แก้ค่า) 1 ครั้ง → restore คืน `organisation_name` เป็น NULL ตามเดิม (NULL = แอปแสดง `DEFAULT_ORGANISATION_NAME`) · เหลือแค่ `system_settings.updated_at` = 2026-10-03 10:33:33Z
 
+## 📨 3 ต.ค. ดึก — QA ไม่ส่งอีเมลจริงแล้ว + reload loop หยุดทำซ้ำได้ (DoubleKill)
+
+**อีเมลเด้ง (เจ้าของถาม):** ไม่ใช่บั๊ก — setup สมัครบัญชี QA ผ่านฟอร์มจริง แอปจึงส่งรหัสผ่าน SMTP จริงไป `qa-run.ac.th` / `example.invalid` ซึ่งไม่มีอยู่ → Gmail ตีกลับเข้ากล่องผู้ส่ง 4–6 ฉบับต่อ sweep · harness ไม่เคยอ่านเมลพวกนี้ (ใช้ `plantEmailCode`) · spec อื่นที่ใช้ `gmail.com` `pkru.ac.th` `x.com` `example.net` แค่พิมพ์ลงช่อง/ลอง login ไม่ได้กดส่งรหัส
+
+**แก้ (`a47787d`):** `src/lib/mail.ts` — `MAIL_SUPPRESS_DOMAINS` (comma list) · ผู้รับที่โดเมนตรงทั้งโดเมน → log `[mail] not sent to …` + คืน `{ status: "suppressed" }` ซึ่งผู้เรียกทั้งสอง (`email-verification.ts`, `request-password-reset`) จัดการเหมือน `sent` · อีเมลอื่นส่งตามปกติ · ตั้งเฉพาะใน `webServer.env` ของ `qa/playwright.config.ts` (ทั้ง dev และ build) · **Vercel ไม่ได้ตั้ง** · ตรวจ: run `mail-20261003` 77/77 ledger FAIL 0 · 5 ที่อยู่ที่เคยเด้งถูก log ว่าไม่ส่งครบ ไม่มีการส่งจริง
+
+**reload loop ใน Next dev — หยุดทำซ้ำได้เอง:** ตั้งแต่ 12:15Z ทดลองแบบ Playwright เปิด dev server 3 รอบด้วย probe (project ต่อท้ายที่นับ document load ของ `/tech` ใน 12 วิ) → **techDocLoads=1 ทุกรอบ** รวมรอบที่ใส่ test สร้างใบงานครบ และรอบที่เปิดส่งอีเมลจริงกลับมา (`PROBE_MAIL=send`, เด้งเข้ากล่องอีก ~5 ฉบับ ~12:48Z) · ก่อนหน้านั้นเงื่อนไขเดียวกันเกิด 7/7 (ครั้งสุดท้าย `devclean` 10:05Z) → ขึ้นกับสภาพแวดล้อมที่ไม่ได้อยู่ในชุดที่ควบคุม · **ตัดทิ้งแล้วทั้งหมด:** ชุด test · server action ที่ revalidate `/tech` · แท็บ admin ค้าง · env ของ Playwright · `.next` ค้าง · stdout pipe · การส่งอีเมล SMTP · ไฟล์ทดลอง (`qa/_probe*`) ลบแล้ว ไม่ได้ commit · **ข้อเสนอ:** ไม่ไล่ต่อจนกว่าจะเกิดอีก — ถ้าเกิด ให้เก็บ `.next/dev` ทั้งโฟลเดอร์ไว้ก่อนรีสตาร์ท (สถานะ chunk/manifest ตอนนั้นคือหลักฐานเดียวที่ยังไม่ได้ดู) แล้วดู `client-reference-manifest` ของ `/tech` ว่ามี `src/app/admin/error.tsx` หรือไม่
+
 ## กติกาที่ได้จากรอบนี้
 
 - หลัง `npm install` ที่ Playwright ขยับเวอร์ชัน ต้อง **`npx playwright install chromium`**
