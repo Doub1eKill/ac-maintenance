@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/lib/auth";
+import { sessionWithRole } from "@/lib/auth-guards";
 import { catalogueFlags } from "@/lib/catalogue-status";
 import { formatUnitLocation } from "@/lib/location";
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth();
-    const allowedRoles = ["org_admin", "technician"];
-    if (!session || !allowedRoles.includes(session.user.role)) {
+    if (!(await sessionWithRole("org_admin", "technician"))) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

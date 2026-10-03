@@ -1,22 +1,13 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { sessionWithRole } from "@/lib/auth-guards";
 import { syncOverdueMaintenanceWorkOrders, getTechnicianAssetList } from "@/lib/maintenance";
-
-async function verifyTechnician() {
-  const session = await auth();
-  if (!session?.user || session.user.role !== "technician") {
-    return null;
-  }
-  return session.user;
-}
 
 // Full asset list for the technician dashboard (backlog: all units with last-
 // cleaned date, stalest first, overdue units pinned to the top regardless of
 // date, plus a job-type summary). Deliberately a separate endpoint from
 // /api/tech/work-orders so the existing claim-pool UI keeps working unchanged.
 export async function GET() {
-  const tech = await verifyTechnician();
-  if (!tech) return new NextResponse("Unauthorized", { status: 401 });
+  if (!(await sessionWithRole("technician"))) return new NextResponse("Unauthorized", { status: 401 });
 
   try {
     await syncOverdueMaintenanceWorkOrders();

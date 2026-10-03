@@ -1,4 +1,4 @@
-import { auth } from "@/lib/auth";
+import { sessionWithRole } from "@/lib/auth-guards";
 
 /**
  * Every technician entry point starts here. Kept beside the technician modules
@@ -7,8 +7,8 @@ import { auth } from "@/lib/auth";
  * a technician — putting them in one file invites reaching for the wrong guard.
  */
 export async function verifyTechnician() {
-  const session = await auth();
-  if (!session?.user || session.user.role !== "technician") {
+  const session = await sessionWithRole("technician");
+  if (!session) {
     throw new Error("Unauthorized: Technician access required");
   }
   return session;
