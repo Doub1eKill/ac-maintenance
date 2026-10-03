@@ -26,7 +26,7 @@
 
 ## ระยะ 3 — ประสิทธิภาพ/ความน่าเชื่อถือ ✅ เสร็จ (`3603ebb` `1f4adff` `c9b5a82` `6fddcf0`)
 
-> ### ✅ `CRON_SECRET` ตั้งแล้ว (เจ้าของ, 3 ต.ค. ~16:15Z) — production ตอบ 401 แทน 503 (ไม่มี/ผิด secret) · **ยังต้องยืนยันการรันจริงครั้งแรก 18:00Z** (`overdue_sync_at` ไม่ NULL)
+> ### ✅ `CRON_SECRET` ตั้งแล้ว (เจ้าของ, 3 ต.ค. ~16:15Z) — production ตอบ 401 แทน 503 (ไม่มี/ผิด secret) · **✅ รันจริงครั้งแรกแล้ว 2026-10-03 18:19:01Z (01:19 น. ไทย)** — สร้าง WO 297 ให้เครื่องที่ถึงรอบค้างอยู่ 1 เครื่อง + `overdue_sync_at` บันทึกวินาทีเดียวกัน (มาจาก cron ไม่ใช่ fallback ซึ่งไม่บันทึกค่านี้) · Hobby รันช้ากว่า 18:00 ได้ภายในชั่วโมง (ครั้งนี้ 19 นาที) · จากนี้หน้าเว็บไม่เขียน DB ตราบใดที่ cron สำเร็จภายใน 26 ชม.
 > วิธีตั้ง (เก็บไว้อ้างอิง):
 > Vercel → Project → Settings → Environment Variables → เพิ่ม `CRON_SECRET` (Production) เป็นสตริงสุ่มยาว ≥ 32 ตัว เช่นผลของ `openssl rand -hex 32` → **Redeploy** (env ใหม่มีผลหลัง deploy) · Vercel จะส่ง `Authorization: Bearer <CRON_SECRET>` ให้ cron เอง · **ก่อนตั้ง:** route ตอบ 503 ทุก request และหน้าเว็บสร้างใบงานแบบเดิม (ไม่มีช่องว่าง) · **ตรวจหลังตั้ง:** หลัง 01:00 น. วันถัดไป `select overdue_sync_at from system_settings` ต้องไม่ NULL และ Vercel → Cron Jobs มีประวัติการรัน
 
