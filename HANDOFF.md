@@ -1,5 +1,41 @@
 # Project Handoff & Technical Summary
 
+# 🗺️ แผน Optimize + Refactor (วาง 3 ต.ค. 2026, DoubleKill) — ระยะ 1 ✅ เสร็จ (`a8038df` `76e4daf`)
+
+> ที่มา: สำรวจโค้ด + production จริง 3 ต.ค. · เรียงตามความเร่งด่วน · **ทุกข้อ:** 1 commit ต่อข้อ · tsc/eslint 0/0 · full sweep (production build) 77/77 ledger FAIL 0 คร่อม snapshot/restore · หลัง push เช็ค deploy success · ระยะ 4 ห้ามเปลี่ยนพฤติกรรม
+
+**ที่ดีอยู่แล้ว:** server action 29 ตัวมี guard ครบ · ตารางที่ query บ่อยมี index · Vercel function อยู่ `sin1` ใกล้ Aiven · HSTS มี (Vercel) · recharts lazy-load แล้ว
+
+## ระยะ 1 — ปิดช่องโหว่ (✅ เสร็จ (`a8038df` `76e4daf`))
+1. `next` 16.2.11 → **16.3.8** (+ `eslint-config-next` 16.3.8) — critical 3 ตัว (RCE บน Windows host, **Image Optimization API ที่แอปใช้กับรูปจาก Blob**, `next/og`) · npm audit หลังขยับ: critical 0
+2. `sharp` 0.34.5 → **0.35.5** (major) — libvips/libheif ใช้กับรูปที่ผู้ใช้อัปโหลด · API ที่ใช้ (`rotate` `resize` `jpeg`) ไม่เปลี่ยน
+3. **ระงับบัญชีมีผลภายใน 1 นาที** (เดิม: JWT เก็บ role/status ตอน login แล้วไม่อ่านอีก → ช่างที่ถูกระงับใช้ต่อได้ถึงเที่ยงคืน) — `src/lib/account-status.ts` ใหม่: อ่าน role/status จาก DB cache ต่อ process 60 วิ · `auth.ts` jwt callback (instance ที่มี DB; `proxy.ts` ยังใช้ `authConfig` ตัวเบาเหมือนเดิม) คืน `null` ถ้าไม่ active → cookie ถูกล้าง → layout `/admin` `/tech` redirect `/login` · role เปลี่ยน → อัปเดต token · **DB ติดต่อไม่ได้ → ใช้ token เดิม ไม่เตะใครออก** · `updateUserStatusByOrgAdminAction` ล้าง cache ของคนนั้นทันที (instance เดียวกัน) · test ใหม่ใน `admin/workflows.spec.ts` "team: suspend": tech2 เปิด `/tech` ค้างไว้ → admin ระงับ → reload ต้องไป `/login` (มี `expect`)
+
+**ผลระยะ 1:** run `phase1b-20261003` (production build, Next.js 16.3.8) **77/77 · ledger PASS 217 · FAIL 0 · SKIP 5** · test อัปโหลดผ่านทุกข้อบน sharp 0.35.5 · session tech2 ที่เปิดค้าง `/tech` → `/login` ทันทีหลังระงับ · restore ครบ
+
+**บทเรียนระยะ 1:** รอบแรก (`phase1-20261003`) การตัด session ไม่ทันที — production build **ฝังโมดูลเดียวกันซ้ำในหลาย bundle** (`route.js` ของ auth, `app/page.js`, chunk 770, 8510) แต่ละชุดมี module scope ของตัวเอง → `Map` ระดับโมดูลแยกกัน การล้าง cache จาก admin action ไปล้างคนละชุดกับที่ layout อ่าน → แก้ด้วย cache บน `globalThis` · **กติกาใหม่: state ระดับ process ที่ต้องแชร์ข้าม route ต้องอยู่บน `globalThis`** (แบบ `prisma.ts`) · และ test ที่เปลี่ยนสถานะบัญชีต้องคืนสถานะก่อน assert ไม่งั้นล้มแล้ว tech2 ค้าง suspended ลาก tech project ล้มตาม
+
+## ระยะ 2 — เสริมความปลอดภัย (ยังไม่ทำ)
+4. rate limit หน้า login ต่อ email+IP — เก็บใน Postgres แบบเดียวกับ OTP (ไม่ต้องมี Redis)
+5. security headers ใน `next.config.ts`: `frame-ancestors 'none'` · `X-Content-Type-Options: nosniff` · `Referrer-Policy` · `Permissions-Policy` (**ต้องคง `camera=(self)`** ให้สแกน QR) · CSP เต็มทำทีหลังแบบ report-only (Next มี inline script)
+6. `nodemailer` 8 → 10 (major; แอปไม่ใช้ `raw`/เนื้อหาจากผู้ใช้ → เสี่ยงต่ำ)
+7. `sharp` `limitInputPixels` ต่ำลง (กันรูประเบิด)
+8. ตรวจ `reset-token.ts` ว่า hash + มีวันหมดอายุ (ยังไม่ได้ดู)
+- npm audit ที่เหลือหลังระยะ 1: `next-auth` (beta) · `prisma`/`@prisma/*`/`mysql2` (เครื่องมือ CLI; แอปไม่ใช้ mysql2) — audit แนะนำ downgrade ใช้ไม่ได้ → เฝ้าดูเวอร์ชันใหม่
+
+## ระยะ 3 — ประสิทธิภาพ/ความน่าเชื่อถือ (ยังไม่ทำ)
+9. ย้าย `syncOverdueMaintenanceWorkOrders` จาก render หน้า (GET เขียน DB) ไป **Vercel Cron วันละครั้ง** — **เปลี่ยนพฤติกรรม ต้องให้เจ้าของยืนยัน** · แก้ต้นเหตุเคส WO 193
+10. `/qr/[id]` (หน้า guest) ดึงเครื่อง + ประวัติพร้อมกัน — วัด production: อุ่น 0.5–0.8 วิ, cold 2.9 วิ
+11. `take`/pagination ให้ตารางที่โตไม่หยุด: audit log · ประวัติช่าง · ใบงานที่ปิดแล้ว (findMany ไม่มี take 35 จุด; ข้อมูลยังเล็ก)
+12. `transactionOptions` ของ Prisma สำหรับ Aiven — ผูกกับเคส claim ล้ม 1 ต.ค. (รอ log ก่อน)
+13. (ทางเลือก) donut ด้วย SVG เอง แทน recharts chunk 330 KB
+
+## ระยะ 4 — ปรับโครงสร้าง (ทยอย, ไม่เปลี่ยนพฤติกรรม)
+14. แยก component ใหญ่: `asset-manager.tsx` 981 · `upcoming-maintenance-table.tsx` 805 · `maintenance-calendar.tsx` 668 · `register-form.tsx` 594
+15. แยก `src/lib/admin/master-data.ts` (716) ตามโดเมน · ใช้ select shape ร่วมใน `pages.ts`
+16. รวม guard ที่เดียว + wrapper action (guard + zod + error shape) ใช้กับ 29 action
+17. unit test ให้ logic ล้วน (session-expiry, วันครบรอบ, email check) — ตอนนี้มีแต่ e2e
+
 # ❓ งานค้างฝั่ง QA — เหลือ 1 ข้อ (อัปเดต 3 ต.ค. 2026 เย็น, DoubleKill)
 
 > หัวข้อนี้คือ **ที่เดียว** ที่รวมของค้างฝั่ง QA ไว้
