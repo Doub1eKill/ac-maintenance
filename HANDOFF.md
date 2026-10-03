@@ -1,6 +1,6 @@
 # Project Handoff & Technical Summary
 
-# 🗺️ แผน Optimize + Refactor (วาง 3 ต.ค. 2026, DoubleKill) — ระยะ 1 ✅ · ระยะ 2 ✅ (3 ต.ค.)
+# 🗺️ แผน Optimize + Refactor (วาง 3 ต.ค. 2026, DoubleKill) — ระยะ 1 ✅ · ระยะ 2 ✅ · ระยะ 3 ✅ (3 ต.ค.) · **⚠️ เจ้าของต้องตั้ง `CRON_SECRET` บน Vercel**
 
 > ที่มา: สำรวจโค้ด + production จริง 3 ต.ค. · เรียงตามความเร่งด่วน · **ทุกข้อ:** 1 commit ต่อข้อ · tsc/eslint 0/0 · full sweep (production build) 77/77 ledger FAIL 0 คร่อม snapshot/restore · หลัง push เช็ค deploy success · ระยะ 4 ห้ามเปลี่ยนพฤติกรรม
 
@@ -24,12 +24,18 @@
 
 **ผลระยะ 2:** run `phase2-20261003` (production build) **80/80 · ledger PASS 224 · FAIL 0 · SKIP 5** · test ใหม่ 3 ตัวใน `public/regressions.spec.ts`: throttle (10 ครั้งแรกข้อความปกติ · ครั้งที่ 11 ข้อความ throttle · อีเมลอื่นไม่โดน), reset link ใช้ครั้งเดียว (ครั้งสองถูกปฏิเสธ hash ไม่เปลี่ยน · รหัสที่ตั้งใช้ login ได้), security headers (ครบ + กล้องยังอนุญาต) · restore ครบ `login_failures` = 0
 
-## ระยะ 3 — ประสิทธิภาพ/ความน่าเชื่อถือ (ยังไม่ทำ)
-9. ย้าย `syncOverdueMaintenanceWorkOrders` จาก render หน้า (GET เขียน DB) ไป **Vercel Cron วันละครั้ง** — **เปลี่ยนพฤติกรรม ต้องให้เจ้าของยืนยัน** · แก้ต้นเหตุเคส WO 193
-10. `/qr/[id]` (หน้า guest) ดึงเครื่อง + ประวัติพร้อมกัน — วัด production: อุ่น 0.5–0.8 วิ, cold 2.9 วิ
-11. `take`/pagination ให้ตารางที่โตไม่หยุด: audit log · ประวัติช่าง · ใบงานที่ปิดแล้ว (findMany ไม่มี take 35 จุด; ข้อมูลยังเล็ก)
-12. `transactionOptions` ของ Prisma สำหรับ Aiven — ผูกกับเคส claim ล้ม 1 ต.ค. (รอ log ก่อน)
-13. (ทางเลือก) donut ด้วย SVG เอง แทน recharts chunk 330 KB
+## ระยะ 3 — ประสิทธิภาพ/ความน่าเชื่อถือ ✅ เสร็จ (`3603ebb` `1f4adff` `c9b5a82` `6fddcf0`)
+
+> ### ⚠️ งานของเจ้าของ: ตั้ง `CRON_SECRET` บน Vercel
+> Vercel → Project → Settings → Environment Variables → เพิ่ม `CRON_SECRET` (Production) เป็นสตริงสุ่มยาว ≥ 32 ตัว เช่นผลของ `openssl rand -hex 32` → **Redeploy** (env ใหม่มีผลหลัง deploy) · Vercel จะส่ง `Authorization: Bearer <CRON_SECRET>` ให้ cron เอง · **ก่อนตั้ง:** route ตอบ 503 ทุก request และหน้าเว็บสร้างใบงานแบบเดิม (ไม่มีช่องว่าง) · **ตรวจหลังตั้ง:** หลัง 01:00 น. วันถัดไป `select overdue_sync_at from system_settings` ต้องไม่ NULL และ Vercel → Cron Jobs มีประวัติการรัน
+
+9. **cron รายวัน** (`3603ebb`) — `src/app/api/cron/overdue-maintenance/route.ts` + `vercel.json` `0 18 * * *` (= 01:00 น. ไทย; Hobby รันวันละครั้ง คลาดได้ภายในชั่วโมง) · ตรวจ `CRON_SECRET` แบบ constant-time · สำเร็จ → บันทึก `system_settings.overdue_sync_at` (คอลัมน์ใหม่ migration `20261003160000_add_overdue_sync_at` **apply ลง Aiven แล้ว**) · `syncOverdueMaintenanceWorkOrders` (ที่หน้าเว็บเรียก) **ข้ามการเขียนถ้า cron สำเร็จภายใน 26 ชม.** ไม่งั้นทำแบบเดิม (fallback) · query+transaction เดิมย้ายไป `materializeOverdueWorkOrders` ไม่เปลี่ยน · `baseline.mjs` MUTABLE คืน `overdue_sync_at` (QA เรียก route แล้วต้องไม่ทำให้ production คิดว่า cron รันแล้ว) · harness ตั้ง `CRON_SECRET=qa-cron-secret` ให้ server ของมันเอง
+10. **`/qr/[id]`** (`1f4adff`) — session + เครื่อง + ประวัติ ใน `Promise.all` เดียว (`getMaintenanceHistory` รับ `{ qrCode }` ได้)
+11. **ขอบเขต query** (`c9b5a82`) — audit log มี pagination อยู่แล้ว · ประวัติช่างมี `take: 50` แล้ว · คลังงาน/งานของฉันมีขอบเขตตามธรรมชาติ (งานเปิด) · **เจอบั๊ก:** ดัชนี omnibox ของ admin เอาใบงาน `not: "completed"` → ใบงานที่**ยกเลิก**ขึ้นเป็น "กำลังดำเนินการ" (4 ใบบน production) และโตไม่หยุด → แก้เป็น pending+claimed · **ปล่อยไว้โดยตั้งใจ:** ประวัติทั้งหมดใน modal รายละเอียดช่าง (`users.ts`) — UI ใช้จำนวนรวมคำนวณตัวเลข ถ้า take จะผิด; โตตามงานของช่างคนเดียว ถ้าวันหนึ่งเยอะค่อยแยก query นับ
+12. **`transactionOptions`** (`6fddcf0`) — `maxWait` 5 วิ / `timeout` 10 วิ (default 2/5) — ผูกกับเคส claim ล้ม 1 ต.ค.
+13. (ทางเลือก) donut SVG แทน recharts — **ยังไม่ทำ**
+
+**ผลระยะ 3:** run `phase3-20261003` (production build) **81 ผ่าน · 1 ล้ม** — ที่ล้มคือ test omnibox ใหม่ที่**อ่านข้อความทั้งหน้า** ไปเจอการ์ด "กำลังดำเนินการ" ของ dashboard (โค้ดถูก: screenshot มีแต่ "เครื่องแอร์") → แก้ test ให้อ่านแค่ dropdown → run `phase3b-20261003` (setup + omnibox ทั้งสอง) **7/7 PASS** · Cron: ไม่มี secret 401 · ผิด 401 · ถูก 200 + `overdue_sync_at` ถูกบันทึก · หลัง restore `overdue_sync_at` = NULL ตามเดิม
 
 ## ระยะ 4 — ปรับโครงสร้าง (ทยอย, ไม่เปลี่ยนพฤติกรรม)
 14. แยก component ใหญ่: `asset-manager.tsx` 981 · `upcoming-maintenance-table.tsx` 805 · `maintenance-calendar.tsx` 668 · `register-form.tsx` 594
