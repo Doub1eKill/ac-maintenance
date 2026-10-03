@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { authConfig } from "@/lib/auth.config";
 import { prisma } from "@/lib/prisma";
+import { currentAccountState } from "@/lib/account-status";
 import type { SignInCode } from "@/lib/sign-in-codes";
 
 const credentialsSchema = z.object({
@@ -163,6 +164,26 @@ const demoRoleProvider = Credentials({
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
+  callbacks: {
+    ...authConfig.callbacks,
+    // authConfig's jwt stamps the claims at sign-in and enforces midnight;
+    // this instance (pages, layouts, server actions — not proxy.ts, which has
+    // no database) also re-reads the account, so a suspension or a role change
+    // ends or reshapes the session within a minute instead of at midnight.
+    // Returning null clears the cookie, and the /admin and /tech layouts then
+    // redirect to /login.
+    async jwt(params) {
+      const token = authConfig.callbacks.jwt(params);
+      if (!token || params.user || !token.sub) return token;
+
+      const state = await currentAccountState(token.sub);
+      if (state === "unknown") return token;
+      if (!state || state.status !== "active") return null;
+      token.role = state.role as typeof token.role;
+      token.status = state.status as typeof token.status;
+      return token;
+    },
+  },
   providers:
     process.env.NODE_ENV === "production"
       ? [passwordProvider]

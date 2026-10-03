@@ -1,6 +1,6 @@
 import path from "node:path";
 import { devices, type Page } from "@playwright/test";
-import { test, QA, OUT_ROOT, ledger, shot, note, hydrated, loginViaForm, watchConsole, unitPhoto, pickRoom, dismissModal } from "../../lib";
+import { test, expect, QA, OUT_ROOT, ledger, shot, note, hydrated, loginViaForm, watchConsole, unitPhoto, pickRoom, dismissModal } from "../../lib";
 
 // What the print test hangs off `window` inside the page.
 type PrintWindow = Window & { __printDoc: string };
@@ -290,12 +290,24 @@ test.describe("admin workflows", () => {
     const card = page.locator("div").filter({ hasText: /QA_TEST_USER_TECH2/ }).filter({ has: page.getByRole("button", { name: /ระงับสิทธิ์/ }) }).last();
     const btn = card.getByRole("button", { name: /ระงับสิทธิ์/ }).first();
     if (!(await btn.count())) { ledger("Team", "suspend button for QA tech2 found", "UI", "BLOCKED", await shot(page, "team-no-suspend")); return; }
+    // tech2 is signed in elsewhere while this happens: the session it already
+    // holds has to end too, not only the next sign-in (src/lib/account-status.ts).
+    const live = await browser.newContext({ ...devices["Pixel 7"], storageState: path.join(OUT_ROOT, "auth", "tech2.json") });
+    await live.addInitScript(() => sessionStorage.setItem("ac-maintenance.browser-session", "1"));
+    const lp = await live.newPage();
+    await lp.goto("/tech"); await lp.locator("main").last().waitFor({ timeout: 90_000 });
+    const liveBefore = new URL(lp.url()).pathname;
     await btn.click();
     const dlg = page.getByRole("alertdialog").or(page.getByRole("dialog")).first();
     await dlg.getByRole("button", { name: /^ระงับสิทธิ์$/ }).click();
     const tt = await toastText(page);
     await settle(page, 2500);
     ledger("Team", "suspend confirms via dialog and toasts", "UI", /ระงับ|สำเร็จ/.test(tt) ? "PASS" : "FAIL", await shot(page, "team-suspended"));
+    await lp.goto("/tech").catch(() => {});
+    await lp.waitForURL(/\/login/, { timeout: 30_000 }).catch(() => {});
+    const liveAfter = new URL(lp.url()).pathname;
+    ledger("Team", `a session tech2 already held ends on suspension: ${liveBefore} → ${liveAfter}`, "UI", liveBefore === "/tech" && liveAfter === "/login" ? "PASS" : "FAIL", await shot(lp, "team-suspended-live-session"));
+    await live.close();
     const ctx = await browser.newContext(); const p2 = await ctx.newPage();
     await loginViaForm(p2, QA.tech2, QA.password);
     const msg = await body(p2);
@@ -314,6 +326,9 @@ test.describe("admin workflows", () => {
     const u3 = await loginViaForm(p3, QA.tech2, QA.password);
     ledger("Team", "restored account logs in again", "UI", /\/tech/.test(u3) ? "PASS" : "FAIL", await shot(p3, "team-restored-login"));
     await ctx3.close();
+    // Asserted only now, after tech2 is active again: failing earlier left it
+    // suspended and took the tech project's two-technician tests down with it.
+    expect(liveAfter, "tech2's open session after suspension").toBe("/login");
   });
 
   test("settings: rename a brand round-trip; duplicate refused; trash bin", async ({ page }) => {

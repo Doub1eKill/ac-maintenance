@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { logAudit } from "@/lib/audit";
 import { verifyOrgAdmin } from "@/lib/auth-guards";
+import { forgetAccountStatus } from "@/lib/account-status";
 import { formatUnitLocation } from "@/lib/location";
 
 // What an org admin can do to somebody else's account: approve or suspend it,
@@ -32,6 +33,9 @@ export async function updateUserStatusByOrgAdminAction(
       where: { id: BigInt(targetUserId) },
       data: { status: newStatus },
     });
+    // The account's next request on this instance re-reads it rather than
+    // waiting out the cache (see account-status.ts).
+    forgetAccountStatus(targetUserId);
 
     console.log(
       `[AUDIT TRAIL] User status updated by OrgAdmin (AdminID: ${session.user.id}): TargetUser ${targetUserId} -> Status: ${newStatus} at ${new Date().toISOString()}`
