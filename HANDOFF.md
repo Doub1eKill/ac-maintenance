@@ -1,6 +1,6 @@
 # Project Handoff & Technical Summary
 
-# 🗺️ แผน Optimize + Refactor (วาง 3 ต.ค. 2026, DoubleKill) — ระยะ 1 ✅ · ระยะ 2 ✅ · ระยะ 3 ✅ (3 ต.ค.) · ระยะ 4 ยังไม่เริ่ม
+# 🗺️ แผน Optimize + Refactor (วาง 3 ต.ค. 2026, DoubleKill) — ระยะ 1 ✅ · ระยะ 2 ✅ · ระยะ 3 ✅ · ระยะ 4 ✅ (3–4 ต.ค.) · **แผนนี้ปิดแล้ว**
 
 > ที่มา: สำรวจโค้ด + production จริง 3 ต.ค. · เรียงตามความเร่งด่วน · **ทุกข้อ:** 1 commit ต่อข้อ · tsc/eslint 0/0 · full sweep (production build) 77/77 ledger FAIL 0 คร่อม snapshot/restore · หลัง push เช็ค deploy success · ระยะ 4 ห้ามเปลี่ยนพฤติกรรม
 
@@ -38,11 +38,13 @@
 
 **ผลระยะ 3:** run `phase3-20261003` (production build) **81 ผ่าน · 1 ล้ม** — ที่ล้มคือ test omnibox ใหม่ที่**อ่านข้อความทั้งหน้า** ไปเจอการ์ด "กำลังดำเนินการ" ของ dashboard (โค้ดถูก: screenshot มีแต่ "เครื่องแอร์") → แก้ test ให้อ่านแค่ dropdown → run `phase3b-20261003` (setup + omnibox ทั้งสอง) **7/7 PASS** · Cron: ไม่มี secret 401 · ผิด 401 · ถูก 200 + `overdue_sync_at` ถูกบันทึก · หลัง restore `overdue_sync_at` = NULL ตามเดิม
 
-## ระยะ 4 — ปรับโครงสร้าง (ทยอย, ไม่เปลี่ยนพฤติกรรม)
-14. แยก component ใหญ่: `asset-manager.tsx` 981 · `upcoming-maintenance-table.tsx` 805 · `maintenance-calendar.tsx` 668 · `register-form.tsx` 594
-15. แยก `src/lib/admin/master-data.ts` (716) ตามโดเมน · ใช้ select shape ร่วมใน `pages.ts`
-16. รวม guard ที่เดียว + wrapper action (guard + zod + error shape) ใช้กับ 29 action
-17. unit test ให้ logic ล้วน (session-expiry, วันครบรอบ, email check) — ตอนนี้มีแต่ e2e
+## ระยะ 4 — ปรับโครงสร้าง ✅ เสร็จ (`305b8fd` `13b789d` `7c9f1f7` `ece7f48` `6de9e28`) — ไม่เปลี่ยนพฤติกรรม
+17. **unit test** (`305b8fd`, +`catalogue-names` ใน `7c9f1f7`) — **vitest** (`npm test`, `vitest.config.ts`, ไฟล์ `src/**/*.test.ts`) · 37 test ~1 วิ: session-expiry, maintenance (วันไทยข้ามเที่ยงคืน UTC / parse วันที่ไม่มีจริง / บวกเดือนแบบ clamp / เวลาไทยทุก zone / ลำดับงาน), email-check, reset-token (ใช้ครั้งเดียว/หมดอายุ/ปลอม), login-throttle clientIp, location, catalogue-names · โมดูลที่เปิด Prisma ตอน import ใช้ `vi.mock("@/lib/prisma")` · **ยืนยันว่าจับได้จริง:** แก้ `>=`→`>` ใน isPastExpiry และลบ clamp เดือน → test แดงทั้งคู่ (คืนแล้ว) · **ยังไม่ได้ผูกกับ build/CI** — รันมือ
+16. **guard** (`13b789d`) — `sessionWithRole(...roles)` ใน `auth-guards.ts` = ที่เดียวที่ตรวจ role · `verifyOrgAdmin`/`verifyAssetEditor`/`verifyTechnician` (ยังอยู่ `tech/guards.ts` ตามเหตุผลเดิม) และ API route ทั้งสอง (`/api/tech/units` เคยมี verifyTechnician ส่วนตัว) ใช้ตัวนี้ · **wrapper ครอบ 29 action ไม่ทำ** — แต่ละ action มีข้อความไทยของตัวเอง 115 จุด ห่อทั้งหมด = แก้ทุกไฟล์ lib/admin lib/tech เสี่ยงเปลี่ยนสิ่งที่ผู้ใช้อ่าน ประโยชน์น้อยเมื่อ guard ครบแล้ว
+15. **แยก `master-data.ts`** (`7c9f1f7`) 716 → `master-data.ts` (อ่าน/เพิ่ม 185 + re-export) · `master-data-rename.ts` (verifyAssetEditor) · `master-data-trash.ts` (ลบ/กู้/ลบถาวร verifyOrgAdmin) · `catalogue-names.ts` · ผู้เรียก import ที่เดิม · **ย้ายไม่ได้เขียนใหม่** (เทียบบรรทัด: ต่างแค่ import, re-export, `export` 2 จุด) · select shape ร่วมมีอยู่แล้ว (userListSelect, buildingTreeSelect, workOrderBoardSelect, techJobInclude) ไม่ต้องทำเพิ่ม
+14. **แยก component ใหญ่** — `upcoming-maintenance-table.tsx` 805 → 487 + `upcoming-maintenance-columns.tsx` (type, badge, columns; re-export ครบ) (`ece7f48`) · `asset-manager.tsx` 981 → 752 + `asset-manager-modals.tsx` (AddBuilding / AddRoom / PmSettings / QrCode modal) + `asset-manager-types.ts` (`6de9e28`) — พิสูจน์: เนื้อใน modal ตรงกับ JSX เดิมทุกบรรทัดหลัง rename · **ไม่แยก:** modal เพิ่ม/แก้เครื่อง (ผูก state เลือกยี่ห้อหลายตัว) · `maintenance-calendar.tsx` (668; render function ซ้อน 4 ตัว closure state 11 ตัว, test ครอบแค่เลื่อนเดือน) · `register-form.tsx` (594; ฟอร์มเดียว state ร่วม email→OTP→submit) — ความเสี่ยงเปลี่ยนพฤติกรรมโดยไม่มี test จับ > ประโยชน์ · **บทเรียน:** สคริปต์แยกไฟล์ต้องตัดคอมเมนต์ก่อนดูว่าใช้ชื่ออะไร (เคยใส่ import เกินเพราะชื่ออยู่ในคอมเมนต์) และนับ `...name` (spread) เป็นการใช้ (เคยทำ import `nativeValidity` หาย — tsc จับได้)
+
+**ผลระยะ 4:** run `phase4-20261004` (production build) **83/83 · ledger PASS 227 · FAIL 0 · SKIP 5** · unit 37/37 · tsc/eslint 0/0 · restore ครบ
 
 # ❓ งานค้างฝั่ง QA — เหลือ 1 ข้อ (อัปเดต 3 ต.ค. 2026 เย็น, DoubleKill)
 
