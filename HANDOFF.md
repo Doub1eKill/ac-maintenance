@@ -55,6 +55,20 @@ run `tech-20261003`: test ผ่าน และ ledger แถว 24–25 PASS �
   - uuid ปลอม → **404** ✓ · `/login?callbackUrl=…` โหลดได้ มีฟอร์ม · **production ไม่มีแผง demo-role** ✓ (ข้อที่ `public/auth.spec.ts` ให้ไปยืนยันบน production)
 - **ยังค้าง (ต้องเป็นเจ้าของ):** ลงทะเบียนเครื่องใหม่พร้อมรูปจาก**มือถือจริง**บน production — ต้อง login บัญชีจริง (production ไม่มี demo-role) · ทำแล้วลบเครื่องทดสอบทิ้งด้วย
 
+## 🔍 3 ต.ค. ค่ำ — ไล่ต้นเหตุ /tech reload loop ใน Next dev ต่อ: ยังไม่เจอ แต่แคบลง (DoubleKill)
+
+**ตารางผล** (ตัววัด = สคริปต์ probe ที่ login ช่างด้วย demo-role แล้วนับ document load ของ `/tech` ใน 12 วิ + hook `__webpack_require__.i` จับ module ที่ไม่มี factory):
+
+| server เปิดโดย | ลำดับที่รัน | loop? |
+|---|---|---|
+| Playwright `webServer` (`npm run dev`) | `--project=admin` ทั้งชุด · full sweep | **เกิด 7/7** (รวม `devclean` ที่ลบ `.next` ใหม่หมด) |
+| preview (`ac-maintenance-dev` ใน `.claude/launch.json`, `npm run dev` เหมือนกัน) | เปิด /tech ก่อน → /admin → /tech · admin แท็บค้าง · เปิดทุกหน้า admin · server action ที่ revalidate `/tech` (บันทึกข้อมูลองค์กร) · bisect A (workflows) · B (+inventory) · C (+regressions) · **D (`--project=admin` ครบลำดับจริงบน DB สะอาด, 26/26)** | **ไม่เกิด 0/9** |
+
+- ตัดทิ้งเพิ่ม: ชุด test (D ครบทุก test ก็ไม่เกิด) · env ที่ Playwright ส่งให้ server (มีแค่ `FORCE_COLOR` `DEBUG_COLORS` `BROWSER=none` `PLAYWRIGHT_TEST=1` `NODE_USE_SYSTEM_CA` — **ไม่มี `NODE_OPTIONS`**, และ Next ไม่อ่าน `PLAYWRIGHT_*` เลย) · `.next` ค้าง
+- ที่ยังต่างกันและยังไม่ได้แยก: server ของ Playwright มี stdout/stderr เป็น pipe (ไม่ใช่ TTY) ตลอดอายุ · ลำดับ compile ตอนเริ่ม (`warm the heavy routes` เปิด admin 8 หน้าก่อน tech 6 หน้า บน server ที่ยังไม่เคย compile อะไร) — server ฝั่ง preview ทุกครั้ง compile `/` และ `/login` ก่อนเสมอ
+- **ข้อสรุปที่ใช้ได้:** ปัญหาอยู่ฝั่ง Next dev เท่านั้น ไม่กระทบ production (prod sweep 3 รอบไม่เกิด) และ dev ที่เจ้าของเปิดเองไม่น่าเจอบ่อย · ถ้าจะไล่ต่อ: ให้ Playwright เปิด server แบบ `stdout: "ignore"` เทียบกับ `"pipe"` · หรือรัน `warm` ด้วยลำดับ tech ก่อน admin · ถ้าทำซ้ำได้ด้วยโปรเจกต์เล็ก → เปิด issue ที่ vercel/next.js
+- ระหว่างไล่: กด "บันทึก" ข้อมูลองค์กรบน dev (ไม่แก้ค่า) 1 ครั้ง → restore คืน `organisation_name` เป็น NULL ตามเดิม (NULL = แอปแสดง `DEFAULT_ORGANISATION_NAME`) · เหลือแค่ `system_settings.updated_at` = 2026-10-03 10:33:33Z
+
 ## กติกาที่ได้จากรอบนี้
 
 - หลัง `npm install` ที่ Playwright ขยับเวอร์ชัน ต้อง **`npx playwright install chromium`**
