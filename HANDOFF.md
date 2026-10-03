@@ -1,6 +1,6 @@
 # Project Handoff & Technical Summary
 
-# 🗺️ แผน Optimize + Refactor (วาง 3 ต.ค. 2026, DoubleKill) — ระยะ 1 ✅ เสร็จ (`a8038df` `76e4daf`)
+# 🗺️ แผน Optimize + Refactor (วาง 3 ต.ค. 2026, DoubleKill) — ระยะ 1 ✅ · ระยะ 2 ✅ (3 ต.ค.)
 
 > ที่มา: สำรวจโค้ด + production จริง 3 ต.ค. · เรียงตามความเร่งด่วน · **ทุกข้อ:** 1 commit ต่อข้อ · tsc/eslint 0/0 · full sweep (production build) 77/77 ledger FAIL 0 คร่อม snapshot/restore · หลัง push เช็ค deploy success · ระยะ 4 ห้ามเปลี่ยนพฤติกรรม
 
@@ -15,13 +15,14 @@
 
 **บทเรียนระยะ 1:** รอบแรก (`phase1-20261003`) การตัด session ไม่ทันที — production build **ฝังโมดูลเดียวกันซ้ำในหลาย bundle** (`route.js` ของ auth, `app/page.js`, chunk 770, 8510) แต่ละชุดมี module scope ของตัวเอง → `Map` ระดับโมดูลแยกกัน การล้าง cache จาก admin action ไปล้างคนละชุดกับที่ layout อ่าน → แก้ด้วย cache บน `globalThis` · **กติกาใหม่: state ระดับ process ที่ต้องแชร์ข้าม route ต้องอยู่บน `globalThis`** (แบบ `prisma.ts`) · และ test ที่เปลี่ยนสถานะบัญชีต้องคืนสถานะก่อน assert ไม่งั้นล้มแล้ว tech2 ค้าง suspended ลาก tech project ล้มตาม
 
-## ระยะ 2 — เสริมความปลอดภัย (ยังไม่ทำ)
-4. rate limit หน้า login ต่อ email+IP — เก็บใน Postgres แบบเดียวกับ OTP (ไม่ต้องมี Redis)
-5. security headers ใน `next.config.ts`: `frame-ancestors 'none'` · `X-Content-Type-Options: nosniff` · `Referrer-Policy` · `Permissions-Policy` (**ต้องคง `camera=(self)`** ให้สแกน QR) · CSP เต็มทำทีหลังแบบ report-only (Next มี inline script)
-6. `nodemailer` 8 → 10 (major; แอปไม่ใช้ `raw`/เนื้อหาจากผู้ใช้ → เสี่ยงต่ำ)
-7. `sharp` `limitInputPixels` ต่ำลง (กันรูประเบิด)
-8. ตรวจ `reset-token.ts` ว่า hash + มีวันหมดอายุ (ยังไม่ได้ดู)
-- npm audit ที่เหลือหลังระยะ 1: `next-auth` (beta) · `prisma`/`@prisma/*`/`mysql2` (เครื่องมือ CLI; แอปไม่ใช้ mysql2) — audit แนะนำ downgrade ใช้ไม่ได้ → เฝ้าดูเวอร์ชันใหม่
+## ระยะ 2 — เสริมความปลอดภัย ✅ เสร็จ (`4dbd66f` `f10842e` `2bd1ddc` `c804ca9` `6d3748e`)
+4. **throttle หน้า login** (`6d3748e`) — ตารางใหม่ `login_failures` (migration `20261003150000_add_login_failures`, **apply ลง Aiven แล้วด้วย `prisma migrate deploy`** — `migrate diff` กับ DB จริงก่อน apply ได้แค่ตารางนี้) · `src/lib/login-throttle.ts`: เกิน **10 ครั้ง/อีเมล** หรือ **50 ครั้ง/IP** ใน 15 นาที → code ใหม่ `too-many-attempts` (ข้อความไทยใน login-form) **ก่อนตรวจรหัส** · รหัสผิดกับอีเมลไม่มีจริงนับเท่ากัน (ไม่ให้ throttle บอกว่าอีเมลไหนมีอยู่) · login สำเร็จล้างตัวนับของอีเมลนั้น · ลบแถวเก่ากว่า 1 วันตอนมีแถวใหม่ · ตารางพัง → ปล่อยผ่าน (fail open) · `baseline.mjs` GROWTH_TABLES เพิ่ม `login_failures` · IP จาก `x-forwarded-for` (Vercel) · **ยังไม่มี test ของการจำกัดต่อ IP**
+5. **security headers** (`c804ca9`) ใน `next.config.ts`: `Content-Security-Policy: frame-ancestors 'self'` · `X-Frame-Options: SAMEORIGIN` · `nosniff` · `Referrer-Policy: strict-origin-when-cross-origin` · `Permissions-Policy: camera=(self), microphone=(), geolocation=(), payment=(), usb=()` · ใช้ `'self'` ไม่ใช่ `'none'` (การพิมพ์สติกเกอร์ใช้ window.open ไม่ใช่ iframe แต่เผื่อ) · **CSP เต็มยังไม่ทำ** (ต้อง nonce ให้ inline script ของ Next — ทำแบบ report-only ก่อน)
+6. **nodemailer 10.0.13** (`4dbd66f`) · ถอด `@types/nodemailer` (มี type ในตัว) · `package.json` `overrides: { nodemailer: "$nodemailer" }` เพราะ next-auth/@auth/core ประกาศ optional peer `^7 || ^8` (Email provider ที่เราไม่ใช้) · **กับดักที่เจอ:** npm ยังซ้อน `@auth/core` ไว้ใต้ `next-auth/node_modules` เพราะ peer นั้น → `declare module "@auth/core/jwt"` ใน `src/types/next-auth.d.ts` **หยุดทำงานโดยไม่มี error** (token.role กลายเป็น unknown) → `auth.config.ts` ระบุ type role/status ตรงๆ แล้ว · npm audit production: high เหลือ 8 ทั้งหมดเป็น Prisma CLI
+7. **sharp `limitInputPixels` 100 M** (`f10842e`) — ทดสอบตรง: 8064×6048 (48.8 M) ผ่าน · 12000×10000 ถูกปฏิเสธ "Input image exceeds pixel limit"
+8. **ลิงก์รีเซ็ตรหัสใช้ได้ครั้งเดียว** (`2bd1ddc`) — ลายเซ็น HMAC ครอบ hash รหัสผ่านปัจจุบันด้วย (ไม่อยู่ใน token) → ตั้งรหัสใหม่แล้วลิงก์นั้นและลิงก์ก่อนหน้าใช้ไม่ได้ · update guard ด้วย hash เดิม กันส่งซ้ำพร้อมกัน · **ลิงก์ที่ออกก่อน deploy นี้ใช้ไม่ได้แล้ว** (อายุแค่ 1 ชม.อยู่แล้ว) · ข้อความ error ของหน้านี้ยังเป็นภาษาอังกฤษ (ของเดิม)
+
+**ผลระยะ 2:** run `phase2-20261003` (production build) **80/80 · ledger PASS 224 · FAIL 0 · SKIP 5** · test ใหม่ 3 ตัวใน `public/regressions.spec.ts`: throttle (10 ครั้งแรกข้อความปกติ · ครั้งที่ 11 ข้อความ throttle · อีเมลอื่นไม่โดน), reset link ใช้ครั้งเดียว (ครั้งสองถูกปฏิเสธ hash ไม่เปลี่ยน · รหัสที่ตั้งใช้ login ได้), security headers (ครบ + กล้องยังอนุญาต) · restore ครบ `login_failures` = 0
 
 ## ระยะ 3 — ประสิทธิภาพ/ความน่าเชื่อถือ (ยังไม่ทำ)
 9. ย้าย `syncOverdueMaintenanceWorkOrders` จาก render หน้า (GET เขียน DB) ไป **Vercel Cron วันละครั้ง** — **เปลี่ยนพฤติกรรม ต้องให้เจ้าของยืนยัน** · แก้ต้นเหตุเคส WO 193
