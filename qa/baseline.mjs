@@ -124,32 +124,44 @@ const MUTABLE = {
 // columns are enough to rebuild the row.
 const REINSERT = ["user_phones"];
 
-const COUNTS = `select
+const COUNT_COLUMNS = `
   (select count(*) from users),(select count(*) from user_phones),(select count(*) from buildings),
   (select count(*) from rooms),(select count(*) from air_conditioners),(select count(*) from ac_brands),
   (select count(*) from ac_models),(select count(*) from maintenance_logs),(select count(*) from work_orders),
   (select count(*) from maintenance_schedules),(select max(id) from system_audit_logs),
   (select count(*) from users where status='pending')`;
+const COUNTS = `select ${COUNT_COLUMNS}`;
 const COUNT_LABELS = ["users", "phones", "buildings", "rooms", "acs", "brands", "models", "logs", "WO", "schedules", "audit max", "pending"];
+
+function printCounts(row) {
+  console.log(COUNT_LABELS.map((l, i) => `${l} ${row[i]}`).join(" · "));
+}
 
 function check() {
   const [row] = sql(COUNTS);
-  console.log(COUNT_LABELS.map((l, i) => `${l} ${row[i]}`).join(" · "));
+  printCounts(row);
   return row;
 }
 
 async function snapshot() {
-  const maxIds = Object.fromEntries(GROWTH_TABLES.map((t) => [t, Number(sql(`select coalesce(max(id),0) from ${t}`)[0][0])]));
   const rows = {};
   for (const [table, cols] of Object.entries(MUTABLE)) {
     rows[table] = sql(`select id, ${cols.join(", ")} from ${table}`);
   }
   const uploads = fs.existsSync(UPLOADS) ? fs.readdirSync(UPLOADS) : [];
   const blobs = await listBlobs();
+  // The restore boundary, read last and in one statement together with the
+  // counts printed below. It used to be eleven separate psql calls first and
+  // the counts after: a work order the app raised on its own in between
+  // (syncOverdueMaintenanceWorkOrders, on any page load) was counted but sat
+  // above the recorded max, so restore deleted it (WO 193, 3 Oct 2026). Read
+  // last, anything that lands while the rows above are copied stays below it.
+  const [boundary] = sql(`select ${GROWTH_TABLES.map((t) => `(select coalesce(max(id),0) from ${t})`).join(", ")}, ${COUNT_COLUMNS}`);
+  const maxIds = Object.fromEntries(GROWTH_TABLES.map((t, i) => [t, Number(boundary[i])]));
   fs.mkdirSync(OUT, { recursive: true });
   fs.writeFileSync(SNAPSHOT, JSON.stringify({ takenAt: new Date().toISOString(), maxIds, rows, uploads, blobs }, null, 1));
   console.log(`snapshot → ${SNAPSHOT}`);
-  check();
+  printCounts(boundary.slice(GROWTH_TABLES.length));
 }
 
 function quote(v) {
