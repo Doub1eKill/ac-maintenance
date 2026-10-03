@@ -1,6 +1,6 @@
 # Project Handoff & Technical Summary
 
-# ❓ งานค้างฝั่ง QA — เหลือ 2 ข้อ (อัปเดต 3 ต.ค. 2026 บ่าย, DoubleKill)
+# ❓ งานค้างฝั่ง QA — เหลือ 1 ข้อ (อัปเดต 3 ต.ค. 2026 เย็น, DoubleKill)
 
 > หัวข้อนี้คือ **ที่เดียว** ที่รวมของค้างฝั่ง QA ไว้
 
@@ -29,24 +29,22 @@ run `tech-20261003`: test ผ่าน และ ledger แถว 24–25 PASS �
 
 ดูข้อแรกด้านบน · รอให้เกิดซ้ำพร้อม log แล้วค่อยแก้ตามสาเหตุ (ถ้าเป็น `P2028` / transaction timeout จริง → ตั้ง `transactionOptions` ใน `src/lib/prisma.ts`) · **อย่าแก้ล่วงหน้าโดยไม่มี error จริง**
 
-## 2. 🟡 ยังไม่เคยมี full sweep ที่เขียวทั้งแผง — ต้นเหตุตัวใหม่: `/tech` reload วนบน dev server (3 ต.ค., DoubleKill)
+## ✅ ปิดแล้ว 3 ต.ค. — full sweep เขียวทั้งแผงครั้งแรก: harness รันกับ production build แล้ว (DoubleKill)
 
-**run `full-20261003`: 56 ผ่าน · 2 ล้ม · 19 ไม่ได้รัน** · ล้มที่ test เดียวกันทั้ง `[admin]` และ `[admin-seed]`: `admin/workflows.spec.ts:165` บรรทัด `const pool = await body(tp)` → `Execution context was destroyed` · `admin-seed` ล้ม → tech 19 ข้อไม่ได้รัน
+**run `prod2-20261003`: 77/77 ผ่าน · 0 ไม่ได้รัน · 21.4 นาที** (build ก่อนเริ่ม ~95 วิ) · restore ครบ ค่าตรง snapshot (WO 74 = รวม WO 223 ที่ระบบสร้างเอง ดูด้านล่าง) · ลบ blob 12 ไฟล์ · run ก่อนหน้า `prod-20261003`: 76/77 (BUG-009 ล้ม → แก้แล้ว)
 
-**อาการ:** context ช่าง (Pixel 7) เปิด `/tech` แล้วหน้า **full reload ตัวเองทุก ~0.5–1 วิ ไม่หยุด** (server log: `GET /tech 200` ติดกัน 20+ ครั้ง · navigation `type=reload`) · test ผ่านหรือล้มแค่ขึ้นกับว่า `innerText` อ่านทันระหว่าง reload ไหม — `--project=admin` 5 รอบ: loop เกิด **ทุกรอบ** แต่ test ผ่าน 3 ล้ม 2 · รอบ `tech-20261003` (tech-only) **ไม่เกิด**
+**ต้นเหตุเดิม (dev server):** run `full-20261003` 56 ผ่าน · 2 ล้ม · 19 ไม่ได้รัน — context ช่างเปิด `/tech` แล้วหน้า full reload ตัวเองทุก ~0.5–1 วิ ไม่หยุด · ไล่ด้วยตัวดักชั่วคราว (ไม่ได้ commit) จนพบว่า: คนสั่ง reload = runtime ของ React Refresh ใน webpack ของ Next dev (`if (!originalFactory) { document.location.reload(); }` — CDP initiator stack ชี้บรรทัดนั้น) และ module ที่หาไม่เจอทุกครั้ง = `src/app/admin/error.tsx` (RSC ของ `/tech` อ้าง error boundary ฝั่ง admin ที่ไม่อยู่ใน chunk ของ `/tech`) · ตัดทิ้งด้วยการรันจริงแล้ว: HMR · `debug-channel.js` · route ถูกทิ้ง (`onDemandEntries`) · `experimental.reactDebugChannel: false` → **ไม่รู้ต้นเหตุลึกใน Next แต่ production build ไม่มี runtime นี้** และใน prod sweep ไม่เกิดเลย · **คนที่ dev บนเครื่องอาจเจอ**: เปิด admin แล้วไป `/tech` ใน dev server เดียวกัน หน้าช่างกระพริบไม่หยุด → ปิดเปิด dev server ใหม่
 
-**สิ่งที่พิสูจน์แล้ว** (ตัวดักชั่วคราวใน spec, ถอดออกแล้ว ไม่ได้ commit):
-- คนสั่ง reload = webpack runtime ของ React Refresh ใน Next dev (`.next/dev/static/chunks/webpack.js`): `if (!originalFactory) { document.location.reload(); }` — CDP `Network.requestWillBeSent` initiator stack ชี้บรรทัดนั้น ผ่าน `requireModule` ของ `react-server-dom-webpack-client` ตอน parse RSC
-- module ที่หาไม่เจอ **ทุกครั้ง** = `(app-pages-browser)/./src/app/admin/error.tsx` — RSC ของหน้า `/tech` อ้าง error boundary ของฝั่ง admin ซึ่งไม่อยู่ใน chunk ของ `/tech` · ไม่มีไฟล์ไหนฝั่ง tech import มัน · server ไม่มี error ก่อนหน้า
-- **ไม่ใช่** HMR (hash คงที่, ไม่มี `reloadPage`, client ไม่ได้ส่ง `client-full-reload`) · **ไม่ใช่** `debug-channel.js` (transferSize > 0 ทุกรอบ) · **ไม่ใช่** route ถูกทิ้ง/compile ใหม่ (ตั้ง `onDemandEntries` ให้เก็บ 1 ชม. แล้วยังเกิด) · **ไม่ใช่** React debug channel (`experimental.reactDebugChannel: false` แล้วยังเกิด หนักกว่าเดิม 137 ครั้ง) — config ทั้งสองถอนกลับแล้ว
-- ทุกอย่างชี้ว่าเป็นบั๊กของ **Next 16.2 webpack dev mode** (client reference ของ route หนึ่งรั่วเข้า RSC ของอีก route) · production build ไม่มี React Refresh runtime → **ไม่น่ากระทบ Vercel** แต่ยังไม่ได้ยืนยันบน `next start`
-- น่าจะกระทบคนที่ dev บนเครื่องด้วย: เปิด admin แล้วเปิด `/tech` ใน dev server เดียวกัน อาจเจอหน้าช่างกระพริบไม่หยุด
+**สิ่งที่เปลี่ยน:**
+- `qa/playwright.config.ts` — `webServer.command` = `npm run build && npm run start` (timeout 15 นาที) · env `AUTH_TRUST_HOST=true` (Auth.js v5 trust host เองเฉพาะ dev/Vercel) + `EMAIL_MX_CHECK=off` · **`QA_SERVER=dev` = กลับไปใช้ `npm run dev` แบบเดิม** · ถ้ามี server เปิดค้างที่ port 3000 จะถูก reuse ไม่ว่าแบบไหน
+- `src/lib/email-mx.ts` — `EMAIL_MX_CHECK=off` ปิดการบังคับ MX ตอนสมัคร (production บังคับเสมอ บัญชี QA อยู่บนโดเมนปลอม `qa-run.ac.th`) · **Vercel ไม่ได้ตั้งค่านี้ → production พฤติกรรมเดิม**
+- `qa/specs/auth.setup.ts` — production build ไม่มีปุ่ม demo-role → อนุมัติ QA admin ด้วย SQL (`status='active'` = สิ่งเดียวที่ปุ่มอนุมัติทำ นอกจาก audit row) · หน้า approvals ยังขับผ่าน UI ใน `admin/workflows.spec.ts`
+- `qa/specs/public/regressions.spec.ts` BUG-009 — production prerender `/login` โดยฟอร์มอยู่หลัง Suspense fallback (`BAILOUT_TO_CLIENT_SIDE_RENDERING`, ตั้งใจ — ดูคอมเมนต์ `src/app/login/page.tsx`) ปิด JS แล้ว **ไม่มีฟอร์มให้ submit เลย** → test เช็คกรณีนี้แยก (PASS พร้อมเหตุผล) · dev ยังตรวจแบบเดิม
+- `qa/specs/admin/workflows.spec.ts` rename Panasonic — ledger FAIL ตั้งแต่ 1 ต.ค. แต่ **แอปทำงานถูก** (screenshot มี toast + ชื่อเปลี่ยน) · `toastText()` คืนค่าทันทีเพราะ toast "ซ้ำ" ของขั้นก่อนยังค้าง → รอ toast ของขั้นนี้ก่อน
 
-**ทางเลือกที่ยังไม่ได้ทำ (รอเจ้าของเลือก):** (ก) ให้ harness รันกับ `next build && next start` แทน dev — ตัดปัญหานี้ + server ตายกลางคันได้พร้อมกัน แต่ทุก sweep ต้อง build ก่อน · (ข) ไล่หาต้นเหตุใน Next ต่อ (ลองเพิ่ม `src/app/tech/error.tsx` / ทำ repro เล็ก / ดู issue ของ Next) · (ค) ย้ายเช็ค "ช่างเห็นใบงาน" ออกจาก `admin-seed` ไม่ให้บล็อก tech
+**ledger FAIL ที่ยังเหลือ 4 แถว = noise ที่รู้ที่มา ไม่ใช่บั๊ก:** "create room…", "create work order via header modal", "board opened from the shell…", "รอซ่อมด่วน counter moved" — เป็น **รอบที่สอง** ของ test เดียวกันที่ `admin-seed` รันซ้ำหลัง `[admin]` (รอบแรก PASS ทุกแถว) ห้อง/ใบงานมีอยู่แล้ว ระบบปฏิเสธการสร้างซ้ำถูกต้อง (BUG-004) · ถ้าจะให้ ledger สะอาด: ให้ test รู้ว่าแถวถูกสร้างไปแล้วในรอบนี้ แล้วบันทึกเป็น "skipped" แทน
 
-**สาเหตุเชิงโครงสร้างที่ขยายความเสียหาย (เดิม):** `tech` → `admin-seed` → `setup` · ตั้ง `retries` ไม่ช่วยข้อนี้เพราะ loop เกิดทุกรอบ
-
-**WO ระบบสร้างเองหายหลัง restore (3 ต.ค.):** WO 193 (`B120345-3-590314-01` ล้างแอร์ครบรอบ, ระบบสร้างอัตโนมัติ) ถูกสร้าง 06:48:06Z แค่ 5 วิก่อน snapshot → restore รอบถัดไปลบทิ้ง น่าจะเพราะ `baseline.mjs` อ่าน `maxIds` ก่อนแถวนี้ commit แต่อ่าน count หลัง (count บอก 74 แต่ restore ได้ 73) · ไม่เสียหายถาวร: เครื่องยังเลยรอบ (`next_due_date` 2026-10-03) ไม่มีใบงานเปิด → `syncOverdueMaintenanceWorkOrders` จะสร้างคืนเองเมื่อมีคนเปิดหน้า admin/tech · ถ้าจะกันจริงต้องให้ snapshot อ่าน maxIds กับ count ใน transaction/statement เดียว
+**WO ที่ระบบสร้างเองกับ restore:** WO 193 (`B120345-3-590314-01` ครบรอบล้าง) ถูกสร้าง 5 วิก่อน snapshot → restore ถัดไปลบทิ้ง (น่าจะ `baseline.mjs` อ่าน `maxIds` ก่อนแถวนี้ commit แต่ count หลัง) · **self-heal แล้ว**: ระบบสร้างคืนเป็น WO 223 เมื่อมีคนเปิดหน้า (07:55Z) · ถ้าจะกันจริง ให้ snapshot อ่าน maxIds กับ count ใน statement เดียว
 
 ## กติกาที่ได้จากรอบนี้
 
@@ -54,6 +52,7 @@ run `tech-20261003`: test ผ่าน และ ledger แถว 24–25 PASS �
 - แก้ harness ที่เกิดจาก UI เปลี่ยน ให้ **grep หาสำเนาทั้ง repo เสมอ**
 - **test ที่ test ถัดไปพึ่งผลของมัน ต้องมี `expect`** — ledger FAIL อย่างเดียวไม่ทำให้ test แดง · อ่าน ledger ทุกครั้ง อย่าเชื่อแค่ `ok` ใน log
 - รัน sweep ตอน **port 3000 ว่าง** เพื่อให้ Playwright เปิด server เองและเก็บ log ได้
+- sweep **build ก่อนเสมอ** (`next build` เขียนทับ `.next/` นอกจาก `.next/dev`) · ต้องการ dev แบบเดิม: `QA_SERVER=dev` · **ledger FAIL 4 แถวของ admin-seed รอบสอง = noise ที่รู้ที่มา** (ดูด้านบน) แถวอื่นที่ FAIL ต้องดูทุกครั้ง
 
 # 🔧 แก้ harness ที่ตามโค้ดไม่ทัน — ฝั่งช่างได้รันครั้งแรก 16 ผ่าน (1 ต.ค. 2026, DoubleKill)
 
