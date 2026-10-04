@@ -66,7 +66,11 @@
 
 **Full sweep หลัง deploy ทั้งสองฟีเจอร์ (เจ้าของสั่ง 4 ต.ค. ตี 2–3):** run `presence-accounts-20261004` (production build) **83/83 · ledger PASS 227 · FAIL 0 · SKIP 5** (5 ข้อเดิม "already created earlier in this run" เหมือน phase4) · test ระงับ/ตัด session/กู้คืน (ledger 146–150) ผ่านด้วย SuspendUserDialog ตัวใหม่ · server log: "unsupported image format" 2 (test อัปโหลดไฟล์ปลอม, เท่าเดิม) และ "destination stream closed early" 6 (phase4 มี 4, เป็นการตัด stream ตอน navigate) · ไม่มี error ของ presence/สถานะบัญชี/การลบ · restore ครบ: users 9 · phones 11 · logs 233 · WO 75 · audit max 113 · presence เหลือแค่ของเจ้าของ (id 26, ใช้งานจริง)
 
-**ยังไม่มี spec ใน `qa/` สำหรับ:** dialog งานค้าง, ปุ่มลบบัญชี, ป้าย Online/Offline (ทดสอบด้วยสคริปต์ headless แยกแล้ว)
+**Spec ใหม่ `qa/specs/admin/accounts.spec.ts` (4 ต.ค., เจ้าของสั่ง):** ใช้ช่างของตัวเอง `QA_TEST_USER_REMOVE` (สร้างด้วย SQL, email ไม่ซ้ำต่อรอบ) ไม่แตะ tech/tech2 เพราะการลบย้อนไม่ได้ · ใบงาน 2 ใบที่ถือไว้ insert ด้วย SQL บนเครื่องที่ไม่มีงานซ่อมเปิดอยู่ และลบทิ้งใน afterAll · 21 ledger rows: Presence (Offline ก่อน login / Online หลัง login / Offline หลัง sign-out แบบไม่ reload / anonymous POST 401 / tech GET 401 / last_seen_at, signed_out_at) · Suspend (dialog งานค้าง + รายการเครื่อง + ปุ่ม คืนงานและระงับสิทธิ์ / toast จำนวนงาน / งานกลับเป็น pending / audit RELEASE + SUSPEND / การ์ดแสดง ถูกระงับ + ปุ่ม เปิดใช้งาน, ลบออกจากระบบ) · Remove (dialog สิ่งที่ลบ/เก็บ / toast / การ์ดหาย / email ถูกแทน, password NULL, deleted_at / phones 0, อีเมลเดิมว่าง / ชื่อยังขึ้นในใบงานที่เคยแจ้ง / audit DELETE_USER / login ด้วยอีเมลเดิมไม่ได้)
+
+**กับดัก:** `browser.newContext()` ใน Playwright Test **สืบทอด storageState ของ project** (cookie ของ QA admin) — รอบลองแรก "anonymous" POST ได้ 204 เพราะเป็น admin จริง ๆ · context ที่ต้องเป็นคนอื่นต้องส่ง `{ storageState: { cookies: [], origins: [] } }` (`NO_SESSION` ใน spec) · test ทีมเดิมใน workflows.spec.ts ก็ใช้ `browser.newContext()` แบบนี้ (ยังผ่านเพราะ login ทับ cookie)
+
+**Full sweep `accounts-sweep-20261004` (production build): 86/86 (21.4 นาที) · ledger PASS 248 · FAIL 0 · SKIP 5** (5 ข้อเดิม) · rows ใหม่ 21/21 PASS · server log: unsupported image format 2, stream closed early 7 (ชนิดเดิม) · ไม่มี error ของ presence/สถานะ/การลบ · restore ครบ: users 9 · phones 11 · logs 233 · WO 75 (max 297, claimed 25) · audit max 113 · presence เหลือแค่ id 26 (เจ้าของ)
 
 **ข้อจำกัด:** ช่างที่กดรับงานในเสี้ยววินาทีเดียวกับที่ถูกระงับอาจยังถืองานนั้นอยู่ (การรับงานไม่ล็อก row ของ users) — session ตายภายใน 1 นาที และการลบบัญชีคืนงานให้อีกรอบ
 
