@@ -1,5 +1,27 @@
 # Project Handoff & Technical Summary
 
+# 📌 สถานะล่าสุด (5 ต.ค. 2026, DoubleKill) — อ่านตรงนี้ก่อน
+
+**master = origin/master** · Vercel deploy ล่าสุด success · **GitHub Actions CI** (`.github/workflows/ci.yml`: typecheck · lint · vitest) รันครั้งแรกผ่าน — https://github.com/Doub1eKill/ac-maintenance/actions/runs/37306907722 · full sweep ล่าสุด `csp-ci-20261005`: 88/88 · ledger PASS 252 · FAIL 0 · SKIP 5 · unit 53/53 · DB restore แล้ว
+
+**ทำเสร็จตั้งแต่ 4 ต.ค. (รายละเอียดอยู่ใน entry ถัดลงไป):** ป้าย Online/Offline · ระงับสิทธิ์แล้วคืนงานที่ค้าง + ลบบัญชีที่ถูกระงับ + audit การเปลี่ยนสถานะ · QA spec `accounts.spec.ts` · test throttle ต่อ IP · CSP แบบ Report-Only · unit test ผูกกับ build + CI
+
+**เจ้าของทดสอบบน iPhone แล้ว "ผ่าน" (5 ต.ค.)** — ยังไม่ได้ยืนยันว่าครอบข้อไหนบ้างใน 3 ข้อนี้: ปุ่มถ่ายรูปบน Safari (HEIC) · สแกน QR ด้วยกล้อง (jsQR) · ลงทะเบียนเครื่องพร้อมรูปบน production แล้วลบเครื่องทดสอบ
+
+**งานที่เหลือ**
+1. **ล้าง fixture บน production** (ต้องให้เจ้าของอนุญาตก่อน ลบแล้วกู้ไม่ได้): `photo_url` ของ ac id 3 · WO #140 · log 623 · WO #138 · blob 3 ไฟล์ — แล้วตามด้วย Phase 4 metric "เครื่องยังไม่มีรูป"
+2. **เฝ้า CSP report-only:** ค้น `[csp]` ใน log ของ Vercel หลังใช้งานจริงสักพัก ถ้าเงียบ → ย้าย `cspReportOnly` ใน `next.config.ts` เข้า header `Content-Security-Policy` ที่บังคับใช้ (preview deployment อาจมี report จาก vercel.live ไม่ต้องสนใจ)
+3. **เฝ้าดูอย่างเดียว:** claim ล้มแบบ transient (1 ต.ค., ไม่เกิดซ้ำ) · `/tech` reload วนบน Next dev (หยุดเกิดตั้งแต่ 3 ต.ค.)
+4. **ยังไม่มี QA spec:** หน้าต่างแจ้งงานค้างถูกครอบแล้วใน `accounts.spec.ts` · ที่ยังไม่มีคือการแสดงชื่อคนที่ถูกลบในหน้าประวัติ (เช็คแค่ระดับ DB)
+
+**ตั้งใจไม่ทำ (เกณฑ์: ความเสี่ยงที่พฤติกรรมเปลี่ยนโดยไม่มี test จับ > ประโยชน์)**
+- wrapper ครอบ server action 29 ตัว — ข้อความไทยของแต่ละ action 115 จุด ต้องแก้ทุกไฟล์ใน lib/admin lib/tech เสี่ยงเปลี่ยนสิ่งที่ผู้ใช้อ่าน ขณะที่ guard ครบแล้วผ่าน `sessionWithRole` ที่เดียว
+- แยก `maintenance-calendar.tsx` (668) — render function ซ้อน 4 ตัวใช้ closure state 11 ตัว test ครอบแค่เลื่อนเดือน
+- แยก `register-form.tsx` (594) — ฟอร์มเดียว state ไหลต่อกัน email → OTP → submit
+- แยก modal เพิ่ม/แก้เครื่องใน asset-manager — ผูก state เลือกยี่ห้อ/รุ่นหลายตัวของหน้าหลัก (modal ที่แยกง่ายแยกไปแล้วในระยะ 4)
+
+**กติกาเดิมยังใช้ทั้งหมด:** DB มีตัวเดียว (Aiven production) · QA ต้อง snapshot ก่อน/restore หลัง และห้ามรันขณะเจ้าของใช้ระบบ · ห้าม `prisma seed` · migration ตรวจด้วย `migrate diff --from-config-datasource` ก่อน `migrate deploy` · HANDOFF.md เป็น CRLF · เช็ค line ending ก่อนแก้ไฟล์
+
 # 🗺️ แผน Optimize + Refactor (วาง 3 ต.ค. 2026, DoubleKill) — ระยะ 1 ✅ · ระยะ 2 ✅ · ระยะ 3 ✅ · ระยะ 4 ✅ (3–4 ต.ค.) · **แผนนี้ปิดแล้ว**
 
 > ที่มา: สำรวจโค้ด + production จริง 3 ต.ค. · เรียงตามความเร่งด่วน · **ทุกข้อ:** 1 commit ต่อข้อ · tsc/eslint 0/0 · full sweep (production build) 77/77 ledger FAIL 0 คร่อม snapshot/restore · หลัง push เช็ค deploy success · ระยะ 4 ห้ามเปลี่ยนพฤติกรรม
@@ -66,7 +88,8 @@
 **6. unit test ผูกกับ build และ CI**
 - `package.json`: `build` = `prisma generate && vitest run && next build --webpack` → Vercel ไม่ deploy ถ้า unit test ล้ม (เพิ่ม ~2 วิ, devDependencies ติดตั้งบน Vercel อยู่แล้ว) · harness QA ก็รันผ่าน `npm run build` จึงได้รัน unit ทุก sweep · เพิ่ม script `typecheck` = `tsc --noEmit`
 - `.github/workflows/ci.yml`: push master + PR → `npm ci` → `prisma generate` (ไม่ต้องมี DATABASE_URL, ลองแล้ว) → typecheck → lint → test · ไม่รัน Playwright เพราะเขียนลง Aiven production
-- **token ของ gh ในเครื่องมีแค่ scope `repo` ไม่มี `workflow`** → push ไฟล์ workflow ถูกปฏิเสธ · workflow แยก commit ไว้ เจ้าของต้องรัน `gh auth refresh -s workflow` ก่อน
+- token ของ gh เดิมมีแค่ scope `repo` → เจ้าของอนุมัติ scope `workflow` ผ่าน device flow (`gh auth refresh -h github.com -s workflow` รันจาก shell ของ session, เจ้าของใส่รหัสที่ github.com/login/device) · cmd ของเจ้าของขึ้น "not logged in" ทั้งที่ gh ตัวเดียวกัน — น่าจะเป็น cmd แบบ Run as administrator ที่มองไม่เห็น keyring ของ user ปกติ
+- **push แล้ว 5 ต.ค.** (`0c50ce5` + `4f634ba`): Vercel success · CI รันแรกผ่านทุกขั้น (npm ci → prisma generate → typecheck → lint → test) · production ส่ง `Content-Security-Policy-Report-Only` + `Reporting-Endpoints` แล้ว และ `/api/csp-report` ตอบ 204
 
 **ผล:** typecheck/lint/test ผ่านในเครื่อง (53/53) · full sweep `csp-ci-20261005` (production build): **88/88 (27.7 นาที) · ledger PASS 252 · FAIL 0 · SKIP 5** (5 ข้อเดิม) · rows ใหม่: throttle IP 3/3, headers 2/2 · build ใน sweep รัน vitest ก่อน (8 ไฟล์, 53 test) · restore ครบ: users 9 · phones 11 · logs 233 · WO 75 · audit max 113
 
