@@ -46,6 +46,32 @@
 
 **ผลระยะ 4:** run `phase4-20261004` (production build) **83/83 · ledger PASS 227 · FAIL 0 · SKIP 5** · unit 37/37 · tsc/eslint 0/0 · restore ครบ
 
+# 🧱 throttle ต่อ IP มี test · CSP แบบ Report-Only · unit test ผูกกับ build + GitHub Actions (5 ต.ค. 2026, DoubleKill)
+
+เจ้าของสั่งข้อ 4, 5, 6 จากรายการค้าง ("ทำ 4, 5 และ 6 ก่อนได้เลย")
+
+**4. throttle ต่อ IP (50 ครั้ง/15 นาที)**
+- unit test ใหม่ใน `src/lib/login-throttle.test.ts` (mock `prisma.loginFailure`): ขอบ 9/10 ต่ออีเมล, ขอบ 49/50 ต่อ IP, หน้าต่างเวลา 15 นาทีเดียวกัน, ไม่มี IP = ไม่นับต่อ IP, fail-open ตอน DB ล่ม (อ่าน/บันทึก), บันทึก IP คู่กับความล้มเหลว · unit รวม 53 (เดิม 46)
+- QA ใหม่ใน `qa/specs/public/regressions.spec.ts` "sign-in throttle per IP": ปลูก 50 แถวใน login_failures ให้ IP ช่วง 198.51.100.x (ไม่ซ้ำต่อรอบ) → อีเมลที่ไม่เคยลองจาก IP นั้นถูกปฏิเสธด้วยข้อความ throttle · อีเมลเดียวกันจาก IP อื่นได้ข้อความปกติ · ครั้งที่ถูกปฏิเสธไม่ถูกนับเพิ่ม (ยัง 50 แถว)
+- **local ใช้ X-Forwarded-For ได้** เพราะ `next start` ตั้ง header นี้แบบ `??=` (base-server.js) — ทุก request ในเครื่องที่ไม่ส่ง header ได้ IP ของ socket (::1/127.0.0.1) ร่วมกัน
+- **production ปลอม X-Forwarded-For ไม่ได้ (probe 5 ต.ค.):** ส่ง login ผิดพร้อม `X-Forwarded-For: 203.0.113.99` ไปที่ production → login_failures บันทึก IP จริงของผู้ส่ง ไม่ใช่ค่าที่ปลอม → Vercel เขียนทับ header ให้ · ลบแถวที่ probe แล้ว
+
+**5. CSP แบบ Report-Only** (`next.config.ts`)
+- header ใหม่ `Content-Security-Policy-Report-Only`: default-src 'self' · script-src 'self' 'unsafe-inline' (+ 'unsafe-eval' เฉพาะ dev) · style-src 'self' 'unsafe-inline' · img-src 'self' blob: data: Blob store + Unsplash · font-src 'self' data: · connect-src 'self' (+ ws: wss: เฉพาะ dev) · media/worker 'self' blob: · object-src 'none' · base-uri/form-action/frame-ancestors 'self' · report-uri + report-to → `/api/csp-report` · `Reporting-Endpoints: csp="/api/csp-report"`
+- ไม่ใช้ nonce ตามแนว "Without Nonces" ใน docs ของ Next (nonce บังคับ render dynamic ทุกหน้า) · CSP ที่บังคับใช้ยังเป็น `frame-ancestors 'self'` อย่างเดียวเหมือนเดิม
+- `src/app/api/csp-report/route.ts`: รับทั้ง report-uri (`csp-report`) และ Reporting API (array `csp-violation`) → `console.warn("[csp] <directive> blocked=… page=… at=…")` ลง log ของ Vercel · อ่านไม่เกิน 16 KB, 10 report ต่อ request, ไม่เขียน DB, ตอบ 204 เสมอ
+- QA: test header เดิมเช็ค report-only + reporting-endpoints ด้วย · test ใหม่ยิง report 3 แบบ (legacy / Reporting API / ขยะ) ต้องได้ 204
+- **ผลจาก sweep:** ตลอด 88 test ทุกหน้า มี `[csp]` แค่ 2 บรรทัดที่ test ยิงเอง → **ไม่มี violation จริง** และ test "no console errors" ทุกหน้าผ่าน (Chrome ส่ง violation ของ report-only ออก console ด้วย) · **ขั้นต่อไป:** ปล่อยบน production สักพัก ค้น "[csp]" ใน log ของ Vercel ถ้าเงียบ → ย้ายนโยบายเข้า header ที่บังคับใช้ · preview deployment ของ Vercel อาจมี report จาก vercel.live (toolbar) ไม่ต้องสนใจ
+
+**6. unit test ผูกกับ build และ CI**
+- `package.json`: `build` = `prisma generate && vitest run && next build --webpack` → Vercel ไม่ deploy ถ้า unit test ล้ม (เพิ่ม ~2 วิ, devDependencies ติดตั้งบน Vercel อยู่แล้ว) · harness QA ก็รันผ่าน `npm run build` จึงได้รัน unit ทุก sweep · เพิ่ม script `typecheck` = `tsc --noEmit`
+- `.github/workflows/ci.yml`: push master + PR → `npm ci` → `prisma generate` (ไม่ต้องมี DATABASE_URL, ลองแล้ว) → typecheck → lint → test · ไม่รัน Playwright เพราะเขียนลง Aiven production
+- **token ของ gh ในเครื่องมีแค่ scope `repo` ไม่มี `workflow`** → push ไฟล์ workflow ถูกปฏิเสธ · workflow แยก commit ไว้ เจ้าของต้องรัน `gh auth refresh -s workflow` ก่อน
+
+**ผล:** typecheck/lint/test ผ่านในเครื่อง (53/53) · full sweep `csp-ci-20261005` (production build): **88/88 (27.7 นาที) · ledger PASS 252 · FAIL 0 · SKIP 5** (5 ข้อเดิม) · rows ใหม่: throttle IP 3/3, headers 2/2 · build ใน sweep รัน vitest ก่อน (8 ไฟล์, 53 test) · restore ครบ: users 9 · phones 11 · logs 233 · WO 75 · audit max 113
+
+**กับดักของเครื่องมือ:** heredoc ใน Bash tool ของ session นี้ยุบ `\` เหลือ `\` → anchor ที่มี regex escape (`\(`) ไม่ตรง · แก้ไฟล์ CRLF ที่มี backslash ให้แปลงเป็น LF แล้วใช้ Edit tool แล้วแปลงกลับ
+
 # 🛡️ ระงับสิทธิ์แล้วคืนงานที่ค้าง + ลบบัญชีที่ถูกระงับออกจากระบบ + audit การเปลี่ยนสถานะ (4 ต.ค. 2026 ตี 2, DoubleKill)
 
 เจ้าของสั่ง: (1) บันทึก audit ตอนระงับ/เปิดใช้งาน (2) ตอนระงับให้เตือนว่ามีงานค้าง พร้อมปุ่ม "คืนงานและระงับสิทธิ์" (3) บัญชีที่ถูกระงับมีปุ่มลบออกจากระบบ: ลบรหัส เก็บชื่อ/โปรไฟล์/ประวัติงาน ไม่มีการ์ดให้เห็นอีก

@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import type { Page } from "@playwright/test";
 import path from "node:path";
 import { createResetToken } from "../../../src/lib/reset-token";
 import { test, expect, ledger, shot, note, loginViaForm, hydrated, db, QA, QA_EMAIL_CODE, plantEmailCode, pngBuffer } from "../../lib";
@@ -269,6 +270,43 @@ test("sign-in throttle: the 11th wrong attempt for one address is refused, other
   expect(other).toMatch(/อีเมลหรือรหัสผ่านไม่ถูกต้อง/);
 });
 
+test("sign-in throttle per IP: 50 failures from one IP refuse a fresh address from it, not from elsewhere", async ({ browser }) => {
+  // The per-IP limit (50 in 15 minutes, src/lib/login-throttle.ts) counts
+  // failures across every address. Fifty real attempts would take minutes,
+  // so they are planted in login_failures for a documentation-range IP that
+  // is new on every run; the attempt that matters goes through the form.
+  // Locally the IP comes from X-Forwarded-For, which next start keeps when
+  // the client sends one. On Vercel the header is replaced with the real
+  // client address (probed 5 Oct 2026), so it cannot be used to dodge this.
+  const ip = `198.51.100.${(Date.now() % 250) + 1}`;
+  const tag = Date.now();
+  db(`insert into login_failures (email, ip, created_at)
+      select 'qa.ipthrottle.' || g || '.${tag}@qa-run.ac.th', '${ip}', now() at time zone 'utc'
+      from generate_series(1, 50) g`);
+  const fresh = `qa.ipthrottle.fresh.${tag}@qa-run.ac.th`;
+  const message = (p: Page) =>
+    p.evaluate(() => document.body.innerText).then((t) => t.match(/พยายามเข้าสู่ระบบ[^\n]*|อีเมลหรือรหัสผ่านไม่ถูกต้อง[^\n]*/)?.[0] ?? "(no message)");
+
+  const fromIt = await browser.newContext({ extraHTTPHeaders: { "x-forwarded-for": ip } });
+  const p1 = await fromIt.newPage();
+  await loginViaForm(p1, fresh, "wrong");
+  const blocked = await message(p1);
+  ledger("Login throttle", `a never-tried address from an IP with 50 recent failures: "${blocked}"`, "UI", /พยายามเข้าสู่ระบบ/.test(blocked) ? "PASS" : "FAIL", await shot(p1, "throttle-ip-blocked"));
+  await fromIt.close();
+
+  const elsewhere = await browser.newContext({ extraHTTPHeaders: { "x-forwarded-for": "198.51.100.254" } });
+  const p2 = await elsewhere.newPage();
+  await loginViaForm(p2, fresh, "wrong");
+  const allowed = await message(p2);
+  ledger("Login throttle", `the same address from another IP gets the ordinary refusal: "${allowed}"`, "UI", /อีเมลหรือรหัสผ่านไม่ถูกต้อง/.test(allowed) ? "PASS" : "FAIL", await shot(p2, "throttle-ip-elsewhere"));
+  await elsewhere.close();
+
+  const [[recorded]] = db(`select count(*) from login_failures where ip = '${ip}'`);
+  ledger("Login throttle", `the refused attempt was not counted against the IP again (${recorded} rows, planted 50)`, "DB", recorded === "50" ? "PASS" : "FAIL");
+  expect(blocked).toMatch(/พยายามเข้าสู่ระบบ/);
+  expect(allowed).toMatch(/อีเมลหรือรหัสผ่านไม่ถูกต้อง/);
+});
+
 test("security headers are sent, and the camera stays allowed for the QR scanner", async ({ page }) => {
   const res = await page.request.get("/login");
   const h = res.headers();
@@ -278,10 +316,31 @@ test("security headers are sent, and the camera stays allowed for the QR scanner
     ["x-content-type-options", /^nosniff$/i],
     ["referrer-policy", /strict-origin-when-cross-origin/],
     ["permissions-policy", /camera=\(self\)/],
+    // The full policy, reporting only (next.config.ts), and where it reports.
+    ["content-security-policy-report-only", /default-src 'self'.*script-src 'self' 'unsafe-inline'.*object-src 'none'.*report-uri \/api\/csp-report/],
+    ["reporting-endpoints", /csp="\/api\/csp-report"/],
   ];
   const missing = want.filter(([k, re]) => !re.test(h[k] ?? "")).map(([k]) => `${k}=${h[k] ?? "(none)"}`);
   ledger("Headers", `security headers on /login${missing.length ? ": missing " + missing.join(", ") : ""}`, "API", missing.length === 0 ? "PASS" : "FAIL", note("security-headers.txt", JSON.stringify(h, null, 1)));
   expect(missing).toEqual([]);
+});
+
+test("CSP report endpoint takes both report formats and answers 204", async ({ page }) => {
+  // src/app/api/csp-report. Browsers send report-uri bodies as
+  // application/csp-report and Reporting API batches as
+  // application/reports+json; neither may error, and junk is ignored.
+  const legacy = await page.request.post("/api/csp-report", {
+    headers: { "content-type": "application/csp-report" },
+    data: JSON.stringify({ "csp-report": { "document-uri": "http://localhost:3000/qa", "violated-directive": "img-src", "blocked-uri": "https://qa.invalid/x.png" } }),
+  });
+  const batch = await page.request.post("/api/csp-report", {
+    headers: { "content-type": "application/reports+json" },
+    data: JSON.stringify([{ type: "csp-violation", body: { documentURL: "http://localhost:3000/qa", effectiveDirective: "script-src-elem", blockedURL: "https://qa.invalid/x.js" } }]),
+  });
+  const junk = await page.request.post("/api/csp-report", { headers: { "content-type": "text/plain" }, data: "not json" });
+  const codes = [legacy.status(), batch.status(), junk.status()];
+  ledger("Headers", `CSP report endpoint: legacy ${codes[0]}, Reporting API ${codes[1]}, junk ${codes[2]}`, "API", codes.every((c) => c === 204) ? "PASS" : "FAIL");
+  expect(codes).toEqual([204, 204, 204]);
 });
 
 test("daily cron route: refuses without the secret, runs with it and records the run", async ({ page }) => {
