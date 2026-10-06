@@ -11,8 +11,9 @@
 **งานที่เหลือ**
 1. **ล้าง fixture บน production** (ต้องให้เจ้าของอนุญาตก่อน ลบแล้วกู้ไม่ได้): `photo_url` ของ ac id 3 · WO #140 · log 623 · WO #138 · blob 3 ไฟล์ — แล้วตามด้วย Phase 4 metric "เครื่องยังไม่มีรูป"
 2. **เฝ้า CSP report-only:** ค้น `[csp]` ใน log ของ Vercel หลังใช้งานจริงสักพัก ถ้าเงียบ → ย้าย `cspReportOnly` ใน `next.config.ts` เข้า header `Content-Security-Policy` ที่บังคับใช้ (preview deployment อาจมี report จาก vercel.live ไม่ต้องสนใจ)
-3. **เฝ้าดูอย่างเดียว:** claim ล้มแบบ transient (1 ต.ค., ไม่เกิดซ้ำ) · `/tech` reload วนบน Next dev (หยุดเกิดตั้งแต่ 3 ต.ค.)
-4. **ยังไม่มี QA spec:** หน้าต่างแจ้งงานค้างถูกครอบแล้วใน `accounts.spec.ts` · ที่ยังไม่มีคือการแสดงชื่อคนที่ถูกลบในหน้าประวัติ (เช็คแค่ระดับ DB)
+3. **เก็บ LCP ภาคสนามสำหรับบทความ:** โค้ดเสร็จบน branch `feat/field-lcp` (`7ce79af`) รอเจ้าของอนุมัติ migrate → sweep → merge/deploy และแจ้งอาจารย์ก่อนเริ่มเก็บ (ดู entry "📈" ด้านล่าง)
+4. **เฝ้าดูอย่างเดียว:** claim ล้มแบบ transient (1 ต.ค., ไม่เกิดซ้ำ) · `/tech` reload วนบน Next dev (หยุดเกิดตั้งแต่ 3 ต.ค.)
+5. **ยังไม่มี QA spec:** หน้าต่างแจ้งงานค้างถูกครอบแล้วใน `accounts.spec.ts` · ที่ยังไม่มีคือการแสดงชื่อคนที่ถูกลบในหน้าประวัติ (เช็คแค่ระดับ DB)
 
 **ตั้งใจไม่ทำ (เกณฑ์: ความเสี่ยงที่พฤติกรรมเปลี่ยนโดยไม่มี test จับ > ประโยชน์)**
 - wrapper ครอบ server action 29 ตัว — ข้อความไทยของแต่ละ action 115 จุด ต้องแก้ทุกไฟล์ใน lib/admin lib/tech เสี่ยงเปลี่ยนสิ่งที่ผู้ใช้อ่าน ขณะที่ guard ครบแล้วผ่าน `sessionWithRole` ที่เดียว
@@ -67,6 +68,54 @@
 14. **แยก component ใหญ่** — `upcoming-maintenance-table.tsx` 805 → 487 + `upcoming-maintenance-columns.tsx` (type, badge, columns; re-export ครบ) (`ece7f48`) · `asset-manager.tsx` 981 → 752 + `asset-manager-modals.tsx` (AddBuilding / AddRoom / PmSettings / QrCode modal) + `asset-manager-types.ts` (`6de9e28`) — พิสูจน์: เนื้อใน modal ตรงกับ JSX เดิมทุกบรรทัดหลัง rename · **ไม่แยก:** modal เพิ่ม/แก้เครื่อง (ผูก state เลือกยี่ห้อหลายตัว) · `maintenance-calendar.tsx` (668; render function ซ้อน 4 ตัว closure state 11 ตัว, test ครอบแค่เลื่อนเดือน) · `register-form.tsx` (594; ฟอร์มเดียว state ร่วม email→OTP→submit) — ความเสี่ยงเปลี่ยนพฤติกรรมโดยไม่มี test จับ > ประโยชน์ · **บทเรียน:** สคริปต์แยกไฟล์ต้องตัดคอมเมนต์ก่อนดูว่าใช้ชื่ออะไร (เคยใส่ import เกินเพราะชื่ออยู่ในคอมเมนต์) และนับ `...name` (spread) เป็นการใช้ (เคยทำ import `nativeValidity` หาย — tsc จับได้)
 
 **ผลระยะ 4:** run `phase4-20261004` (production build) **83/83 · ledger PASS 227 · FAIL 0 · SKIP 5** · unit 37/37 · tsc/eslint 0/0 · restore ครบ
+
+# 📈 เก็บค่า LCP ภาคสนามสำหรับบทความ TTACON 2026 — โค้ดเสร็จบน branch `feat/field-lcp` ยังไม่ apply/deploy (7 ต.ค. 2026, DoubleKill)
+
+**ทำไม:** บทความจะเทียบเวลาโหลดกับเกณฑ์ web.dev "LCP ≤ 2.5 วินาที ที่ p75" ซึ่งต้องเป็น **field data** (อุปกรณ์และเครือข่ายจริง) ผลวัดเดิมใน `C:\Project\Doc\TTACON2026_ResponseTime.md` เป็น lab data · แผนอยู่ใน `C:\Project\Doc\`: `TTACON2026_LCP_FieldTest.md` (แผนเดิมจากแชทฝั่งเขียนบทความ) → `TTACON2026_LCP_Implementation.md` (ฝั่งนี้แก้ให้ใช้กับระบบได้) → `TTACON2026_LCP_Review.md` (อีกฝั่งตรวจและขอแก้ 4 ข้อ ทำครบแล้ว)
+
+**แก้จากแผนเดิม (มีหลักฐาน):**
+- กรอง e2e ด้วย User-Agent ไม่ได้ เพราะ Playwright ที่จำลอง "Desktop Chrome" / "Pixel 7" ใช้ UA ของ Chrome ปกติ (ไม่มี HeadlessChrome) → ใช้ `navigator.webdriver` แทน
+- ฐานข้อมูลมีตัวเดียว → API บันทึกเฉพาะเมื่อ `VERCEL_ENV === "production"` (dev, sweep และ preview ไม่บันทึก)
+- callback ของ `useReportWebVitals` ต้องอยู่ระดับโมดูลตามเอกสาร Next.js 16 ไม่อย่างนั้นค่าจะถูกส่งซ้ำ
+- ผลการสแกนของช่างวัด LCP ไม่ได้ เพราะตัวสแกนในแอปเป็น modal และปุ่ม "บันทึกงาน" บนหน้า `/qr` เป็น `<Link>` (client navigation) → วัดหน้า `/qr/[id]` แยกตามบทบาทแทน
+- อ่าน path และ `fromScan` (`?ac=`) **ตอนโหลดหน้า** ไม่ใช่ตอนส่งค่า เพราะ LCP มักถูกส่งหลังจาก URL เปลี่ยนแล้ว และ tech-shell ลบ `?ac=` ทิ้ง
+
+**การออกแบบ (บน branch):**
+- `src/lib/web-vitals.ts`: กฎตรวจข้อมูล ไม่มี Prisma
+  - body ≤ 2 KB, รับเฉพาะ LCP, 0 < ค่า ≤ 60 วินาที
+  - id ต้องเป็นรูปแบบของ web-vitals คือ `v4-<เวลา>-<สุ่ม>` (ตรวจกับ `next/dist/compiled/web-vitals`)
+  - path ต้องเป็นหน้าที่มีจริง 23 หน้า
+  - เพดาน 300 ค่าต่อ IP ต่อ 10 นาที นับในหน่วยความจำบน globalThis และไม่เก็บ IP
+- `src/components/shared/web-vitals-reporter.tsx`: วางใน `src/app/layout.tsx` ส่งด้วย sendBeacon ถ้าใช้ไม่ได้ใช้ fetch keepalive
+- `src/app/api/vitals/route.ts`: ตอบ 204 เสมอ · `createMany({ skipDuplicates })` บน `metric_id` ที่ห้ามซ้ำ · role อ่านจาก session
+- ตาราง `web_vital_samples` (migration `20261007090000_add_web_vital_samples`)
+  - เป็นตารางเดี่ยว ไม่มี FK
+  - คอลัมน์: value_ms, rating, navigation_type, path, from_scan, connection_type, effective_type, device (ios/android/desktop/other), role
+  - **ไม่เก็บข้อมูลระบุตัวตน** (ไม่มี user id, ชื่อ, อีเมล, IP, UA เต็ม)
+- `qa/baseline.mjs`: เพิ่มตารางใน GROWTH_TABLES
+- QA regression ใหม่ "field LCP" 3 ข้อ:
+  1. เบราว์เซอร์ที่ Playwright ควบคุมไม่ส่งค่า
+  2. ถ้าแกล้งให้ `webdriver` เป็น false ต้องส่งค่า LCP ของ `/qr/[id]` (พิสูจน์ว่าตัวเก็บค่าทำงาน)
+  3. เซิร์ฟเวอร์ในเครื่องไม่บันทึกอะไร
+- ผลตรวจในเครื่อง: unit test 64/64 (ใหม่ 11) · tsc/eslint 0/0 · migrate diff มีแค่สร้างตารางใหม่และ index 2 ตัว · **QA test ใหม่ยังไม่ได้รัน** เพราะต้องมีตารางในฐานข้อมูลก่อน
+
+**คำตอบจากอีกฝั่ง:**
+- ตัด `back-forward-cache`, `prerender`, `restore` ออกจากค่าหลัก (รายงานเฉพาะ navigate/reload และบอกจำนวนที่ตัด)
+- แยกเครือข่ายด้วยบันทึกของผู้ทดสอบเป็นช่วงเวลา จับคู่กับ `created_at` (เป็น UTC ต้อง +7 ชม.)
+- เก็บเฉพาะ LCP ไม่เก็บ CLS/INP
+- Safari รองรับ LCP ตั้งแต่ 26.2 ตามบทความ WebKit "WebKit Features for Safari 26.2"
+- iPadOS ถูกนับเป็น desktop เพราะ UA บอกว่าเป็น Mac ต้องเขียนเป็นข้อจำกัด
+
+**ขั้นที่เหลือ (ต้องให้เจ้าของอนุมัติทุกขั้น ยังไม่ได้รับ):**
+1. `npx prisma migrate deploy` บน Aiven (ตรวจ diff ก่อน)
+2. full sweep บน branch (ต้อง FAIL 0 และตารางต้องไม่มีแถวเพิ่ม)
+3. merge เข้า master แล้ว push (= deploy production และเริ่มเก็บข้อมูลทันที) · **ควรแจ้งอาจารย์ก่อน** เพราะเรื่องจริยธรรมการวิจัยยังค้าง
+4. เปิดหน้า `/qr/<uuid>` บน production 1 ครั้ง ตรวจว่ามีแถวเข้า แล้วลบแถวนั้น
+
+**ข้อควรระวัง:**
+- **ห้าม merge `feat/field-lcp` เข้า master ก่อน apply migration** ไม่อย่างนั้น production จะพยายาม insert ลงตารางที่ยังไม่มี (route จับ error ไว้แล้ว แต่จะขึ้น log `[vitals] could not store a sample` ทุกครั้ง)
+- `qa/baseline.mjs` บน branch อ้างตารางนี้ ถ้ารัน snapshot ก่อน migrate จะพัง
+- **ถอดออกหลังส่งบทความ:** ส่งออก CSV ไป `C:\Project\Doc\perf\field-lcp-raw.csv` → ลบ reporter, route, lib, test, regression และบรรทัดใน baseline → เพิ่ม migration `DROP TABLE web_vital_samples`
 
 # 🧱 throttle ต่อ IP มี test · CSP แบบ Report-Only · unit test ผูกกับ build + GitHub Actions (5 ต.ค. 2026, DoubleKill)
 
