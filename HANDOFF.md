@@ -6,7 +6,7 @@
 
 **ทำเสร็จตั้งแต่ 4 ต.ค. (รายละเอียดอยู่ใน entry ถัดลงไป):** ป้าย Online/Offline · ระงับสิทธิ์แล้วคืนงานที่ค้าง + ลบบัญชีที่ถูกระงับ + audit การเปลี่ยนสถานะ · QA spec `accounts.spec.ts` · test throttle ต่อ IP · CSP แบบ Report-Only · unit test ผูกกับ build + CI
 
-**เจ้าของทดสอบบน iPhone แล้ว "ผ่าน" (5 ต.ค.)** — ยังไม่ได้ยืนยันว่าครอบข้อไหนบ้างใน 3 ข้อนี้: ปุ่มถ่ายรูปบน Safari (HEIC) · สแกน QR ด้วยกล้อง (jsQR) · ลงทะเบียนเครื่องพร้อมรูปบน production แล้วลบเครื่องทดสอบ
+**✅ ทดสอบบน iPhone จริงผ่านครบทั้ง 3 ข้อ (เจ้าของยืนยัน 7 ต.ค. 2026):** ปุ่มถ่ายรูปบน Safari (HEIC) · สแกน QR ด้วยกล้อง (jsQR) · ลงทะเบียนเครื่องพร้อมรูปบน production แล้วลบเครื่องทดสอบ
 
 **งานที่เหลือ**
 1. **ล้าง fixture บน production** (ต้องให้เจ้าของอนุญาตก่อน ลบแล้วกู้ไม่ได้): `photo_url` ของ ac id 3 · WO #140 · log 623 · WO #138 · blob 3 ไฟล์ — แล้วตามด้วย Phase 4 metric "เครื่องยังไม่มีรูป"
@@ -203,7 +203,7 @@ run `tech-20261003`: test ผ่าน และ ledger แถว 24–25 PASS �
   - `B467711-1-19179-01` (มีรูป, ประวัติ 5, repair_detail "Mainboard", ช่าง 2 คน, มี notes + รูปหลังซ่อม): รูปหลักโหลดจาก Blob ✓ · เวลา 5 แถวเป็นเวลาไทยตรง DB (29 ก.ย. 2026 14:45 = 07:45Z) ✓ · เห็น "Mainboard" ✓ · **ไม่เห็น** ชื่อช่าง / "โดย" / notes / ลิงก์รูปก่อน-หลัง ✓ · ไม่มีปุ่มเลย ✓ · ลิงก์เดียว `/login?callbackUrl=/tech?ac=B467711-1-19179-01` ✓
   - `B660550-8-194445-03` (ไม่มีรูป) บน 375px: placeholder "ยังไม่มีรูปเครื่องนี้" ✓ · ประวัติ 6 แถว เวลาไทยตรง DB ✓ · ไม่ล้นแนวนอน ✓
   - uuid ปลอม → **404** ✓ · `/login?callbackUrl=…` โหลดได้ มีฟอร์ม · **production ไม่มีแผง demo-role** ✓ (ข้อที่ `public/auth.spec.ts` ให้ไปยืนยันบน production)
-- **ยังค้าง (ต้องเป็นเจ้าของ):** ลงทะเบียนเครื่องใหม่พร้อมรูปจาก**มือถือจริง**บน production — ต้อง login บัญชีจริง (production ไม่มี demo-role) · ทำแล้วลบเครื่องทดสอบทิ้งด้วย
+- ~~**ยังค้าง (ต้องเป็นเจ้าของ):**~~ **✅ ผ่านแล้ว (เจ้าของยืนยัน 7 ต.ค. 2026)** ลงทะเบียนเครื่องใหม่พร้อมรูปจาก**มือถือจริง**บน production — ต้อง login บัญชีจริง (production ไม่มี demo-role) · ทำแล้วลบเครื่องทดสอบทิ้งด้วย
 
 ## 🔍 3 ต.ค. ค่ำ — ไล่ต้นเหตุ /tech reload loop ใน Next dev ต่อ: ยังไม่เจอ แต่แคบลง (DoubleKill)
 
@@ -609,7 +609,7 @@ spec รู้จักเคสนี้อยู่แล้วในส่ว
 ## สภาพแวดล้อม
 - **เครื่องรีบูต 16 ก.ย. 13:59** → MariaDB/:3000/:3001 ดับหมด · ปลุก mysqld ด้วย WMI แล้ว · dev server :3000 ตอนนี้เป็นของ session นี้ (`preview_start` config `ac-maintenance-dev`) · :3001 ยังไม่เปิดใหม่ (ไม่จำเป็น)
 
-**ค้าง:** ทดสอบบน production หลัง deploy (guest view ของ unit จริง + ลงทะเบียนเครื่องใหม่พร้อมรูปจากมือถือ) · ข้อ 1 บัญชี admin บน production (ยังรอเจ้าของสมัคร) · E merge feat/postgres → master ตอนใช้จริง (ล้าง seed ตอนนั้น)
+**ค้าง:** ~~ทดสอบบน production หลัง deploy (guest view ของ unit จริง + ลงทะเบียนเครื่องใหม่พร้อมรูปจากมือถือ)~~ ✅ ผ่านบน iPhone แล้ว (7 ต.ค. 2026) · ข้อ 1 บัญชี admin บน production (ยังรอเจ้าของสมัคร) · E merge feat/postgres → master ตอนใช้จริง (ล้าง seed ตอนนั้น)
 
 # 📋 แผน: ระบบ Guest — สแกนสติกเกอร์แล้วเห็นรูปแอร์ + ประวัติ โดยไม่ต้อง login (เขียน 16 ก.ย. 2026, DoubleKill) — ยังไม่ได้ลงมือ
 
@@ -646,7 +646,7 @@ E (merge feat/postgres → master, เลิก MariaDB local, worktree/:3001 �
 ## D (E1) — `9c6a297` feat(tech): กล้องสแกนได้แม้ไม่มี BarcodeDetector (iOS Safari)
 - `qr-scan-modal.tsx`: `createQrDetector()` — native ถ้ามีและรองรับ qr_code, ไม่งั้น **jsQR** (`npm i jsqr` ~ dynamic import เฉพาะเบราว์เซอร์ที่ต้องใช้) อ่าน `<video>` ผ่าน canvas ย่อ ≤640px, `inversionAttempts: "dontInvert"` · interface `detect()` เดิม → loop/cooldown/hand-off ไม่แตะ · `readCameraSupport()` เหลือแค่เช็ค getUserMedia · Desktop Chrome Windows/Linux (มี API แต่ไม่มี format) ได้ jsQR แทนการปฏิเสธ
 - regression "E1: without BarcodeDetector…": render สติกเกอร์ของ unit ที่มี job pending ด้วย `QRCodeSVG` ตัวเดียวกับหน้า admin (react-dom/server) → sharp → MJPEG 640×480 30 เฟรม → `chromium.launch({ args: [--use-file-for-fake-video-capture=<clip>] })` + `delete window.BarcodeDetector` ใน init script → สแกนเนอร์เปิด, **ผลลัพธ์ขึ้นเองใน ~4 วิ พร้อม "รับงานทันที"** · เฟรมถูกเขียนที่ `runs/<run>/e1-sticker.mjpeg` (ไม่มี fixture ใน repo) · เช็ค "กล้องเปิด" ยอมรับทั้งข้อความ "เล็งกล้อง" หรือผลลัพธ์ เพราะ decoder เร็วกว่าการ sample ข้อความ
-- **ยังไม่ได้ทดสอบบน iPhone จริง** — ต้องมีเครื่อง + HTTPS (production URL ใช้ได้เลย ไม่ต้องตั้ง flag เหมือน LAN)
+- ~~**ยังไม่ได้ทดสอบบน iPhone จริง**~~ **✅ ทดสอบบน iPhone จริงผ่านแล้ว (เจ้าของยืนยัน 7 ต.ค. 2026)** — ต้องมีเครื่อง + HTTPS (production URL ใช้ได้เลย ไม่ต้องตั้ง flag เหมือน LAN)
 
 ## ทดสอบทั้งหมดบน :3000 master/MariaDB · DB คืน baseline ทุกครั้ง · tsc 0 · eslint สะอาด
 
@@ -1071,7 +1071,7 @@ npx playwright test --config qa/playwright.config.ts --project=tech  ; node qa/b
 - โมดัลเปิด**กล้องหลัง** (`getUserMedia facingMode environment`) แล้ว poll `BarcodeDetector.detect(video)` ทุก 250ms · เจอแล้วหยุด stream ทันที · ปิดโมดัล / "สแกนเครื่องใหม่" = unmount body → cleanup stream เอง
 - เช็ค `BarcodeDetector.getSupportedFormats()` ต้องมี `qr_code` ก่อนเปิดกล้อง — **Chrome บน Windows/Linux มี class แต่ไม่รองรับ format ใด** จึงตกไปโหมดพิมพ์รหัส (label "หรือพิมพ์รหัสเครื่อง / วางลิงก์จากสติกเกอร์") พร้อมข้อความเหลืองบอกเหตุผล · permission ถูกปฏิเสธก็มีข้อความของตัวเอง · **กล้องจริงใช้ได้บน Android Chrome (Pixel 7 ของช่าง) — ยังไม่ได้ทดสอบบนเครื่องจริง** ทดสอบผ่าน fake device + stub `BarcodeDetector` ใน Playwright เท่านั้น
 - ปุ่ม "สร้างใบงาน PM ใหม่ (จำลอง)" **ถูกถอด** · เครื่องที่ไม่มีใบงานค้างจะได้ปุ่ม "บันทึกงานซ่อมบำรุงเครื่องนี้" → เปิด `LogActionModal` ผ่าน `onLogWork → jobFromScan()` (helper ใหม่ใน `tech-shell.tsx` ใช้ร่วมกับ `?ac=`) · ไม่มี string "(จำลอง)" เหลือใน `src/`
-- iOS Safari ไม่มี `BarcodeDetector` → ได้โหมดพิมพ์รหัสเช่นกัน ถ้าต้องรองรับ iPhone ต้องใส่ decoder JS (เช่น `jsQR`/`zxing-wasm`) — ยังไม่ทำ
+- iOS Safari ไม่มี `BarcodeDetector` → ได้โหมดพิมพ์รหัสเช่นกัน ถ้าต้องรองรับ iPhone ต้องใส่ decoder JS (เช่น `jsQR`/`zxing-wasm`) — ~~ยังไม่ทำ~~ ทำแล้วด้วย jsQR (`9c6a297`) และทดสอบบน iPhone จริงผ่าน (7 ต.ค. 2026)
 
 ## วิธีทดสอบที่ใช้ (script อยู่นอก repo ใน scratchpad ของ session — ไม่ได้เก็บ)
 
