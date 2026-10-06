@@ -74,6 +74,10 @@ function sql(query) {
 // Tables the run can only ever add to, deepest child first so the deletes
 // below never trip a foreign key. Everything with an auto-increment id.
 const GROWTH_TABLES = [
+  // Field LCP for the paper. /api/vitals stores nothing off Vercel production
+  // and the reporter skips automated browsers, so a sweep adds no rows; listed
+  // so a restore would remove any that slipped through.
+  "web_vital_samples",
   "login_failures",
   "system_audit_logs",
   "maintenance_logs",

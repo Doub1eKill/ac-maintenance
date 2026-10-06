@@ -28,6 +28,7 @@ export const metadata: Metadata = {
 import { ThemeProvider } from "next-themes";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
+import { WebVitalsReporter } from "@/components/shared/web-vitals-reporter";
 
 export default function RootLayout({
   children,
@@ -46,6 +47,8 @@ export default function RootLayout({
       className={cn("h-full", "antialiased", notoSansThai.variable, geistSans.variable, geistMono.variable, "font-sans")}
     >
       <body className="min-h-full flex flex-col font-sans bg-background text-foreground">
+        {/* Field LCP for the TTACON 2026 paper; temporary (src/lib/web-vitals.ts). */}
+        <WebVitalsReporter />
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <TooltipProvider delayDuration={0}>{children}</TooltipProvider>
           <Toaster position="top-right" richColors closeButton />
