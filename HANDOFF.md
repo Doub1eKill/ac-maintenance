@@ -1,6 +1,6 @@
 # Project Handoff & Technical Summary
 
-# 📌 สถานะล่าสุด (5 ต.ค. 2026, DoubleKill) — อ่านตรงนี้ก่อน
+# 📌 สถานะล่าสุด (7 ต.ค. 2026, DoubleKill) — อ่านตรงนี้ก่อน
 
 **master = origin/master** · Vercel deploy ล่าสุด success · **GitHub Actions CI** (`.github/workflows/ci.yml`: typecheck · lint · vitest) รันครั้งแรกผ่าน — https://github.com/Doub1eKill/ac-maintenance/actions/runs/37306907722 · full sweep ล่าสุด `csp-ci-20261005`: 88/88 · ledger PASS 252 · FAIL 0 · SKIP 5 · unit 53/53 · DB restore แล้ว
 
@@ -10,8 +10,8 @@
 
 **งานที่เหลือ**
 1. **ล้าง fixture บน production** (ต้องให้เจ้าของอนุญาตก่อน ลบแล้วกู้ไม่ได้): `photo_url` ของ ac id 3 · WO #140 · log 623 · WO #138 · blob 3 ไฟล์ — แล้วตามด้วย Phase 4 metric "เครื่องยังไม่มีรูป"
-2. **เฝ้า CSP report-only:** ค้น `[csp]` ใน log ของ Vercel หลังใช้งานจริงสักพัก ถ้าเงียบ → ย้าย `cspReportOnly` ใน `next.config.ts` เข้า header `Content-Security-Policy` ที่บังคับใช้ (preview deployment อาจมี report จาก vercel.live ไม่ต้องสนใจ)
-3. **เก็บ LCP ภาคสนามสำหรับบทความ:** โค้ดเสร็จบน branch `feat/field-lcp` (`7ce79af`) รอเจ้าของอนุมัติ migrate → sweep → merge/deploy (ดู entry "📈" ด้านล่าง)
+2. **เฝ้า CSP report-only:** ค้น `[csp]` ใน log ของ Vercel หลังใช้งานจริงสักพัก ถ้าเงียบ → ย้าย `cspReportOnly` ใน `next.config.ts` เข้า header `Content-Security-Policy` ที่บังคับใช้ (preview deployment อาจมี report จาก vercel.live ไม่ต้องสนใจ) · **7 ต.ค.:** sweep `field-lcp-20261007` เปิดทุกหน้าบน production build ไม่มี violation จากแอป (`[csp]` มีแค่ 2 บรรทัดที่ test ส่งเอง) · log บน Vercel ยังไม่ได้ดู (เครื่องนี้ไม่มี Vercel CLI)
+3. **เก็บ LCP ภาคสนามสำหรับบทความ:** branch `feat/field-lcp` (`7e6b5c7`) · ✅ migration apply แล้ว · ✅ sweep ผ่าน (test ที่ล้มเป็นปัญหาของ test แก้แล้ว) · รอเจ้าของอนุมัติ merge/deploy (ดู entry "📈" ด้านล่าง)
 4. **เฝ้าดูอย่างเดียว:** claim ล้มแบบ transient (1 ต.ค., ไม่เกิดซ้ำ) · `/tech` reload วนบน Next dev (หยุดเกิดตั้งแต่ 3 ต.ค.)
 5. **ยังไม่มี QA spec:** หน้าต่างแจ้งงานค้างถูกครอบแล้วใน `accounts.spec.ts` · ที่ยังไม่มีคือการแสดงชื่อคนที่ถูกลบในหน้าประวัติ (เช็คแค่ระดับ DB)
 
@@ -69,7 +69,7 @@
 
 **ผลระยะ 4:** run `phase4-20261004` (production build) **83/83 · ledger PASS 227 · FAIL 0 · SKIP 5** · unit 37/37 · tsc/eslint 0/0 · restore ครบ
 
-# 📈 เก็บค่า LCP ภาคสนามสำหรับบทความ TTACON 2026 — โค้ดเสร็จบน branch `feat/field-lcp` ยังไม่ apply/deploy (7 ต.ค. 2026, DoubleKill)
+# 📈 เก็บค่า LCP ภาคสนามสำหรับบทความ TTACON 2026 — branch `feat/field-lcp` · migration apply แล้ว · sweep ผ่าน · รอ merge (7 ต.ค. 2026, DoubleKill)
 
 **ทำไม:** บทความจะเทียบเวลาโหลดกับเกณฑ์ web.dev "LCP ≤ 2.5 วินาที ที่ p75" ซึ่งต้องเป็น **field data** (อุปกรณ์และเครือข่ายจริง) ผลวัดเดิมใน `C:\Project\Doc\TTACON2026_ResponseTime.md` เป็น lab data · แผนอยู่ใน `C:\Project\Doc\`: `TTACON2026_LCP_FieldTest.md` (แผนเดิมจากแชทฝั่งเขียนบทความ) → `TTACON2026_LCP_Implementation.md` (ฝั่งนี้แก้ให้ใช้กับระบบได้) → `TTACON2026_LCP_Review.md` (อีกฝั่งตรวจและขอแก้ 4 ข้อ ทำครบแล้ว)
 
@@ -97,7 +97,7 @@
   1. เบราว์เซอร์ที่ Playwright ควบคุมไม่ส่งค่า
   2. ถ้าแกล้งให้ `webdriver` เป็น false ต้องส่งค่า LCP ของ `/qr/[id]` (พิสูจน์ว่าตัวเก็บค่าทำงาน)
   3. เซิร์ฟเวอร์ในเครื่องไม่บันทึกอะไร
-- ผลตรวจในเครื่อง: unit test 64/64 (ใหม่ 11) · tsc/eslint 0/0 · migrate diff มีแค่สร้างตารางใหม่และ index 2 ตัว · **QA test ใหม่ยังไม่ได้รัน** เพราะต้องมีตารางในฐานข้อมูลก่อน
+- ผลตรวจในเครื่อง: unit test 64/64 (ใหม่ 11) · tsc/eslint 0/0 · migrate diff มีแค่สร้างตารางใหม่และ index 2 ตัว · QA test ใหม่รันแล้ว 7 ต.ค. (ดูขั้นที่ 1–2 ด้านล่าง)
 
 **คำตอบจากอีกฝั่ง:**
 - ตัด `back-forward-cache`, `prerender`, `restore` ออกจากค่าหลัก (รายงานเฉพาะ navigate/reload และบอกจำนวนที่ตัด)
@@ -106,15 +106,19 @@
 - Safari รองรับ LCP ตั้งแต่ 26.2 ตามบทความ WebKit "WebKit Features for Safari 26.2"
 - iPadOS ถูกนับเป็น desktop เพราะ UA บอกว่าเป็น Mac ต้องเขียนเป็นข้อจำกัด
 
-**ขั้นที่เหลือ (ต้องให้เจ้าของอนุมัติทุกขั้น ยังไม่ได้รับ):**
-1. `npx prisma migrate deploy` บน Aiven (ตรวจ diff ก่อน)
-2. full sweep บน branch (ต้อง FAIL 0 และตารางต้องไม่มีแถวเพิ่ม)
-3. merge เข้า master แล้ว push (= deploy production และเริ่มเก็บข้อมูลทันที)
+**ขั้นที่ 1–2 เสร็จ (เจ้าของสั่ง "ทำ 1-2 ก่อน", 7 ต.ค.):**
+1. ✅ **migration apply ลง Aiven แล้ว** — `migrate diff` ก่อน apply ตรงกับไฟล์ migration ทุกบรรทัด (สร้างตาราง + index 2 ตัว ไม่แตะตารางเดิม) · หลัง apply diff ว่าง
+2. ✅ **full sweep `field-lcp-20261007`:** 88 ผ่าน · 1 ล้ม · ledger PASS 254 · FAIL 1 · SKIP 5 · restore ครบ · `web_vital_samples` 0 → 0 แถว
+   - ที่ล้มคือ "a real browser sends an LCP sample" (0 sent) — **test ผิด ไม่ใช่ reporter:** test ใช้การเปลี่ยนหน้าเป็นตัวปิดค่า LCP แต่ headless Chromium ไม่ยิง `visibilitychange` ตอนเปลี่ยนหน้า → web-vitals ไม่รายงาน · ทดลองตรง (`next start` ในเครื่อง): เห็น entry LCP แต่ไม่มี beacon · คลิก / กด Shift / ยิง visibilitychange hidden → ส่ง 1 ค่าทุกแบบ
+   - แก้ (`7e6b5c7` บน branch): ปิดค่าด้วย `keyboard.press("Shift")` (input จริง ไม่คลิกอะไร) · รันเฉพาะ test นี้ `field-lcp-fix-20261007`: **3/3 PASS** (ส่ง 1 ค่า 544 ms · webdriver=true ส่ง 0 · ตาราง 0 → 0) · restore ครบ
+   - หมายเหตุ: ข้อ "automated browser sends no samples" เดิมผ่านแบบไม่มีความหมาย (ไม่มีใครส่งได้เลย) — หลังแก้จึงพิสูจน์ว่า `navigator.webdriver` กันได้จริง
+
+**ขั้นที่เหลือ (ต้องให้เจ้าของอนุมัติ):**
+3. merge `feat/field-lcp` (`7e6b5c7`) เข้า master แล้ว push (= deploy production และเริ่มเก็บข้อมูลทันที) — ไม่มีข้อห้ามเรื่อง migration แล้ว
 4. เปิดหน้า `/qr/<uuid>` บน production 1 ครั้ง ตรวจว่ามีแถวเข้า แล้วลบแถวนั้น
 
 **ข้อควรระวัง:**
-- **ห้าม merge `feat/field-lcp` เข้า master ก่อน apply migration** ไม่อย่างนั้น production จะพยายาม insert ลงตารางที่ยังไม่มี (route จับ error ไว้แล้ว แต่จะขึ้น log `[vitals] could not store a sample` ทุกครั้ง)
-- `qa/baseline.mjs` บน branch อ้างตารางนี้ ถ้ารัน snapshot ก่อน migrate จะพัง
+- ระหว่างที่ยังไม่ merge: master ไม่รู้จักตารางนี้ แต่ `baseline.mjs` ของ master ไม่ได้อ้างถึง จึง sweep บน master ได้ตามปกติ (ตารางไม่ถูก restore — production ไม่บันทึกอะไรจนกว่าจะ merge)
 - **ถอดออกหลังส่งบทความ:** ส่งออก CSV ไป `C:\Project\Doc\perf\field-lcp-raw.csv` → ลบ reporter, route, lib, test, regression และบรรทัดใน baseline → เพิ่ม migration `DROP TABLE web_vital_samples`
 
 # 🧱 throttle ต่อ IP มี test · CSP แบบ Report-Only · unit test ผูกกับ build + GitHub Actions (5 ต.ค. 2026, DoubleKill)
