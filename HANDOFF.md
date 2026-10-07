@@ -11,7 +11,7 @@
 **งานที่เหลือ**
 1. **ล้าง fixture บน production** (ต้องให้เจ้าของอนุญาตก่อน ลบแล้วกู้ไม่ได้): `photo_url` ของ ac id 3 · WO #140 · log 623 · WO #138 · blob 3 ไฟล์ — แล้วตามด้วย Phase 4 metric "เครื่องยังไม่มีรูป"
 2. **เฝ้า CSP report-only:** ค้น `[csp]` ใน log ของ Vercel หลังใช้งานจริงสักพัก ถ้าเงียบ → ย้าย `cspReportOnly` ใน `next.config.ts` เข้า header `Content-Security-Policy` ที่บังคับใช้ (preview deployment อาจมี report จาก vercel.live ไม่ต้องสนใจ)
-3. **เก็บ LCP ภาคสนามสำหรับบทความ:** โค้ดเสร็จบน branch `feat/field-lcp` (`7ce79af`) รอเจ้าของอนุมัติ migrate → sweep → merge/deploy และแจ้งอาจารย์ก่อนเริ่มเก็บ (ดู entry "📈" ด้านล่าง)
+3. **เก็บ LCP ภาคสนามสำหรับบทความ:** โค้ดเสร็จบน branch `feat/field-lcp` (`7ce79af`) รอเจ้าของอนุมัติ migrate → sweep → merge/deploy (ดู entry "📈" ด้านล่าง)
 4. **เฝ้าดูอย่างเดียว:** claim ล้มแบบ transient (1 ต.ค., ไม่เกิดซ้ำ) · `/tech` reload วนบน Next dev (หยุดเกิดตั้งแต่ 3 ต.ค.)
 5. **ยังไม่มี QA spec:** หน้าต่างแจ้งงานค้างถูกครอบแล้วใน `accounts.spec.ts` · ที่ยังไม่มีคือการแสดงชื่อคนที่ถูกลบในหน้าประวัติ (เช็คแค่ระดับ DB)
 
@@ -109,7 +109,7 @@
 **ขั้นที่เหลือ (ต้องให้เจ้าของอนุมัติทุกขั้น ยังไม่ได้รับ):**
 1. `npx prisma migrate deploy` บน Aiven (ตรวจ diff ก่อน)
 2. full sweep บน branch (ต้อง FAIL 0 และตารางต้องไม่มีแถวเพิ่ม)
-3. merge เข้า master แล้ว push (= deploy production และเริ่มเก็บข้อมูลทันที) · **ควรแจ้งอาจารย์ก่อน** เพราะเรื่องจริยธรรมการวิจัยยังค้าง
+3. merge เข้า master แล้ว push (= deploy production และเริ่มเก็บข้อมูลทันที)
 4. เปิดหน้า `/qr/<uuid>` บน production 1 ครั้ง ตรวจว่ามีแถวเข้า แล้วลบแถวนั้น
 
 **ข้อควรระวัง:**
