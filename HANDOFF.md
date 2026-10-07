@@ -9,7 +9,7 @@
 **✅ ทดสอบบน iPhone จริงผ่านครบทั้ง 3 ข้อ (เจ้าของยืนยัน 7 ต.ค. 2026):** ปุ่มถ่ายรูปบน Safari (HEIC) · สแกน QR ด้วยกล้อง (jsQR) · ลงทะเบียนเครื่องพร้อมรูปบน production แล้วลบเครื่องทดสอบ
 
 **งานที่เหลือ**
-1. **ล้าง fixture บน production** (ต้องให้เจ้าของอนุญาตก่อน ลบแล้วกู้ไม่ได้): `photo_url` ของ ac id 3 · WO #140 · log 623 · WO #138 · blob 3 ไฟล์ — แล้วตามด้วย Phase 4 metric "เครื่องยังไม่มีรูป"
+1. ✅ **ล้าง fixture บน production เสร็จ (7 ต.ค., เจ้าของสั่ง):** ลบ log 623 · WO #140 · WO #138 · `photo_url` ของ ac id 3 = NULL · blob 3 ไฟล์ (`uploads/1789842657696-unit.jpg`, `1789843054201-before.jpg`, `1789843055836-after.jpg` — ตรวจก่อนลบว่าไม่มีแถวอื่นอ้าง, `head` หลังลบไม่เจอ) · **คืนรอบของเครื่อง 3:** การปิด WO #140 เคยเลื่อน `maintenance_schedules` เป็น 2026-09-20 / 2026-12-20 → คืนเป็น 2026-08-25 / 2026-11-25 (log 620 = งานล่าสุดก่อน fixture) · audit 89–94 ของ fixture เก็บไว้ · `baseline.mjs snapshot` ใหม่: logs 232 · WO 73 · **งานต่อ:** Phase 4 metric "เครื่องยังไม่มีรูป"
 2. **เฝ้า CSP report-only:** ค้น `[csp]` ใน log ของ Vercel หลังใช้งานจริงสักพัก ถ้าเงียบ → ย้าย `cspReportOnly` ใน `next.config.ts` เข้า header `Content-Security-Policy` ที่บังคับใช้ (preview deployment อาจมี report จาก vercel.live ไม่ต้องสนใจ) · **7 ต.ค.:** sweep `field-lcp-20261007` เปิดทุกหน้าบน production build ไม่มี violation จากแอป (`[csp]` มีแค่ 2 บรรทัดที่ test ส่งเอง) · log บน Vercel ยังไม่ได้ดู (เครื่องนี้ไม่มี Vercel CLI)
 3. **เก็บ LCP ภาคสนามสำหรับบทความ:** branch `feat/field-lcp` (`7e6b5c7`) · ✅ migration apply แล้ว · ✅ sweep ผ่าน (test ที่ล้มเป็นปัญหาของ test แก้แล้ว) · รอเจ้าของอนุมัติ merge/deploy (ดู entry "📈" ด้านล่าง)
 4. **เฝ้าดูอย่างเดียว:** claim ล้มแบบ transient (1 ต.ค., ไม่เกิดซ้ำ) · `/tech` reload วนบน Next dev (หยุดเกิดตั้งแต่ 3 ต.ค.)
