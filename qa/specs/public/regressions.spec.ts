@@ -353,12 +353,15 @@ test("field LCP: automated browsers send nothing, and only Vercel production sto
     ctxPage.on("request", (r) => { if (r.url().endsWith("/api/vitals")) seen.push(r.postData() ?? ""); });
     return seen;
   };
-  // LCP is final once the page is hidden; a navigation away does that.
+  // LCP is final at the first input or once the page is hidden. Headless
+  // Chromium fires no visibilitychange when navigating away (checked 7 Oct:
+  // nothing was sent that way), so a key press — a real input that clicks
+  // nothing — is what ends it here.
   const loadAndLeave = async (p: import("@playwright/test").Page) => {
     await p.goto(`/qr/${qr}`, { waitUntil: "load" });
     await p.waitForTimeout(1500);
-    await p.goto("/login", { waitUntil: "load" });
-    await p.waitForTimeout(800);
+    await p.keyboard.press("Shift");
+    await p.waitForTimeout(1500);
   };
 
   // 1. As every QA browser is: navigator.webdriver is true, so nothing is sent.
