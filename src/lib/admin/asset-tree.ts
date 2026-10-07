@@ -124,6 +124,9 @@ export function shapeBuildingTree(
   let brokenOrCleaningUnits = 0;
   let repairUnits = 0;
   let cleaningUnits = 0;
+  // Counted over the same units as totalUnits, so the two figures on the
+  // dashboard card always describe one fleet.
+  let unitsWithoutPhoto = 0;
   const urgentUnits: UrgentUnit[] = [];
 
   const buildings = rows.map((b) => {
@@ -132,6 +135,7 @@ export function shapeBuildingTree(
       bldgUnits += r.airConditioners.length;
       totalUnits += r.airConditioners.length;
       r.airConditioners.forEach((ac) => {
+        if (!ac.photoUrl) unitsWithoutPhoto += 1;
         if (ac.status === "broken" || ac.status === "needs_cleaning") {
           brokenOrCleaningUnits += 1;
           if (ac.status === "broken") repairUnits += 1;
@@ -221,7 +225,7 @@ export function shapeBuildingTree(
   return {
     buildings,
     urgentUnits,
-    unitCounts: { totalUnits, brokenOrCleaningUnits, repairUnits, cleaningUnits },
+    unitCounts: { totalUnits, brokenOrCleaningUnits, repairUnits, cleaningUnits, unitsWithoutPhoto },
   };
 }
 

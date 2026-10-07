@@ -33,6 +33,7 @@ interface OverviewPanelProps {
     brokenOrCleaningUnits: number;
     repairUnits: number;
     cleaningUnits: number;
+    unitsWithoutPhoto: number;
     pendingWorkOrders: number;
     activeTechsCount: number;
   };

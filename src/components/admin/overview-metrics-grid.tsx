@@ -1,6 +1,6 @@
 "use client";
 
-import { Snowflake, Wrench, Sparkles, Users, Activity } from "lucide-react";
+import { Snowflake, Wrench, Sparkles, Users, Activity, ImageOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   MotionStagger,
@@ -16,6 +16,7 @@ interface OverviewMetricsGridProps {
     brokenOrCleaningUnits: number;
     repairUnits: number;
     cleaningUnits: number;
+    unitsWithoutPhoto: number;
     pendingWorkOrders: number;
     activeTechsCount: number;
   };
@@ -64,6 +65,17 @@ export function OverviewMetricsGrid({ metrics }: OverviewMetricsGridProps) {
                   healthPercent >= 90 ? "bg-emerald-500" : healthPercent >= 75 ? "bg-amber-500" : "bg-destructive"
                 )}
               />
+            </div>
+            {/* Units registered before photos were required. Technicians add
+                them from the assets tab; this shows how many are left. */}
+            <div className="flex items-center justify-between text-xs mt-2.5" data-testid="units-without-photo">
+              <span className="text-muted-foreground flex items-center gap-1">
+                <ImageOff className="w-3.5 h-3.5" /> ยังไม่มีรูปเครื่อง
+              </span>
+              <span className="font-bold text-foreground">
+                <MotionNumber value={metrics.unitsWithoutPhoto} />
+                <span className="font-normal text-muted-foreground ml-1">เครื่อง</span>
+              </span>
             </div>
           </div>
         </MotionCard>

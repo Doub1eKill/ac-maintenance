@@ -101,6 +101,23 @@ test.describe("admin inventory", () => {
     if (Number(pending) > 0) expect(during).toContain(`${pending}รอดำเนินการ`);
   });
 
+  test("dashboard: units without a photo agree with the database", async ({ page }) => {
+    // overview-metrics-grid.tsx, first card. Counted over the same rows as the
+    // card's total (asset-tree.ts walks every unit in the building tree).
+    const [[total, withoutPhoto]] = db("select count(*), count(*) filter (where photo_url is null) from air_conditioners");
+    await page.goto("/admin");
+    const row = page.getByTestId("units-without-photo");
+    await row.waitFor({ timeout: 60_000 });
+    // MotionNumber counts up from zero; wait for it to settle on the figure.
+    await expect(row).toContainText(`${withoutPhoto}`, { timeout: 5_000 }).catch(() => {});
+    const shown = ((await row.innerText()) ?? "").replace(/\s+/g, " ").trim();
+    // The unit sits in its own span with a margin, so innerText has no space before it.
+    const figure = new RegExp(`ยังไม่มีรูปเครื่อง ?${withoutPhoto} ?เครื่อง$`);
+    const agrees = figure.test(shown);
+    ledger("Dashboard", `units without a photo: card "${shown}", database ${withoutPhoto} of ${total}`, "UI", agrees ? "PASS" : "FAIL", await shot(page, "admin-units-without-photo"));
+    expect(shown).toMatch(figure);
+  });
+
   test("header omnibox lists no cancelled order as an open one", async ({ page }) => {
     // The index took every order but the completed ones, so a cancelled order
     // showed up as "กำลังดำเนินการ" (lib/admin/pages.ts getAdminSearchIndex).
