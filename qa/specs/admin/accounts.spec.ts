@@ -48,6 +48,7 @@ test.describe("accounts: presence, suspending with held jobs, removal", () => {
   let userId = "";
   let jobIds: string[] = [];
   let acCodes: string[] = [];
+  let logId = "";
 
   test.beforeAll(() => {
     const hash = bcrypt.hashSync(QA.password, 10);
@@ -78,6 +79,7 @@ test.describe("accounts: presence, suspending with held jobs, removal", () => {
 
   test.afterAll(() => {
     // Whatever state the jobs ended in, they were only ever QA's.
+    if (logId) db(`delete from maintenance_logs where id = ${logId}`);
     if (jobIds.length) db(`delete from work_orders where id in (${jobIds.join(",")})`);
   });
 
@@ -155,6 +157,17 @@ test.describe("accounts: presence, suspending with held jobs, removal", () => {
     const auditFloor = one("select coalesce(max(id), 0) from system_audit_logs")!;
     // History that has to survive: one of the released jobs pinned to this person as reporter.
     db(`update work_orders set reported_by_id = ${userId} where id = ${jobIds[0]}`);
+    // ...and a maintenance entry they wrote, for the unit's history page. Inserted
+    // straight in, so the unit's schedule is not rolled forward the way closing
+    // a job would.
+    const detail = `QA_TEST work by a removed account ${Date.now()}`;
+    logId = one(
+      `insert into maintenance_logs (air_conditioner_id, work_order_id, user_id, action, repair_detail, performed_at, created_at, updated_at)
+       select air_conditioner_id, null, ${userId}, 'repair', '${sq(detail)}', now() at time zone 'utc', now() at time zone 'utc', now() at time zone 'utc'
+       from work_orders where id = ${jobIds[0]}
+       returning id`
+    )!;
+    const qr = one(`select a.qr_code from work_orders w join air_conditioners a on a.id = w.air_conditioner_id where w.id = ${jobIds[0]}`)!;
 
     await openTeam(page);
     await card(page).getByRole("button", { name: "ลบออกจากระบบ" }).click();
@@ -177,6 +190,14 @@ test.describe("accounts: presence, suspending with held jobs, removal", () => {
     ledger("Remove", `phones deleted (${phones}) and the old email is free to register again (${freed} rows)`, "DB", phones === "0" && freed === "0" ? "PASS" : "FAIL");
     const reporter = one(`select u.name from work_orders w join users u on u.id = w.reported_by_id where w.id = ${jobIds[0]}`);
     ledger("Remove", `history still names the person (${reporter})`, "DB", reporter === NAME ? "PASS" : "FAIL");
+    // The same on screen: the unit's history, as a signed-in viewer sees it (/qr/[id]).
+    await page.goto(`/qr/${qr}`);
+    const entry = page.locator("div.pl-6", { hasText: detail });
+    await entry.waitFor({ timeout: 60_000 });
+    const entryText = (await entry.innerText()).replace(/\s+/g, " ");
+    const named = entryText.includes(`โดย ${NAME}`);
+    ledger("Remove", `unit history page still shows "โดย ${NAME}" on their entry`, "UI", named ? "PASS" : "FAIL", await shot(page, "remove-history-name"));
+    expect(entryText).toContain(`โดย ${NAME}`);
     const audited = one(`select count(*) from system_audit_logs where id > ${auditFloor} and action = 'DELETE_USER' and entity_id = ${userId}`);
     ledger("Remove", "audit: DELETE_USER", "DB", audited === "1" ? "PASS" : "FAIL");
 
