@@ -1,5 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 import path from "node:path";
+import { qaDatabaseUrl } from "./target-db.mjs";
 
 // See qa/lib.ts: anything written inside the repo makes Next dev reload the page.
 const OUT = process.env.QA_OUT ?? path.resolve(__dirname, "..", "..", "ac-maintenance-qa");
@@ -78,12 +79,24 @@ export default defineConfig({
     // host only in development or on Vercel.
     command: QA_SERVER === "dev" ? "npm run dev" : "npm run build && npm run start",
     url: `${BASE_URL}/login`,
-    reuseExistingServer: true,
+    // Never reuse: a server someone already started on the port reads .env,
+    // i.e. production's database and Blob store, while the specs' own SQL goes
+    // to the test database. Playwright stops if the port is taken.
+    reuseExistingServer: false,
     timeout: QA_SERVER === "dev" ? 180_000 : 900_000,
     // MAIL_SUPPRESS_DOMAINS on both: the QA accounts' domains do not exist,
     // so each code mailed to them bounced into the sending inbox; the specs
     // plant their codes in the database (plantEmailCode) and never read mail.
     env: {
+      // The test database, not .env's (qa/target-db.mjs refuses production);
+      // set in the environment, which Next does not let .env override. No Blob
+      // token either: .env.local's store is production's, so uploads stay in
+      // public/uploads, where baseline restore cleans them up. No CA: .env's is
+      // Aiven's, and with one set lib/prisma.ts insists on TLS, which a local
+      // test database does not speak.
+      DATABASE_URL: qaDatabaseUrl(),
+      DATABASE_CA_CERT: "",
+      BLOB_READ_WRITE_TOKEN: "",
       MAIL_SUPPRESS_DOMAINS: "qa-run.ac.th,example.invalid",
       // Lets public/regressions.spec.ts call the cron route as Vercel would.
       // Local only; the real secret lives in the Vercel project settings.

@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import zlib from "node:zlib";
 import { runPsql } from "./psql.mjs";
+import { qaDatabaseUrl } from "./target-db.mjs";
 
 /** One run id for every spec in an invocation; set QA_RUN to pin it. */
 export const RUN = process.env.QA_RUN ?? new Date().toISOString().replace(/[-:T]/g, "").slice(0, 13);
@@ -171,17 +172,10 @@ export async function loginViaForm(page: Page, email: string, password: string) 
 }
 
 /**
- * The postgres:// DATABASE_URL from the repo's .env — the Aiven database
- * production runs on, since 17 September. Same source qa/baseline.mjs reads.
- * Never logged.
+ * The test database (QA_DATABASE_URL; qa/target-db.mjs refuses production).
+ * Same source qa/baseline.mjs reads. Never logged.
  */
-const POSTGRES_URL: string | null = (() => {
-  try {
-    return fs.readFileSync(path.resolve(__dirname, "..", ".env"), "utf8").match(/^DATABASE_URL="?(postgres(?:ql)?:\/\/[^"\r\n]+)"?/m)?.[1] ?? null;
-  } catch {
-    return null;
-  }
-})();
+const POSTGRES_URL: string = qaDatabaseUrl();
 
 /**
  * Read (or, sparingly, write) the database directly — the "DB" method in the
@@ -193,7 +187,6 @@ const POSTGRES_URL: string | null = (() => {
  * end), and no backslash escapes in string literals.
  */
 export function db(query: string): (string | null)[][] {
-  if (!POSTGRES_URL) throw new Error("no postgres:// DATABASE_URL in .env");
   return runPsql(POSTGRES_URL, query);
 }
 
@@ -350,3 +343,39 @@ export const test = base.extend({
   },
 });
 export { expect } from "@playwright/test";
+
+/**
+ * Pick a catalogue brand and model in a BrandModelPicker (the technician's
+ * register and log forms, and the admin's register form since 14 Oct 2026).
+ * A name picks that exact option; none picks the first one listed.
+ */
+export async function pickCatalogue(scope: Locator, brand?: string, model?: string) {
+  await scope.getByRole("button", { name: /เลือกจากระบบ/ }).click();
+  // Exact names: until a brand is picked, the model trigger reads "เลือกยี่ห้อก่อน".
+  await scope.getByRole("button", { name: "เลือกยี่ห้อ", exact: true }).click();
+  await chooseSearchable(scope, "พิมพ์ชื่อยี่ห้อ...", brand);
+  await scope.getByRole("button", { name: "เลือกรุ่น", exact: true }).click();
+  await chooseSearchable(scope, "พิมพ์ชื่อรุ่น...", model);
+}
+
+async function chooseSearchable(scope: Locator, searchPlaceholder: string, label?: string) {
+  const search = scope.getByPlaceholder(searchPlaceholder);
+  await search.waitFor({ timeout: 10_000 });
+  if (label) {
+    await search.fill(label);
+    await scope.getByText(label, { exact: true }).first().click();
+  } else {
+    await search.press("Enter");
+  }
+}
+
+/** The free-text branch of a BrandModelPicker. */
+export async function fillCustomBrand(scope: Locator, brand: string, model?: string) {
+  await scope.getByRole("button", { name: /กำหนดเอง/ }).click();
+  await scope.getByPlaceholder("เช่น Carrier", { exact: true }).fill(brand);
+  if (model) await scope.getByPlaceholder("ไม่บังคับ", { exact: true }).fill(model);
+}
+
+/** The admin's register-a-unit form, once its modal is open. */
+export const registerUnitForm = (page: Page) =>
+  page.locator("form").filter({ has: page.getByRole("button", { name: /ลงทะเบียนเครื่องปรับอากาศ/ }) });

@@ -15,24 +15,23 @@
 //   - rows the run changed in place (a unit marked broken by a new order, an
 //     avatar replaced, a brand renamed, a schedule advanced by a logged visit)
 //     are put back from the snapshot's copy of the few mutable columns;
-//   - files the run added under public/uploads are removed — and, when a
-//     BLOB_READ_WRITE_TOKEN is in .env.local (the app then stores photos on
-//     Vercel Blob instead, see lib/upload.ts), blobs the run added are too.
+//   - files the run added under public/uploads are removed (the server under
+//     test has no Blob token, so that is where its uploads go).
 //
 // Nothing here runs the Prisma seed — that wipes the restored data. The
 // snapshot lives outside the repo (next to the run output), because a file
 // written inside it makes Next dev reload every open page.
 //
-// Connection: statements go through psql (QA_PSQL for the binary) to the
-// postgres:// DATABASE_URL in the repo's .env — since 17 September that is the
-// Aiven database production runs on, so a sweep writes into the same rows the
-// owner is testing against; snapshot before, restore after, and do not run two
-// sweeps at once. The URL is passed to psql as an argument and never printed.
+// Connection: statements go through psql (QA_PSQL for the binary) to
+// QA_DATABASE_URL — a test database, never production (qa/target-db.mjs).
+// Production has held real data since 14 Oct 2026. Do not run two sweeps at
+// once. The URL is passed to psql as an argument and never printed.
 
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runPsql } from "./psql.mjs";
+import { qaDatabaseUrl } from "./target-db.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, "..");
@@ -40,17 +39,12 @@ const OUT = process.env.QA_OUT ?? path.resolve(repo, "..", "ac-maintenance-qa");
 const SNAPSHOT = path.join(OUT, "baseline.json");
 const UPLOADS = path.join(repo, "public", "uploads");
 
-// Same rule as the app: a token means uploads went to Vercel Blob. Read from
-// the environment or the repo's .env.local, the file the dev server reads it
-// from. Never logged.
-const BLOB_TOKEN = (() => {
-  if (process.env.BLOB_READ_WRITE_TOKEN) return process.env.BLOB_READ_WRITE_TOKEN;
-  try {
-    return fs.readFileSync(path.join(repo, ".env.local"), "utf8").match(/^BLOB_READ_WRITE_TOKEN="?([^"\r\n]+)"?/m)?.[1] ?? null;
-  } catch {
-    return null;
-  }
-})();
+// The Blob store in .env.local is production's: real photos live there now, and
+// restore deletes every blob the snapshot did not list, so it is never read
+// here. The server Playwright starts runs without a token (playwright.config.ts)
+// and keeps uploads under public/uploads. QA_BLOB_READ_WRITE_TOKEN is for a
+// store of the harness's own, should one ever exist. Never logged.
+const BLOB_TOKEN = process.env.QA_BLOB_READ_WRITE_TOKEN || null;
 const BLOB_PREFIX = "uploads/";
 
 /** Pathnames of every blob the app has stored, or null when there is no token. */
@@ -67,16 +61,9 @@ async function listBlobs() {
   return names;
 }
 
-// The postgres:// DATABASE_URL from the repo's .env. Read once; kept in a
-// closure, never logged.
-const POSTGRES_URL = (() => {
-  try {
-    return fs.readFileSync(path.join(repo, ".env"), "utf8").match(/^DATABASE_URL="?(postgres(?:ql)?:\/\/[^"\r\n]+)"?/m)?.[1] ?? null;
-  } catch {
-    return null;
-  }
-})();
-if (!POSTGRES_URL) throw new Error("no postgres:// DATABASE_URL in .env — the harness only knows PostgreSQL now");
+// The test database (qa/target-db.mjs refuses production). Read once; kept in
+// a closure, never logged.
+const POSTGRES_URL = qaDatabaseUrl();
 
 // Binary resolution, the spawn and the row parsing all live in psql.mjs now —
 // see the note there about the pinned version and the leaked argv.

@@ -109,7 +109,8 @@ test.describe("admin inventory", () => {
     const row = page.getByTestId("units-without-photo");
     await row.waitFor({ timeout: 60_000 });
     // MotionNumber counts up from zero; wait for it to settle on the figure.
-    await expect(row).toContainText(`${withoutPhoto}`, { timeout: 5_000 }).catch(() => {});
+    // 20s: on the local test server the count was still at 63 of 73 after 5s.
+    await expect(row).toContainText(`${withoutPhoto}`, { timeout: 20_000 }).catch(() => {});
     const shown = ((await row.innerText()) ?? "").replace(/\s+/g, " ").trim();
     // The unit sits in its own span with a margin, so innerText has no space before it.
     const figure = new RegExp(`ยังไม่มีรูปเครื่อง ?${withoutPhoto} ?เครื่อง$`);
