@@ -5,7 +5,7 @@ import { format } from "date-fns";
 import { QrCode, X, CheckCircle2, AlertTriangle, Camera, CameraOff, ClipboardPen, History, Loader2 } from "lucide-react";
 import { scanQrCodeAction } from "@/app/tech/actions";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
-import { UnitThumb } from "@/components/shared/unit-thumb";
+import { UnitPhoto } from "@/components/shared/unit-photo";
 
 // The shape scanQrCodeAction returns when it finds the unit — the success
 // half of its union, so the result panel below is typed against the action
@@ -397,7 +397,7 @@ function QrScanModalBody({ isPending, onClose, onClaim, onClaimAndLog, onLogWork
                     machine in front of the technician, and this is the
                     fastest way to tell. */}
                 <div className="flex min-w-0 items-start gap-3">
-                  <UnitThumb src={qrResult.acDetails.photoUrl} alt={`เครื่อง ${qrResult.acDetails.acCode}`} size="lg" />
+                  <UnitPhoto src={qrResult.acDetails.photoUrl} acCode={qrResult.acDetails.acCode} size="lg" />
                   <div className="min-w-0">
                     <div className="font-mono text-lg font-bold text-foreground break-all">{qrResult.acDetails.acCode}</div>
                     <div className="text-xs text-muted-foreground font-medium">{qrResult.acDetails.location}</div>

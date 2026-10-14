@@ -13,7 +13,7 @@ import {
 import type { TechJobItem } from "@/components/tech/types";
 import { filterJobs } from "@/components/tech/types";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
-import { UnitThumb } from "@/components/shared/unit-thumb";
+import { UnitPhoto } from "@/components/shared/unit-photo";
 import { WorkOrderPriorityBadge, WorkOrderTypeBadge } from "@/components/shared/work-order-badges";
 
 interface MyJobsPanelProps {
@@ -61,7 +61,7 @@ export function MyJobsPanel({
                         className="biz-card p-5 space-y-4 hover:border-muted-foreground transition-all relative overflow-hidden"
                       >
                         <div className="flex items-start gap-3">
-                          <UnitThumb src={job.photoUrl} size="md" />
+                          <UnitPhoto src={job.photoUrl} acCode={job.acCode} size="md" />
                           <div className="min-w-0 space-y-1">
                             <div className="flex items-center gap-2">
                               <span className="font-mono text-xs font-bold text-muted-foreground">

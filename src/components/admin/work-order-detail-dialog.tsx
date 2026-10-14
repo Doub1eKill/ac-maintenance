@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import type { WorkOrderItem } from "@/components/admin/types";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
-import { UnitThumb } from "@/components/shared/unit-thumb";
+import { UnitPhoto } from "@/components/shared/unit-photo";
 import { EvidencePhotos } from "@/components/shared/evidence-photos";
 import {
   WorkOrderPriorityBadge,
@@ -152,7 +152,7 @@ export function WorkOrderDetailDialog({ workOrder, isPending, onClose, onCancelW
                   key/value pairs: three facts an admin reads once, and the
                   right-aligned values used to wrap the code mid-way. */}
               <dl className="mt-4 flex min-w-0 flex-wrap items-center gap-x-5 gap-y-1.5 text-sm">
-                <UnitThumb src={workOrder.photoUrl} alt={`เครื่อง ${workOrder.acCode}`} size="sm" />
+                <UnitPhoto src={workOrder.photoUrl} acCode={workOrder.acCode} size="sm" />
                 <div className="inline-flex items-center gap-1.5">
                   <dt className="sr-only">ยี่ห้อ</dt>
                   <Snowflake className="h-4 w-4 text-primary" aria-hidden />

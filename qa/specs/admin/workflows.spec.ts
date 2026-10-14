@@ -1,6 +1,6 @@
 import path from "node:path";
 import { devices, type Page } from "@playwright/test";
-import { test, expect, QA, OUT_ROOT, ledger, shot, note, hydrated, loginViaForm, watchConsole, unitPhoto, pickRoom, dismissModal } from "../../lib";
+import { test, expect, QA, OUT_ROOT, ledger, shot, note, hydrated, loginViaForm, watchConsole, unitPhoto, pickRoom, dismissModal, pickCatalogue, fillCustomBrand, registerUnitForm } from "../../lib";
 
 // What the print test hangs off `window` inside the page.
 type PrintWindow = Window & { __printDoc: string };
@@ -129,11 +129,8 @@ test.describe("admin workflows", () => {
       return;
     }
     await addAc.click();
-    const uform = page.locator("form").filter({ has: page.locator('select[name="acModelId"]') });
-    const brandSel = uform.locator("select").first();
-    await brandSel.selectOption({ index: 1 });
-    await page.waitForTimeout(400);
-    await uform.locator('select[name="acModelId"]').selectOption({ index: 1 });
+    const uform = registerUnitForm(page);
+    await pickCatalogue(uform);
     await uform.locator('input[name="photo"]').setInputFiles(unitPhoto());
     await uform.getByRole("button", { name: /ลงทะเบียนเครื่องปรับอากาศ/ }).click();
     const t5 = await toastText(page);
@@ -144,10 +141,8 @@ test.describe("admin workflows", () => {
     note("assets-unit-created.txt", `toast: ${t5}\ncode: ${code}`);
     // register a second unit as "Other" with BTU -5 → sequence must be -02 only if accepted
     await main.getByRole("button", { name: /ลงทะเบียนแอร์/ }).first().click();
-    await page.getByRole("button", { name: /กำหนดเอง/ }).click();
-    const cform = page.locator("form").filter({ has: page.locator('input[name="customBrand"]') });
-    await cform.locator('input[name="customBrand"]').fill("QA Custom Brand");
-    await cform.locator('input[name="customModel"]').fill("QA-MODEL");
+    const cform = registerUnitForm(page);
+    await fillCustomBrand(cform, "QA Custom Brand", "QA-MODEL");
     await cform.locator('input[name="btu"]').fill("-5");
     await cform.locator('input[name="photo"]').setInputFiles(unitPhoto());
     await cform.getByRole("button", { name: /ลงทะเบียนเครื่องปรับอากาศ/ }).click();

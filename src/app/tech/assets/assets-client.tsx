@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { toast } from "sonner";
 import { createPortal } from "react-dom";
 import { Plus, X } from "lucide-react";
 import { AssetsPanel } from "@/components/tech/assets-panel";
@@ -10,6 +11,9 @@ import { UnitCataloguePanel } from "@/components/tech/unit-catalogue-panel";
 import { useTechFilters } from "@/components/tech/tech-shell";
 import type { TechnicianAssetUnit, TechnicianAssetSummary } from "@/lib/maintenance";
 import type { RoomOption } from "@/lib/tech/pages";
+import { EditRoomModal, type EditRoomTarget } from "@/components/shared/edit-room-modal";
+import { updateRoomAction } from "@/app/tech/actions";
+import { useEscapeToClose } from "@/hooks/use-escape-to-close";
 
 export function TechAssetsClient({
   assetList,
@@ -28,6 +32,25 @@ export function TechAssetsClient({
   // The unit being corrected (brand, model, BTU — and its picture). The same
   // panel the maintenance-log form opens inline, here in a modal of its own.
   const [editingUnit, setEditingUnit] = useState<TechnicianAssetUnit | null>(null);
+  // The room being renamed or moved to another floor.
+  const [editingRoom, setEditingRoom] = useState<EditRoomTarget | null>(null);
+  const [isSavingRoom, startSavingRoom] = useTransition();
+  useEscapeToClose(() => setEditingRoom(null), editingRoom !== null);
+
+  function handleEditRoom(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!editingRoom) return;
+    const formData = new FormData(e.currentTarget);
+    formData.append("id", editingRoom.id);
+    startSavingRoom(async () => {
+      const res = await updateRoomAction(formData);
+      if (res.error) toast.error(res.error);
+      else {
+        setEditingRoom(null);
+        toast.success("บันทึกการแก้ไขห้องแล้ว");
+      }
+    });
+  }
 
   return (
     <>
@@ -56,9 +79,14 @@ export function TechAssetsClient({
         onViewHistory={openHistoryFor}
         onEditSchedule={setSchedulingUnit}
         onEditUnit={setEditingUnit}
+        onEditRoom={setEditingRoom}
       />
 
       {registering && <RegisterUnitModal rooms={rooms} onClose={() => setRegistering(false)} />}
+
+      {editingRoom && (
+        <EditRoomModal target={editingRoom} isPending={isSavingRoom} onClose={() => setEditingRoom(null)} onSubmit={handleEditRoom} />
+      )}
 
       {schedulingUnit && (
         <ScheduleModal unit={schedulingUnit} onClose={() => setSchedulingUnit(null)} />

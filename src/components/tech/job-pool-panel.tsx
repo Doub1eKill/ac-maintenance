@@ -15,7 +15,7 @@ import {
 import type { TechJobItem } from "@/components/tech/types";
 import { filterJobs } from "@/components/tech/types";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
-import { UnitThumb } from "@/components/shared/unit-thumb";
+import { UnitPhoto } from "@/components/shared/unit-photo";
 import { WorkOrderPriorityBadge, WorkOrderTypeBadge } from "@/components/shared/work-order-badges";
 import { MotionCard } from "@/components/ui/motion";
 import { motion, AnimatePresence } from "motion/react";
@@ -119,7 +119,7 @@ export function JobPoolPanel({ jobPool, searchQuery, selectedBuilding, isPending
                                   thing that says "this machine" before the
                                   technician is standing in front of it. */}
                               <div className="flex items-start gap-3">
-                                <UnitThumb src={job.photoUrl} size="md" />
+                                <UnitPhoto src={job.photoUrl} acCode={job.acCode} size="md" />
                                 <div className="flex min-w-0 flex-wrap items-center gap-2">
                                   <span className="font-mono text-xs font-bold text-muted-foreground">{job.acCode}</span>
                                   <span className="rounded-md bg-secondary px-2 py-0.5 text-[10px] font-bold text-foreground">

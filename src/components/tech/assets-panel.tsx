@@ -1,7 +1,7 @@
 "use client";
 
 import { format } from "date-fns";
-import { CalendarClock, Camera, Clock, Droplets, Snowflake, Wrench } from "lucide-react";
+import { CalendarClock, Camera, Clock, Droplets, Pencil, Snowflake, Wrench } from "lucide-react";
 import {
   BuildingGroupList,
   FloorGroupList,
@@ -13,7 +13,8 @@ import {
 import type { TechnicianAssetUnit, TechnicianAssetSummary } from "@/lib/maintenance";
 import { filterJobs } from "@/components/tech/types";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
-import { UnitThumb } from "@/components/shared/unit-thumb";
+import { UnitPhoto } from "@/components/shared/unit-photo";
+import type { EditRoomTarget } from "@/components/shared/edit-room-modal";
 
 interface AssetsPanelProps {
   assetList: TechnicianAssetUnit[];
@@ -28,6 +29,8 @@ interface AssetsPanelProps {
   // Opens the unit editor — the way a unit registered before pictures
   // existed gets one. Optional for the same reason.
   onEditUnit?: (unit: TechnicianAssetUnit) => void;
+  // Opens the room editor (name and floor). Optional for the same reason.
+  onEditRoom?: (room: EditRoomTarget) => void;
 }
 
 // The open work on a group of units, as the two badges the cards themselves
@@ -62,6 +65,7 @@ export function AssetsPanel({
   onViewHistory,
   onEditSchedule,
   onEditUnit,
+  onEditRoom,
 }: AssetsPanelProps) {
   const filteredAssets = filterJobs(assetList, searchQuery, selectedBuilding);
   const groups = groupByBuilding(filteredAssets);
@@ -111,7 +115,30 @@ export function AssetsPanel({
                 <RoomGroupList
                   rooms={groupByRoom(floor.items)}
                   getSubtitle={(room) => `${room.items.length} แอร์`}
-                  renderExtra={(room) => <GroupJobBadges items={room.items} />}
+                  renderExtra={(room) => (
+                    <div className="flex items-center gap-1.5">
+                      <GroupJobBadges items={room.items} />
+                      {onEditRoom && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            // The room header opens and closes on a click of its own.
+                            e.stopPropagation();
+                            onEditRoom({
+                              id: room.roomId,
+                              name: room.roomName,
+                              floor: room.items[0]?.floor ?? null,
+                              unitCount: room.items.length,
+                            });
+                          }}
+                          aria-label={`แก้ไขห้อง ${room.roomName}`}
+                          className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  )}
                   renderItems={(room) => (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {room.items.map((unit) => (
@@ -131,7 +158,7 @@ export function AssetsPanel({
                                 list is where a technician can fix that without
                                 waiting for a job on the unit. */}
                             {unit.photoUrl || !onEditUnit ? (
-                              <UnitThumb src={unit.photoUrl} size="md" />
+                              <UnitPhoto src={unit.photoUrl} acCode={unit.acCode} size="md" />
                             ) : (
                               <button
                                 type="button"

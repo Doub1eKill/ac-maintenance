@@ -14,6 +14,8 @@ import {
 import {
   createBuildingAction,
   createRoomAction,
+  updateBuildingAction,
+  updateRoomAction,
   createAirConditionerAction,
   saveMaintenanceScheduleAction,
   updateAirConditionerAction,
@@ -33,10 +35,25 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
-import { UnitThumb } from "@/components/shared/unit-thumb";
+import { UnitPhoto } from "@/components/shared/unit-photo";
 import { FloorGroupList, groupByFloor } from "@/components/shared/building-groups";
+import {
+  BrandModelPicker,
+  appendBrandModel,
+  emptyBrandModel,
+  type BrandModelValue,
+} from "@/components/shared/brand-model-picker";
+import { getAcMasterDataAction } from "@/app/tech/actions";
 import { type ACUnit, type QrModalData } from "@/components/admin/asset-manager-types";
-import { AddBuildingModal, AddRoomModal, PmSettingsModal, QrCodeModal } from "@/components/admin/asset-manager-modals";
+import {
+  AddBuildingModal,
+  AddRoomModal,
+  EditBuildingModal,
+  PmSettingsModal,
+  QrCodeModal,
+  type EditBuildingTarget,
+} from "@/components/admin/asset-manager-modals";
+import { EditRoomModal, type EditRoomTarget } from "@/components/shared/edit-room-modal";
 
 interface RoomItem {
   id: string;
@@ -93,14 +110,21 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
     { buildingId: string; floor?: number | null } | null
   >(null);
   const [showAddAc, setShowAddAc] = useState<{ roomId: string } | null>(null);
+  const [editBuilding, setEditBuilding] = useState<EditBuildingTarget | null>(null);
+  const [editRoom, setEditRoom] = useState<EditRoomTarget | null>(null);
   const [showPmSettings, setShowPmSettings] = useState<ACUnit | null>(null);
   const [showQrCode, setShowQrCode] = useState<QrModalData | null>(null);
   const [showHistoryFor, setShowHistoryFor] = useState<string | null>(null);
   const [showEditAc, setShowEditAc] = useState<ACUnit | null>(null);
 
   // AC Form state
-  const [acBrandType, setAcBrandType] = useState<"master" | "other">("master");
-  const [selectedBrandId, setSelectedBrandId] = useState<string>("");
+  // The register form's brand and model: the same picker the technician's
+  // form uses, so a model missing from the catalogue can be added right there
+  // instead of on the catalogue page. BTU is optional; empty takes the model's.
+  const [addPicked, setAddPicked] = useState<BrandModelValue>(emptyBrandModel);
+  const [addBtu, setAddBtu] = useState("");
+  // The catalogue after the picker added to it; until then, the server's.
+  const [freshCatalogue, setFreshCatalogue] = useState<BrandItem[] | null>(null);
 
   // Edit AC form state — defaults to "other" (free text) because the unit
   // list only carries the resolved brand/model strings, not the catalog
@@ -130,6 +154,8 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
   // their explicit cancel: half-typed room and unit details are worth more
   // than the convenience of dismissing them with a key.
   useEscapeToClose(() => setShowQrCode(null), showQrCode !== null);
+  useEscapeToClose(() => setEditBuilding(null), editBuilding !== null);
+  useEscapeToClose(() => setEditRoom(null), editRoom !== null);
 
   // Applied in the same render the search changes in (React's "adjust state
   // on change" form): back to page 1, and dropping a deliberate collapse so
@@ -247,17 +273,67 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
     });
   }
 
+  async function handleEditBuilding(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!editBuilding) return;
+    const formData = new FormData(e.currentTarget);
+    formData.append("id", editBuilding.id);
+    startTransition(async () => {
+      const res = await updateBuildingAction(formData);
+      if (res.error) toast.error(res.error);
+      else {
+        setEditBuilding(null);
+        toast.success("บันทึกการแก้ไขอาคารแล้ว");
+      }
+    });
+  }
+
+  async function handleEditRoom(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!editRoom) return;
+    const formData = new FormData(e.currentTarget);
+    formData.append("id", editRoom.id);
+    startTransition(async () => {
+      const res = await updateRoomAction(formData);
+      if (res.error) toast.error(res.error);
+      else {
+        setEditRoom(null);
+        toast.success("บันทึกการแก้ไขห้องแล้ว");
+      }
+    });
+  }
+
+  function closeAddAc() {
+    setShowAddAc(null);
+    setAddPicked(emptyBrandModel);
+    setAddBtu("");
+  }
+
+  async function reloadCatalogue() {
+    const data = await getAcMasterDataAction();
+    setFreshCatalogue(data.brands);
+    return data.brands;
+  }
+
   async function handleAddAc(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     if (showAddAc) formData.append("roomId", showAddAc.roomId);
-    formData.append("brandType", acBrandType);
+    if (addPicked.brandType === "master" && !addPicked.modelId) {
+      toast.error("กรุณาเลือกรุ่นแอร์");
+      return;
+    }
+    if (addPicked.brandType === "other" && !addPicked.customBrand.trim()) {
+      toast.error("กรุณาระบุยี่ห้อแอร์");
+      return;
+    }
+    appendBrandModel(formData, addPicked);
 
     startTransition(async () => {
       const res = await createAirConditionerAction(formData);
       if (res.error) toast.error(res.error);
       else {
-        setShowAddAc(null);
+        closeAddAc();
         toast.success("ลงทะเบียนแอร์สำเร็จ");
       }
     });
@@ -318,8 +394,8 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
     });
   }
 
-  const selectedBrand = brands.find(b => b.id === selectedBrandId);
-  const editSelectedBrand = brands.find(b => b.id === editSelectedBrandId);
+  const catalogue = freshCatalogue ?? brands;
+  const editSelectedBrand = catalogue.find(b => b.id === editSelectedBrandId);
 
   return (
     <div className="biz-card p-6 space-y-5 animate-in fade-in">
@@ -369,7 +445,25 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
                   <Building2 className="h-4 w-4" />
                 </span>
                 <div className="min-w-0">
-                  <h3 className="font-bold text-foreground text-sm">{b.name}</h3>
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <h3 className="truncate font-bold text-foreground text-sm">{b.name}</h3>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditBuilding({
+                          id: b.id,
+                          name: b.name,
+                          abbreviation: b.abbreviation,
+                          unitCount: b.rooms.reduce((n, r) => n + r.acUnits.length, 0),
+                        });
+                      }}
+                      aria-label={`แก้ไขอาคาร ${b.name}`}
+                      className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-card hover:text-foreground"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                   {/* Both halves counted off the same (filtered) rooms. Taking
                       the unit half from the server's `unitsCount` instead made
                       one line contradict itself under a search — "1 ห้อง • 22
@@ -428,7 +522,17 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
                       {floor.items.map((r) => (
                   <div key={r.id} className="rounded-xl border border-border p-3.5 space-y-2">
                     <div className="flex items-center justify-between text-xs font-bold text-foreground border-b border-border pb-2">
-                      <span>ห้อง {r.name}</span>
+                      <span className="flex min-w-0 items-center gap-1.5">
+                        <span className="truncate">ห้อง {r.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => setEditRoom({ id: r.id, name: r.name, floor: r.floor ?? null, unitCount: r.acUnits.length })}
+                          aria-label={`แก้ไขห้อง ${r.name}`}
+                          className="shrink-0 rounded-md p-1 font-normal text-muted-foreground hover:bg-muted hover:text-foreground"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                      </span>
                       <div className="flex items-center gap-3">
                         <span className="text-muted-foreground font-normal">{r.acUnits.length} แอร์</span>
                         <button
@@ -444,7 +548,7 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
                         <div key={ac.id} className="rounded-lg border border-border bg-muted p-3 text-xs flex flex-col gap-3">
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex min-w-0 items-start gap-2.5">
-                              <UnitThumb src={ac.photoUrl} size="sm" />
+                              <UnitPhoto src={ac.photoUrl} acCode={ac.acCode} size="sm" />
                               <div className="min-w-0">
                                 <div className="font-mono font-bold text-foreground text-sm break-all">{ac.acCode}</div>
                                 <div className="text-[11px] text-muted-foreground mt-0.5">
@@ -542,68 +646,45 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
       {/* Add Room Modal */}
       {showAddRoom && <AddRoomModal target={showAddRoom} isPending={isPending} onClose={() => setShowAddRoom(null)} onSubmit={handleAddRoom} />}
 
+      {editBuilding && <EditBuildingModal target={editBuilding} isPending={isPending} onClose={() => setEditBuilding(null)} onSubmit={handleEditBuilding} />}
+      {editRoom && <EditRoomModal target={editRoom} isPending={isPending} onClose={() => setEditRoom(null)} onSubmit={handleEditRoom} />}
+
       {/* Add AC Modal */}
       {showAddAc && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-xs p-4">
           <div className="w-full max-w-md rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-xl space-y-4 animate-in fade-in max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-border pb-3">
               <h3 className="text-base font-bold text-foreground">ลงทะเบียนเครื่องปรับอากาศ</h3>
-              <button onClick={() => setShowAddAc(null)} className="text-muted-foreground hover:text-foreground">
+              <button onClick={closeAddAc} aria-label="ปิด" className="text-muted-foreground hover:text-foreground">
                 <X className="h-5 w-5" />
               </button>
             </div>
             <form onSubmit={handleAddAc} className="space-y-4 text-xs">
               
-              <div className="flex gap-2 p-1 bg-secondary rounded-lg">
-                <button type="button" onClick={() => setAcBrandType("master")} className={`flex-1 py-1.5 rounded-md font-bold transition-all ${acBrandType === "master" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
-                  เลือกรุ่นมาตรฐาน
-                </button>
-                <button type="button" onClick={() => setAcBrandType("other")} className={`flex-1 py-1.5 rounded-md font-bold transition-all ${acBrandType === "other" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
-                  กำหนดเอง (อื่นๆ)
-                </button>
-              </div>
+              <BrandModelPicker
+                brands={catalogue}
+                value={addPicked}
+                onChange={setAddPicked}
+                onCatalogueChanged={reloadCatalogue}
+                btu={addBtu}
+                onBtuSuggest={setAddBtu}
+              />
 
-              {acBrandType === "master" ? (
-                <>
-                  <div>
-                    <label className="mb-1.5 block font-bold text-foreground">ยี่ห้อ (Brand)</label>
-                    <NativeSelect value={selectedBrandId} onChange={(e) => setSelectedBrandId(e.target.value)} required className="w-full h-auto py-3 px-3.5 rounded-xl border-border text-xs text-foreground">
-                      <NativeSelectOption value="" disabled>-- เลือกยี่ห้อ --</NativeSelectOption>
-                      {brands.map(b => (
-                        <NativeSelectOption key={b.id} value={b.id}>
-                          {b.name}
-                        </NativeSelectOption>
-                      ))}
-                    </NativeSelect>
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block font-bold text-foreground">รุ่น (Model)</label>
-                    <NativeSelect name="acModelId" required disabled={!selectedBrandId} className="w-full h-auto py-3 px-3.5 rounded-xl border-border text-xs text-foreground disabled:opacity-50" defaultValue="">
-                      <NativeSelectOption value="" disabled>-- เลือกรุ่น --</NativeSelectOption>
-                      {selectedBrand?.models.map(m => (
-                        <NativeSelectOption key={m.id} value={m.id}>
-                          {m.name} {m.defaultBtu ? `(${m.defaultBtu} BTU)` : ""}
-                        </NativeSelectOption>
-                      ))}
-                    </NativeSelect>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div>
-                    <label className="mb-1.5 block font-bold text-foreground">ยี่ห้อแอร์ (พิมพ์เอง)</label>
-                    <input name="customBrand" required placeholder="เช่น Daikin, Carrier" className="w-full rounded-xl border border-border px-3.5 py-2.5 text-foreground focus:border-primary focus:outline-none" />
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block font-bold text-foreground">รุ่น (พิมพ์เอง - ไม่บังคับ)</label>
-                    <input name="customModel" placeholder="เช่น Inverter X" className="w-full rounded-xl border border-border px-3.5 py-2.5 text-foreground focus:border-primary focus:outline-none" />
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block font-bold text-foreground">ขนาด BTU (ไม่บังคับ)</label>
-                    <input name="btu" type="number" min="1" step="1" placeholder="เช่น 18000" {...nativeValidity({ rangeUnderflow: "ขนาด BTU ต้องมากกว่า 0", stepMismatch: "ขนาด BTU ต้องเป็นจำนวนเต็ม", badInput: "ขนาด BTU ต้องเป็นตัวเลข" })} className="w-full rounded-xl border border-border px-3.5 py-2.5 text-foreground focus:border-primary focus:outline-none" />
-                  </div>
-                </>
-              )}
+              <div>
+                <label className="mb-1.5 block font-bold text-foreground">ขนาด BTU (ไม่บังคับ)</label>
+                <input
+                  name="btu"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={addBtu}
+                  onChange={(e) => setAddBtu(e.target.value)}
+                  placeholder="เช่น 18000"
+                  {...nativeValidity({ rangeUnderflow: "ขนาด BTU ต้องมากกว่า 0", stepMismatch: "ขนาด BTU ต้องเป็นจำนวนเต็ม", badInput: "ขนาด BTU ต้องเป็นตัวเลข" })}
+                  className="w-full rounded-xl border border-border px-3.5 py-2.5 text-foreground focus:border-primary focus:outline-none"
+                />
+                <p className="mt-1 text-[11px] text-muted-foreground">รุ่นจากระบบ: ไม่กรอก = ใช้ BTU ของรุ่น · รุ่นที่เพิ่มใหม่จะเก็บค่านี้เป็นค่าเริ่มต้นของรุ่น</p>
+              </div>
 
               <UnitPhotoField required disabled={isPending} />
 
@@ -654,7 +735,7 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
                     <label className="mb-1.5 block font-bold text-foreground">ยี่ห้อ (Brand)</label>
                     <NativeSelect value={editSelectedBrandId} onChange={(e) => setEditSelectedBrandId(e.target.value)} required className="w-full h-auto py-3 px-3.5 rounded-xl border-border text-xs text-foreground">
                       <NativeSelectOption value="" disabled>-- เลือกยี่ห้อ --</NativeSelectOption>
-                      {brands.map(b => (
+                      {catalogue.map(b => (
                         <NativeSelectOption key={b.id} value={b.id}>
                           {b.name}
                         </NativeSelectOption>

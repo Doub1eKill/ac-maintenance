@@ -125,10 +125,22 @@ export async function createBuildingAction(
   return buildings.createBuildingAction(...args);
 }
 
+export async function updateBuildingAction(
+  ...args: Parameters<typeof buildings.updateBuildingAction>
+) {
+  return buildings.updateBuildingAction(...args);
+}
+
 export async function createRoomAction(
   ...args: Parameters<typeof rooms.createRoomAction>
 ) {
   return rooms.createRoomAction(...args);
+}
+
+export async function updateRoomAction(
+  ...args: Parameters<typeof rooms.updateRoomAction>
+) {
+  return rooms.updateRoomAction(...args);
 }
 
 export async function createAirConditionerAction(

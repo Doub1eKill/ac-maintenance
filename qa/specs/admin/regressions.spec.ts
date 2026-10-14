@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { test, expect, ledger, shot, note, hydrated, toastText, clearToasts, db, unitPhoto, pickRoom } from "../../lib";
+import { test, expect, ledger, shot, note, hydrated, toastText, clearToasts, db, unitPhoto, pickRoom, pickCatalogue, fillCustomBrand, registerUnitForm } from "../../lib";
 
 // Regressions for the admin-side findings of run 20260913-1742. These write
 // to the database on purpose; qa/baseline.mjs restore puts it back.
@@ -60,10 +60,8 @@ test.describe.serial("assets", () => {
   test("BUG-005: a unit registered from the catalogue takes the model's default BTU", async ({ page }) => {
     const f = fixture();
     await openRegisterUnit(page, f);
-    const form = page.locator("form").filter({ has: page.locator('select[name="acModelId"]') });
-    await form.locator("select").first().selectOption({ label: f.brandName });
-    await page.waitForTimeout(400);
-    await form.locator('select[name="acModelId"]').selectOption(String(f.modelId));
+    const form = registerUnitForm(page);
+    await pickCatalogue(form, f.brandName, f.modelName);
     const hasBtuField = await form.locator('input[name="btu"]').count();
     await form.locator('input[name="photo"]').setInputFiles(unitPhoto());
     await form.getByRole("button", { name: /ลงทะเบียนเครื่องปรับอากาศ/ }).click();
@@ -91,9 +89,8 @@ test.describe.serial("assets", () => {
   test("BUG-006 / BUG-010: a negative or fractional BTU is refused, in Thai, by the browser and by the server", async ({ page }) => {
     const f = fixture();
     await openRegisterUnit(page, f);
-    await page.getByRole("button", { name: /กำหนดเอง/ }).click();
-    const form = page.locator("form").filter({ has: page.locator('input[name="customBrand"]') });
-    await form.locator('input[name="customBrand"]').fill("QA_TEST_BRAND_NEG");
+    const form = registerUnitForm(page);
+    await fillCustomBrand(form, "QA_TEST_BRAND_NEG");
     const btu = form.locator('input[name="btu"]');
     const submit = form.getByRole("button", { name: /ลงทะเบียนเครื่องปรับอากาศ/ });
     await form.locator('input[name="photo"]').setInputFiles(unitPhoto());
@@ -245,9 +242,8 @@ test.describe.serial("work orders", () => {
     await expand(page, main, /^ชั้น 1/, /ห้อง QA-F1/);
     await expand(page, main, /ห้อง QA-F1/, /ลงทะเบียนแอร์/);
     await main.getByRole("button", { name: /ลงทะเบียนแอร์/ }).first().click();
-    await page.getByRole("button", { name: /กำหนดเอง/ }).click();
-    const uform = page.locator("form").filter({ has: page.locator('input[name="customBrand"]') });
-    await uform.locator('input[name="customBrand"]').fill("QA_TEST_BRAND_FOCUS");
+    const uform = registerUnitForm(page);
+    await fillCustomBrand(uform, "QA_TEST_BRAND_FOCUS");
     await uform.locator('input[name="photo"]').setInputFiles(unitPhoto());
     await clearToasts(page);
     await uform.getByRole("button", { name: /ลงทะเบียนเครื่องปรับอากาศ/ }).click();

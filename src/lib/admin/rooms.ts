@@ -1,7 +1,8 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { verifyOrgAdmin } from "@/lib/auth-guards";
+import { verifyAssetEditor, verifyOrgAdmin } from "@/lib/auth-guards";
+import { logAudit } from "@/lib/audit";
 
 // Rooms — the middle of the asset hierarchy, between a building and its units.
 const roomSchema = z.object({
@@ -68,3 +69,63 @@ export async function createRoomAction(formData: FormData) {
   }
 }
 
+
+const roomUpdateSchema = roomSchema.omit({ buildingId: true });
+
+/**
+ * Rename a room, or move it to another floor. As with buildings, units already
+ * in it keep their codes (the room name is the middle of an acCode, printed on
+ * the sticker); units registered afterwards use the new name, numbered on from
+ * the units already there.
+ *
+ * Technicians may do this too (the owner's call, 14 Oct 2026): they are the ones
+ * standing in the room and see when its label is wrong. Buildings stay with the
+ * org admin — a building's abbreviation starts every code registered in it.
+ */
+export async function updateRoomAction(formData: FormData) {
+  const session = await verifyAssetEditor();
+
+  const rawId = String(formData.get("id") ?? "");
+  if (!/^\d+$/.test(rawId)) return { error: "ห้องไม่ถูกต้อง" };
+  const id = BigInt(rawId);
+
+  const parsed = roomUpdateSchema.safeParse({
+    name: String(formData.get("name") ?? "").trim(),
+    floor: formData.get("floor") ?? "",
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message || "ข้อมูลไม่ถูกต้อง" };
+  const { name, floor } = parsed.data;
+
+  try {
+    const room = await prisma.room.findUnique({ where: { id } });
+    if (!room) return { error: "ไม่พบห้องนี้ อาจถูกลบไปแล้ว" };
+    if (room.name === name && room.floor === floor) return { success: true };
+
+    if (room.name !== name) {
+      const clash = await prisma.room.findUnique({
+        where: { buildingId_name: { buildingId: room.buildingId, name } },
+        select: { id: true },
+      });
+      if (clash) return { error: "มีห้องนี้อยู่ในอาคารแล้ว" };
+    }
+
+    await prisma.room.update({ where: { id }, data: { name, floor, updatedAt: new Date() } });
+
+    await logAudit({
+      userId: BigInt(session.user.id!),
+      action: "UPDATE_ROOM",
+      entityType: "room",
+      entityId: id,
+      oldValues: { name: room.name, floor: room.floor },
+      newValues: { name, floor },
+      ipAddress: "server_action",
+    });
+
+    revalidatePath("/admin", "layout");
+    revalidatePath("/tech", "layout");
+    return { success: true };
+  } catch (error) {
+    console.error(error);
+    return { error: "เกิดข้อผิดพลาดในการบันทึกห้อง" };
+  }
+}

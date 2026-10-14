@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { verifyOrgAdmin } from "@/lib/auth-guards";
+import { logAudit } from "@/lib/audit";
 
 // Buildings — the top of the asset hierarchy. Split out of the former
 // assets.ts, which had grown to hold buildings, rooms, units, service history
@@ -59,3 +60,54 @@ export async function createBuildingAction(formData: FormData) {
   }
 }
 
+/**
+ * Rename a building, or change its abbreviation. Units already registered keep
+ * their codes: an acCode is printed on the sticker on the machine and is how
+ * people find it, so it is fixed at registration (as createAirConditionerAction
+ * says). Only units registered afterwards start with the new abbreviation.
+ */
+export async function updateBuildingAction(formData: FormData) {
+  const session = await verifyOrgAdmin();
+
+  const rawId = String(formData.get("id") ?? "");
+  if (!/^\d+$/.test(rawId)) return { error: "อาคารไม่ถูกต้อง" };
+  const id = BigInt(rawId);
+
+  const parsed = buildingSchema.safeParse({
+    name: formData.get("name"),
+    abbreviation: formData.get("abbreviation"),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message || "ข้อมูลไม่ถูกต้อง" };
+  const { name, abbreviation } = parsed.data;
+
+  try {
+    const building = await prisma.building.findUnique({ where: { id } });
+    if (!building) return { error: "ไม่พบอาคารนี้ อาจถูกลบไปแล้ว" };
+    if (building.name === name && building.abbreviation === abbreviation) return { success: true };
+
+    const clash = await prisma.building.findFirst({
+      where: { id: { not: id }, OR: [{ name }, { abbreviation }] },
+      select: { id: true },
+    });
+    if (clash) return { error: "มีชื่อหรือตัวย่ออาคารนี้ในระบบแล้ว" };
+
+    await prisma.building.update({ where: { id }, data: { name, abbreviation, updatedAt: new Date() } });
+
+    await logAudit({
+      userId: BigInt(session.user.id!),
+      action: "UPDATE_BUILDING",
+      entityType: "building",
+      entityId: id,
+      oldValues: { name: building.name, abbreviation: building.abbreviation },
+      newValues: { name, abbreviation },
+      ipAddress: "server_action",
+    });
+
+    revalidatePath("/admin", "layout");
+    revalidatePath("/tech", "layout");
+    return { success: true };
+  } catch (error) {
+    console.error(error);
+    return { error: "เกิดข้อผิดพลาดในการบันทึกอาคาร" };
+  }
+}

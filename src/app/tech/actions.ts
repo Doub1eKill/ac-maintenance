@@ -26,6 +26,7 @@ import * as pages from "@/lib/tech/pages";
 import * as masterData from "@/lib/admin/master-data";
 import * as airConditioners from "@/lib/admin/air-conditioners";
 import * as schedules from "@/lib/admin/schedules";
+import * as rooms from "@/lib/admin/rooms";
 
 // --- dashboard ---
 
@@ -130,4 +131,16 @@ export async function saveMaintenanceScheduleAction(
   ...args: Parameters<typeof schedules.saveMaintenanceScheduleAction>
 ) {
   return schedules.saveMaintenanceScheduleAction(...args);
+}
+
+// --- rooms ---
+//
+// Renaming a room or moving it to another floor; verifyAssetEditor lets a
+// technician through. Creating rooms and anything on buildings stays admin-only
+// and has no wrapper here.
+
+export async function updateRoomAction(
+  ...args: Parameters<typeof rooms.updateRoomAction>
+) {
+  return rooms.updateRoomAction(...args);
 }

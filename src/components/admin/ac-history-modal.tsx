@@ -6,7 +6,7 @@ import { X, Clock, MapPin, Wrench, Loader2, Pencil } from "lucide-react";
 import { getAirConditionerHistory, updateMaintenanceLogAction } from "@/app/admin/actions";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
-import { UnitThumb } from "@/components/shared/unit-thumb";
+import { UnitPhoto } from "@/components/shared/unit-photo";
 import { EvidencePhotos } from "@/components/shared/evidence-photos";
 import { useEscapeToClose } from "@/hooks/use-escape-to-close";
 import { MAINTENANCE_ACTION_LABEL, formatThaiDate } from "@/lib/labels";
@@ -157,7 +157,7 @@ export function AcHistoryModal({ airConditionerId, onClose, currentUserId, isAdm
 
         {unit && (
           <div className="flex items-start gap-3 rounded-xl border border-border bg-muted p-3.5 text-xs">
-            <UnitThumb src={unit.photoUrl} alt={`เครื่อง ${unit.acCode}`} size="lg" />
+            <UnitPhoto src={unit.photoUrl} acCode={unit.acCode} size="lg" />
             <div className="min-w-0 space-y-1.5">
               <div className="font-bold text-foreground text-sm">
                 {unit.brand} {unit.model ? `• ${unit.model}` : ""} {unit.btu ? `(${unit.btu.toLocaleString()} BTU)` : ""}

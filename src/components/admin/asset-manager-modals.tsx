@@ -9,6 +9,7 @@ import { formatUnitLocation } from "@/lib/location";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import type { ACUnit, QrModalData } from "@/components/admin/asset-manager-types";
 import type { FormEvent } from "react";
+import { KeptCodesNote } from "@/components/shared/edit-room-modal";
 
 // The asset manager's simpler dialogs, lifted out of asset-manager.tsx as they
 // were. Each shows what it is given and hands its form back through onSubmit;
@@ -40,6 +41,38 @@ export function AddBuildingModal({ isPending, onClose, onSubmit }: { isPending: 
           </div>
           <button type="submit" disabled={isPending} className="w-full rounded-xl bg-primary py-2.5 font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
             {isPending ? "กำลังบันทึก..." : "บันทึกอาคาร"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+/** The building being edited, as the tree has it. */
+export type EditBuildingTarget = { id: string; name: string; abbreviation: string; unitCount: number };
+
+export function EditBuildingModal({ target, isPending, onClose, onSubmit }: { target: EditBuildingTarget; isPending: boolean; onClose: () => void; onSubmit: SubmitHandler }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-xs p-4">
+      <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-xl space-y-4 animate-in fade-in">
+        <div className="flex items-center justify-between border-b border-border pb-3">
+          <h3 className="text-base font-bold text-foreground">แก้ไขอาคาร</h3>
+          <button onClick={onClose} aria-label="ปิด" className="text-muted-foreground hover:text-foreground">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <form onSubmit={onSubmit} className="space-y-4 text-xs">
+          <div>
+            <label htmlFor="edit-building-name" className="mb-1.5 block font-bold text-foreground">ชื่ออาคาร</label>
+            <input id="edit-building-name" name="name" required defaultValue={target.name} className="w-full rounded-xl border border-border px-3.5 py-2.5 text-foreground focus:border-primary focus:outline-none" />
+          </div>
+          <div>
+            <label htmlFor="edit-building-abbreviation" className="mb-1.5 block font-bold text-foreground">ตัวย่อ (สำหรับรหัสแอร์)</label>
+            <input id="edit-building-abbreviation" name="abbreviation" required maxLength={10} defaultValue={target.abbreviation} className="w-full font-mono rounded-xl border border-border px-3.5 py-2.5 text-foreground focus:border-primary focus:outline-none" />
+          </div>
+          <KeptCodesNote unitCount={target.unitCount} what="ตัวย่อ" />
+          <button type="submit" disabled={isPending} className="w-full rounded-xl bg-primary py-2.5 font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+            {isPending ? "กำลังบันทึก..." : "บันทึกการแก้ไข"}
           </button>
         </form>
       </div>
