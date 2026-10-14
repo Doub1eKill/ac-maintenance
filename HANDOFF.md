@@ -1,6 +1,13 @@
 # Project Handoff & Technical Summary
 
-# 📌 สถานะล่าสุด (7 ต.ค. 2026, DoubleKill) — อ่านตรงนี้ก่อน
+# 📌 สถานะล่าสุด (14 ต.ค. 2026, DoubleKill) — อ่านตรงนี้ก่อน
+
+> ## ⛔ production ใช้ข้อมูลจริงแล้ว (14 ต.ค. 2026) — ห้ามรัน QA sweep / `baseline.mjs` / `prisma seed` กับ Aiven
+> เจ้าของสั่ง "ล้างข้อมูลจำลองแล้วเริ่มใช้ข้อมูลจริง" · ล้างใน transaction เดียว (`C:\Project\ac-maintenance-qa\go-live-cleanup-20261014.sql`): ใบงาน · ประวัติงาน · รอบบำรุงรักษา · แอร์ · ห้อง · อาคาร · **ยี่ห้อและรุ่นทั้งหมด** (เจ้าของเลือกลบ) · audit · OTP · login_failures · บัญชีทุกคนยกเว้น **org_admin id 26** (เจ้าของเลือก — ช่าง 31/32/33 ต้องสมัครใหม่แล้วอนุมัติ) · `overdue_sync_at` = NULL · Blob ลบ 8 ไฟล์ เหลือรูปโปรไฟล์ของ 26 ไฟล์เดียว
+> - **ผลหลังล้าง:** users 1 (26) · phones 1 · ที่เหลือ 0 ทุกตาราง · system_settings 1 แถว · `/login` `/register` 200 · `/admin` → `/login` · `/qr/<uuid ไม่มีจริง>` 404
+> - **สำรองก่อนล้าง (มีอีเมล/เบอร์จริง เก็บในเครื่องเท่านั้น):** `C:\Project\ac-maintenance-qa\backup-before-go-live-20261014.json` (ทุกตาราง, jsonb) + โฟลเดอร์ `…-blobs` (9 ไฟล์) · pg_dump ในเครื่องเป็น 17 ใช้กับ server 18 ไม่ได้
+> - **QA harness ใช้กับ production ไม่ได้แล้ว:** setup พึ่งบัญชี seed (admin id 2, ช่าง Craig Yost id 3) ที่ลบไปแล้ว · `baseline.mjs restore` ลบทุกแถวที่ id เกิน snapshot = **จะลบข้อมูลจริง** → snapshot เดิมเปลี่ยนชื่อเป็น `baseline.seed-data-RETIRED-20261014.json` แล้ว (restore จึงรันไม่ได้) · **เจ้าของเลือก: ตั้งฐานข้อมูลทดสอบแยก** แล้วชี้ harness ไปที่นั่น — ยังไม่ได้ทำ ต้องทำก่อน sweep ครั้งต่อไป
+> - **ค้างเพราะไม่มี sweep:** CSP แบบบังคับใช้ (`8d4d731` อยู่ใน master ในเครื่อง ยังไม่ push — sweep 7 ต.ค. ผ่านแล้ว รอเจ้าของทดสอบบนมือถือพร้อมดู Live log) · LCP branch (ตาราง `web_vital_samples` ยังอยู่บน Aiven ว่าง 0 แถว)
 
 **master = origin/master** · Vercel deploy ล่าสุด success · **GitHub Actions CI** (`.github/workflows/ci.yml`: typecheck · lint · vitest) รันครั้งแรกผ่าน — https://github.com/Doub1eKill/ac-maintenance/actions/runs/37306907722 · full sweep ล่าสุด `csp-ci-20261005`: 88/88 · ledger PASS 252 · FAIL 0 · SKIP 5 · unit 53/53 · DB restore แล้ว
 
@@ -13,7 +20,7 @@
 2. **เฝ้า CSP report-only:** ค้น `[csp]` ใน log ของ Vercel หลังใช้งานจริงสักพัก ถ้าเงียบ → ย้าย `cspReportOnly` ใน `next.config.ts` เข้า header `Content-Security-Policy` ที่บังคับใช้ (preview deployment อาจมี report จาก vercel.live ไม่ต้องสนใจ) · **7 ต.ค.:** sweep `field-lcp-20261007` เปิดทุกหน้าบน production build ไม่มี violation จากแอป (`[csp]` มีแค่ 2 บรรทัดที่ test ส่งเอง) · log บน Vercel ยังไม่ได้ดู (เครื่องนี้ไม่มี Vercel CLI)
 3. **เก็บ LCP ภาคสนามสำหรับบทความ:** branch `feat/field-lcp` (`7e6b5c7`) · ✅ migration apply แล้ว · ✅ sweep ผ่าน (test ที่ล้มเป็นปัญหาของ test แก้แล้ว) · รอเจ้าของอนุมัติ merge/deploy (ดู entry "📈" ด้านล่าง)
 4. **เฝ้าดูอย่างเดียว:** claim ล้มแบบ transient (1 ต.ค., ไม่เกิดซ้ำ) · `/tech` reload วนบน Next dev (หยุดเกิดตั้งแต่ 3 ต.ค.)
-5. **ยังไม่มี QA spec:** หน้าต่างแจ้งงานค้างถูกครอบแล้วใน `accounts.spec.ts` · ที่ยังไม่มีคือการแสดงชื่อคนที่ถูกลบในหน้าประวัติ (เช็คแค่ระดับ DB)
+5. ✅ **QA spec ชื่อคนที่ถูกลบในหน้าประวัติ** (`c452ae3`) · ✅ **dashboard "ยังไม่มีรูปเครื่อง"** (`c024b6f`) — sweep `csp-photo-20261007` 88/89 (ตัวที่ล้มคือ regex ของ test ใหม่เอง แก้แล้วรันซ้ำผ่าน) · SKIP ใหม่ 1: omnibox ไม่มีเครื่องที่มีแต่ใบงานยกเลิก (เดิมใช้ WO #138 ที่ล้างไป)
 
 **ตั้งใจไม่ทำ (เกณฑ์: ความเสี่ยงที่พฤติกรรมเปลี่ยนโดยไม่มี test จับ > ประโยชน์)**
 - wrapper ครอบ server action 29 ตัว — ข้อความไทยของแต่ละ action 115 จุด ต้องแก้ทุกไฟล์ใน lib/admin lib/tech เสี่ยงเปลี่ยนสิ่งที่ผู้ใช้อ่าน ขณะที่ guard ครบแล้วผ่าน `sessionWithRole` ที่เดียว
@@ -21,7 +28,7 @@
 - แยก `register-form.tsx` (594) — ฟอร์มเดียว state ไหลต่อกัน email → OTP → submit
 - แยก modal เพิ่ม/แก้เครื่องใน asset-manager — ผูก state เลือกยี่ห้อ/รุ่นหลายตัวของหน้าหลัก (modal ที่แยกง่ายแยกไปแล้วในระยะ 4)
 
-**กติกาเดิมยังใช้ทั้งหมด:** DB มีตัวเดียว (Aiven production) · QA ต้อง snapshot ก่อน/restore หลัง และห้ามรันขณะเจ้าของใช้ระบบ · ห้าม `prisma seed` · migration ตรวจด้วย `migrate diff --from-config-datasource` ก่อน `migrate deploy` · HANDOFF.md เป็น CRLF · เช็ค line ending ก่อนแก้ไฟล์
+**กติกาเดิมยังใช้ทั้งหมด:** DB มีตัวเดียว (Aiven production) — **ตั้งแต่ 14 ต.ค. เป็นข้อมูลจริง ห้าม QA sweep/snapshot/restore กับมันจนกว่าจะมีฐานข้อมูลทดสอบแยก** · ห้าม `prisma seed` · migration ตรวจด้วย `migrate diff --from-config-datasource` ก่อน `migrate deploy` · HANDOFF.md เป็น CRLF · เช็ค line ending ก่อนแก้ไฟล์
 
 # 🗺️ แผน Optimize + Refactor (วาง 3 ต.ค. 2026, DoubleKill) — ระยะ 1 ✅ · ระยะ 2 ✅ · ระยะ 3 ✅ · ระยะ 4 ✅ (3–4 ต.ค.) · **แผนนี้ปิดแล้ว**
 
