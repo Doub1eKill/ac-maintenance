@@ -187,3 +187,4 @@ export async function createAcModelAction(formData: FormData) {
 // caller keeps importing the catalogue from here.
 export * from "@/lib/admin/master-data-rename";
 export * from "@/lib/admin/master-data-trash";
+export * from "@/lib/admin/master-data-promote";

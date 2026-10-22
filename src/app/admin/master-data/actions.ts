@@ -39,6 +39,26 @@ export async function createAcModelAction(
   return masterData.createAcModelAction(...args);
 }
 
+// --- moving typed-in brands and models into the catalogue ---
+
+export async function getCustomUnitGroups(
+  ...args: Parameters<typeof masterData.getCustomUnitGroups>
+) {
+  return masterData.getCustomUnitGroups(...args);
+}
+
+export async function addCustomBrandModelToCatalogueAction(
+  ...args: Parameters<typeof masterData.addCustomBrandModelToCatalogueAction>
+) {
+  return masterData.addCustomBrandModelToCatalogueAction(...args);
+}
+
+export async function linkCustomUnitsToCatalogueAction(
+  ...args: Parameters<typeof masterData.linkCustomUnitsToCatalogueAction>
+) {
+  return masterData.linkCustomUnitsToCatalogueAction(...args);
+}
+
 // --- renaming ---
 
 export async function updateAcBrandAction(

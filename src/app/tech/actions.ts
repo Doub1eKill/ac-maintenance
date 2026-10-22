@@ -97,6 +97,16 @@ export async function createAcModelAction(
   return masterData.createAcModelAction(...args);
 }
 
+// The กำหนดเอง tab's "เพิ่มเข้าระบบ": the typed brand and model become a
+// catalogue entry the form can select. Linking units that were already saved
+// as text is admin-only and has no wrapper here.
+
+export async function addCustomBrandModelToCatalogueAction(
+  ...args: Parameters<typeof masterData.addCustomBrandModelToCatalogueAction>
+) {
+  return masterData.addCustomBrandModelToCatalogueAction(...args);
+}
+
 // Correcting a name that was typed wrong, which is why these are here and the
 // delete/restore pair still is not: a rename relabels a row that stays, so
 // nothing a unit points at goes missing.

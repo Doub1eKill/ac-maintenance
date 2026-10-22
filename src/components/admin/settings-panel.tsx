@@ -13,6 +13,7 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { MasterDataClient, type BrandType } from "@/app/admin/master-data/master-data-client";
+import type { CustomUnitGroup } from "@/lib/admin/custom-unit-groups";
 import {
   updateDefaultFrequencyAction,
   updateOrganisationInfoAction,
@@ -21,16 +22,17 @@ import {
 
 interface SettingsPanelProps {
   brands: BrandType[];
+  customUnitGroups: CustomUnitGroup[];
   organisationInfo: { name: string; address: string | null; phone: string | null };
   defaultFrequency: { value: number; unit: string };
 }
 
-export function SettingsPanel({ brands, organisationInfo, defaultFrequency }: SettingsPanelProps) {
+export function SettingsPanel({ brands, customUnitGroups, organisationInfo, defaultFrequency }: SettingsPanelProps) {
   return (
     <div className="space-y-6 max-w-4xl animate-in fade-in">
       <DefaultFrequencyCard defaultFrequency={defaultFrequency} />
       <OrganisationInfoCard organisationInfo={organisationInfo} />
-      <MasterDataCard brands={brands} />
+      <MasterDataCard brands={brands} customUnitGroups={customUnitGroups} />
       <AuditLogCard />
     </div>
   );
@@ -184,7 +186,7 @@ function OrganisationInfoCard({
   );
 }
 
-function MasterDataCard({ brands }: { brands: BrandType[] }) {
+function MasterDataCard({ brands, customUnitGroups }: { brands: BrandType[]; customUnitGroups: CustomUnitGroup[] }) {
   const totalModels = brands.reduce((sum, b) => sum + b.modelsCount, 0);
 
   return (
@@ -198,7 +200,7 @@ function MasterDataCard({ brands }: { brands: BrandType[] }) {
           {brands.length} ยี่ห้อ • {totalModels} รุ่น
         </span>
       </div>
-      <MasterDataClient initialBrands={brands} />
+      <MasterDataClient initialBrands={brands} customUnitGroups={customUnitGroups} />
     </div>
   );
 }

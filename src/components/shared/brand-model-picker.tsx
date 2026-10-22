@@ -2,8 +2,13 @@
 
 import { toast } from "sonner";
 import { useState } from "react";
+import { FolderInput } from "lucide-react";
 import { SearchableSelect, type SearchableOption } from "@/components/shared/searchable-select";
-import { createAcBrandAction, createAcModelAction } from "@/app/tech/actions";
+import {
+  addCustomBrandModelToCatalogueAction,
+  createAcBrandAction,
+  createAcModelAction,
+} from "@/app/tech/actions";
 
 export interface CatalogueModel {
   id: string;
@@ -123,6 +128,31 @@ export function BrandModelPicker({
     }
   }
 
+  // The typed brand and model become a catalogue entry, and the form switches
+  // to it — so the unit is saved against the model, not as text nobody else
+  // can pick. An existing entry of the same name is selected instead of
+  // duplicated.
+  async function handleAddCustomToCatalogue() {
+    setCreating(true);
+    try {
+      const formData = new FormData();
+      formData.append("brand", value.customBrand);
+      formData.append("model", value.customModel);
+      formData.append("defaultBtu", btu);
+      const res = await addCustomBrandModelToCatalogueAction(formData);
+      if (res.error || !res.brandId || !res.modelId) {
+        toast.error(res.error ?? "เพิ่มเข้าระบบไม่สำเร็จ");
+        return;
+      }
+      await onCatalogueChanged();
+      onChange({ ...emptyBrandModel, brandId: res.brandId, modelId: res.modelId });
+      const label = `${value.customBrand.trim()} ${value.customModel.trim()}`;
+      toast.success(res.created ? `เพิ่ม "${label}" เข้าระบบแล้ว` : `"${label}" มีอยู่ในระบบแล้ว เลือกให้แล้ว`);
+    } finally {
+      setCreating(false);
+    }
+  }
+
   return (
     <div className="space-y-3">
       <div className="flex rounded-lg bg-secondary p-0.5 text-[11px]">
@@ -182,27 +212,41 @@ export function BrandModelPicker({
           </div>
         </>
       ) : (
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <label className="mb-1 block text-[11px] font-bold text-foreground">ยี่ห้อ</label>
-            <input
-              type="text"
-              value={value.customBrand}
-              onChange={(e) => onChange({ ...value, customBrand: e.target.value })}
-              placeholder="เช่น Carrier"
-              className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-xs text-foreground focus:border-primary focus:outline-none"
-            />
+        <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="mb-1 block text-[11px] font-bold text-foreground">ยี่ห้อ</label>
+              <input
+                type="text"
+                value={value.customBrand}
+                onChange={(e) => onChange({ ...value, customBrand: e.target.value })}
+                placeholder="เช่น Carrier"
+                className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-xs text-foreground focus:border-primary focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] font-bold text-foreground">รุ่น</label>
+              <input
+                type="text"
+                value={value.customModel}
+                onChange={(e) => onChange({ ...value, customModel: e.target.value })}
+                placeholder="ไม่บังคับ"
+                className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-xs text-foreground focus:border-primary focus:outline-none"
+              />
+            </div>
           </div>
-          <div>
-            <label className="mb-1 block text-[11px] font-bold text-foreground">รุ่น</label>
-            <input
-              type="text"
-              value={value.customModel}
-              onChange={(e) => onChange({ ...value, customModel: e.target.value })}
-              placeholder="ไม่บังคับ"
-              className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-xs text-foreground focus:border-primary focus:outline-none"
-            />
-          </div>
+          <button
+            type="button"
+            onClick={handleAddCustomToCatalogue}
+            disabled={creating || !value.customBrand.trim() || !value.customModel.trim()}
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-primary/40 bg-primary/5 px-3 py-2 text-[11px] font-bold text-primary hover:bg-primary/10 disabled:opacity-50 transition-colors"
+          >
+            <FolderInput className="h-3.5 w-3.5" />
+            {creating ? "กำลังเพิ่ม..." : "เพิ่มยี่ห้อและรุ่นนี้เข้าระบบ"}
+          </button>
+          {!value.customModel.trim() && (
+            <p className="text-[10px] text-muted-foreground">ระบุรุ่นก่อนจึงจะเพิ่มเข้าระบบได้</p>
+          )}
         </div>
       )}
     </div>

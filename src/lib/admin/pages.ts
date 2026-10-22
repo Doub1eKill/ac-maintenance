@@ -6,7 +6,7 @@ import { isOnline } from "@/lib/presence";
 import { USER_STATUS_LABEL } from "@/lib/labels";
 import { syncOverdueMaintenanceWorkOrders } from "@/lib/maintenance";
 import { getOrganisationName, getOrganisationInfo, getDefaultMaintenanceFrequency } from "@/lib/organisation";
-import { getAcMasterData } from "@/lib/admin/master-data";
+import { getAcMasterData, getCustomUnitGroups } from "@/lib/admin/master-data";
 import {
   WORK_ORDER_BOARD_LIMIT,
   workOrderBoardSelect,
@@ -295,12 +295,13 @@ export async function getCalendarPageData() {
 
 export async function getSettingsPageData() {
   await verifyOrgAdmin();
-  const [{ brands }, organisationInfo, defaultFrequency] = await Promise.all([
+  const [{ brands }, customUnitGroups, organisationInfo, defaultFrequency] = await Promise.all([
     getAcMasterData(),
+    getCustomUnitGroups(),
     getOrganisationInfo(),
     getDefaultMaintenanceFrequency(),
   ]);
-  return { masterDataBrands: brands, organisationInfo, defaultFrequency };
+  return { masterDataBrands: brands, customUnitGroups, organisationInfo, defaultFrequency };
 }
 
 /**

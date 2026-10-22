@@ -10,8 +10,10 @@ import {
   deleteAcModelAction,
   updateAcBrandAction,
   updateAcModelAction,
+  linkCustomUnitsToCatalogueAction,
 } from "./actions";
-import { Plus, Check, ChevronDown, ChevronRight, Wind, Trash2, Pencil } from "lucide-react";
+import { Plus, Check, ChevronDown, ChevronRight, Wind, Trash2, Pencil, FolderInput } from "lucide-react";
+import type { CustomUnitGroup } from "@/lib/admin/custom-unit-groups";
 import { TrashModal } from "./trash-modal";
 
 export type ModelType = {
@@ -29,13 +31,21 @@ export type BrandType = {
   models: ModelType[];
 };
 
-export function MasterDataClient({ initialBrands }: { initialBrands: BrandType[] }) {
+export function MasterDataClient({
+  initialBrands,
+  customUnitGroups = [],
+}: {
+  initialBrands: BrandType[];
+  customUnitGroups?: CustomUnitGroup[];
+}) {
   const [expandedBrand, setExpandedBrand] = useState<string | null>(null);
   const [showTrash, setShowTrash] = useState(false);
 
   return (
     <div className="space-y-6">
       <AddBrandCard />
+
+      {customUnitGroups.length > 0 && <CustomUnitsCard groups={customUnitGroups} />}
 
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-4">
@@ -125,6 +135,143 @@ function AddBrandCard() {
           </button>
         </form>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Units saved under "กำหนดเอง", grouped by what was typed, each with a button
+ * that adds the brand and model to the catalogue and moves the units onto it.
+ * Hidden once nothing is left on free text.
+ */
+function CustomUnitsCard({ groups }: { groups: CustomUnitGroup[] }) {
+  const totalUnits = groups.reduce((sum, g) => sum + g.units.length, 0);
+
+  return (
+    <div className="biz-card overflow-hidden bg-card border border-border shadow-sm rounded-2xl">
+      <div className="p-5 sm:p-6 border-b border-border space-y-1">
+        <h3 className="text-base font-bold text-foreground">แอร์ที่ใช้ยี่ห้อ/รุ่นกำหนดเอง</h3>
+        <p className="text-xs text-muted-foreground">
+          {totalUnits} เครื่องบันทึกยี่ห้อหรือรุ่นแบบพิมพ์เอง กดเพิ่มเข้าระบบเพื่อสร้างยี่ห้อและรุ่นนั้นในรายการ
+          แล้วผูกแอร์ทุกเครื่องในกลุ่มเข้ากับรุ่นนั้น ถ้ามียี่ห้อหรือรุ่นชื่อเดียวกันอยู่แล้วจะใช้ตัวเดิม
+        </p>
+      </div>
+      <div className="divide-y divide-border">
+        {groups.map((group) => (
+          <CustomUnitRow key={group.key} group={group} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CustomUnitRow({ group }: { group: CustomUnitGroup }) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [open, setOpen] = useState(false);
+  const [brand, setBrand] = useState(group.brand);
+  const [model, setModel] = useState(group.model);
+  const [btu, setBtu] = useState(group.commonBtu === null ? "" : String(group.commonBtu));
+
+  const shownCodes = group.units.slice(0, 6).map((u) => u.acCode).join(", ");
+  const moreCodes = group.units.length - 6;
+
+  function handleLink() {
+    startTransition(async () => {
+      const formData = new FormData();
+      formData.append("groupKey", group.key);
+      formData.append("brand", brand);
+      formData.append("model", model);
+      formData.append("defaultBtu", btu);
+      const result = await linkCustomUnitsToCatalogueAction(formData);
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success(`เพิ่ม "${brand.trim()} ${model.trim()}" เข้าระบบ และผูกแอร์ ${result.linked} เครื่องแล้ว`);
+      setOpen(false);
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="p-4 sm:px-6 space-y-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-bold text-foreground truncate">
+            {group.brand}{" "}
+            {group.model ? group.model : <span className="font-normal text-muted-foreground">(ไม่ได้ระบุรุ่น)</span>}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {group.units.length} เครื่อง: {shownCodes}
+            {moreCodes > 0 && ` และอีก ${moreCodes} เครื่อง`}
+          </p>
+        </div>
+        {!open && (
+          <button
+            onClick={() => setOpen(true)}
+            className="shrink-0 inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            <FolderInput className="h-3.5 w-3.5" /> เพิ่มเข้าระบบ
+          </button>
+        )}
+      </div>
+
+      {open && (
+        <div className="rounded-xl border border-border bg-muted/50 p-3 space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div>
+              <label className="mb-1 block text-[11px] font-bold text-foreground">ยี่ห้อ</label>
+              <input
+                value={brand}
+                onChange={(e) => setBrand(e.target.value)}
+                disabled={isPending}
+                className="w-full rounded-xl border border-border bg-card px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] font-bold text-foreground">รุ่น</label>
+              <input
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                placeholder="ต้องระบุรุ่น"
+                disabled={isPending}
+                className="w-full rounded-xl border border-border bg-card px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] font-bold text-foreground">BTU มาตรฐาน</label>
+              <input
+                value={btu}
+                onChange={(e) => setBtu(e.target.value)}
+                type="number"
+                placeholder="ไม่บังคับ"
+                disabled={isPending}
+                className="w-full rounded-xl border border-border bg-card px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
+              />
+            </div>
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            แก้ชื่อให้ถูกก่อนเพิ่มได้ แอร์แต่ละเครื่องยังใช้ค่า BTU เดิมของตัวเอง เครื่องที่ไม่มีค่า BTU จะได้ค่ามาตรฐานนี้
+          </p>
+          <div className="flex items-center justify-end gap-2">
+            <button
+              onClick={() => setOpen(false)}
+              disabled={isPending}
+              className="rounded-xl border border-border bg-card px-4 py-2 text-xs font-bold text-foreground hover:bg-muted disabled:opacity-50 transition-colors"
+            >
+              ยกเลิก
+            </button>
+            <button
+              onClick={handleLink}
+              disabled={isPending || !brand.trim() || !model.trim()}
+              className="rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+            >
+              {isPending ? "กำลังบันทึก..." : `ยืนยัน ผูก ${group.units.length} เครื่อง`}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
