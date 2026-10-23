@@ -126,15 +126,18 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
   // The catalogue after the picker added to it; until then, the server's.
   const [freshCatalogue, setFreshCatalogue] = useState<BrandItem[] | null>(null);
 
-  // Edit AC form state — defaults to "other" (free text) because the unit
-  // list only carries the resolved brand/model strings, not the catalog
-  // acBrandId/acModelId to preselect the master dropdowns with. installedAt
-  // isn't in the list either, so it's fetched fresh when the modal opens —
-  // leaving it blank here would silently clear a real install date on save,
-  // since the update action treats an empty date as "clear it" (unlike
-  // registration, where empty means "today").
-  const [editAcBrandType, setEditAcBrandType] = useState<"master" | "other">("other");
-  const [editSelectedBrandId, setEditSelectedBrandId] = useState<string>("");
+  // Edit AC form state. The unit list only carries display names, so what the
+  // record actually holds — catalogue ids or typed-in text — is fetched fresh
+  // when the modal opens, with installedAt. Saving waits for that load: the
+  // form used to open every unit on the typed-in tab filled with the display
+  // names, and saving a status change then unbound a catalogue unit from its
+  // model. installedAt the same way — left blank it would clear a real
+  // install date on save, since the update action treats "" as "clear it".
+  // BTU sits outside the picker so both tabs keep the unit's own value; it
+  // used to exist on the typed-in tab only, and a save from the catalogue tab
+  // replaced the unit's BTU with the model's default.
+  const [editPicked, setEditPicked] = useState<BrandModelValue>(emptyBrandModel);
+  const [editBtu, setEditBtu] = useState("");
   const [editAcInstalledAt, setEditAcInstalledAt] = useState<string>("");
   const [editAcPhotoUrl, setEditAcPhotoUrl] = useState<string | null>(null);
   const [isLoadingEditAc, setIsLoadingEditAc] = useState(false);
@@ -341,8 +344,8 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
 
   function handleOpenEditAc(ac: ACUnit) {
     setShowEditAc(ac);
-    setEditAcBrandType("other");
-    setEditSelectedBrandId("");
+    setEditPicked(emptyBrandModel);
+    setEditBtu(ac.btu === null ? "" : String(ac.btu));
     setEditAcInstalledAt("");
     setEditAcPhotoUrl(null);
     setEditAcLoadFailed(false);
@@ -357,6 +360,17 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
       } else {
         setEditAcInstalledAt(result.unit.installedAt ? result.unit.installedAt.slice(0, 10) : "");
         setEditAcPhotoUrl(result.unit.photoUrl);
+        setEditBtu(result.unit.btu === null ? "" : String(result.unit.btu));
+        setEditPicked(
+          result.unit.acModelId
+            ? { ...emptyBrandModel, brandId: result.unit.acBrandId, modelId: result.unit.acModelId }
+            : {
+                ...emptyBrandModel,
+                brandType: "other",
+                customBrand: result.unit.customBrand ?? "",
+                customModel: result.unit.customModel ?? "",
+              }
+        );
       }
       setIsLoadingEditAc(false);
     });
@@ -367,7 +381,15 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
     if (!showEditAc) return;
     const formData = new FormData(e.currentTarget);
     formData.append("airConditionerId", showEditAc.id);
-    formData.append("brandType", editAcBrandType);
+    if (editPicked.brandType === "master" && !editPicked.modelId) {
+      toast.error("กรุณาเลือกรุ่นแอร์");
+      return;
+    }
+    if (editPicked.brandType === "other" && !editPicked.customBrand.trim()) {
+      toast.error("กรุณาระบุยี่ห้อแอร์");
+      return;
+    }
+    appendBrandModel(formData, editPicked);
 
     startTransition(async () => {
       const res = await updateAirConditionerAction(formData);
@@ -395,7 +417,6 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
   }
 
   const catalogue = freshCatalogue ?? brands;
-  const editSelectedBrand = catalogue.find(b => b.id === editSelectedBrandId);
 
   return (
     <div className="biz-card p-6 space-y-5 animate-in fade-in">
@@ -565,6 +586,7 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
                           <div className="grid grid-cols-2 gap-1.5 pt-2 border-t border-border">
                             <button
                               onClick={() => handleOpenEditAc(ac)}
+                              aria-label={`แก้ไขเครื่อง ${ac.acCode}`}
                               className="inline-flex items-center justify-center gap-1 rounded border border-border bg-card py-1.5 text-[10px] font-bold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors text-center"
                             >
                               <Pencil className="h-3 w-3" /> แก้ไข
@@ -720,56 +742,36 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
             </div>
             <form onSubmit={handleUpdateAc} className="space-y-4 text-xs">
 
-              <div className="flex gap-2 p-1 bg-secondary rounded-lg">
-                <button type="button" onClick={() => setEditAcBrandType("master")} className={`flex-1 py-1.5 rounded-md font-bold transition-all ${editAcBrandType === "master" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
-                  เลือกรุ่นมาตรฐาน
-                </button>
-                <button type="button" onClick={() => setEditAcBrandType("other")} className={`flex-1 py-1.5 rounded-md font-bold transition-all ${editAcBrandType === "other" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
-                  กำหนดเอง (อื่นๆ)
-                </button>
-              </div>
-
-              {editAcBrandType === "master" ? (
-                <>
-                  <div>
-                    <label className="mb-1.5 block font-bold text-foreground">ยี่ห้อ (Brand)</label>
-                    <NativeSelect value={editSelectedBrandId} onChange={(e) => setEditSelectedBrandId(e.target.value)} required className="w-full h-auto py-3 px-3.5 rounded-xl border-border text-xs text-foreground">
-                      <NativeSelectOption value="" disabled>-- เลือกยี่ห้อ --</NativeSelectOption>
-                      {catalogue.map(b => (
-                        <NativeSelectOption key={b.id} value={b.id}>
-                          {b.name}
-                        </NativeSelectOption>
-                      ))}
-                    </NativeSelect>
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block font-bold text-foreground">รุ่น (Model)</label>
-                    <NativeSelect name="acModelId" required disabled={!editSelectedBrandId} className="w-full h-auto py-3 px-3.5 rounded-xl border-border text-xs text-foreground disabled:opacity-50" defaultValue="">
-                      <NativeSelectOption value="" disabled>-- เลือกรุ่น --</NativeSelectOption>
-                      {editSelectedBrand?.models.map(m => (
-                        <NativeSelectOption key={m.id} value={m.id}>
-                          {m.name} {m.defaultBtu ? `(${m.defaultBtu} BTU)` : ""}
-                        </NativeSelectOption>
-                      ))}
-                    </NativeSelect>
-                  </div>
-                </>
+              {isLoadingEditAc ? (
+                <p className="rounded-xl border border-dashed border-border px-3.5 py-3 text-muted-foreground">
+                  กำลังโหลดยี่ห้อและรุ่นของเครื่อง...
+                </p>
               ) : (
-                <>
-                  <div>
-                    <label className="mb-1.5 block font-bold text-foreground">ยี่ห้อแอร์ (พิมพ์เอง)</label>
-                    <input name="customBrand" required defaultValue={showEditAc.brand} placeholder="เช่น Daikin, Carrier" className="w-full rounded-xl border border-border px-3.5 py-2.5 text-foreground focus:border-primary focus:outline-none" />
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block font-bold text-foreground">รุ่น (พิมพ์เอง - ไม่บังคับ)</label>
-                    <input name="customModel" defaultValue={showEditAc.model ?? ""} placeholder="เช่น Inverter X" className="w-full rounded-xl border border-border px-3.5 py-2.5 text-foreground focus:border-primary focus:outline-none" />
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block font-bold text-foreground">ขนาด BTU (ไม่บังคับ)</label>
-                    <input name="btu" type="number" min="1" step="1" defaultValue={showEditAc.btu ?? ""} placeholder="เช่น 18000" {...nativeValidity({ rangeUnderflow: "ขนาด BTU ต้องมากกว่า 0", stepMismatch: "ขนาด BTU ต้องเป็นจำนวนเต็ม", badInput: "ขนาด BTU ต้องเป็นตัวเลข" })} className="w-full rounded-xl border border-border px-3.5 py-2.5 text-foreground focus:border-primary focus:outline-none" />
-                  </div>
-                </>
+                <BrandModelPicker
+                  brands={catalogue}
+                  value={editPicked}
+                  onChange={setEditPicked}
+                  onCatalogueChanged={reloadCatalogue}
+                  btu={editBtu}
+                  onBtuSuggest={setEditBtu}
+                />
               )}
+
+              <div>
+                <label className="mb-1.5 block font-bold text-foreground">ขนาด BTU (ไม่บังคับ)</label>
+                <input
+                  name="btu"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={editBtu}
+                  onChange={(e) => setEditBtu(e.target.value)}
+                  placeholder="เช่น 18000"
+                  {...nativeValidity({ rangeUnderflow: "ขนาด BTU ต้องมากกว่า 0", stepMismatch: "ขนาด BTU ต้องเป็นจำนวนเต็ม", badInput: "ขนาด BTU ต้องเป็นตัวเลข" })}
+                  className="w-full rounded-xl border border-border px-3.5 py-2.5 text-foreground focus:border-primary focus:outline-none"
+                />
+                <p className="mt-1 text-[11px] text-muted-foreground">รุ่นจากระบบ: เว้นว่าง = ใช้ BTU ของรุ่น</p>
+              </div>
 
               <div>
                 <label className="mb-1.5 block font-bold text-foreground">สถานะเครื่อง</label>

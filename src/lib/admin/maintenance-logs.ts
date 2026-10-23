@@ -43,6 +43,8 @@ export async function getAirConditionerHistory(airConditionerId: string) {
           acCode: true,
           brand: true,
           model: true,
+          acBrandId: true,
+          acModelId: true,
           btu: true,
           status: true,
           installedAt: true,
@@ -70,6 +72,15 @@ export async function getAirConditionerHistory(airConditionerId: string) {
         location: formatUnitLocation(ac.room),
         installedAt: ac.installedAt ? ac.installedAt.toISOString() : null,
         photoUrl: ac.photoUrl,
+        // What the record actually holds, for the admin's edit form: a unit
+        // bound to the catalogue opens on its model, a typed-in one on its
+        // own text. `brand`/`model` above are display names and cannot tell
+        // the two apart — opening every unit as typed-in text was how saving
+        // a status change quietly unbound a unit from its model.
+        acBrandId: ac.acBrandId?.toString() ?? null,
+        acModelId: ac.acModelId?.toString() ?? null,
+        customBrand: ac.brand,
+        customModel: ac.model,
       },
       history,
     };

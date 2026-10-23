@@ -70,7 +70,8 @@ test.describe("catalogue: typed-in brand and model moved into the catalogue", ()
     db(`delete from ac_brands where name in ('${FORM_BRAND}', '${SAVED_BRAND}')`);
   });
 
-  async function openRegisterForm(page: Page) {
+  /** The asset page with this spec's room open; returns its register button. */
+  async function openRoom(page: Page) {
     await page.goto("/admin/assets");
     await page.locator("main").last().waitFor({ timeout: 120_000 });
     await hydrated(page, "main");
@@ -85,6 +86,11 @@ test.describe("catalogue: typed-in brand and model moved into the catalogue", ()
       await floor.waitFor({ timeout: 10_000 });
       if (!(await register.isVisible().catch(() => false))) await floor.click();
     }
+    return register;
+  }
+
+  async function openRegisterForm(page: Page) {
+    const register = await openRoom(page);
     await register.click();
     const form = registerUnitForm(page);
     await form.waitFor({ timeout: 10_000 });
@@ -174,5 +180,29 @@ test.describe("catalogue: typed-in brand and model moved into the catalogue", ()
     expect(ok).toBe(true);
     expect(audited).toBe("1");
     expect(left).toBe(0);
+  });
+
+  test("edit form: a catalogue unit opens on its model, and saving a status change keeps model and BTU", async ({ page }) => {
+    // The third unit: linked above, BTU 18000 against a model default of
+    // 12000 — so a save that dropped the model or the BTU shows up in the row.
+    const unitId = savedUnits[2];
+    const [[code, modelBefore]] = db(`select ac_code, ac_model_id from air_conditioners where id = ${unitId}`) as string[][];
+    await openRoom(page);
+    await page.getByRole("button", { name: `แก้ไขเครื่อง ${code}` }).click();
+    const form = page.locator("form").filter({ has: page.getByRole("button", { name: "บันทึกการแก้ไข" }) });
+    await form.getByRole("button", { name: SAVED_MODEL }).waitFor({ timeout: 15_000 });
+    const btuShown = await form.locator('input[name="btu"]').inputValue();
+    const customShown = await form.getByPlaceholder("เช่น Carrier", { exact: true }).count();
+    ledger("Custom to catalogue", `edit form opens on the catalogue tab with ${SAVED_MODEL} selected (BTU field ${btuShown}, typed-in fields shown ${customShown})`, "UI", btuShown === "18000" && customShown === 0 ? "PASS" : "FAIL", await shot(page, "custom-edit-opens-on-model"));
+
+    await form.locator('select[name="status"]').selectOption("needs_cleaning");
+    await form.getByRole("button", { name: "บันทึกการแก้ไข" }).click();
+    const tt = await toastText(page, 15_000);
+    const [row] = db(`select ac_model_id, brand, model, btu, status from air_conditioners where id = ${unitId}`);
+    ledger("Custom to catalogue", `status-only save keeps the unit on its model ("${tt}"; model ${modelBefore} → ${row?.[0]}, text ${row?.[1]}/${row?.[2]}, BTU ${row?.[3]}, status ${row?.[4]})`, "DB", /แก้ไขข้อมูลเครื่องปรับอากาศสำเร็จ/.test(tt) && row?.[0] === modelBefore && row?.[1] === null && row?.[2] === null && row?.[3] === "18000" && row?.[4] === "needs_cleaning" ? "PASS" : "FAIL", await shot(page, "custom-edit-status-saved"));
+
+    expect(btuShown).toBe("18000");
+    expect(row?.[0]).toBe(modelBefore);
+    expect(row?.[3]).toBe("18000");
   });
 });
