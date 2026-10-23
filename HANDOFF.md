@@ -1,7 +1,15 @@
 # Project Handoff & Technical Summary
 
-# 📌 สถานะล่าสุด (22 ต.ค. 2026, DoubleKill) — อ่านตรงนี้ก่อน
+# 📌 สถานะล่าสุด (23 ต.ค. 2026, DoubleKill) — อ่านตรงนี้ก่อน
 
+> ## 🔁 ปุ่มในฟอร์มเปลี่ยนแอร์เครื่องเก่าที่ชื่อตรงกันด้วย (23 ต.ค. 2026, เจ้าของสั่ง) — branch `feat/form-links-custom-units`
+> - เดิมปุ่ม "เพิ่มยี่ห้อและรุ่นนี้เข้าระบบ" ในฟอร์มเขียนแค่ catalogue · ตอนนี้ `addCustomBrandModelToCatalogueAction` ผูกแอร์ที่บันทึกแบบพิมพ์เองด้วยชื่อเดียวกัน (`customUnitKey`) เข้ารุ่นนั้นทันที · ใช้ `linkUnits()` ตัวเดียวกับการ์ดหน้าตั้งค่า (BTU เดิมคงไว้ ไม่มีได้ default · audit `LINK_CUSTOM_UNITS_TO_AC_MODEL` มี `via: "form"` / `"settings"`) · toast บอกจำนวนเครื่องที่เปลี่ยน
+> - ยังเปิดให้ช่างกดได้ (`verifyAssetEditor`) — เครื่องที่ย้ายมีแค่เครื่องที่ชื่อที่พิมพ์ตรงกับรุ่นนี้อยู่แล้ว และอยู่ใน audit พร้อม id
+> - spec `custom-to-catalogue` เพิ่มเครื่องที่บันทึกชื่อเดียวกันไว้ก่อน (ตัวพิมพ์/ช่องว่างต่าง, ไม่มี BTU) → ต้องถูกย้ายและได้ BTU 9000 · sweep `form-links-20261023`: **96/96 · ledger PASS 275 · FAIL 0 · SKIP 6** · unit 55/55 · Aiven นับก่อน (10:36 UTC) / หลัง (10:57 UTC) ตรงกันทุกตาราง · `baseline.mjs restore` แล้ว
+> - **ฐานข้อมูลทดสอบ:** หลัง seed บน branch LCP มีตาราง/migration ของ LCP ค้าง → drop + create `ac_maintenance_test` ใหม่ก่อน seed บน master · `.next/types` ค้างจาก build ของ branch อื่นทำ tsc ล้ม (`api/vitals/route.js`) → ลบ `.next/types` ก่อน
+> - **production (อ่านอย่างเดียว 23 ต.ค.):** แอร์ 10 เครื่อง ผูกรุ่นแล้ว 9 · เหลือแบบกำหนดเอง 1 = `อาคาร 28-หอสมุด-04` อิมิเน้นท์ / AVE40FU/UVE40F (BTU 40944) — catalogue ยังไม่มีชื่อตรงกัน จึงไม่ใช่เครื่องค้าง · มียี่ห้อ `EMINENT` ซึ่งน่าจะเป็นยี่ห้อเดียวกัน แต่ระบบจับคู่ชื่อไทย/อังกฤษไม่ได้ → ให้แอดมินกดจากการ์ดแล้วแก้ยี่ห้อเป็น `EMINENT` ก่อนยืนยัน
+> - **LCP:** rebase บน `68f45a5` แล้ว (`6d1cee2` + `849e6f6`) · tsc/eslint ผ่าน · unit 66/66 · sweep `field-lcp-20261022` **97/97 · PASS 277 · FAIL 0 · SKIP 6** (LCP 3 ข้อผ่าน) · **รอเจ้าของอนุมัติ merge/push และการลบแถวทดสอบใน `web_vital_samples`**
+>
 > ## ➕ ย้ายยี่ห้อ/รุ่น "กำหนดเอง" เข้าระบบ (22 ต.ค. 2026, เจ้าของสั่ง "ทำทั้งสองแบบ") — `e5f51de` + spec + `4820f4e` · **merge เข้า master และ push แล้ว (เจ้าของสั่ง 22 ต.ค.)**
 > - **ปุ่มในฟอร์ม:** แท็บ "กำหนดเอง (อื่นๆ)" ของ `BrandModelPicker` (ฟอร์มลงทะเบียนแอดมิน + ฟอร์มช่าง) มีปุ่ม "เพิ่มยี่ห้อและรุ่นนี้เข้าระบบ" → `addCustomBrandModelToCatalogueAction` (`verifyAssetEditor`) หา/สร้างยี่ห้อ+รุ่น (เทียบชื่อด้วย `normaliseCatalogueName` · ชื่อที่มีอยู่แล้ว = เลือกตัวเดิม ไม่ error · อยู่ในถังขยะ = ให้แอดมินกู้คืน) → สลับไปแท็บ "เลือกจากระบบ" พร้อมเลือกรุ่นให้ · ต้องกรอกรุ่นก่อนถึงกดได้ · BTU ในฟอร์มเป็น default ของรุ่นใหม่
 > - **แอร์ที่บันทึกไว้แล้ว (แอดมินเท่านั้น):** ตั้งค่าระบบ → การ์ด "แอร์ที่ใช้ยี่ห้อ/รุ่นกำหนดเอง" จัดกลุ่มตามข้อความ (`groupCustomUnits` ใน `src/lib/admin/custom-unit-groups.ts` — ต่างแค่ตัวพิมพ์/ช่องว่าง = กลุ่มเดียว) · กด "เพิ่มเข้าระบบ" แก้ชื่อ/BTU ได้ก่อนยืนยัน → `linkCustomUnitsToCatalogueAction` (`verifyOrgAdmin`) ผูกแอร์ทั้งกลุ่ม ล้าง `brand`/`model` · BTU เดิมของแต่ละเครื่องคงไว้ เครื่องที่ไม่มีได้ default ของรุ่น · audit `LINK_CUSTOM_UNITS_TO_AC_MODEL` (+ `CREATE_AC_BRAND`/`CREATE_AC_MODEL` ที่มี `from: "custom"`) · การ์ดซ่อนเมื่อไม่เหลือแอร์แบบกำหนดเอง

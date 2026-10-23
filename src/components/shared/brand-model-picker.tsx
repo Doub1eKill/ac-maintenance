@@ -131,7 +131,7 @@ export function BrandModelPicker({
   // The typed brand and model become a catalogue entry, and the form switches
   // to it — so the unit is saved against the model, not as text nobody else
   // can pick. An existing entry of the same name is selected instead of
-  // duplicated.
+  // duplicated, and units saved earlier under the same text move onto it.
   async function handleAddCustomToCatalogue() {
     setCreating(true);
     try {
@@ -147,7 +147,10 @@ export function BrandModelPicker({
       await onCatalogueChanged();
       onChange({ ...emptyBrandModel, brandId: res.brandId, modelId: res.modelId });
       const label = `${value.customBrand.trim()} ${value.customModel.trim()}`;
-      toast.success(res.created ? `เพิ่ม "${label}" เข้าระบบแล้ว` : `"${label}" มีอยู่ในระบบแล้ว เลือกให้แล้ว`);
+      const moved = res.linked ? ` และเปลี่ยนแอร์ที่บันทึกชื่อนี้ไว้ ${res.linked} เครื่องให้ใช้รุ่นนี้แล้ว` : "";
+      toast.success(
+        res.created ? `เพิ่ม "${label}" เข้าระบบแล้ว${moved}` : `"${label}" มีอยู่ในระบบแล้ว เลือกให้แล้ว${moved}`
+      );
     } finally {
       setCreating(false);
     }

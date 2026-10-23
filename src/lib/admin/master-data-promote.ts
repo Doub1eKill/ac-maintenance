@@ -113,9 +113,13 @@ async function findOrCreateEntry(
 /**
  * The "เพิ่มเข้าระบบ" button in the form's กำหนดเอง tab.
  *
- * Only the catalogue is written: the unit being registered or edited is saved
- * by its own form, which now has a catalogue model selected instead of text.
- * Open to technicians, the same as adding a brand or model directly.
+ * The unit being registered or edited is saved by its own form, which now has
+ * a catalogue model selected instead of text. Units saved earlier under the
+ * same text move onto the entry here too (the owner asked for it on 23 Oct):
+ * otherwise they sat on free text until an admin found them on the settings
+ * card. Open to technicians, the same as adding a brand or model directly —
+ * the units moved are only ever ones whose typed name already says this model,
+ * and each move is in the audit log with the unit ids.
  */
 export async function addCustomBrandModelToCatalogueAction(formData: FormData) {
   const session = await verifyAssetEditor();
@@ -126,23 +130,87 @@ export async function addCustomBrandModelToCatalogueAction(formData: FormData) {
     defaultBtu: formData.get("defaultBtu") ?? "",
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message || "ข้อมูลไม่ถูกต้อง" };
+  const data = parsed.data;
 
   try {
-    const entry = await findOrCreateEntry(session, parsed.data.brand, parsed.data.model, parsed.data.defaultBtu);
+    const entry = await findOrCreateEntry(session, data.brand, data.model, data.defaultBtu);
     if ("error" in entry) return { error: entry.error };
 
-    revalidatePath("/admin", "layout");
+    const unitIds = await customUnitIds(customUnitKey(data.brand, data.model));
+    const linked = await linkUnits(session, unitIds, entry, data.brand, data.model, "form");
+
+    revalidatePath(linked > 0 ? "/" : "/admin", "layout");
     revalidatePath("/tech", "layout");
     return {
       success: true,
       brandId: entry.brandId.toString(),
       modelId: entry.modelId.toString(),
       created: entry.createdBrand || entry.createdModel,
+      linked,
     };
   } catch (error) {
     console.error(error);
     return { error: "เกิดข้อผิดพลาดในการเพิ่มยี่ห้อ/รุ่นเข้าระบบ" };
   }
+}
+
+/** Ids of live free-text units whose typed brand and model match the key. */
+async function customUnitIds(key: string): Promise<bigint[]> {
+  return (await loadCustomUnits())
+    .filter((u) => customUnitKey(u.brand, u.model) === key)
+    .map((u) => BigInt(u.id));
+}
+
+/**
+ * Points the given free-text units at a catalogue entry and clears their text.
+ *
+ * A unit's own BTU is kept; one saved without a size takes the model's
+ * default, the same rule createAirConditionerAction applies. acModelId: null
+ * in both filters so a unit someone re-pointed in the meantime is left as they
+ * set it. Returns how many units moved.
+ */
+async function linkUnits(
+  session: Session,
+  unitIds: bigint[],
+  entry: Extract<CatalogueEntry, { modelId: bigint }>,
+  brandText: string,
+  modelText: string,
+  via: "form" | "settings"
+): Promise<number> {
+  if (unitIds.length === 0) return 0;
+
+  const scope = { id: { in: unitIds }, acModelId: null, deletedAt: null };
+  const [linked] = await prisma.$transaction([
+    prisma.airConditioner.updateMany({
+      where: scope,
+      data: { acBrandId: entry.brandId, acModelId: entry.modelId, brand: null, model: null },
+    }),
+    ...(entry.defaultBtu !== null
+      ? [
+          prisma.airConditioner.updateMany({
+            where: { ...scope, acModelId: entry.modelId, btu: null },
+            data: { btu: entry.defaultBtu },
+          }),
+        ]
+      : []),
+  ]);
+  if (linked.count === 0) return 0;
+
+  await logAudit({
+    userId: BigInt(session.user.id!),
+    action: "LINK_CUSTOM_UNITS_TO_AC_MODEL",
+    entityType: "acModel",
+    entityId: entry.modelId,
+    newValues: {
+      brand: tidyCatalogueName(brandText),
+      model: tidyCatalogueName(modelText),
+      unitIds: unitIds.map(String),
+      linked: linked.count,
+      via,
+    },
+    ipAddress: "server_action",
+  });
+  return linked.count;
 }
 
 /** Live units still on free text, one row per brand and model. */
@@ -178,9 +246,6 @@ const linkSchema = entrySchema.extend({
  * Admin-only: unlike adding a model, this rewrites units other people
  * registered. The admin may correct the spelling first; the units are still
  * found by the text they were saved with, carried in groupKey.
- *
- * A unit's own BTU is kept. One saved without a size takes the model's
- * default, the same rule createAirConditionerAction applies.
  */
 export async function linkCustomUnitsToCatalogueAction(formData: FormData) {
   const session = await verifyOrgAdmin();
@@ -197,9 +262,9 @@ export async function linkCustomUnitsToCatalogueAction(formData: FormData) {
   try {
     // Matched before anything is created, so a stale tab whose units were
     // already moved does not leave an empty model behind.
-    const unitIds = (await loadCustomUnits())
-      .filter((u) => customUnitKey(u.brand, u.model) === data.groupKey)
-      .map((u) => BigInt(u.id));
+    // Matched before anything is created, so a stale tab whose units were
+    // already moved does not leave an empty model behind.
+    const unitIds = await customUnitIds(data.groupKey);
     if (unitIds.length === 0) {
       return { error: "ไม่พบแอร์ในกลุ่มนี้แล้ว อาจถูกย้ายเข้าระบบไปก่อนหน้า กรุณารีเฟรชหน้า" };
     }
@@ -207,43 +272,13 @@ export async function linkCustomUnitsToCatalogueAction(formData: FormData) {
     const entry = await findOrCreateEntry(session, data.brand, data.model, data.defaultBtu);
     if ("error" in entry) return { error: entry.error };
 
-    // acModelId: null in both filters so a unit someone re-pointed in the
-    // meantime is left as they set it.
-    const scope = { id: { in: unitIds }, acModelId: null, deletedAt: null };
-    const [linked] = await prisma.$transaction([
-      prisma.airConditioner.updateMany({
-        where: scope,
-        data: { acBrandId: entry.brandId, acModelId: entry.modelId, brand: null, model: null },
-      }),
-      ...(entry.defaultBtu !== null
-        ? [
-            prisma.airConditioner.updateMany({
-              where: { ...scope, acModelId: entry.modelId, btu: null },
-              data: { btu: entry.defaultBtu },
-            }),
-          ]
-        : []),
-    ]);
-
-    await logAudit({
-      userId: BigInt(session.user.id!),
-      action: "LINK_CUSTOM_UNITS_TO_AC_MODEL",
-      entityType: "acModel",
-      entityId: entry.modelId,
-      newValues: {
-        brand: tidyCatalogueName(data.brand),
-        model: tidyCatalogueName(data.model),
-        unitIds: unitIds.map(String),
-        linked: linked.count,
-      },
-      ipAddress: "server_action",
-    });
+    const linked = await linkUnits(session, unitIds, entry, data.brand, data.model, "settings");
 
     // The public sticker pages show the brand and model too.
     revalidatePath("/", "layout");
     return {
       success: true,
-      linked: linked.count,
+      linked,
       created: entry.createdBrand || entry.createdModel,
     };
   } catch (error) {

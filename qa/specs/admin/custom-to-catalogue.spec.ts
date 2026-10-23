@@ -25,6 +25,9 @@ test.describe("catalogue: typed-in brand and model moved into the catalogue", ()
   let buildingId = "";
   let roomId = "";
   const savedUnits: string[] = [];
+  // Saved earlier under the form test's name, in other case and spacing, with
+  // no BTU: the form button moves it onto the new model too (23 Oct).
+  let earlierUnit = "";
 
   test.beforeAll(() => {
     buildingId = one(
@@ -50,6 +53,11 @@ test.describe("catalogue: typed-in brand and model moved into the catalogue", ()
         )!
       );
     });
+    earlierUnit = one(
+      `insert into air_conditioners (room_id, ac_code, qr_code, brand, model, btu, photo_url, status, created_at, updated_at)
+       values (${roomId}, '${ABBR}-${ROOM}-04', gen_random_uuid(), '${FORM_BRAND.toLowerCase()} ', '  ${FORM_MODEL.toLowerCase()}', null, '${PHOTO}', 'normal', now() at time zone 'utc', now() at time zone 'utc')
+       returning id`
+    )!;
   });
 
   test.afterAll(() => {
@@ -96,6 +104,13 @@ test.describe("catalogue: typed-in brand and model moved into the catalogue", ()
     );
     const selected = await form.getByRole("button", { name: FORM_MODEL }).count();
     ledger("Custom to catalogue", `form button adds "${FORM_BRAND} ${FORM_MODEL}" ("${added}"); model row ${model?.[0] ?? "none"} default BTU ${model?.[1]}; selected in the picker ${selected > 0}`, "UI", /เข้าระบบแล้ว/.test(added) && !!model && model[1] === "9000" && selected > 0 ? "PASS" : "FAIL", await shot(page, "custom-form-added"));
+
+    const [earlier] = db(`select ac_model_id, brand, model, btu from air_conditioners where id = ${earlierUnit}`);
+    const linkAudit = one(
+      `select count(*) from system_audit_logs where action = 'LINK_CUSTOM_UNITS_TO_AC_MODEL'
+       and entity_id = ${model?.[0] ?? 0} and new_values::text like '%"form"%'`
+    );
+    ledger("Custom to catalogue", `form button also moves the unit saved earlier under that name (model ${earlier?.[0]}, text ${earlier?.[1]}/${earlier?.[2]}, BTU ${earlier?.[3]}, audit ${linkAudit}; toast says 1 unit)`, "DB", earlier?.[0] === model?.[0] && earlier?.[1] === null && earlier?.[2] === null && earlier?.[3] === "9000" && linkAudit === "1" && /1 เครื่อง/.test(added) ? "PASS" : "FAIL");
     await clearToasts(page);
 
     // Same names, other case and spacing: picks the existing entry.
@@ -110,13 +125,17 @@ test.describe("catalogue: typed-in brand and model moved into the catalogue", ()
     await form.locator('input[name="photo"]').setInputFiles(unitPhoto());
     await form.getByRole("button", { name: /ลงทะเบียนเครื่องปรับอากาศ/ }).click();
     const tt = await toastText(page, 15_000);
-    const [unit] = db(`select ac_model_id, brand from air_conditioners where room_id = ${roomId} and ac_model_id is not null`);
+    const [unit] = db(
+      `select ac_model_id, brand from air_conditioners where room_id = ${roomId} and ac_model_id is not null
+       and id not in (${[...savedUnits, earlierUnit].join(",")})`
+    );
     ledger("Custom to catalogue", `unit registered against the catalogue model, no free text ("${tt}")`, "DB", /ลงทะเบียนแอร์สำเร็จ/.test(tt) && unit?.[0] === model?.[0] && unit?.[1] === null ? "PASS" : "FAIL", await shot(page, "custom-form-registered"));
 
     expect(model).toBeTruthy();
     expect(brands).toBe("1");
     expect(models).toBe("1");
     expect(unit?.[0]).toBe(model?.[0]);
+    expect(earlier?.[0]).toBe(model?.[0]);
   });
 
   test("settings: units saved as text are grouped and linked to a new catalogue model", async ({ page }) => {
