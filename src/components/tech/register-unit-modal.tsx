@@ -15,6 +15,7 @@ import {
 import { createAirConditionerAction, getAcMasterDataAction } from "@/app/tech/actions";
 import { UnitPhotoField } from "@/components/shared/unit-photo-field";
 import type { RoomOption } from "@/lib/tech/pages";
+import { installDateLimits } from "@/lib/native-validity";
 
 interface RegisterUnitModalProps {
   rooms: RoomOption[];
@@ -192,6 +193,7 @@ export function RegisterUnitModal({ rooms, onClose }: RegisterUnitModalProps) {
                 </label>
                 <input
                   type="date"
+                  {...installDateLimits()}
                   value={installedAt}
                   onChange={(e) => setInstalledAt(e.target.value)}
                   className="w-full rounded-xl border border-border bg-muted px-3 py-2.5 text-xs text-foreground focus:border-primary focus:outline-none"

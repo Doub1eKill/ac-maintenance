@@ -23,7 +23,7 @@ import {
 } from "@/app/admin/actions";
 import { AcHistoryModal } from "@/components/admin/ac-history-modal";
 import { useEscapeToClose } from "@/hooks/use-escape-to-close";
-import { nativeValidity } from "@/lib/native-validity";
+import { installDateLimits, nativeValidity } from "@/lib/native-validity";
 import { UnitPhotoField } from "@/components/shared/unit-photo-field";
 import { roomSequenceOf } from "@/components/shared/qr-sticker";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
@@ -717,6 +717,7 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
                 <input
                   name="installedAt"
                   type="date"
+                  {...installDateLimits()}
                   className="w-full rounded-xl border border-border px-3.5 py-2.5 text-foreground focus:border-primary focus:outline-none"
                 />
                 <p className="mt-1 text-[11px] text-muted-foreground">ไม่กรอก = ใช้วันที่วันนี้</p>
@@ -795,6 +796,7 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
                 <input
                   name="installedAt"
                   type="date"
+                  {...installDateLimits()}
                   value={editAcInstalledAt}
                   onChange={(e) => setEditAcInstalledAt(e.target.value)}
                   disabled={isLoadingEditAc || editAcLoadFailed}

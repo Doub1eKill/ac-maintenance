@@ -40,3 +40,21 @@ export function nativeValidity(messages: {
     onInput: (e: FormEvent<HTMLInputElement>) => e.currentTarget.setCustomValidity(""),
   };
 }
+
+/**
+ * Attributes for an install-date <input type="date">: no later than today,
+ * with a Thai message that also names the usual cause. A Buddhist-era year
+ * typed into the field (2544 for 2001) is a date centuries ahead, so the same
+ * limit catches it before the server does (installDateProblem in
+ * src/lib/maintenance.ts gives the exact year back).
+ *
+ * "Today" is the browser's own date, which for this app's users is Bangkok's.
+ */
+export function installDateLimits() {
+  return {
+    max: new Date().toLocaleDateString("en-CA"),
+    ...nativeValidity({
+      rangeOverflow: "วันที่ติดตั้งต้องไม่เกินวันนี้ (ถ้ากรอกปี พ.ศ. ให้เปลี่ยนเป็น ค.ศ. เช่น 2544 = 2001)",
+    }),
+  };
+}

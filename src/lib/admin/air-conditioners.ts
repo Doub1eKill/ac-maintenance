@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/generated/prisma/client";
 import { logAudit } from "@/lib/audit";
-import { businessDateToday, businessDateFrom, addMaintenanceInterval } from "@/lib/maintenance";
+import { businessDateToday, businessDateFrom, addMaintenanceInterval, installDateProblem } from "@/lib/maintenance";
 import { getDefaultMaintenanceFrequency } from "@/lib/organisation";
 import { verifyAssetEditor } from "@/lib/auth-guards";
 import { saveUpload, deleteUpload } from "@/lib/upload";
@@ -54,7 +54,12 @@ const acSchema = z.object({
   installedAt: z
     .string()
     .trim()
-    .refine((v) => v === "" || businessDateFrom(v) !== null, "วันที่ติดตั้งไม่ถูกต้อง")
+    .superRefine((v, ctx) => {
+      // Not a date, a Buddhist-era year, or a day that has not come yet. See
+      // installDateProblem — the first cleaning is computed from this date.
+      const problem = installDateProblem(v);
+      if (problem) ctx.addIssue({ code: "custom", message: problem });
+    })
     .optional(),
 });
 
@@ -286,7 +291,12 @@ const updateAcSchema = z.object({
   installedAt: z
     .string()
     .trim()
-    .refine((v) => v === "" || businessDateFrom(v) !== null, "วันที่ติดตั้งไม่ถูกต้อง")
+    .superRefine((v, ctx) => {
+      // Not a date, a Buddhist-era year, or a day that has not come yet. See
+      // installDateProblem — the first cleaning is computed from this date.
+      const problem = installDateProblem(v);
+      if (problem) ctx.addIssue({ code: "custom", message: problem });
+    })
     .optional(),
 });
 

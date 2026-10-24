@@ -81,6 +81,28 @@ export function businessDateFrom(ymd: string): Date | null {
   return parsed;
 }
 
+/**
+ * What is wrong with an install date typed into a unit form, or null if
+ * nothing is. Empty is fine (the forms treat it as "today" or "unknown").
+ *
+ * Added after the first real registrations (14 Oct 2026): four units went in
+ * as 2544-02-20 — a Buddhist-era year in a CE field — and one as 2047. Both
+ * passed, and firstDueDateFor() computed the first cleaning from them, so the
+ * schedules said 2544 and 2047 and those units would never have come due.
+ * A year past 2400 is read as BE and the message names the CE year meant.
+ */
+export function installDateProblem(ymd: string, today: Date = businessDateToday()): string | null {
+  if (ymd.trim() === "") return null;
+  const date = businessDateFrom(ymd);
+  if (!date) return "วันที่ติดตั้งไม่ถูกต้อง";
+  const year = date.getUTCFullYear();
+  if (year > 2400) {
+    return `ปีที่กรอก (${year}) น่าจะเป็นปี พ.ศ. กรุณากรอกเป็นปี ค.ศ. (${year - 543})`;
+  }
+  if (date > today) return "วันที่ติดตั้งต้องไม่เกินวันนี้";
+  return null;
+}
+
 // Advances a business date by a maintenance interval. Uses UTC setters rather
 // than date-fns so the calendar day is preserved regardless of the runtime's
 // own timezone — date-fns operates on local-time fields, which would read the

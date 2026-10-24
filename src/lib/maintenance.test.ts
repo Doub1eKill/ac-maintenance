@@ -9,6 +9,7 @@ import {
   businessDateToday,
   compareJobOrder,
   inAppTimeZone,
+  installDateProblem,
 } from "@/lib/maintenance";
 
 const day = (ymd: string) => new Date(`${ymd}T00:00:00.000Z`);
@@ -97,5 +98,29 @@ describe("compareJobOrder", () => {
 
   it("sorts a job that never happened as the oldest", () => {
     expect(compareJobOrder(job("A", "cleaning", null), job("A", "cleaning", "2026-01-01"))).toBeLessThan(0);
+  });
+});
+
+describe("installDateProblem", () => {
+  const today = new Date("2026-10-24T00:00:00.000Z");
+
+  it("accepts an empty field, today, and a past date", () => {
+    expect(installDateProblem("", today)).toBeNull();
+    expect(installDateProblem("2026-10-24", today)).toBeNull();
+    expect(installDateProblem("2001-02-20", today)).toBeNull();
+  });
+
+  it("reads a year past 2400 as Buddhist-era and names the CE year (the 2544-02-20 units)", () => {
+    expect(installDateProblem("2544-02-20", today)).toContain("2001");
+    expect(installDateProblem("2544-02-20", today)).toContain("พ.ศ.");
+  });
+
+  it("refuses a day that has not come yet (the 2047-09-14 unit), including tomorrow", () => {
+    expect(installDateProblem("2047-09-14", today)).toBe("วันที่ติดตั้งต้องไม่เกินวันนี้");
+    expect(installDateProblem("2026-10-25", today)).toBe("วันที่ติดตั้งต้องไม่เกินวันนี้");
+  });
+
+  it("refuses something that is not a calendar day", () => {
+    expect(installDateProblem("2026-02-31", today)).toBe("วันที่ติดตั้งไม่ถูกต้อง");
   });
 });

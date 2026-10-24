@@ -205,4 +205,44 @@ test.describe("catalogue: typed-in brand and model moved into the catalogue", ()
     expect(row?.[0]).toBe(modelBefore);
     expect(row?.[3]).toBe("18000");
   });
+
+  test("register form: a Buddhist-era or future install date is refused (24 Oct)", async ({ page }) => {
+    const before = one(`select count(*) from air_conditioners where room_id = ${roomId}`);
+    const form = await openRegisterForm(page);
+    await fillCustomBrand(form, SAVED_BRAND, SAVED_MODEL);
+    await form.locator('input[name="photo"]').setInputFiles(unitPhoto());
+    const date = form.locator('input[name="installedAt"]');
+    const max = await date.getAttribute("max");
+
+    // The browser's own check first: 2544 is centuries past max.
+    await date.fill("2544-02-20");
+    const blocked = await date.evaluate((el) => !(el as HTMLInputElement).checkValidity());
+    const bubble = await date.evaluate((el) => {
+      el.dispatchEvent(new Event("invalid", { cancelable: true }));
+      return (el as HTMLInputElement).validationMessage;
+    });
+    ledger("Custom to catalogue", `date field max ${max}; 2544-02-20 fails the browser check (${blocked}): "${bubble}"`, "UI", !!max && blocked && /พ.ศ./.test(bubble) ? "PASS" : "FAIL");
+
+    // And the server, with the browser check taken away. The custom message
+    // the invalid event above left on the field has to go too: it clears only
+    // on the next input event, and until then the browser keeps the form from
+    // submitting at all (the first run of this test, 24 Oct, read no toast).
+    await date.evaluate((el) => {
+      el.removeAttribute("max");
+      (el as HTMLInputElement).setCustomValidity("");
+    });
+    await form.getByRole("button", { name: /ลงทะเบียนเครื่องปรับอากาศ/ }).click();
+    const be = await toastText(page, 15_000);
+    await clearToasts(page);
+    await date.fill("2047-09-14");
+    await form.getByRole("button", { name: /ลงทะเบียนเครื่องปรับอากาศ/ }).click();
+    const future = await toastText(page, 15_000);
+    const after = one(`select count(*) from air_conditioners where room_id = ${roomId}`);
+    ledger("Custom to catalogue", `server refuses 2544 ("${be}") and 2047 ("${future}"); units ${before} -> ${after}`, "UI", /2001/.test(be) && /ต้องไม่เกินวันนี้/.test(future) && before === after ? "PASS" : "FAIL", await shot(page, "custom-install-date-refused"));
+
+    expect(blocked).toBe(true);
+    expect(be).toMatch(/2001/);
+    expect(future).toMatch(/ต้องไม่เกินวันนี้/);
+    expect(after).toBe(before);
+  });
 });
