@@ -50,6 +50,12 @@ export async function bulkClaimWorkOrdersAction(
   return jobs.bulkClaimWorkOrdersAction(...args);
 }
 
+export async function releaseWorkOrderAction(
+  ...args: Parameters<typeof jobs.releaseWorkOrderAction>
+) {
+  return jobs.releaseWorkOrderAction(...args);
+}
+
 // --- recording a visit ---
 
 export async function logMaintenanceAction(

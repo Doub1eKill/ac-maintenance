@@ -61,6 +61,12 @@ export async function cancelWorkOrderAction(
   return workOrders.cancelWorkOrderAction(...args);
 }
 
+export async function recallWorkOrderAction(
+  ...args: Parameters<typeof workOrders.recallWorkOrderAction>
+) {
+  return workOrders.recallWorkOrderAction(...args);
+}
+
 // --- users, profile, system settings ---
 
 export async function updateUserStatusByOrgAdminAction(

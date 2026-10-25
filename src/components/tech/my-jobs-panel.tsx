@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { format } from "date-fns";
-import { Clock } from "lucide-react";
+import { Clock, Undo2 } from "lucide-react";
 import {
   BuildingGroupList,
   FloorGroupList,
@@ -24,6 +25,9 @@ interface MyJobsPanelProps {
   // Opens the shared history modal on the unit this job belongs to. Optional
   // so the panel still renders read-only wherever no handler is wired.
   onViewHistory?: (airConditionerId: string) => void;
+  // Hands a claimed job back to the pool. Optional for the same reason.
+  onRelease?: (workOrderId: string) => void;
+  isReleasing?: boolean;
 }
 
 export function MyJobsPanel({
@@ -32,7 +36,12 @@ export function MyJobsPanel({
   selectedBuilding,
   onSelectForLog,
   onViewHistory,
+  onRelease,
+  isReleasing,
 }: MyJobsPanelProps) {
+  // Which card is asking "คืนงานนี้?" — at most one, and asked in place: on
+  // a phone a stray tap on the wrong button should not drop a job.
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const filteredMyJobs = filterJobs(myJobs, searchQuery, selectedBuilding);
   const groups = groupByBuilding(filteredMyJobs);
 
@@ -112,6 +121,43 @@ export function MyJobsPanel({
                             </button>
                           </div>
                         </div>
+
+                        {onRelease && (
+                          confirmingId === job.id ? (
+                            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-muted/50 px-3 py-2">
+                              <span className="text-[11px] font-bold text-foreground">
+                                คืนงานนี้ให้กลับไปรอรับงาน?
+                              </span>
+                              <div className="flex gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setConfirmingId(null)}
+                                  disabled={isReleasing}
+                                  className="rounded-lg border border-border bg-card px-3 py-1.5 text-[11px] font-bold text-foreground hover:bg-muted disabled:opacity-50"
+                                >
+                                  ไม่คืน
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => onRelease(job.id)}
+                                  disabled={isReleasing}
+                                  className="rounded-lg bg-foreground px-3 py-1.5 text-[11px] font-bold text-background hover:bg-foreground/90 disabled:opacity-50"
+                                >
+                                  {isReleasing ? "กำลังคืน..." : "ยืนยันคืนงาน"}
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setConfirmingId(job.id)}
+                              aria-label={`คืนงาน ${job.acCode}`}
+                              className="inline-flex items-center gap-1 text-[11px] font-bold text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                              <Undo2 className="h-3 w-3" /> คืนงาน
+                            </button>
+                          )
+                        )}
                       </div>
                     ))}
                   </div>

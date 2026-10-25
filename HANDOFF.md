@@ -1,7 +1,14 @@
 # Project Handoff & Technical Summary
 
-# 📌 สถานะล่าสุด (24 ต.ค. 2026, DoubleKill) — อ่านตรงนี้ก่อน
+# 📌 สถานะล่าสุด (25 ต.ค. 2026, DoubleKill) — อ่านตรงนี้ก่อน
 
+> ## ↩️ ปุ่ม "คืนงาน" (ช่าง) และ "เรียกงานคืน" (แอดมิน) (25 ต.ค. 2026, เจ้าของสั่ง) — branch `feat/tech-release-job`
+> - **ที่มา:** เจ้าของกดรับ WO #344 (ล้างแอร์ -05) บน production ด้วยบัญชีช่าง 241 เพื่อแคปรูปทำเล่มโครงงาน แล้วต้องคืนค่าด้วยการแก้ DB · **คืนค่าแล้ว (เจ้าของอนุมัติ):** #344 → pending ไม่มีผู้รับ · audit `RELEASE_WORKORDER` user 26 `ip_address = claude_code` · audit `CLAIM_WORKORDER` (#768) เก็บไว้ · ไม่มี maintenance log
+> - **ช่าง:** `releaseWorkOrderAction` (`src/lib/tech/jobs.ts`, `verifyTechnician`) — updateMany แบบมี guard `status = claimed` + `claimedBy = ตัวเอง` → pending ล้าง claimed/assigned · audit `RELEASE_WORKORDER` (`by: technician`) · ปุ่ม "คืนงาน" ในการ์ดหน้า งานของฉัน (`aria-label = คืนงาน <acCode>`) ถามยืนยันในการ์ดก่อน · งานที่แอดมินมอบหมายก็คืนได้ (กลับไปกระดานให้มอบหมายใหม่)
+> - **แอดมิน:** `recallWorkOrderAction` (`src/lib/admin/work-orders.ts`, `verifyOrgAdmin`) — guard ทั้ง status, claimedBy และ claimedAt ที่อ่านไว้ (งานที่ถูกปิด/คืน/รับใหม่ระหว่างนั้นจะไม่ถูกแตะ) · audit `RECALL_WORKORDER` (old = ใครถือ ตั้งแต่เมื่อไร) · ปุ่ม "เรียกงานคืน" ใน dialog รายละเอียดใบงาน แสดงเฉพาะ status claimed แยกจาก "ยกเลิกใบงาน" (ใบงานยังอยู่)
+> - spec ใหม่ `qa/specs/tech/release.spec.ts` + `qa/specs/admin/recall.spec.ts` (สร้างอาคาร/ห้อง/แอร์/ใบงานเองด้วย SQL แล้วลบตอนจบ) · unit 59/59 · sweep `release-recall-20261025`: **100/100 · PASS 284 · FAIL 0 · SKIP 6** · Aiven นับก่อน (07:06 UTC) / หลัง (07:27 UTC) ตรงกัน · `baseline.mjs restore` แล้ว
+> - **ทำ screenshot สำหรับเล่มโครงงาน:** ใช้ dev server บนฐานข้อมูลทดสอบ (config `ac-maintenance-qa-dev`, port 3100) แทน production — ข้อมูลจำลองเต็มระบบ กดอะไรก็ได้ ไม่ต้องคืนค่า
+>
 > ## 📅 วันที่ติดตั้งผิดทำให้แอร์ 5 เครื่องไม่มีวันถึงรอบล้าง — แก้ข้อมูล production + กันไม่ให้เกิดซ้ำ (24 ต.ค. 2026, เจ้าของสั่ง) · **merge + push แล้ว**
 > - **เจอ:** แอร์ทั้ง 10 เครื่องลงทะเบียน 14 ต.ค. 2026 (audit 734–743, โดย Akarln Noochoo) · `created_at` ของแอร์เป็น NULL ทุกเครื่อง (create ไม่ได้ตั้ง) → วันลงทะเบียนดูจาก audit เท่านั้น · -01 -02 -05 -10 กรอก **2544-02-20** (ปี พ.ศ. ในช่อง ค.ศ.) → รอบถัดไป 2544-05-20 · -07 กรอก **2047-09-14** → รอบถัดไป 2047-12-14 · ทั้ง 5 เครื่อง**จะไม่มีวันถึงรอบล้าง** เพราะ `firstDueDateFor()` คำนวณจากวันที่ติดตั้ง
 > - **แก้ข้อมูล production (เจ้าของอนุมัติ, transaction เดียว, dry run ก่อน):** -07 → ติดตั้ง 2026-10-14 (ไม่รู้วันติดตั้งจริง ใช้วันลงทะเบียนแบบเว้นว่าง) รอบถัดไป 2027-01-14 · 4 เครื่อง → ติดตั้ง 2001-02-20 รอบถัดไป 2026-10-14 (ติดตั้งนานกว่า 6 เดือน = ถึงรอบวันลงทะเบียน แบบเดียวกับ -06 -08 -09) → **เลยกำหนดแล้ว จะมีใบงานล้างเพิ่ม 4 ใบตอน cron/sync รอบถัดไป** (ตอนตรวจ 08:15 UTC ยังเป็น WO 4) · audit `UPDATE_AIRCONDITIONER` 5 แถว (old/new installedAt + nextDueDate) user 26 `ip_address = claude_code`

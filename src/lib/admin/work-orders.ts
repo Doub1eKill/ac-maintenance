@@ -182,6 +182,68 @@ export async function assignWorkOrderAction(workOrderId: string, assignToUserId:
 }
 
 /**
+ * Takes a claimed job back from the technician holding it and returns it to
+ * the pool, where the admin can assign it to someone else or anyone can claim
+ * it. For a job that has stalled — the technician is away, or was assigned
+ * the wrong one — without cancelling it, since the work still needs doing.
+ * Added 25 Oct 2026 alongside the technician's own "คืนงาน".
+ *
+ * Guarded on the holder read a moment earlier as well as on status, so a job
+ * that was closed, released and re-claimed in between is left alone rather
+ * than taken from someone the admin never saw holding it.
+ */
+export async function recallWorkOrderAction(workOrderId: string) {
+  const session = await verifyOrgAdmin();
+
+  let wId: bigint;
+  try {
+    wId = BigInt(workOrderId);
+  } catch {
+    return { error: "ไม่พบใบงานซ่อมบำรุง" };
+  }
+
+  try {
+    const workOrder = await prisma.workOrder.findUnique({
+      where: { id: wId },
+      select: { status: true, claimedBy: true, claimedAt: true },
+    });
+    if (!workOrder) return { error: "ไม่พบใบงานซ่อมบำรุง" };
+    if (workOrder.status !== "claimed" || workOrder.claimedBy === null) {
+      return { error: "ใบงานนี้ไม่ได้อยู่กับช่างแล้ว (อาจปิดงานหรือถูกคืนไปแล้ว)" };
+    }
+
+    const { count } = await prisma.workOrder.updateMany({
+      where: { id: wId, status: "claimed", claimedBy: workOrder.claimedBy, claimedAt: workOrder.claimedAt },
+      data: { status: "pending", claimedBy: null, claimedAt: null, assignedToId: null, assignedAt: null },
+    });
+    if (count === 0) {
+      return { error: "ใบงานเปลี่ยนไประหว่างนี้ กรุณาเปิดใบงานใหม่อีกครั้ง" };
+    }
+
+    await logAudit({
+      userId: BigInt(session.user.id!),
+      action: "RECALL_WORKORDER",
+      entityType: "workOrder",
+      entityId: wId,
+      oldValues: {
+        status: "claimed",
+        claimedBy: workOrder.claimedBy.toString(),
+        claimedAt: workOrder.claimedAt?.toISOString() ?? null,
+      },
+      newValues: { status: "pending", claimedBy: null },
+      ipAddress: "server_action",
+    });
+
+    revalidatePath("/admin", "layout");
+    revalidatePath("/tech", "layout");
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to recall work order:", error);
+    return { error: "ไม่สามารถเรียกงานคืนได้ กรุณาลองใหม่อีกครั้ง" };
+  }
+}
+
+/**
  * Assigns several work orders to one technician in a single call.
  *
  * The urgent list on the dashboard ticks *units*, but a technician is assigned

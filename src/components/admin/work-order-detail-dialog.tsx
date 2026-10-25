@@ -12,6 +12,7 @@ import {
   Images,
   MapPin,
   Snowflake,
+  Undo2,
   UserCheck,
 } from "lucide-react";
 import {
@@ -33,6 +34,8 @@ interface WorkOrderDetailDialogProps {
   isPending?: boolean;
   onClose: () => void;
   onCancelWorkOrder?: (workOrderId: string, reason: string) => void;
+  /** Takes a claimed job back from its technician into the pool. */
+  onRecallWorkOrder?: (workOrderId: string) => void;
 }
 
 function normalizeWorkOrderImages(images: unknown): string[] {
@@ -103,10 +106,11 @@ function TimelineStep({
   );
 }
 
-export function WorkOrderDetailDialog({ workOrder, isPending, onClose, onCancelWorkOrder }: WorkOrderDetailDialogProps) {
+export function WorkOrderDetailDialog({ workOrder, isPending, onClose, onCancelWorkOrder, onRecallWorkOrder }: WorkOrderDetailDialogProps) {
   const [brokenEvidenceImages, setBrokenEvidenceImages] = useState<Record<string, boolean>>({});
   const [showCancelForm, setShowCancelForm] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
+  const [showRecallConfirm, setShowRecallConfirm] = useState(false);
 
   // Per-order scratch state is dropped the moment a different order (or
   // none) is shown, in the same render, rather than a frame later.
@@ -116,9 +120,11 @@ export function WorkOrderDetailDialog({ workOrder, isPending, onClose, onCancelW
     setBrokenEvidenceImages({});
     setShowCancelForm(false);
     setCancelReason("");
+    setShowRecallConfirm(false);
   }
 
   const canCancel = !!workOrder && (workOrder.status === "pending" || workOrder.status === "claimed");
+  const canRecall = !!workOrder && workOrder.status === "claimed";
   const evidenceImages = workOrder ? normalizeWorkOrderImages(workOrder.images) : [];
   // What the technician photographed when closing the order.
   const logPhotos = workOrder?.logPhotos ?? null;
@@ -290,6 +296,51 @@ export function WorkOrderDetailDialog({ workOrder, isPending, onClose, onCancelW
 
             {/* Footer: the one destructive action, away from the information
                 and confirmed in place. Only while the order is still open. */}
+            {/* Taking a job back from its technician, short of cancelling it:
+                the work still needs doing, by someone else or later. */}
+            {canRecall && onRecallWorkOrder && (
+              <div className="border-t border-border bg-card px-6 py-4">
+                {!showRecallConfirm ? (
+                  <div className="flex items-center justify-between gap-4">
+                    <p className="text-xs text-muted-foreground">
+                      ช่าง {workOrder.claimedByName || "-"} ถืองานนี้อยู่ เรียกคืนให้กลับไปรอรับงานได้ — ใบงานยังอยู่ ไม่ถูกยกเลิก
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setShowRecallConfirm(true)}
+                      className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-xs font-bold text-foreground hover:bg-secondary transition-colors"
+                    >
+                      <Undo2 className="h-3.5 w-3.5" /> เรียกงานคืน
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <p className="text-sm font-bold text-foreground">
+                      เรียกงาน {workOrder.acCode} คืนจากช่าง {workOrder.claimedByName || "-"}?
+                    </p>
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowRecallConfirm(false)}
+                        disabled={isPending}
+                        className="rounded-lg border border-border px-4 py-2 text-xs font-bold text-foreground hover:bg-secondary disabled:opacity-50"
+                      >
+                        ไม่เรียกคืน
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onRecallWorkOrder(workOrder.id)}
+                        disabled={isPending}
+                        className="rounded-lg bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                      >
+                        {isPending ? "กำลังเรียกคืน..." : "ยืนยันเรียกคืน"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {canCancel && onCancelWorkOrder && (
               <div className="border-t border-border bg-card px-6 py-4">
                 {!showCancelForm ? (

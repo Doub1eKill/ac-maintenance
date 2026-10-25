@@ -8,6 +8,7 @@ import {
   assignWorkOrderAction,
   bulkAssignWorkOrdersAction,
   cancelWorkOrderAction,
+  recallWorkOrderAction,
 } from "@/app/admin/actions";
 import type { WorkOrderItem } from "@/components/admin/types";
 
@@ -135,6 +136,18 @@ export function useWorkOrderAssignment() {
     });
   }
 
+  function recallWorkOrder(workOrderId: string) {
+    startTransition(async () => {
+      const res = await recallWorkOrderAction(workOrderId);
+      if (res.error) {
+        toast.error(res.error);
+      } else {
+        toast.success("เรียกงานคืนแล้ว ใบงานกลับไปรอรับงาน");
+        setDetail(null);
+      }
+    });
+  }
+
   return {
     isPending,
     assignTarget: target,
@@ -147,5 +160,6 @@ export function useWorkOrderAssignment() {
     openDetail: setDetail,
     closeDetail: () => setDetail(null),
     cancelWorkOrder,
+    recallWorkOrder,
   };
 }

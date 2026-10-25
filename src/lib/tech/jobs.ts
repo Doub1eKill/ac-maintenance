@@ -87,3 +87,59 @@ export async function bulkClaimWorkOrdersAction(workOrderIds: string[]) {
     return { error: "เกิดข้อผิดพลาดในการรับงานหลายรายการ" };
   }
 }
+
+/**
+ * A technician hands back a job they claimed and have not closed: it goes back
+ * to the pool for anyone to pick up, the same state releaseHeldWorkOrders()
+ * leaves it in when an account is suspended.
+ *
+ * Added 25 Oct 2026, after a job was claimed on production only to take
+ * screenshots and needed a database edit to undo. Anyone can claim from the
+ * pool, so anyone holding a job should be able to give it back — including one
+ * an admin assigned them, which is how an assignment that cannot be done gets
+ * back to the admin's board.
+ *
+ * One guarded write, like claiming: status=claimed and claimedBy=this
+ * technician, so a job they closed a moment ago, or one an admin recalled or
+ * cancelled, simply is not matched. Work orders only, so no lock order to keep.
+ */
+export async function releaseWorkOrderAction(workOrderId: string) {
+  const session = await verifyTechnician();
+  const techId = BigInt(session.user.id!);
+
+  let id: bigint;
+  try {
+    id = BigInt(workOrderId);
+  } catch {
+    return { error: "ไม่พบใบงาน" };
+  }
+
+  try {
+    const { count } = await prisma.workOrder.updateMany({
+      where: { id, status: "claimed", claimedBy: techId },
+      data: { status: "pending", claimedBy: null, claimedAt: null, assignedToId: null, assignedAt: null },
+    });
+    if (count === 0) {
+      return { error: "งานนี้ไม่ได้อยู่ในมือคุณแล้ว (อาจปิดงาน ถูกเรียกคืน หรือถูกยกเลิกไปแล้ว)" };
+    }
+
+    await logAuditMany([
+      {
+        userId: techId,
+        action: "RELEASE_WORKORDER",
+        entityType: "workOrder",
+        entityId: id,
+        oldValues: { status: "claimed", claimedBy: techId.toString() },
+        newValues: { status: "pending", claimedBy: null, by: "technician" },
+        ipAddress: "server_action",
+      },
+    ]);
+
+    revalidatePath("/tech", "layout");
+    revalidatePath("/admin", "layout");
+    return { success: true as const };
+  } catch (error) {
+    console.error("Failed to release work order:", error);
+    return { error: "เกิดข้อผิดพลาดในการคืนงาน" };
+  }
+}

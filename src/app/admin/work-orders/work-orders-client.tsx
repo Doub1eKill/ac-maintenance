@@ -44,6 +44,7 @@ export function WorkOrdersClient({
         isPending={assignment.isPending}
         onClose={assignment.closeDetail}
         onCancelWorkOrder={assignment.cancelWorkOrder}
+        onRecallWorkOrder={assignment.recallWorkOrder}
       />
     </>
   );
