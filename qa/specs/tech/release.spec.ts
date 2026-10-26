@@ -52,6 +52,18 @@ test.describe("technician: give a claimed job back", () => {
     await hydrated(page, "main");
 
     const release = page.getByRole("button", { name: `คืนงาน ${CODE}` });
+    // The page opens a building by itself only when it is the only one. If the
+    // QA technician holds another job too (whichever tech spec ran first
+    // claimed it), the buildings start closed — field-lcp-20261026 failed
+    // here for that alone. This building has one floor and one room, so
+    // opening it opens all the way down to the card.
+    // The heading is there either way; waiting for it first means the cards
+    // under an already-open building have rendered too, so the click below
+    // never closes the one building that opened by itself.
+    // As a heading: the building filter above the list lists the same name.
+    const building = page.getByRole("heading", { name: `QA_TEST_RELEASE_BLDG_${STAMP}`, exact: true });
+    await building.waitFor({ timeout: 15_000 });
+    if (!(await release.isVisible().catch(() => false))) await building.click();
     await release.waitFor({ timeout: 15_000 });
     await release.click();
     // Asked in place; nothing written yet.
