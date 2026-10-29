@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 
-// Where browsers send Content-Security-Policy-Report-Only violations
-// (next.config.ts). Nothing is blocked yet; this is how we find out whether
-// the policy would break anything before enforcing it. Each report becomes one
-// line in the Vercel function logs, searchable by "[csp]".
+// Where browsers send Content-Security-Policy violations. The policy is
+// enforced (src/proxy.ts, since 29 Oct 2026), so each report is something the
+// browser actually blocked — a page the policy breaks shows up here first.
+// Each report becomes one line in the Vercel function logs, searchable by
+// "[csp]".
 //
 // Open to anyone, as report endpoints have to be: it writes nothing but a log
 // line, reads at most MAX_BYTES, and logs only the handful of fields that say

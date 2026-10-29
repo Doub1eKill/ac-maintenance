@@ -311,16 +311,24 @@ test("security headers are sent, and the camera stays allowed for the QR scanner
   const res = await page.request.get("/login");
   const h = res.headers();
   const want: Array<[string, RegExp]> = [
-    ["content-security-policy", /frame-ancestors 'self'/],
+    // Enforced, with a per-request nonce instead of 'unsafe-inline' for
+    // scripts (src/proxy.ts + src/lib/csp.ts, 29 Oct 2026), and where it reports.
+    ["content-security-policy", /default-src 'self'.*script-src 'self' 'nonce-[A-Za-z0-9+/=]+' 'strict-dynamic'.*object-src 'none'.*frame-ancestors 'self'.*report-uri \/api\/csp-report/],
     ["x-frame-options", /^SAMEORIGIN$/i],
     ["x-content-type-options", /^nosniff$/i],
     ["referrer-policy", /strict-origin-when-cross-origin/],
     ["permissions-policy", /camera=\(self\)/],
-    // The full policy, reporting only (next.config.ts), and where it reports.
-    ["content-security-policy-report-only", /default-src 'self'.*script-src 'self' 'unsafe-inline'.*object-src 'none'.*report-uri \/api\/csp-report/],
     ["reporting-endpoints", /csp="\/api\/csp-report"/],
   ];
   const missing = want.filter(([k, re]) => !re.test(h[k] ?? "")).map(([k]) => `${k}=${h[k] ?? "(none)"}`);
+  // No 'unsafe-inline' left for scripts, no second (Report-Only) policy, and a
+  // nonce that changes per response.
+  const scriptSrc = (h["content-security-policy"] ?? "").split(";").find((d) => d.trim().startsWith("script-src")) ?? "";
+  if (/'unsafe-inline'/.test(scriptSrc)) missing.push("script-src still has 'unsafe-inline'");
+  if (h["content-security-policy-report-only"]) missing.push("content-security-policy-report-only still sent");
+  const again = (await page.request.get("/login")).headers()["content-security-policy"] ?? "";
+  const nonceOf = (csp: string) => /'nonce-([^']+)'/.exec(csp)?.[1];
+  if (!nonceOf(again) || nonceOf(again) === nonceOf(h["content-security-policy"] ?? "")) missing.push("nonce did not change between two responses");
   ledger("Headers", `security headers on /login${missing.length ? ": missing " + missing.join(", ") : ""}`, "API", missing.length === 0 ? "PASS" : "FAIL", note("security-headers.txt", JSON.stringify(h, null, 1)));
   expect(missing).toEqual([]);
 });

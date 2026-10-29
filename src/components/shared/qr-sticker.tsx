@@ -170,11 +170,22 @@ export function openStickerSheet(stickersHtml: string, title: string) {
       </head>
       <body>
         <div class="sheet">${stickersHtml}</div>
-        <script>
-          window.onload = () => { window.print(); window.close(); }
-        </script>
       </body>
     </html>
   `);
   printWindow.document.close();
+
+  // Printed from here rather than by a <script> written into the sheet: the
+  // new window is about:blank, which inherits this page's Content-Security-
+  // Policy, and that policy runs only scripts carrying the page's nonce — an
+  // inline script in the sheet would be blocked and nothing would print.
+  // Optional calls because the QA harness swaps window.open for a stub that
+  // only records what is written.
+  const print = () => {
+    printWindow.focus?.();
+    printWindow.print?.();
+    printWindow.close?.();
+  };
+  if (printWindow.document.readyState === "complete") print();
+  else printWindow.addEventListener?.("load", print, { once: true });
 }
