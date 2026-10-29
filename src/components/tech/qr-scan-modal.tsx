@@ -316,7 +316,7 @@ function QrScanModalBody({ isPending, onClose, onClaim, onClaimAndLog, onLogWork
             <QrCode className="h-4 w-4 text-foreground" />
             <span>สแกนรหัส QR เครื่องปรับอากาศ</span>
           </h3>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+          <button aria-label="ปิด" onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X className="h-5 w-5" />
           </button>
         </div>

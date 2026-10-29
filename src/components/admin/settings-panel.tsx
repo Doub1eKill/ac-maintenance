@@ -267,6 +267,7 @@ function AuditLogCard() {
         {availableActions.length > 0 && (
           <NativeSelect
             value={actionFilter}
+            aria-label="กรองประวัติตามประเภท"
             onChange={(e) => setActionFilter(e.target.value)}
             className="w-full sm:w-auto h-auto py-2 px-3 rounded-lg border-border text-xs font-bold text-foreground"
           >

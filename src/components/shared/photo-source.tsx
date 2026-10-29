@@ -115,6 +115,7 @@ export function PhotoSource({
         name={name}
         type="file"
         accept="image/*"
+        aria-label={labels?.gallery ?? (hasCamera ? "เลือกรูปจากคลัง" : "เลือกรูปภาพ")}
         required={required}
         disabled={disabled}
         className="sr-only"

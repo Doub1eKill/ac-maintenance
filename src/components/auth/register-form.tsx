@@ -230,8 +230,8 @@ export function RegisterForm() {
         <div
           className={`mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border shadow-2xs ${
             activeNow
-              ? "bg-emerald-50 border-emerald-200 text-emerald-600"
-              : "bg-amber-50 border-amber-200 text-amber-600"
+              ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+              : "bg-amber-50 border-amber-200 text-amber-700"
           }`}
         >
           {activeNow ? <CheckCircle2 className="h-7 w-7" /> : <Clock className="h-7 w-7" />}
@@ -323,7 +323,7 @@ export function RegisterForm() {
           className="justify-center"
           buttonClassName="min-h-8 rounded-lg border-slate-200 bg-white px-2.5 text-[11px] text-slate-800 hover:bg-slate-50 shadow-2xs"
         />
-        <span className="text-[10px] text-slate-400">
+        <span className="text-[10px] text-slate-500">
           จำเป็นต้องใส่ · ไฟล์รูปภาพ ขนาดไม่เกิน 8 MB
         </span>
         {avatarError && (
@@ -344,7 +344,7 @@ export function RegisterForm() {
             className={`flex items-center justify-center gap-2 rounded-lg py-2 text-xs font-bold transition-all ${
               selectedRole === "technician"
                 ? "bg-white text-slate-950 shadow-2xs"
-                : "text-slate-500 hover:text-slate-950"
+                : "text-slate-600 hover:text-slate-950"
             }`}
           >
             <Wrench className="h-3.5 w-3.5" />
@@ -356,7 +356,7 @@ export function RegisterForm() {
             className={`flex items-center justify-center gap-2 rounded-lg py-2 text-xs font-bold transition-all ${
               selectedRole === "org_admin"
                 ? "bg-white text-slate-950 shadow-2xs"
-                : "text-slate-500 hover:text-slate-950"
+                : "text-slate-600 hover:text-slate-950"
             }`}
           >
             <Building2 className="h-3.5 w-3.5" />
@@ -565,7 +565,9 @@ export function RegisterForm() {
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-950"
+            aria-label={showPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
+            aria-pressed={showPassword}
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-slate-500 hover:text-slate-950"
           >
             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
@@ -585,7 +587,7 @@ export function RegisterForm() {
       {/* Back to Login */}
       <div className="pt-3 text-center text-xs text-slate-500 border-t border-slate-100">
         มีบัญชีผู้ใช้งานอยู่แล้ว?{" "}
-        <Link href="/login" className="font-bold text-slate-950 hover:underline">
+        <Link href="/login" className="inline-flex min-h-6 items-center font-bold text-slate-950 hover:underline">
           เข้าสู่ระบบที่นี่
         </Link>
       </div>

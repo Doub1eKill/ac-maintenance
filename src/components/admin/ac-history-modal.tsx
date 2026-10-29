@@ -140,7 +140,7 @@ export function AcHistoryModal({ airConditionerId, onClose, currentUserId, isAdm
             <Clock className="h-4 w-4 text-primary" />
             ประวัติการซ่อมบำรุง{unit ? ` — ${unit.acCode}` : ""}
           </h3>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+          <button aria-label="ปิด" onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X className="h-5 w-5" />
           </button>
         </div>

@@ -55,7 +55,7 @@ export function ScheduleModal({ unit, onClose }: ScheduleModalProps) {
       <div className="w-full max-w-sm space-y-4 rounded-t-3xl border border-border bg-card p-6 pb-10 shadow-2xl animate-in slide-in-from-bottom-full sm:rounded-2xl sm:pb-6 sm:slide-in-from-bottom-0 sm:fade-in">
         <div className="flex items-center justify-between border-b border-border pb-3">
           <h3 className="text-sm font-bold text-foreground">รอบการล้างแอร์ ({unit.acCode})</h3>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+          <button aria-label="ปิด" onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X className="h-5 w-5" />
           </button>
         </div>

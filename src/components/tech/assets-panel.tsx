@@ -44,7 +44,7 @@ function GroupJobBadges({ items }: { items: TechnicianAssetUnit[] }) {
   return (
     <div className="hidden sm:flex items-center gap-1.5 text-[10px] font-bold">
       {repairCount > 0 && (
-        <span className="inline-flex items-center gap-1 rounded-md bg-destructive/10 text-destructive px-1.5 py-0.5">
+        <span className="inline-flex items-center gap-1 rounded-md bg-destructive/10 text-red-700 dark:text-destructive px-1.5 py-0.5">
           <Wrench className="h-3 w-3" /> {repairCount}
         </span>
       )}

@@ -26,7 +26,7 @@ export function AddBuildingModal({ isPending, onClose, onSubmit }: { isPending: 
       <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-xl space-y-4 animate-in fade-in">
         <div className="flex items-center justify-between border-b border-border pb-3">
           <h3 className="text-base font-bold text-foreground">เพิ่มอาคารใหม่</h3>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+          <button aria-label="ปิด" onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -90,7 +90,7 @@ export function AddRoomModal({ target, isPending, onClose, onSubmit }: { target:
               ? "เพิ่มชั้นใหม่"
               : `เพิ่มห้อง (${target.floor === null ? "ไม่ระบุชั้น" : `ชั้น ${target.floor}`})`}
           </h3>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+          <button aria-label="ปิด" onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -144,7 +144,7 @@ export function PmSettingsModal({ unit, isPending, onClose, onSubmit }: { unit: 
             <CalendarClock className="w-5 h-5 text-primary" />
             รอบบำรุงรักษา ({unit.acCode})
           </h3>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+          <button aria-label="ปิด" onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -184,7 +184,7 @@ export function QrCodeModal({ unit, onClose }: { unit: QrModalData; onClose: () 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-xs p-4">
       <div className="w-full max-w-sm rounded-3xl border border-border bg-card p-6 shadow-2xl space-y-6 animate-in fade-in zoom-in-95 relative">
-        <button
+        <button aria-label="ปิด"
           onClick={onClose}
           className="absolute right-4 top-4 text-muted-foreground hover:text-foreground bg-secondary p-1.5 rounded-full transition-colors"
         >

@@ -83,7 +83,7 @@ export default async function PendingApprovalPage({ searchParams }: PendingAppro
         {/* Guidance Instructions */}
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-2.5 text-xs text-slate-700">
           <div className="font-bold text-slate-950 flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 text-sky-600" />
+            <AlertCircle className="h-4 w-4 text-sky-700" />
             <span>คำแนะนำเพิ่มเติม</span>
           </div>
           <ul className="list-disc list-inside space-y-1.5 text-slate-600 leading-relaxed pl-1">

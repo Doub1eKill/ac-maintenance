@@ -211,7 +211,7 @@ export function MaintenanceAnalyticsDonut({
                   <span className="text-2xl font-bold text-foreground font-mono">
                     {counts.completed.toLocaleString()}
                   </span>
-                  <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                  <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">
                     {counts.total > 0 ? Math.round((counts.completed / counts.total) * 100) : 0}%
                   </span>
                 </div>
@@ -245,7 +245,7 @@ export function MaintenanceAnalyticsDonut({
                   <span className="text-2xl font-bold text-foreground font-mono">
                     {counts.pending.toLocaleString()}
                   </span>
-                  <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">
+                  <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">
                     {counts.total > 0 ? Math.round((counts.pending / counts.total) * 100) : 0}%
                   </span>
                 </div>

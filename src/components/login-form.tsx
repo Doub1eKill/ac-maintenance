@@ -210,7 +210,7 @@ export function LoginForm() {
             </label>
             <Link
               href="/request-password-reset"
-              className="text-xs font-semibold text-slate-700 hover:text-slate-950 hover:underline"
+              className="inline-flex min-h-6 items-center text-xs font-semibold text-slate-700 hover:text-slate-950 hover:underline"
             >
               ลืมรหัสผ่าน?
             </Link>
@@ -230,7 +230,9 @@ export function LoginForm() {
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-900"
+              aria-label={showPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
+              aria-pressed={showPassword}
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-slate-500 hover:text-slate-900"
             >
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
@@ -250,7 +252,7 @@ export function LoginForm() {
         {/* Register Link */}
         <div className="pt-3 text-center text-xs text-slate-500 border-t border-slate-100">
           ยังไม่มีบัญชีผู้ใช้งานในระบบ?{" "}
-          <Link href="/register" className="font-bold text-slate-900 hover:underline">
+          <Link href="/register" className="inline-flex min-h-6 items-center font-bold text-slate-900 hover:underline">
             ลงทะเบียนผู้ใช้งานใหม่ที่นี่
           </Link>
         </div>

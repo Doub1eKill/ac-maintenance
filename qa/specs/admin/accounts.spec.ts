@@ -27,10 +27,10 @@ const one = (q: string) => db(q)[0]?.[0] ?? null;
 async function openTeam(page: Page, expectCard = true) {
   await page.goto(`/admin/team?q=${encodeURIComponent(NAME)}`);
   await page.locator("main").last().waitFor({ timeout: 60_000 });
-  if (expectCard) await hydrated(page, "[role=button]");
+  if (expectCard) await hydrated(page, "[data-slot=user-card]");
   else await page.getByText("ไม่พบผู้ใช้งานที่ตรงกับคำค้นนี้").waitFor({ timeout: 60_000 }).catch(() => {});
 }
-const card = (page: Page) => page.locator("[role=button]", { hasText: NAME });
+const card = (page: Page) => page.locator("[data-slot=user-card]", { hasText: NAME });
 const badge = async (page: Page) => (await card(page).locator(".flex-wrap > span").nth(1).innerText()).trim();
 
 /** A context signed in as the throwaway technician, sitting on /tech. */

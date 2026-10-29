@@ -379,3 +379,32 @@ export async function fillCustomBrand(scope: Locator, brand: string, model?: str
 /** The admin's register-a-unit form, once its modal is open. */
 export const registerUnitForm = (page: Page) =>
   page.locator("form").filter({ has: page.getByRole("button", { name: /ลงทะเบียนเครื่องปรับอากาศ/ }) });
+
+/**
+ * WCAG 2.1 A/AA audit of the page as it is now, with axe-core 4.10.3 — the
+ * version and tags the TTACON 2026 evaluation used (29 Oct 2026), so a result
+ * here can be set beside that one. The full axe result goes into the run
+ * folder as a11y-<name>.json; the ledger gets the counts.
+ *
+ * Returns the counts; the caller decides what fails. Critical and serious are
+ * what the specs refuse.
+ */
+export const A11Y_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
+
+export async function axeAudit(page: Page, name: string) {
+  const { default: AxeBuilder } = await import("@axe-core/playwright");
+  const result = await new AxeBuilder({ page }).withTags(A11Y_TAGS).analyze();
+  const byImpact = (impact: string) => result.violations.filter((v) => v.impact === impact);
+  const counts = {
+    passes: result.passes.length,
+    violations: result.violations.length,
+    critical: byImpact("critical").length,
+    serious: byImpact("serious").length,
+    moderate: byImpact("moderate").length,
+    minor: byImpact("minor").length,
+    nodes: result.violations.reduce((n, v) => n + v.nodes.length, 0),
+    rules: result.violations.map((v) => `${v.id}(${v.impact}, ${v.nodes.length})`),
+  };
+  const artifact = note(`a11y-${name}.json`, JSON.stringify({ url: page.url(), viewport: page.viewportSize(), counts, violations: result.violations }, null, 2));
+  return { counts, artifact };
+}

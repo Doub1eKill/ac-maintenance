@@ -32,7 +32,7 @@ export function UserStatusBadge({ user }: { user: Pick<PendingUser, "status" | "
   const classes =
     user.status === "pending"
       ? "bg-warning/20 text-warning-foreground border-warning/30"
-      : "bg-destructive/10 text-destructive border-destructive/30";
+      : "bg-destructive/10 text-red-700 dark:text-destructive border-destructive/30";
   return (
     <span className={`rounded-md border px-2 py-0.5 ${classes}`}>
       {USER_STATUS_LABEL[user.status] ?? user.status}
@@ -72,17 +72,13 @@ export function UserCard({ user, onOpen, meta, actions }: UserCardProps) {
   const RoleIcon = user.role === "technician" ? Wrench : Building2;
 
   return (
+    // Clickable anywhere with a mouse, but not a button itself: it holds the
+    // action buttons, and a button inside a button is announced as one control
+    // and fails WCAG (axe nested-interactive, 29 Oct 2026). The keyboard and
+    // screen-reader way in is the name below, which is a real button.
     <div
-      role={onOpen ? "button" : undefined}
-      tabIndex={onOpen ? 0 : undefined}
+      data-slot="user-card"
       onClick={onOpen}
-      onKeyDown={(event) => {
-        if (!onOpen) return;
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onOpen();
-        }
-      }}
       className={`overflow-hidden rounded-2xl border bg-card text-left transition-colors ${
         user.status === "pending" ? "border-warning/40" : "border-border"
       } ${onOpen ? "cursor-pointer hover:border-muted-foreground" : ""}`}
@@ -113,7 +109,21 @@ export function UserCard({ user, onOpen, meta, actions }: UserCardProps) {
 
       <div className="space-y-3 p-4">
         <div className="min-w-0">
-          <p className="truncate text-sm font-bold text-foreground">{user.name}</p>
+          {onOpen ? (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onOpen();
+              }}
+              aria-label={`ดูรายละเอียด ${user.name}`}
+              className="block w-full truncate rounded text-left text-sm font-bold text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            >
+              {user.name}
+            </button>
+          ) : (
+            <p className="truncate text-sm font-bold text-foreground">{user.name}</p>
+          )}
           {/* The login identity, and what the header search matches on — without
               it a search that hits nothing visible looks broken. */}
           <p className="truncate font-mono text-[11px] text-muted-foreground">{user.email}</p>

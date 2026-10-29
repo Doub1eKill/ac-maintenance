@@ -285,6 +285,7 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
         <div className="flex items-center gap-2 bg-muted p-1 rounded-xl border border-border">
           <button 
             onClick={prevMonth}
+            aria-label="เดือนก่อนหน้า"
             className="p-1.5 hover:bg-card rounded-lg text-muted-foreground hover:text-foreground transition-colors hover:shadow-sm"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -297,6 +298,7 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
           </button>
           <button 
             onClick={nextMonth}
+            aria-label="เดือนถัดไป"
             className="p-1.5 hover:bg-card rounded-lg text-muted-foreground hover:text-foreground transition-colors hover:shadow-sm"
           >
             <ChevronRight className="h-4 w-4" />
@@ -381,13 +383,18 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
                   return acc;
                 }, {})
               ).map((group) => (
-                <div
+                // A button, not a clickable div: the keyboard could not reach
+                // a building's jobs at all, and a day cell that scrolls must
+                // hold something focusable or keyboard users cannot scroll it
+                // (axe scrollable-region-focusable, 29 Oct 2026).
+                <button
+                  type="button"
                   key={group.name}
                   onClick={(e) => {
                     e.stopPropagation();
                     setSelectedDayBuilding({ date: cloneDay, buildingName: group.name, jobs: group.jobs });
                   }}
-                  className="cursor-pointer border px-1.5 py-1 rounded-md text-[10px] font-semibold flex items-start justify-between gap-1 transition-colors bg-primary/10 text-primary border-primary/20 hover:bg-primary/20"
+                  className="w-full text-left cursor-pointer border px-1.5 py-1 rounded-md text-[10px] font-semibold flex items-start justify-between gap-1 transition-colors bg-primary/10 text-primary border-primary/20 hover:bg-primary/20"
                 >
                   {/* No truncate — building names that share a long common
                       prefix (e.g. two "Administration Building ######" seed
@@ -398,7 +405,7 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
                     <span>{group.name} ({group.jobs.length})</span>
                   </span>
                   <ChevronRight className="h-3 w-3 shrink-0 ml-1 mt-px" />
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -449,7 +456,7 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
               </h3>
               <p className="text-xs text-muted-foreground font-medium">รหัสเครื่อง: {selectedEvent.acCode}</p>
             </div>
-            <button onClick={closeEventModal} className="p-1 text-muted-foreground hover:text-foreground rounded-lg hover:bg-secondary transition-colors">
+            <button aria-label="ปิด" onClick={closeEventModal} className="p-1 text-muted-foreground hover:text-foreground rounded-lg hover:bg-secondary transition-colors">
               <X className="h-4 w-4" />
             </button>
           </div>
@@ -523,7 +530,7 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
                 {format(selectedDayBuilding.date, "d MMMM yyyy", { locale: th })} • {selectedDayBuilding.jobs.length} งาน
               </p>
             </div>
-            <button onClick={() => setSelectedDayBuilding(null)} className="p-1 text-muted-foreground hover:text-foreground rounded-lg hover:bg-secondary transition-colors">
+            <button aria-label="ปิด" onClick={() => setSelectedDayBuilding(null)} className="p-1 text-muted-foreground hover:text-foreground rounded-lg hover:bg-secondary transition-colors">
               <X className="h-4 w-4" />
             </button>
           </div>
@@ -573,6 +580,7 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
                   <label className="mb-1 block text-xs font-bold text-foreground">อาคาร</label>
                   <NativeSelect
                     value={dayBuildingFilter}
+                    aria-label="อาคาร"
                     onChange={(e) => handleDayBuildingFilterChange(e.target.value)}
                   >
                     <NativeSelectOption value="all">ทุกอาคาร</NativeSelectOption>
@@ -586,7 +594,7 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
 
                 <div>
                   <label className="mb-1 block text-xs font-bold text-foreground">ห้อง</label>
-                  <NativeSelect value={dayRoomFilter} onChange={(e) => setDayRoomFilter(e.target.value)}>
+                  <NativeSelect value={dayRoomFilter} onChange={(e) => setDayRoomFilter(e.target.value)} aria-label="ห้อง">
                     <NativeSelectOption value="all">ทุกห้อง</NativeSelectOption>
                     {dayRoomOptions.map((option) => (
                       <NativeSelectOption key={option.value} value={option.value}>
@@ -600,6 +608,7 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
                   <label className="mb-1 block text-xs font-bold text-foreground">ประเภทงาน</label>
                   <NativeSelect
                     value={dayTypeFilter}
+                    aria-label="ประเภทงาน"
                     onChange={(e) => setDayTypeFilter(e.target.value as Schedule["jobType"] | "all")}
                   >
                     <NativeSelectOption value="all">ทุกประเภท</NativeSelectOption>

@@ -334,7 +334,7 @@ export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
         {showQrCode && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-xs p-4">
             <div className="w-full max-w-sm rounded-3xl border border-border bg-card p-6 shadow-2xl space-y-6 animate-in fade-in zoom-in-95 relative">
-              <button
+              <button aria-label="ปิด"
                 onClick={() => setShowQrCode(null)}
                 className="absolute right-4 top-4 text-muted-foreground hover:text-foreground bg-secondary p-1.5 rounded-full transition-colors"
               >

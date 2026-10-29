@@ -30,7 +30,7 @@ export function AssignWorkOrderModal({ open, count, activeTechnicians, isPending
           <h3 className="text-base font-bold text-foreground">
             {isBulk ? `มอบหมาย ${count} ใบงานให้ช่างเทคนิค` : "มอบหมายงานให้ช่างเทคนิค"}
           </h3>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+          <button aria-label="ปิด" onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X className="h-5 w-5" />
           </button>
         </div>

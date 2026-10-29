@@ -60,7 +60,7 @@ export default async function QRCodePage(props: { params: Promise<{ id: string }
   const activeSchedule = ac.maintenanceSchedules[0];
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-12">
+    <main className="min-h-screen bg-slate-50 pb-12">
       <div className="bg-slate-900 text-white pb-16 pt-6 px-4">
         <div className="max-w-2xl mx-auto">
           {/* Only shown to signed-in staff: someone who arrived by scanning
@@ -91,7 +91,7 @@ export default async function QRCodePage(props: { params: Promise<{ id: string }
           {ac.photoUrl ? (
             <Image src={ac.photoUrl} alt={`เครื่องปรับอากาศ ${ac.acCode}`} fill sizes="(max-width: 672px) 100vw, 672px" className="object-cover" priority />
           ) : (
-            <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-slate-400">
+            <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-slate-500">
               <Wind className="h-12 w-12" />
               <span className="text-xs font-medium">ยังไม่มีรูปเครื่องนี้</span>
             </div>
@@ -99,7 +99,7 @@ export default async function QRCodePage(props: { params: Promise<{ id: string }
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
-          <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+          <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2">
             <Settings2 className="w-4 h-4" /> ข้อมูลทั่วไป
           </h2>
           <div className="grid grid-cols-2 gap-y-4 gap-x-2 text-sm">
@@ -130,13 +130,13 @@ export default async function QRCodePage(props: { params: Promise<{ id: string }
 
         {activeSchedule && (
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
-            <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+            <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
               <CalendarClock className="w-4 h-4" /> รอบบำรุงรักษา
             </h2>
             <div className="flex items-center justify-between p-3 bg-sky-50 border border-sky-100 rounded-xl">
               <div>
                 <p className="text-xs text-sky-700 font-bold mb-0.5">ล้างทุกๆ {activeSchedule.frequencyValue} {activeSchedule.frequencyUnit === 'days' ? 'วัน' : activeSchedule.frequencyUnit === 'months' ? 'เดือน' : 'ปี'}</p>
-                <p className="text-[11px] text-sky-600 font-medium">กำหนดครั้งถัดไป: {format(inAppTimeZone(activeSchedule.nextDueDate), "d MMM yyyy", { locale: th })}</p>
+                <p className="text-[11px] text-sky-700 font-medium">กำหนดครั้งถัดไป: {format(inAppTimeZone(activeSchedule.nextDueDate), "d MMM yyyy", { locale: th })}</p>
               </div>
               <ShieldCheck className="w-8 h-8 text-sky-500 opacity-50" />
             </div>
@@ -144,7 +144,7 @@ export default async function QRCodePage(props: { params: Promise<{ id: string }
         )}
 
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
-          <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+          <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2">
             <Clock className="w-4 h-4" /> ประวัติการซ่อมบำรุง
           </h2>
           
@@ -220,7 +220,7 @@ export default async function QRCodePage(props: { params: Promise<{ id: string }
           </div>
         ) : null}
       </div>
-    </div>
+    </main>
   );
 }
 

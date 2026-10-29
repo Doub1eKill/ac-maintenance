@@ -62,7 +62,7 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
         </div>
 
         {/* Hero Footer */}
-        <div className="relative z-10 text-xs text-slate-400 flex items-center justify-between border-t border-slate-200/80 pt-6">
+        <div className="relative z-10 text-xs text-slate-500 flex items-center justify-between border-t border-slate-200/80 pt-6">
           <span>&copy; {new Date().getFullYear()} AC Maintenance System</span>
           <span>v1.0 • Executive SaaS Edition</span>
         </div>
@@ -80,8 +80,9 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
           </Link>
         </div>
 
-        {/* Center Form Container Box */}
-        <div className="mx-auto my-auto w-full max-w-md space-y-6">
+        {/* Center Form Container Box: the page's main landmark (Lighthouse,
+            29 Oct 2026 — /login and /register had none). */}
+        <main className="mx-auto my-auto w-full max-w-md space-y-6">
           <div className="space-y-1.5 text-left">
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-950">{title}</h1>
             <p className="text-xs font-medium text-slate-500">{subtitle}</p>
@@ -90,10 +91,10 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
           <div className="biz-card p-6 sm:p-8 shadow-xs">
             {children}
           </div>
-        </div>
+        </main>
 
         {/* Footer Note */}
-        <div className="mt-8 text-center text-xs text-slate-400 font-medium">
+        <div className="mt-8 text-center text-xs text-slate-500 font-medium">
           ต้องการความช่วยเหลือ? ติดต่อผู้ดูแลระบบมหาวิทยาลัยของคุณ
         </div>
       </div>

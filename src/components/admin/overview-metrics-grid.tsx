@@ -99,7 +99,7 @@ export function OverviewMetricsGrid({ metrics }: OverviewMetricsGridProps) {
 
           <div className="mt-4 pt-3 border-t border-border/60 flex items-center justify-between text-xs">
             <span className="text-muted-foreground">เครื่องแจ้งเสีย/ชำรุด</span>
-            <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-destructive/10 text-destructive border border-destructive/20">
+            <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-destructive/10 text-red-700 dark:text-destructive border border-destructive/20">
               ต้องดูแลเร่งด่วน
             </span>
           </div>
@@ -112,13 +112,13 @@ export function OverviewMetricsGrid({ metrics }: OverviewMetricsGridProps) {
           <div className="flex items-start justify-between">
             <div>
               <span className="text-xs font-semibold text-muted-foreground">ถึงรอบล้างแอร์</span>
-              <div className="text-2xl font-bold tracking-tight text-amber-600 dark:text-amber-400 mt-1">
+              <div className="text-2xl font-bold tracking-tight text-amber-700 dark:text-amber-400 mt-1">
                 <MotionNumber value={metrics.cleaningUnits} />
                 <span className="text-xs font-normal text-muted-foreground ml-1.5">รายการ</span>
               </div>
             </div>
             <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
-              <Sparkles className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+              <Sparkles className="w-5 h-5 text-amber-700 dark:text-amber-400" />
             </div>
           </div>
 
@@ -143,7 +143,7 @@ export function OverviewMetricsGrid({ metrics }: OverviewMetricsGridProps) {
               </div>
             </div>
             <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
-              <Users className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              <Users className="w-5 h-5 text-emerald-700 dark:text-emerald-400" />
             </div>
           </div>
 

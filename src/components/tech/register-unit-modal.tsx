@@ -110,7 +110,7 @@ export function RegisterUnitModal({ rooms, onClose }: RegisterUnitModalProps) {
       <div className="max-h-[95vh] w-full max-w-md space-y-4 overflow-y-auto rounded-t-3xl border border-border bg-card p-6 pb-10 shadow-2xl animate-in slide-in-from-bottom-full sm:rounded-2xl sm:pb-6 sm:slide-in-from-bottom-0 sm:fade-in">
         <div className="flex items-center justify-between border-b border-border pb-3">
           <h3 className="text-sm font-bold text-foreground">ลงทะเบียนแอร์เครื่องใหม่</h3>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+          <button aria-label="ปิด" onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X className="h-5 w-5" />
           </button>
         </div>

@@ -103,7 +103,7 @@ export function JobPoolPanel({ jobPool, searchQuery, selectedBuilding, isPending
                                 priority it was raised with is a pill in the badge
                                 row below, the same pill the admin's board shows. */}
                             {isUrgent(job.createdAt) && (
-                              <div className="absolute top-0 right-0 bg-amber-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1 shadow-sm">
+                              <div className="absolute top-0 right-0 bg-amber-700 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1 shadow-sm">
                                 <Clock className="w-3 h-3" /> รอนาน
                               </div>
                             )}

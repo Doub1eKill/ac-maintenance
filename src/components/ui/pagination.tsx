@@ -44,15 +44,28 @@ function PaginationLink({
   size = "icon",
   ...props
 }: PaginationLinkProps) {
+  // The pages here mark the first/last-page arrow as unusable by giving it
+  // "pointer-events-none opacity-50". Say so to assistive tech as well: the
+  // faded link was announced as a working one, and axe failed its contrast
+  // because nothing marked it disabled.
+  // Faded with muted-foreground rather than the callers' opacity-50: half
+  // opacity takes the label below 4.5:1, and axe does not let a disabled link
+  // off for it.
+  const disabled = /\bpointer-events-none\b/.test(className ?? "")
+  const classes = disabled
+    ? cn(className?.replace(/\bopacity-50\b/, ""), "text-muted-foreground")
+    : cn(className)
   return (
     <Button
       asChild
       variant={isActive ? "outline" : "ghost"}
       size={size}
-      className={cn(className)}
+      className={classes}
     >
       <a
         aria-current={isActive ? "page" : undefined}
+        aria-disabled={disabled || undefined}
+        tabIndex={disabled ? -1 : undefined}
         data-slot="pagination-link"
         data-active={isActive}
         {...props}
@@ -68,7 +81,7 @@ function PaginationPrevious({
 }: React.ComponentProps<typeof PaginationLink> & { text?: string }) {
   return (
     <PaginationLink
-      aria-label="Go to previous page"
+      aria-label="หน้าก่อนหน้า"
       size="default"
       className={cn("pl-1.5!", className)}
       {...props}
@@ -86,7 +99,7 @@ function PaginationNext({
 }: React.ComponentProps<typeof PaginationLink> & { text?: string }) {
   return (
     <PaginationLink
-      aria-label="Go to next page"
+      aria-label="หน้าถัดไป"
       size="default"
       className={cn("pr-1.5!", className)}
       {...props}
@@ -113,7 +126,7 @@ function PaginationEllipsis({
     >
       <MoreHorizontalIcon
       />
-      <span className="sr-only">More pages</span>
+      <span className="sr-only">หน้าอื่น ๆ</span>
     </span>
   )
 }

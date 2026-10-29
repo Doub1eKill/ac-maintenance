@@ -737,7 +737,7 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
           <div className="w-full max-w-md rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-xl space-y-4 animate-in fade-in max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-border pb-3">
               <h3 className="text-base font-bold text-foreground">แก้ไขข้อมูลเครื่องปรับอากาศ ({showEditAc.acCode})</h3>
-              <button onClick={() => setShowEditAc(null)} className="text-muted-foreground hover:text-foreground">
+              <button aria-label="ปิด" onClick={() => setShowEditAc(null)} className="text-muted-foreground hover:text-foreground">
                 <X className="h-5 w-5" />
               </button>
             </div>

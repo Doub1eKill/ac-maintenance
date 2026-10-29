@@ -322,6 +322,7 @@ export function TechShell({ user, universityName, buildings, badges, children }:
               <NativeSelect
                 value={building}
                 onChange={(e) => setBuilding(e.target.value)}
+                aria-label="กรองตามอาคาร"
                 className="w-full h-auto py-2 px-3 sm:w-auto rounded-xl border-border bg-card text-xs font-bold text-foreground shadow-sm"
               >
                 <NativeSelectOption value="all">ทุกอาคาร</NativeSelectOption>
@@ -337,6 +338,7 @@ export function TechShell({ user, universityName, buildings, badges, children }:
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.96 }}
               onClick={() => setShowQrModal(true)}
+              aria-label="สแกน QR Code"
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-all shadow-md shrink-0 cursor-pointer"
             >
               <QrCode className="h-4 w-4 text-primary-foreground" />

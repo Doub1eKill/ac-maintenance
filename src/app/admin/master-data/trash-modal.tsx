@@ -150,7 +150,7 @@ export function TrashModal({ onClose }: TrashModalProps) {
           <h3 className="text-base font-bold text-foreground flex items-center gap-2">
             <Trash2 className="h-5 w-5 text-muted-foreground" /> ถังขยะยี่ห้อ/รุ่นแอร์
           </h3>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground bg-secondary p-1.5 rounded-full transition-colors">
+          <button aria-label="ปิด" onClick={onClose} className="text-muted-foreground hover:text-foreground bg-secondary p-1.5 rounded-full transition-colors">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -274,7 +274,7 @@ function TrashRow({
               onClick={() => onSetConfirm(confirmKey)}
               disabled={isPending || !canPurge}
               title={!canPurge ? `ลบถาวรไม่ได้ ยังมี ${unitsUsing} เครื่องใช้อยู่` : undefined}
-              className="inline-flex items-center gap-1 rounded-lg border border-destructive/30 bg-destructive/10 px-2.5 py-1.5 text-[11px] font-bold text-destructive hover:bg-destructive/20 disabled:opacity-40 disabled:hover:bg-destructive/10 transition-colors"
+              className="inline-flex items-center gap-1 rounded-lg border border-destructive/30 bg-destructive/10 px-2.5 py-1.5 text-[11px] font-bold text-red-700 dark:text-destructive hover:bg-destructive/20 disabled:opacity-40 disabled:hover:bg-destructive/10 transition-colors"
             >
               <Trash2 className="h-3 w-3" /> ลบถาวร
             </button>

@@ -247,7 +247,7 @@ export function TechnicianDetailModal({
       <div className="flex max-h-[95vh] w-full max-w-4xl flex-col overflow-hidden rounded-t-3xl border border-border bg-card shadow-2xl animate-in slide-in-from-bottom-full sm:rounded-2xl sm:slide-in-from-bottom-0 sm:fade-in">
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <h3 className="text-sm font-bold text-foreground">ข้อมูลเจ้าหน้าที่</h3>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+          <button aria-label="ปิด" onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -300,7 +300,7 @@ export function TechnicianDetailModal({
                   onClick={() => setSuspendOpen(true)}
                   disabled={isPending || isSelf}
                   title={isSelf ? "ระงับสิทธิ์บัญชีตัวเองไม่ได้" : undefined}
-                  className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg border border-destructive/30 bg-destructive/10 px-2.5 py-2 text-[11px] font-bold text-destructive transition-colors hover:bg-destructive/20 disabled:opacity-40"
+                  className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg border border-destructive/30 bg-destructive/10 px-2.5 py-2 text-[11px] font-bold text-red-700 dark:text-destructive transition-colors hover:bg-destructive/20 disabled:opacity-40"
                 >
                   <ShieldOff className="h-3 w-3" />
                   ระงับสิทธิ์
@@ -321,7 +321,7 @@ export function TechnicianDetailModal({
                   type="button"
                   onClick={() => setDeleteOpen(true)}
                   disabled={isPending}
-                  className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg border border-destructive/30 bg-background px-2.5 py-2 text-[11px] font-bold text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-40"
+                  className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg border border-destructive/30 bg-background px-2.5 py-2 text-[11px] font-bold text-red-700 dark:text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-40"
                 >
                   <Trash2 className="h-3 w-3" />
                   ลบออกจากระบบ
