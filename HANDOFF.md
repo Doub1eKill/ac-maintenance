@@ -2,6 +2,14 @@
 
 # 📌 สถานะล่าสุด (30 ต.ค. 2026, DoubleKill) — อ่านตรงนี้ก่อน
 
+> ## ♿ การเข้าถึงรอบ 2 (R1–R4) ขึ้น production แล้ว (30 ต.ค. 2026, เจ้าของอนุมัติ) — `ca561e4` → `dpl_2kshzDCt15q82DmZMinUEssrtWEh` READY 09:28 UTC
+> - **คำขอ / รายงาน:** `C:\Project\Doc\TTACON2026_Fix_Request_A11y_Round2.md` → `C:\Project\Doc\TTACON2026_Fix_Report_A11y_Round2.md`
+> - **แก้:** R1 checkbox รายแถว `/admin/qr-codes` มี `aria-label="เลือก <acCode>"` · R2 ป้ายมุมการ์ด `/tech/assets` เป็น `bg-amber-700`/`bg-red-700` (และตัวเลขบนแถบล่างของช่าง, ไอคอน `/pending-approval`) · R3 แผงซ้ายของ auth layout เป็น `slate-600` · R4 dark: `--success-foreground` emerald-400, `--warning-foreground` yellow-400, ป้าย "ล้าง" `dark:text-sky-300`, `dark:text-destructive` ทุกจุด → `dark:text-red-300`
+> - **เทส:** `qa/lib.ts` เพิ่ม `expectAxeClean` / `treeRoom` / `openTreeRoom` · axe ใหม่ 7 กรณี (ตาราง QR ตอนกางห้อง, `/tech/assets` ตอนกางห้องที่มีงานค้าง, login/register ที่ 1280, 3 หน้าแอดมินใน dark) — **ล้มทั้ง 7 บนโค้ดเดิม** ผ่านทั้ง 7 หลังแก้ · `treeRoom` เลือกห้องจากอาคารแรกตามที่แอปเรียง (หน้า 1 ของรายการหน้าละ 5 อาคาร)
+> - **ตรวจก่อน merge:** tsc/eslint 0 · Vitest 63/63 · sweep `a11y-round2b-20261030` **125/125 · PASS 311 · FAIL 0 · SKIP 6** · Aiven ก่อน/หลัง ตรงกัน · `baseline.mjs restore` แล้ว · ⚠️ ระหว่างรันเทสย่อยหลายรอบต้อง `baseline.mjs restore` ก่อน sweep เต็ม ไม่งั้น `QA_TEST_BLDG_001` ค้างแล้ว BUG-008 ล้ม (เกิดในรอบ `a11y-round2-20261030`)
+> - **หลัง deploy:** axe บน production `/login` `/register` ที่ 375 และ 1280 → violation 0 · CSP ไม่เปลี่ยน · `/admin` ยัง 307 · log ไม่มี `[csp]` · **หน้าแอดมิน/ช่างบน production ยังไม่ได้วัดซ้ำ (ต้อง login บัญชีจริง — ให้ผู้วัดทำ)**
+> - **พบเพิ่ม (ยังไม่แก้):** หัวอาคาร/ชั้น/ห้องใน `building-groups.tsx` และ `asset-manager.tsx` เป็น `div onClick` → กดด้วยคีย์บอร์ดไม่ได้ ไม่มี `aria-expanded` (WCAG 2.1.1, axe ไม่จับ)
+>
 > ## 🧹 ถอดตัวเก็บค่า LCP ภาคสนามออกแล้ว (30 ต.ค. 2026, เจ้าของสั่ง "ใช้เสร็จแล้ว") — **ขึ้น production แล้ว** (`9a4e4d9` → `dpl_AF43Kb41nMgv5y4N9rQnJjZTPcY8`, push master 04:09:56 UTC) · บน production `GET /api/vitals` ได้ 404 (`POST` ได้ 200 เพราะ Vercel ส่งหน้า `/_not-found` กลับมา ไม่ได้แปลว่ายังมี route)
 > - **ลบ:** `WebVitalsReporter` ออกจาก `src/app/layout.tsx` · `src/components/shared/web-vitals-reporter.tsx` · `src/lib/web-vitals.ts` + test · `src/app/api/vitals/route.ts` · test ใน `regressions.spec.ts` เปลี่ยนเป็นตรวจว่าหน้าไม่ส่งอะไรและ `POST /api/vitals` ได้ 404
 > - **เก็บไว้:** ตาราง `web_vital_samples` (253 แถวบน Aiven, ชุดวิเคราะห์ 223 แถวส่งออกแล้ว ไม่มีค่าใหม่หลัง 29 ต.ค. 20:22 น.) · model ใน `schema.prisma` · migration · รายการใน `qa/baseline.mjs` — drop ตารางเมื่อเจ้าของสั่ง (หลังส่งบทความ) ต้องทำเป็น migration ใหม่
