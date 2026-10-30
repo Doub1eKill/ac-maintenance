@@ -437,8 +437,9 @@ model LoginFailure {
   @@map("login_failures")
 }
 
-// Field LCP samples for the TTACON 2026 paper (src/lib/web-vitals.ts,
-// /api/vitals). TEMPORARY: export to CSV and drop after the paper is submitted.
+// Field LCP samples for the TTACON 2026 paper. The collector (web-vitals
+// reporter + /api/vitals) was removed on 30 Oct 2026; nothing writes here.
+// Exported to CSV on 29 Oct; drop the table after the paper is submitted.
 // Stand-alone on purpose — no foreign keys — and nothing that identifies a
 // person: no user id, name, email, IP or full User-Agent.
 model WebVitalSample {

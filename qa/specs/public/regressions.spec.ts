@@ -351,51 +351,27 @@ test("CSP report endpoint takes both report formats and answers 204", async ({ p
   expect(codes).toEqual([204, 204, 204]);
 });
 
-test("field LCP: automated browsers send nothing, and only Vercel production stores a sample", async ({ browser }) => {
-  // src/components/shared/web-vitals-reporter.tsx + /api/vitals (paper, temporary).
-  // The database is shared with production, so this sweep must leave no rows.
+test("field LCP collector is gone: /api/vitals 404 and a page sends nothing to it", async ({ browser }) => {
+  // The collector for the TTACON 2026 paper was removed on 30 Oct 2026. The
+  // web_vital_samples table stays (it holds the paper's data); nothing writes to it.
   const [[qr]] = db("select qr_code from air_conditioners order by id limit 1");
   const [[before]] = db("select count(*) from web_vital_samples");
-  const vitalsPosts = (ctxPage: import("@playwright/test").Page) => {
-    const seen: string[] = [];
-    ctxPage.on("request", (r) => { if (r.url().endsWith("/api/vitals")) seen.push(r.postData() ?? ""); });
-    return seen;
-  };
-  // LCP is final at the first input or once the page is hidden. Headless
-  // Chromium fires no visibilitychange when navigating away (checked 7 Oct:
-  // nothing was sent that way), so a key press — a real input that clicks
-  // nothing — is what ends it here.
-  const loadAndLeave = async (p: import("@playwright/test").Page) => {
-    await p.goto(`/qr/${qr}`, { waitUntil: "load" });
-    await p.waitForTimeout(1500);
-    await p.keyboard.press("Shift");
-    await p.waitForTimeout(1500);
-  };
-
-  // 1. As every QA browser is: navigator.webdriver is true, so nothing is sent.
-  const auto = await browser.newContext();
-  const ap = await auto.newPage();
-  const autoPosts = vitalsPosts(ap);
-  await loadAndLeave(ap);
-  await auto.close();
-  ledger("Field LCP", `an automated browser sends no samples (${autoPosts.length} sent)`, "UI", autoPosts.length === 0 ? "PASS" : "FAIL");
-
-  // 2. The same browser pretending not to be automated: the reporter must send one LCP for /qr/[id]...
-  const human = await browser.newContext();
-  await human.addInitScript(() => Object.defineProperty(Navigator.prototype, "webdriver", { get: () => false }));
-  const hp = await human.newPage();
-  const humanPosts = vitalsPosts(hp);
-  await loadAndLeave(hp);
-  await human.close();
-  const sent = humanPosts.map((b) => { try { return JSON.parse(b); } catch { return null; } }).filter(Boolean);
-  const qrSample = sent.find((s) => s.path === "/qr/[id]" && s.name === "LCP");
-  ledger("Field LCP", `a real browser sends an LCP sample for /qr/[id] (${sent.length} sent, value ${qrSample?.value?.toFixed?.(0) ?? "-"} ms)`, "UI", qrSample && qrSample.value > 0 ? "PASS" : "FAIL");
-
-  // 3. ...and this local server, not being Vercel production, stores none of it.
+  // A browser that does not look automated, which is what the reporter used to need to send.
+  const ctx = await browser.newContext();
+  await ctx.addInitScript(() => Object.defineProperty(Navigator.prototype, "webdriver", { get: () => false }));
+  const p = await ctx.newPage();
+  const posts: string[] = [];
+  p.on("request", (r) => { if (r.url().endsWith("/api/vitals")) posts.push(r.postData() ?? ""); });
+  await p.goto(`/qr/${qr}`, { waitUntil: "load" });
+  await p.waitForTimeout(1500);
+  await p.keyboard.press("Shift");
+  await p.waitForTimeout(1500);
+  const route = await p.request.post("/api/vitals", { data: { name: "LCP", value: 1 } });
+  await ctx.close();
   const [[after]] = db("select count(*) from web_vital_samples");
-  ledger("Field LCP", `nothing stored off production (rows ${before} → ${after})`, "DB", before === after ? "PASS" : "FAIL");
-  expect(autoPosts).toHaveLength(0);
-  expect(qrSample).toBeTruthy();
+  ledger("Field LCP", `removed: page sent ${posts.length} samples, POST /api/vitals → ${route.status()}, rows ${before} → ${after}`, "API", posts.length === 0 && route.status() === 404 && before === after ? "PASS" : "FAIL");
+  expect(posts).toHaveLength(0);
+  expect(route.status()).toBe(404);
   expect(after).toBe(before);
 });
 

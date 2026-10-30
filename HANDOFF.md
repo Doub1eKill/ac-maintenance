@@ -2,6 +2,11 @@
 
 # 📌 สถานะล่าสุด (29 ต.ค. 2026, DoubleKill) — อ่านตรงนี้ก่อน
 
+> ## 🧹 ถอดตัวเก็บค่า LCP ภาคสนามออกแล้ว (30 ต.ค. 2026, เจ้าของสั่ง "ใช้เสร็จแล้ว") — **commit ในเครื่อง ยังไม่ push / ยังไม่ deploy**
+> - **ลบ:** `WebVitalsReporter` ออกจาก `src/app/layout.tsx` · `src/components/shared/web-vitals-reporter.tsx` · `src/lib/web-vitals.ts` + test · `src/app/api/vitals/route.ts` · test ใน `regressions.spec.ts` เปลี่ยนเป็นตรวจว่าหน้าไม่ส่งอะไรและ `POST /api/vitals` ได้ 404
+> - **เก็บไว้:** ตาราง `web_vital_samples` (253 แถวบน Aiven, ชุดวิเคราะห์ 223 แถวส่งออกแล้ว ไม่มีค่าใหม่หลัง 29 ต.ค. 20:22 น.) · model ใน `schema.prisma` · migration · รายการใน `qa/baseline.mjs` — drop ตารางเมื่อเจ้าของสั่ง (หลังส่งบทความ) ต้องทำเป็น migration ใหม่
+> - **ตรวจ:** tsc/eslint 0 · Vitest **63/63** (ลบ 11 กรณีของ web-vitals) · sweep `remove-lcp-20261030` **118/118 · PASS 304 · FAIL 0 · SKIP 6** · Aiven นับก่อน (03:44 UTC) / หลัง (04:05 UTC) ตรงกัน · `baseline.mjs restore` แล้ว
+>
 > ## 🔒 CSP แบบ nonce + แก้การเข้าถึง (axe 0 ทั้ง 17 หน้า) ขึ้น production แล้ว (29 ต.ค. 2026, เจ้าของอนุมัติ) — **ยังไม่ได้ทดสอบบน iPhone**
 > - **คำขอ / รายงาน:** `C:\Project\Doc\TTACON2026_Fix_Request_A11y_CSP.md` → `C:\Project\Doc\TTACON2026_Fix_Report_A11y_CSP.md` (เติมข้อ 3, 4.1, 6 หลัง deploy แล้ว)
 > - **โค้ด:** `80b671f` CSP แบบ nonce (`src/lib/csp.ts` ใหม่ · `src/proxy.ts` สร้าง nonce ทุก request · `script-src 'self' 'nonce-…' 'strict-dynamic'` ไม่มี `'unsafe-inline'` · `style-src` ยังมี `'unsafe-inline'` · root layout ส่ง nonce ให้ next-themes → ทุกหน้า render แบบ dynamic · พิมพ์สติกเกอร์เลิกใช้ inline script) · `38a3f00` การเข้าถึง (aria-label, ป้ายช่องกรอก, สีตัดกัน, `<main>`, พื้นที่กด, `@axe-core/playwright` 4.10.2 + test axe 17 หน้า)
