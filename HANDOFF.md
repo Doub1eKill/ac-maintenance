@@ -1,21 +1,23 @@
 # Project Handoff & Technical Summary
 
-# 📌 สถานะล่าสุด (29 ต.ค. 2026, DoubleKill) — อ่านตรงนี้ก่อน
+# 📌 สถานะล่าสุด (30 ต.ค. 2026, DoubleKill) — อ่านตรงนี้ก่อน
 
-> ## 🧹 ถอดตัวเก็บค่า LCP ภาคสนามออกแล้ว (30 ต.ค. 2026, เจ้าของสั่ง "ใช้เสร็จแล้ว") — **commit ในเครื่อง ยังไม่ push / ยังไม่ deploy**
+> ## 🧹 ถอดตัวเก็บค่า LCP ภาคสนามออกแล้ว (30 ต.ค. 2026, เจ้าของสั่ง "ใช้เสร็จแล้ว") — **ขึ้น production แล้ว** (`9a4e4d9` → `dpl_AF43Kb41nMgv5y4N9rQnJjZTPcY8`, push master 04:09:56 UTC) · บน production `GET /api/vitals` ได้ 404 (`POST` ได้ 200 เพราะ Vercel ส่งหน้า `/_not-found` กลับมา ไม่ได้แปลว่ายังมี route)
 > - **ลบ:** `WebVitalsReporter` ออกจาก `src/app/layout.tsx` · `src/components/shared/web-vitals-reporter.tsx` · `src/lib/web-vitals.ts` + test · `src/app/api/vitals/route.ts` · test ใน `regressions.spec.ts` เปลี่ยนเป็นตรวจว่าหน้าไม่ส่งอะไรและ `POST /api/vitals` ได้ 404
 > - **เก็บไว้:** ตาราง `web_vital_samples` (253 แถวบน Aiven, ชุดวิเคราะห์ 223 แถวส่งออกแล้ว ไม่มีค่าใหม่หลัง 29 ต.ค. 20:22 น.) · model ใน `schema.prisma` · migration · รายการใน `qa/baseline.mjs` — drop ตารางเมื่อเจ้าของสั่ง (หลังส่งบทความ) ต้องทำเป็น migration ใหม่
 > - **ตรวจ:** tsc/eslint 0 · Vitest **63/63** (ลบ 11 กรณีของ web-vitals) · sweep `remove-lcp-20261030` **118/118 · PASS 304 · FAIL 0 · SKIP 6** · Aiven นับก่อน (03:44 UTC) / หลัง (04:05 UTC) ตรงกัน · `baseline.mjs restore` แล้ว
 >
-> ## 🔒 CSP แบบ nonce + แก้การเข้าถึง (axe 0 ทั้ง 17 หน้า) ขึ้น production แล้ว (29 ต.ค. 2026, เจ้าของอนุมัติ) — **ยังไม่ได้ทดสอบบน iPhone**
+> ## 🔒 CSP แบบ nonce + แก้การเข้าถึง (axe 0 ทั้ง 17 หน้า) ขึ้น production แล้ว (29 ต.ค. 2026, เจ้าของอนุมัติ) — **ทดสอบบน iPhone ผ่านแล้ว (30 ต.ค.)**
 > - **คำขอ / รายงาน:** `C:\Project\Doc\TTACON2026_Fix_Request_A11y_CSP.md` → `C:\Project\Doc\TTACON2026_Fix_Report_A11y_CSP.md` (เติมข้อ 3, 4.1, 6 หลัง deploy แล้ว)
 > - **โค้ด:** `80b671f` CSP แบบ nonce (`src/lib/csp.ts` ใหม่ · `src/proxy.ts` สร้าง nonce ทุก request · `script-src 'self' 'nonce-…' 'strict-dynamic'` ไม่มี `'unsafe-inline'` · `style-src` ยังมี `'unsafe-inline'` · root layout ส่ง nonce ให้ next-themes → ทุกหน้า render แบบ dynamic · พิมพ์สติกเกอร์เลิกใช้ inline script) · `38a3f00` การเข้าถึง (aria-label, ป้ายช่องกรอก, สีตัดกัน, `<main>`, พื้นที่กด, `@axe-core/playwright` 4.10.2 + test axe 17 หน้า)
 > - **`src/proxy.ts`: ห้ามเปลี่ยนเป็น `auth(handler)`** — NextAuth v5 `handleAuth` เมื่อ `authorized()` คืน `false` จะรัน handler ต่อแทน redirect → `/admin` เปิดให้ทุกคน ใช้ `auth()` ตรงๆ แล้วคืน redirect เอง
 > - **ตรวจก่อน merge:** tsc/eslint 0 · Vitest 74/74 · sweep `a11y-csp2-20261029` 118/118 · PASS 306 · FAIL 0 · SKIP 6 · Aiven ก่อน/หลัง ตรงกัน
 > - **deploy:** ff merge `57cc9c1..38a3f00` แล้ว push master อย่างเดียว (ไม่ push branch) → Production `dpl_4kwFADgdgv5m7k6hrvmYfRbPUkXn` READY **16:50:21 UTC (23:50 น.)** · branch `fix/a11y-csp` อยู่ในเครื่องเท่านั้น
 > - **หลัง deploy:** header CSP มี nonce บน `/login` `/qr/[id]` `/admin` · `/admin` ไม่ login → 307 `/login` · Chromium เดสก์ท็อปเปิด `/login` `/qr/[id]` ไม่มี console error · **Observatory A+ 115/100 · 12/12** (ก่อน B+ 80) · TTFB median `/login` 199 (เดิม 159 CDN HIT) · `/register` 200 (157) · `/qr` 371 (358) ms — ผลดิบ `ac-maintenance-qa\scripts\ttfb-after.csv`
-> - **ยังค้าง:** (1) เจ้าของทดสอบบน iPhone (login, สแกน QR, ถ่ายรูปบันทึกงาน, หน้าแอดมิน) — เจ้าของยังไม่มีเครื่อง · (2) ดู log `[csp]` บน Vercel ระหว่างนั้น — Vercel MCP ได้ 403 ที่ team `ac-maintenance1` ต้องให้เจ้าของกด `authorize_team_access` ก่อน · ถ้ามีอะไรถูกบล็อก → Instant Rollback ไป deployment ของ `57cc9c1`
-> - **ข้อมูล LCP ภาคสนาม:** ส่งออกแล้ว `C:\Project\Doc\perf\field-lcp-raw.csv` 223 แถว (29 ต.ค. 17:13–20:22 น., ก่อน CSP ทั้งหมด) · เกณฑ์อยู่ใน memory `field-lcp-collection` · **ค่าที่เก็บหลัง 23:50:21 น. 29 ต.ค. ต้องแยกเป็นชุดหลัง CSP** · ตัวเก็บค่ายังเป็นของชั่วคราว (ถอดเมื่อเจ้าของสั่ง)
+> - **iPhone (30 ต.ค.):** เจ้าของทดสอบ Safari บนเน็ตมือถือราว 14:30–14:38 น. ครบทั้ง login, สแกน QR ด้วยกล้อง, ถ่ายรูปบันทึกงาน และหน้าแอดมิน **ผ่านทุกขั้น** · log production ช่วง 13:43–14:38 น. **ไม่มี `[csp]`** มีแค่ `CredentialsSignin` 2 ครั้ง (พิมพ์รหัสผิด) · ทดสอบบน deployment `9a4e4d9` ซึ่งใช้ CSP ชุดเดียวกับ `38a3f00`
+> - **Vercel MCP:** เจ้าของอนุมัติ `authorize_team_access` แล้ว (team `team_TwqtwEzyf0Y0ARdtPTv7MPsn`, slug `ac-maintenance1`, project `prj_aXeQpgjfYy9a1F7YglvowgH6jGsK`) · `get_runtime_logs` ย้อนหลังได้แค่ 1 ชั่วโมง (Hobby) ให้ใช้ `since` เช่น `"55m"` · request ที่สำเร็จไม่เขียน log
+> - **ถ้าภายหลังมีอะไรถูกบล็อก:** Instant Rollback ไป deployment ของ `57cc9c1` (ก่อน CSP) · ถ้า rollback ไป `38a3f00` จะยังมี CSP แต่ตัวเก็บค่า LCP จะกลับมาด้วย
+> - **ข้อมูล LCP ภาคสนาม:** ส่งออกแล้ว `C:\Project\Doc\perf\field-lcp-raw.csv` 223 แถว (29 ต.ค. 17:13–20:22 น., ก่อน CSP ทั้งหมด) · เกณฑ์อยู่ใน memory `field-lcp-collection` · ไม่มีค่าเข้ามาหลัง 20:22 น. และถอดตัวเก็บค่าออกแล้ว จึงไม่มีชุดหลัง CSP
 > - **ไม่เร่ง:** select ใน modal บางตัวยังไม่ผูก `<label htmlFor>` · ป้ายตัวเลขสีส้มบนแถบเมนูล่างของช่างยังไม่ได้ตรวจ contrast · หัวข้อ C (ประสิทธิภาพ) ไม่ได้ทำ
 >
 > ## 📈 ตัวเก็บค่า LCP ภาคสนามขึ้น production แล้ว (26 ต.ค. 2026, เจ้าของอนุมัติทั้ง 4 ขั้น) — **เริ่มเก็บข้อมูลจริง 19:38 น.**
