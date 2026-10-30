@@ -50,8 +50,8 @@ function Pill({
 }
 
 const TYPE_TONE = {
-  repair: "border-destructive/20 bg-destructive/10 text-red-700 dark:text-destructive",
-  cleaning: "border-sky-500/20 bg-sky-500/10 text-sky-700",
+  repair: "border-destructive/20 bg-destructive/10 text-red-700 dark:text-red-300",
+  cleaning: "border-sky-500/20 bg-sky-500/10 text-sky-700 dark:text-sky-300",
 } as const;
 
 const STATUS_TONE = {

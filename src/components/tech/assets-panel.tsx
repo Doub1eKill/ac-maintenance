@@ -44,7 +44,7 @@ function GroupJobBadges({ items }: { items: TechnicianAssetUnit[] }) {
   return (
     <div className="hidden sm:flex items-center gap-1.5 text-[10px] font-bold">
       {repairCount > 0 && (
-        <span className="inline-flex items-center gap-1 rounded-md bg-destructive/10 text-red-700 dark:text-destructive px-1.5 py-0.5">
+        <span className="inline-flex items-center gap-1 rounded-md bg-destructive/10 text-red-700 dark:text-red-300 px-1.5 py-0.5">
           <Wrench className="h-3 w-3" /> {repairCount}
         </span>
       )}
@@ -146,7 +146,9 @@ export function AssetsPanel({
                           {unit.isOverdue && (
                             <div
                               className={`absolute top-0 right-0 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1 shadow-sm ${
-                                unit.status === "broken" ? "bg-red-500" : "bg-amber-500"
+                                // -700: white on amber-500 is 2.13:1 and on
+                                // red-500 3.8:1; the job pool's badge is amber-700.
+                                unit.status === "broken" ? "bg-red-700" : "bg-amber-700"
                               }`}
                             >
                               <Clock className="w-3 h-3" /> {unit.status === "broken" ? "รอซ่อม" : "รอล้าง"}

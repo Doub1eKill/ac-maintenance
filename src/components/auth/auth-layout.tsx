@@ -21,7 +21,7 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
             </div>
             <div>
               <span className="text-xl font-extrabold tracking-tight text-slate-950 block">AC Maintenance</span>
-              <span className="text-[10px] font-bold text-slate-500 tracking-widest uppercase block">Enterprise Utility Platform</span>
+              <span className="text-[10px] font-bold text-slate-600 tracking-widest uppercase block">Enterprise Utility Platform</span>
             </div>
           </Link>
         </div>
@@ -62,7 +62,9 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
         </div>
 
         {/* Hero Footer */}
-        <div className="relative z-10 text-xs text-slate-500 flex items-center justify-between border-t border-slate-200/80 pt-6">
+        {/* slate-600, not 500: on the panel's bg-muted (#f3f1f1) slate-500 is
+            4.23:1, under AA (axe, TTACON 2026 round 2). */}
+        <div className="relative z-10 text-xs text-slate-600 flex items-center justify-between border-t border-slate-200/80 pt-6">
           <span>&copy; {new Date().getFullYear()} AC Maintenance System</span>
           <span>v1.0 • Executive SaaS Edition</span>
         </div>

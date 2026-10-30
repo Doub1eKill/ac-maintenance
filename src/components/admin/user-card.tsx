@@ -32,7 +32,7 @@ export function UserStatusBadge({ user }: { user: Pick<PendingUser, "status" | "
   const classes =
     user.status === "pending"
       ? "bg-warning/20 text-warning-foreground border-warning/30"
-      : "bg-destructive/10 text-red-700 dark:text-destructive border-destructive/30";
+      : "bg-destructive/10 text-red-700 dark:text-red-300 border-destructive/30";
   return (
     <span className={`rounded-md border px-2 py-0.5 ${classes}`}>
       {USER_STATUS_LABEL[user.status] ?? user.status}

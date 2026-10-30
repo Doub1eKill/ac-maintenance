@@ -227,11 +227,14 @@ body {
   --sidebar-ring: oklch(0.547 0.021 43.1);
   --destructive-foreground: var(--color-red-600);
   --success: var(--color-emerald-500);
-  --success-foreground: var(--color-emerald-600);
+  /* -400, not -600: these are text on a 10–20% tint of the same hue over the
+     dark card, where emerald-600 measured 3.05:1 and yellow-600 3.39:1 (axe,
+     TTACON 2026 round 2). -400 clears 4.5:1 there. */
+  --success-foreground: var(--color-emerald-400);
   --info: var(--color-violet-500);
   --info-foreground: var(--color-violet-600);
   --warning: var(--color-yellow-500);
-  --warning-foreground: var(--color-yellow-600);
+  --warning-foreground: var(--color-yellow-400);
   --invert: var(--color-zinc-700);
   --invert-foreground: var(--color-zinc-50);
 }

@@ -266,7 +266,7 @@ export function UpcomingMaintenanceTable({ data, onViewDetails, onCreateWorkOrde
             <span
               className={cn(
                 "px-1.5 py-0.2 rounded-full text-[10px] font-bold",
-                filterKind === "urgent" ? "bg-destructive/15 text-red-700 dark:text-destructive" : "bg-muted text-muted-foreground"
+                filterKind === "urgent" ? "bg-destructive/15 text-red-700 dark:text-red-300" : "bg-muted text-muted-foreground"
               )}
             >
               {urgentCount}

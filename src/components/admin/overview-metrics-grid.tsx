@@ -99,7 +99,7 @@ export function OverviewMetricsGrid({ metrics }: OverviewMetricsGridProps) {
 
           <div className="mt-4 pt-3 border-t border-border/60 flex items-center justify-between text-xs">
             <span className="text-muted-foreground">เครื่องแจ้งเสีย/ชำรุด</span>
-            <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-destructive/10 text-red-700 dark:text-destructive border border-destructive/20">
+            <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-destructive/10 text-red-700 dark:text-red-300 border border-destructive/20">
               ต้องดูแลเร่งด่วน
             </span>
           </div>

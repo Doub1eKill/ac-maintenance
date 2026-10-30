@@ -489,7 +489,7 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
               <div className="flex justify-between pt-2 border-t border-border mt-2">
                 <span className="text-muted-foreground text-xs font-bold">กำหนดรอบถัดไป</span>
                 <span className={`font-bold text-xs ${
-                  status === "overdue" ? "text-red-600" : status === "warning" ? "text-warning" : "text-primary"
+                  status === "overdue" ? "text-red-600 dark:text-red-400" : status === "warning" ? "text-warning" : "text-primary"
                 }`}>
                   {format(new Date(selectedEvent.nextDueDate), "dd MMM yyyy", { locale: th })}
                 </span>
@@ -552,7 +552,7 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
                     <div className="font-bold text-foreground truncate">{JOB_TYPE_LABEL[job.jobType]} - {job.acCode}</div>
                     <div className="text-muted-foreground text-[11px] truncate">{roomWithFloor(job)}</div>
                   </div>
-                  {status === "overdue" && <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-red-600" />}
+                  {status === "overdue" && <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-red-600 dark:text-red-400" />}
                 </div>
               );
             })}
@@ -646,7 +646,7 @@ export function MaintenanceCalendar({ onCreateWorkOrder }: MaintenanceCalendarPr
                             {job.buildingName} • {roomWithFloor(job)}
                           </div>
                         </div>
-                        {status === "overdue" && <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-red-600" />}
+                        {status === "overdue" && <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-red-600 dark:text-red-400" />}
                       </div>
                     );
                   })

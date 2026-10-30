@@ -300,7 +300,7 @@ export function TechnicianDetailModal({
                   onClick={() => setSuspendOpen(true)}
                   disabled={isPending || isSelf}
                   title={isSelf ? "ระงับสิทธิ์บัญชีตัวเองไม่ได้" : undefined}
-                  className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg border border-destructive/30 bg-destructive/10 px-2.5 py-2 text-[11px] font-bold text-red-700 dark:text-destructive transition-colors hover:bg-destructive/20 disabled:opacity-40"
+                  className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg border border-destructive/30 bg-destructive/10 px-2.5 py-2 text-[11px] font-bold text-red-700 dark:text-red-300 transition-colors hover:bg-destructive/20 disabled:opacity-40"
                 >
                   <ShieldOff className="h-3 w-3" />
                   ระงับสิทธิ์
@@ -321,7 +321,7 @@ export function TechnicianDetailModal({
                   type="button"
                   onClick={() => setDeleteOpen(true)}
                   disabled={isPending}
-                  className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg border border-destructive/30 bg-background px-2.5 py-2 text-[11px] font-bold text-red-700 dark:text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-40"
+                  className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg border border-destructive/30 bg-background px-2.5 py-2 text-[11px] font-bold text-red-700 dark:text-red-300 transition-colors hover:bg-destructive/10 disabled:opacity-40"
                 >
                   <Trash2 className="h-3 w-3" />
                   ลบออกจากระบบ

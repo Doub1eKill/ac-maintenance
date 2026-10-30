@@ -98,7 +98,7 @@ export function JobTypeBadge({ kind, count }: { kind: JobTypeKind; count?: numbe
   }
   if (kind === "overdueCleaning") {
     return (
-      <Badge variant="outline" className="text-[10px] border-amber-500/40 text-amber-800 bg-amber-500/10">
+      <Badge variant="outline" className="text-[10px] border-amber-500/40 text-amber-800 dark:text-amber-300 bg-amber-500/10">
         {label}
       </Badge>
     );

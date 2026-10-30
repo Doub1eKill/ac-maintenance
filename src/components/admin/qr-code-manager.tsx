@@ -267,7 +267,9 @@ export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
                                 "เลือกทั้งห้อง" on the header above it. The
                                 header one wins: it says what it does, and it
                                 works without expanding the room first. */}
-                            <th className="px-4 py-3 font-semibold rounded-tl-xl w-10 text-center" />
+                            <th className="px-4 py-3 font-semibold rounded-tl-xl w-10 text-center">
+                              <span className="sr-only">เลือก</span>
+                            </th>
                             <th className="px-4 py-3 font-semibold">รหัสเครื่อง (AC Code)</th>
                             <th className="px-4 py-3 font-semibold">ยี่ห้อ / รุ่น</th>
                             <th className="px-4 py-3 font-semibold text-center rounded-tr-xl">จัดการ</th>
@@ -283,6 +285,9 @@ export function QrCodeManager({ buildings, globalSearch }: QrCodeManagerProps) {
                               <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                                 <input
                                   type="checkbox"
+                                  // The row's code is in the next cell, which a
+                                  // screen reader does not connect to this box.
+                                  aria-label={`เลือก ${ac.acCode}`}
                                   className="w-4 h-4 rounded border-border text-primary focus:ring-ring cursor-pointer"
                                   checked={selectedAcs.includes(ac.id)}
                                   onChange={() => toggleSelect(ac.id)}

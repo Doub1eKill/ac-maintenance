@@ -40,7 +40,7 @@ export default async function PendingApprovalPage({ searchParams }: PendingAppro
         {/* Status Card */}
         <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-5 space-y-3">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white font-bold shadow-sm">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-700 text-white font-bold shadow-sm">
               <Clock className="h-5 w-5" />
             </div>
             <div>

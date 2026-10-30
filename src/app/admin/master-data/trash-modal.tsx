@@ -274,7 +274,7 @@ function TrashRow({
               onClick={() => onSetConfirm(confirmKey)}
               disabled={isPending || !canPurge}
               title={!canPurge ? `ลบถาวรไม่ได้ ยังมี ${unitsUsing} เครื่องใช้อยู่` : undefined}
-              className="inline-flex items-center gap-1 rounded-lg border border-destructive/30 bg-destructive/10 px-2.5 py-1.5 text-[11px] font-bold text-red-700 dark:text-destructive hover:bg-destructive/20 disabled:opacity-40 disabled:hover:bg-destructive/10 transition-colors"
+              className="inline-flex items-center gap-1 rounded-lg border border-destructive/30 bg-destructive/10 px-2.5 py-1.5 text-[11px] font-bold text-red-700 dark:text-red-300 hover:bg-destructive/20 disabled:opacity-40 disabled:hover:bg-destructive/10 transition-colors"
             >
               <Trash2 className="h-3 w-3" /> ลบถาวร
             </button>

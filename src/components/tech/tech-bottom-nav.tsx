@@ -70,7 +70,7 @@ export function TechBottomNav({ badges, onScanQr }: TechBottomNavProps) {
           <div className="relative">
             <Wrench className="w-5 h-5" />
             {badges.myJobs > 0 && (
-              <span className="absolute -top-1.5 -right-2 px-1 py-0.2 min-w-[14px] h-[14px] rounded-full bg-amber-500 text-[9px] font-bold text-white flex items-center justify-center">
+              <span className="absolute -top-1.5 -right-2 px-1 py-0.2 min-w-[14px] h-[14px] rounded-full bg-amber-700 text-[9px] font-bold text-white flex items-center justify-center">
                 {badges.myJobs > 99 ? "99+" : badges.myJobs}
               </span>
             )}

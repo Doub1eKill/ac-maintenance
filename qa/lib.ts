@@ -1,4 +1,4 @@
-import { test as base, type Locator, type Page } from "@playwright/test";
+import { test as base, expect, type Locator, type Page } from "@playwright/test";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -407,4 +407,69 @@ export async function axeAudit(page: Page, name: string) {
   };
   const artifact = note(`a11y-${name}.json`, JSON.stringify({ url: page.url(), viewport: page.viewportSize(), counts, violations: result.violations }, null, 2));
   return { counts, artifact };
+}
+
+/**
+ * axeAudit, written to the ledger and asserted the way every a11y spec does:
+ * fails on any critical or serious violation.
+ */
+export async function expectAxeClean(page: Page, name: string, label: string) {
+  const { counts, artifact } = await axeAudit(page, name);
+  const bad = counts.critical + counts.serious;
+  ledger("Accessibility", `${label}: passes ${counts.passes}, violations ${counts.violations} (critical ${counts.critical}, serious ${counts.serious}) ${counts.rules.join(" ")}`, "UI", bad === 0 ? "PASS" : "FAIL", artifact);
+  expect(counts.rules.filter((r) => /\((critical|serious),/.test(r))).toEqual([]);
+}
+
+export type TreeRoom = { building: string; floor: string | null; room: string; acCode: string };
+
+/**
+ * A room to open for an audit, among those with units that `join` keeps (e.g.
+ * only units with a pending job). Taken from the first building as the app
+ * sorts them — localeCompare "th" in building-groups.tsx, name order in the
+ * admin tree — so it is on page 1 of the five-to-a-page building list; the
+ * test buildings other specs create (QA_…) sort after the seeded ones. Within
+ * it, the room with the most such units. `acCode` is one of them.
+ */
+export function treeRoom(join = ""): TreeRoom {
+  const rows = db(
+    `select b.name, r.floor::text, r.name, min(a.ac_code), count(distinct a.id) from rooms r join buildings b on b.id = r.building_id join air_conditioners a on a.room_id = r.id and a.deleted_at is null ${join} group by b.name, r.floor, r.name`
+  );
+  const [first] = rows.sort((x, y) => x[0]!.localeCompare(y[0]!, "th") || Number(y[4]) - Number(x[4]) || x[2]!.localeCompare(y[2]!, "th"));
+  if (!first) throw new Error(`no room with units${join ? ` (${join})` : ""} in the test database`);
+  return { building: first[0]!, floor: first[1], room: first[2]!, acCode: first[3]! };
+}
+
+/**
+ * Opens building → floor → room in the drill-down tree (admin QR codes, the
+ * technician's units list) until `content` shows, so what sits inside a room
+ * is on the page for an audit. Rooms start closed, which is why the audits of
+ * 29 Oct 2026 never saw the QR table's checkboxes or the units' overdue badges.
+ * Each header toggles and a lone child opens by itself, so a level is clicked
+ * only while the one under it is not showing. `rooms: false` is for the admin
+ * assets tree, where a floor lists its rooms' units directly.
+ */
+export async function openTreeRoom(page: Page, { building, floor, room }: TreeRoom, content: Locator, { rooms = true } = {}) {
+  const main = page.locator("main").last();
+  const exact = (s: string) => new RegExp(`^${s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`);
+  const buildingHead = main.locator("h3").filter({ hasText: exact(building) }).first();
+  const floorHead = main.locator("h4").filter({ hasText: exact(floor === null ? "ไม่ระบุชั้น" : `ชั้น ${floor}`) }).first();
+  const roomHead = main.locator("h5").filter({ hasText: exact(`ห้อง ${room}`) }).first();
+  const levels: Array<[Locator, Locator]> = rooms
+    ? [[buildingHead, floorHead], [floorHead, roomHead], [roomHead, content]]
+    : [[buildingHead, floorHead], [floorHead, content]];
+  // A second click comes only after the first has had 5 s to open the level:
+  // clicking again sooner, while the level is still rendering, closes it.
+  // Centred first: on a phone the header can sit under the technician's fixed
+  // bottom bar, and while the level above is still opening the click lands on
+  // the neighbouring room instead.
+  for (const [head, child] of levels) {
+    for (let i = 0; i < 2 && !(await child.isVisible().catch(() => false)); i++) {
+      await head.waitFor({ timeout: 10_000 });
+      await head.evaluate((el) => el.scrollIntoView({ block: "center" }));
+      await page.waitForTimeout(300);
+      await head.click({ timeout: 10_000 });
+      await child.waitFor({ timeout: 5_000 }).catch(() => {});
+    }
+  }
+  await content.waitFor({ timeout: 10_000 });
 }
