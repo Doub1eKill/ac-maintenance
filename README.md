@@ -78,12 +78,20 @@ npm run dev
 
 ### ข้อมูลตัวอย่าง (ไม่บังคับ)
 
+เพิ่มรหัสผ่านของบัญชีตัวอย่าง (`admin@pkru.ac.th` / `tech@pkru.ac.th`) ลงใน `.env` ก่อน (อย่างน้อย 12 ตัวอักษร):
+
+```env
+SEED_PASSWORD="<ตั้งรหัสเอง>"
+```
+
 ```bash
 npx tsx prisma/seed.ts
 ```
 
 > **คำเตือน:** `prisma/seed.ts` สั่ง `deleteMany()` ล้างข้อมูลเดิมก่อนเสมอ
 > ใช้กับฐานข้อมูล dev เท่านั้น ห้ามรันใส่ฐานข้อมูลที่มีข้อมูลจริง
+> สคริปต์จะไม่ยอมรันถ้า `NODE_ENV=production` หรือ `DATABASE_URL` ไม่ได้ชี้ไปที่ `localhost`
+> (ถ้าเป็นฐานข้อมูล dev บนคลาวด์จริงๆ ให้ตั้ง `SEED_ALLOW_REMOTE=yes-wipe-this-database`)
 
 ## คำสั่งที่ใช้บ่อย
 

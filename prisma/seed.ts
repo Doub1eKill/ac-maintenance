@@ -3,7 +3,56 @@ import { prisma } from "../src/lib/prisma";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 
+// DEV-ONLY SEED. This script wipes almost every table (deleteMany) before
+// inserting sample data, and it creates two sign-in accounts. Two guards keep
+// it from doing harm:
+//
+// 1. The sample accounts' password comes from SEED_PASSWORD, never from this
+//    file — the repo is public, so a hard-coded password is a known password
+//    for anyone who finds a database this script was run against.
+// 2. It refuses to run against anything but a local database unless
+//    SEED_ALLOW_REMOTE is set to the exact phrase below, so a production
+//    DATABASE_URL left in .env cannot be wiped by accident.
+const MIN_PASSWORD_LENGTH = 12;
+const REMOTE_OVERRIDE = "yes-wipe-this-database";
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+
+function assertSafeTarget() {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Refusing to seed: NODE_ENV is production.");
+  }
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Error("DATABASE_URL is not set.");
+  let host: string;
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    throw new Error("DATABASE_URL is not a valid URL.");
+  }
+  if (!LOCAL_HOSTS.has(host) && process.env.SEED_ALLOW_REMOTE !== REMOTE_OVERRIDE) {
+    throw new Error(
+      `Refusing to seed: DATABASE_URL points at "${host}", not a local database. ` +
+        `This script deletes existing data. If that host really is a throwaway dev ` +
+        `database, re-run with SEED_ALLOW_REMOTE=${REMOTE_OVERRIDE}.`
+    );
+  }
+}
+
+function seedPassword(): string {
+  const password = process.env.SEED_PASSWORD;
+  if (!password || password.length < MIN_PASSWORD_LENGTH) {
+    throw new Error(
+      `Set SEED_PASSWORD (at least ${MIN_PASSWORD_LENGTH} characters) in .env — ` +
+        `it becomes the password of the sample admin and technician accounts.`
+    );
+  }
+  return password;
+}
+
 async function main() {
+  assertSafeTarget();
+  const password = seedPassword();
+
   console.log("🌱 Starting comprehensive seed for AC Maintenance platform...");
 
   console.log("🧹 Cleaning up old data...");
@@ -27,7 +76,7 @@ async function main() {
   });
 
   console.log("👥 Seeding Users...");
-  const defaultPasswordHash = await bcrypt.hash("Password123!", 10);
+  const defaultPasswordHash = await bcrypt.hash(password, 10);
 
   const orgAdmin = await prisma.user.upsert({
     where: { email: "admin@pkru.ac.th" },
