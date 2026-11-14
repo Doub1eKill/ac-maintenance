@@ -54,6 +54,7 @@ import {
   type EditBuildingTarget,
 } from "@/components/admin/asset-manager-modals";
 import { EditRoomModal, type EditRoomTarget } from "@/components/shared/edit-room-modal";
+import { AC_STATUS_LABEL, acStatusLabel, acStatusTone } from "@/lib/labels";
 
 interface RoomItem {
   id: string;
@@ -578,8 +579,8 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
                                 </div>
                               </div>
                             </div>
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-success/20 text-success-foreground border border-success/30 whitespace-nowrap">
-                              {ac.status}
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border whitespace-nowrap ${acStatusTone(ac.status)}`}>
+                              {acStatusLabel(ac.status)}
                             </span>
                           </div>
                           
@@ -777,9 +778,9 @@ export function AssetManager({ buildings, brands, globalSearch, onClearSearch }:
               <div>
                 <label className="mb-1.5 block font-bold text-foreground">สถานะเครื่อง</label>
                 <NativeSelect name="status" required defaultValue={showEditAc.status} className="w-full h-auto py-3 px-3.5 rounded-xl border-border text-xs text-foreground">
-                  <NativeSelectOption value="normal">ปกติ</NativeSelectOption>
-                  <NativeSelectOption value="broken">เสีย</NativeSelectOption>
-                  <NativeSelectOption value="needs_cleaning">รอล้าง</NativeSelectOption>
+                  <NativeSelectOption value="normal">{AC_STATUS_LABEL.normal}</NativeSelectOption>
+                  <NativeSelectOption value="broken">{AC_STATUS_LABEL.broken}</NativeSelectOption>
+                  <NativeSelectOption value="needs_cleaning">{AC_STATUS_LABEL.needs_cleaning}</NativeSelectOption>
                 </NativeSelect>
               </div>
 

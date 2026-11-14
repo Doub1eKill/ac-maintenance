@@ -56,6 +56,41 @@ export const WORK_ORDER_STATUS_LABEL: Record<"pending" | "claimed" | "completed"
   cancelled: "ยกเลิกแล้ว",
 };
 
+/**
+ * What an air conditioner's `status` is called, on every screen that shows it
+ * (admin assets, the sticker page, the technician's units). It used to be
+ * three spellings — เสีย / แจ้งซ่อม / รอซ่อม for the same state — and the
+ * admin card printed the raw enum. รอซ่อม matches "รอซ่อมด่วน" on the dashboard.
+ */
+export const AC_STATUS_LABEL: Record<"normal" | "needs_cleaning" | "broken", string> = {
+  normal: "ปกติ",
+  needs_cleaning: "รอล้าง",
+  broken: "รอซ่อม",
+};
+
+/**
+ * The badge colours for AC_STATUS_LABEL on the app's own surfaces, from the
+ * status tokens in globals.css. Red text is spelled out rather than taken from
+ * --destructive-foreground, which is too dark on a dark card (a11y round 2).
+ */
+export const AC_STATUS_TONE: Record<keyof typeof AC_STATUS_LABEL, string> = {
+  normal: "border-success/30 bg-success/20 text-success-foreground",
+  needs_cleaning: "border-warning/30 bg-warning/20 text-warning-foreground",
+  broken: "border-destructive/30 bg-destructive/10 text-red-700 dark:text-red-300",
+};
+
+const isAcStatus = (status: string): status is keyof typeof AC_STATUS_LABEL => status in AC_STATUS_LABEL;
+
+/** AC_STATUS_LABEL, falling back to the stored value for one it does not know. */
+export function acStatusLabel(status: string): string {
+  return isAcStatus(status) ? AC_STATUS_LABEL[status] : status;
+}
+
+/** AC_STATUS_TONE, falling back to a neutral badge for an unknown status. */
+export function acStatusTone(status: string): string {
+  return isAcStatus(status) ? AC_STATUS_TONE[status] : "border-border bg-muted text-muted-foreground";
+}
+
 /** The two priorities worth a badge; "low"/"normal" show nothing. */
 export const WORK_ORDER_PRIORITY_LABEL: Record<"critical" | "high", string> = {
   critical: "ด่วนที่สุด (Critical)",

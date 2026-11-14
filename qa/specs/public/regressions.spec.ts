@@ -392,3 +392,20 @@ test("daily cron route: refuses without the secret, runs with it and records the
   expect(right.status()).toBe(200);
   expect(recorded, "overdue_sync_at recorded").toBe(true);
 });
+
+// The sticker page called a broken unit แจ้งซ่อม and one due for cleaning
+// รอการล้าง, both in red; the admin pages said เสีย and รอล้าง. One set of names
+// now (lib/labels.ts), and each status keeps its own colour (14 Nov 2026).
+test("sticker page: unit status uses the shared Thai name and its own colour", async ({ page }) => {
+  const want = { needs_cleaning: ["รอล้าง", /amber/], broken: ["รอซ่อม", /red/], normal: ["ปกติ", /emerald/] } as const;
+  const seen: string[] = [];
+  for (const [status, [text, colour]] of Object.entries(want)) {
+    const [[qr]] = db(`select qr_code from air_conditioners where deleted_at is null and status = '${status}' order by id limit 1`);
+    await page.goto(`/qr/${qr}`, { waitUntil: "load" });
+    const badge = page.locator("h1 + div span.rounded-md");
+    await expect(badge).toHaveText(text);
+    await expect(badge).toHaveClass(colour);
+    seen.push(`${status}→${await badge.textContent()}`);
+  }
+  ledger("QR", `status badge: ${seen.join(", ")}`, "UI", "PASS");
+});

@@ -188,10 +188,12 @@ export function ProfilePanel({ profile, universityName }: ProfilePanelProps) {
               buttonClassName="min-h-8 justify-center whitespace-nowrap rounded-lg px-2 text-[11px] hover:bg-secondary"
             />
           </div>
-          <div>
+          {/* min-w-0 + break-all: a name with no spaces (a username, an
+              e-mail-like handle) otherwise widens the page on a phone. */}
+          <div className="min-w-0">
             <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
-              <User className="h-4 w-4 text-muted-foreground" />
-              {profile.name || "-"}
+              <User className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className="min-w-0 break-all">{profile.name || "-"}</span>
             </h3>
             <span className="inline-flex items-center gap-1 mt-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary/20 text-primary border border-primary/30">
               {roleLabel}

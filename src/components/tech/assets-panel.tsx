@@ -15,6 +15,7 @@ import { filterJobs } from "@/components/tech/types";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
 import { UnitPhoto } from "@/components/shared/unit-photo";
 import type { EditRoomTarget } from "@/components/shared/edit-room-modal";
+import { AC_STATUS_LABEL } from "@/lib/labels";
 
 interface AssetsPanelProps {
   assetList: TechnicianAssetUnit[];
@@ -151,7 +152,9 @@ export function AssetsPanel({
                                 unit.status === "broken" ? "bg-red-700" : "bg-amber-700"
                               }`}
                             >
-                              <Clock className="w-3 h-3" /> {unit.status === "broken" ? "รอซ่อม" : "รอล้าง"}
+                              {/* Overdue means a pending job, so a unit still
+                                  marked normal reads as due for cleaning. */}
+                              <Clock className="w-3 h-3" /> {unit.status === "broken" ? AC_STATUS_LABEL.broken : AC_STATUS_LABEL.needs_cleaning}
                             </div>
                           )}
                           <div className="flex items-start gap-3 pr-8">

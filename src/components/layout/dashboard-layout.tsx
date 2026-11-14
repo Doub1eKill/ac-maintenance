@@ -80,6 +80,9 @@ interface DashboardLayoutProps {
   navItems: NavItem[];
   onCreateAction?: () => void;
   createActionLabel?: string;
+  // Below sm the button shows only this icon (the label becomes its
+  // aria-label), so it should say what the action is on its own.
+  createActionIcon?: LucideIcon;
   searchPlaceholder?: string;
   onSearchChange?: (val: string) => void;
   searchValue?: string;
@@ -98,6 +101,7 @@ export function DashboardLayout({
   navItems,
   onCreateAction,
   createActionLabel = "เพิ่มรายการ",
+  createActionIcon: CreateActionIcon = Plus,
   searchPlaceholder = "ค้นหารายการ...",
   onSearchChange,
   searchValue = "",
@@ -309,19 +313,22 @@ export function DashboardLayout({
 
       <SidebarInset className="min-w-0 bg-background">
         <header className="flex h-16 shrink-0 items-center gap-2 border-b border-border px-4 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
-          <div className="flex items-center gap-2 px-2">
-            <SidebarTrigger className="-ml-1" />
+          {/* The header is one fixed-height row, so on a phone the title gives
+              way (one line, cut with …) and the search box shrinks, rather than
+              the row wrapping out of its h-16 or pushing the button off screen. */}
+          <div className="flex min-w-0 items-center gap-2 px-2">
+            <SidebarTrigger className="-ml-1 shrink-0" />
             <Separator orientation="vertical" className="mr-1 h-4 self-center" />
-            <Breadcrumb>
-              <BreadcrumbList>
+            <Breadcrumb className="min-w-0">
+              <BreadcrumbList className="flex-nowrap">
                 <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbPage className="text-xs font-medium text-muted-foreground">
+                  <BreadcrumbPage className="text-xs font-medium text-muted-foreground whitespace-nowrap">
                     {user.universityName || "ระบบส่วนกลาง"}
                   </BreadcrumbPage>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator className="hidden md:block" />
-                <BreadcrumbItem>
-                  <BreadcrumbPage className="text-xs font-bold text-foreground">
+                <BreadcrumbItem className="min-w-0">
+                  <BreadcrumbPage className="block truncate text-xs font-bold text-foreground">
                     {currentNav?.label}
                   </BreadcrumbPage>
                 </BreadcrumbItem>
@@ -329,7 +336,7 @@ export function DashboardLayout({
             </Breadcrumb>
           </div>
 
-          <div className="ml-auto flex items-center gap-3">
+          <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-2 sm:flex-none sm:gap-3">
             {onSearchChange &&
               (searchIndexLoader && onSearchPick ? (
                 <OmniSearch
@@ -340,7 +347,7 @@ export function DashboardLayout({
                   onPick={onSearchPick}
                 />
               ) : (
-                <div className="relative w-48 sm:w-64">
+                <div className="relative min-w-24 flex-1 sm:w-64 sm:flex-none">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                   <input
                     type="text"
@@ -356,10 +363,11 @@ export function DashboardLayout({
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.96 }}
                 onClick={onCreateAction}
-                className="flex items-center gap-1.5 bg-primary text-primary-foreground px-3.5 py-1.5 rounded-xl text-xs font-bold hover:opacity-90 transition-opacity shadow-xs shrink-0 cursor-pointer"
+                aria-label={createActionLabel}
+                className="flex size-8 items-center justify-center gap-1.5 bg-primary text-primary-foreground rounded-xl text-xs font-bold hover:opacity-90 transition-opacity shadow-xs shrink-0 cursor-pointer sm:size-auto sm:px-3.5 sm:py-1.5"
               >
-                <Plus className="h-3.5 w-3.5" />
-                <span>{createActionLabel}</span>
+                <CreateActionIcon className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">{createActionLabel}</span>
               </motion.button>
             )}
           </div>

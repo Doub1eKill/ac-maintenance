@@ -301,6 +301,7 @@ export function TechShell({ user, universityName, buildings, badges, children }:
         }}
         onCreateAction={() => setShowQrModal(true)}
         createActionLabel="สแกน QR Code"
+        createActionIcon={QrCode}
       >
         <div className="biz-banner p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-2xs">
           <div>

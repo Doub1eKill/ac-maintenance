@@ -10,7 +10,16 @@ import Image from "next/image";
 import { catalogueFlags } from "@/lib/catalogue-status";
 import { CatalogueMark } from "@/components/shared/catalogue-mark";
 import { EvidencePhotos } from "@/components/shared/evidence-photos";
-import { MAINTENANCE_ACTION_LABEL } from "@/lib/labels";
+import { MAINTENANCE_ACTION_LABEL, acStatusLabel } from "@/lib/labels";
+
+// The status badge sits on the slate-900 banner, which stays dark in either
+// theme, so it takes light text on a tint rather than AC_STATUS_TONE (built
+// for the app's own light/dark cards). Same three colours: green, amber, red.
+const STATUS_TONE_ON_DARK: Record<string, string> = {
+  normal: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
+  needs_cleaning: "bg-amber-500/20 text-amber-300 border-amber-500/30",
+  broken: "bg-red-500/20 text-red-300 border-red-500/30",
+};
 
 /**
  * Reached by scanning the QR sticker on a unit, so it is deliberately
@@ -75,8 +84,8 @@ export default async function QRCodePage(props: { params: Promise<{ id: string }
             <div className="px-3 py-1 bg-white/20 rounded-lg font-mono text-sm tracking-widest font-bold">
               {ac.acCode}
             </div>
-            <span className={`px-2.5 py-1 text-[10px] font-bold rounded-md ${ac.status === 'normal' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-red-500/20 text-red-300 border border-red-500/30'}`}>
-              {ac.status === 'normal' ? 'ปกติ' : ac.status === 'needs_cleaning' ? 'รอการล้าง' : 'แจ้งซ่อม'}
+            <span className={`px-2.5 py-1 text-[10px] font-bold rounded-md border ${STATUS_TONE_ON_DARK[ac.status] ?? 'bg-white/10 text-slate-200 border-white/20'}`}>
+              {acStatusLabel(ac.status)}
             </span>
           </div>
         </div>

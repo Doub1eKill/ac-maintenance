@@ -473,3 +473,39 @@ export async function openTreeRoom(page: Page, { building, floor, room }: TreeRo
   }
   await content.waitFor({ timeout: 10_000 });
 }
+
+/**
+ * The dashboard header (dashboard-layout.tsx) at a phone width: the page must
+ * not scroll sideways, the page title must stay on one line, and every control
+ * in the header must sit inside both the viewport and the header's own box.
+ * Found 14 Nov 2026 on the README screenshots: at 390 px the scan button ran
+ * off the right edge and titles wrapped to three lines, on /tech/assets up past
+ * the top of the screen.
+ */
+export async function expectHeaderFits(page: Page, path: string, width: number) {
+  await page.setViewportSize({ width, height: 800 });
+  await page.goto(path, { waitUntil: "load" });
+  await page.locator("main").last().waitFor({ timeout: 120_000 });
+  await page.waitForLoadState("networkidle").catch(() => {});
+  await page.waitForTimeout(800);
+  const m = await page.evaluate(() => {
+    const header = document.querySelector("header")!;
+    const hb = header.getBoundingClientRect();
+    const outside = [...header.querySelectorAll("button, input, a, [data-slot=breadcrumb-page]")]
+      .map((el) => ({ el, r: el.getBoundingClientRect() }))
+      .filter(({ r }) => r.width > 0 && (r.left < 0 || r.right > window.innerWidth + 0.5 || r.top < hb.top - 0.5 || r.bottom > hb.bottom + 0.5))
+      .map(({ el }) => el.getAttribute("aria-label") || el.textContent?.trim() || el.tagName);
+    const shown = [...header.querySelectorAll<HTMLElement>("[data-slot=breadcrumb-page]")].filter((el) => el.offsetParent);
+    const title = shown[shown.length - 1];
+    return {
+      fits: document.documentElement.scrollWidth <= window.innerWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      headerHeight: Math.round(hb.height),
+      outside,
+      titleLines: title ? Math.round(title.getBoundingClientRect().height / parseFloat(getComputedStyle(title).lineHeight)) : 0,
+    };
+  });
+  const ok = m.fits && m.outside.length === 0 && m.titleLines === 1;
+  ledger("Layout", `${path} @${width}px: scrollWidth ${m.scrollWidth}, header ${m.headerHeight}px, title lines ${m.titleLines}, outside [${m.outside.join(", ")}]`, "UI", ok ? "PASS" : "FAIL", await shot(page, `header-${path.slice(1).replace(/\//g, "-")}-${width}`));
+  expect({ fits: m.fits, outside: m.outside, titleLines: m.titleLines }).toEqual({ fits: true, outside: [], titleLines: 1 });
+}

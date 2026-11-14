@@ -192,7 +192,7 @@ export function OmniSearch({
   }
 
   return (
-    <div ref={containerRef} className="relative w-48 sm:w-64">
+    <div ref={containerRef} className="relative min-w-24 flex-1 sm:w-64 sm:flex-none">
       <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
       <input
         type="text"
